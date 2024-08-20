@@ -701,6 +701,11 @@ class PayrollCalculatedEmployeeModel(Base):
     employee_quantity = Column(Integer)
     period = Column(String(255))
 
+class CollectionModel(Base):
+    __tablename__ = 'collections'
+
+    id = Column(Integer, primary_key=True)
+
 class DepositModel(Base):
     __tablename__ = 'deposits'
 
