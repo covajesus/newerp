@@ -99,8 +99,7 @@ os.environ['ALGORITHM'] = 'HS256'
 
 origins = [
     "*",
-    "http://localhost:5173",
-    "https://apijis.com",
+    "https://newerp-ghdegyc9cpcpc6gq.eastus-01.azurewebsites.net",
     
 ]
 
