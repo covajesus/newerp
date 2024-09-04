@@ -82,7 +82,6 @@ from app.backend.routers.old_salary_settlements import old_salary_settlements
 from app.backend.routers.payroll_calculations import payroll_calculations
 from app.backend.routers.payroll_item_values import payroll_item_values
 from app.backend.routers.payroll_family_burdens import payroll_family_burdens
-from app.backend.routers.dte_atm_machines import dte_atm_machines
 from app.backend.routers.payroll_second_category_tax import payroll_second_category_taxes
 from app.backend.routers.social_laws import social_laws
 from app.backend.routers.secondary_category_taxes import secondary_category_taxes
