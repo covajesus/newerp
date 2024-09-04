@@ -248,7 +248,7 @@ class ScheduleModel(Base):
     updated_date = Column(DateTime())
 
 class DteModel(Base):
-    __tablename__ = 'dte_atm_machines'
+    __tablename__ = 'dtes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_office_id = Column(Integer)

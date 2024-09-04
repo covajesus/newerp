@@ -37,9 +37,9 @@ def very_sent_to_sii(db: Session = Depends(get_db)):
     return {"message": '1'}
 
 @dtes.post("/store")
-def index(dte:Dte, db: Session = Depends(get_db)):
+def store(dte:Dte, db: Session = Depends(get_db)):
     dte_inputs = dte.dict()
     
-    data = Dte(db).store(dte_inputs)
+    data = DteClass(db).store(dte_inputs)
     
     return {"message": data}
