@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte
+from app.backend.schemas import UserLogin, GetDte, Dte
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.db.database import get_db
@@ -35,3 +35,11 @@ def very_sent_to_sii(db: Session = Depends(get_db)):
     DteClass(db).very_sent_to_sii()
 
     return {"message": '1'}
+
+@dtes.post("/store")
+def index(dte:Dte, db: Session = Depends(get_db)):
+    dte_inputs = dte.dict()
+    
+    data = Dte(db).store(dte_inputs)
+    
+    return {"message": data}

@@ -247,7 +247,7 @@ class ScheduleModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
-class DteAtmMachineModel(Base):
+class DteModel(Base):
     __tablename__ = 'dte_atm_machines'
 
     id = Column(Integer, primary_key=True, autoincrement=True)

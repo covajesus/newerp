@@ -570,7 +570,7 @@ class OldFamilyCoreDatum(BaseModel):
     mother_lastname: str
     born_date: str
 
-class DteAtmMachine(BaseModel):
+class Dte(BaseModel):
     branch_office_id: int
     cashier_id: int
     dte_type_id: int
