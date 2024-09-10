@@ -254,7 +254,7 @@ class DteModel(Base):
     branch_office_id = Column(Integer)
     cashier_id = Column(Integer)
     dte_type_id = Column(Integer)
-    folio = Column(String)
+    folio = Column(Integer)
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
     subtotal = Column(Integer)
