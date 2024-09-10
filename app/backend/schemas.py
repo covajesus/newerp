@@ -574,11 +574,7 @@ class Dte(BaseModel):
     branch_office_id: int
     cashier_id: int
     dte_type_id: int
-    sii_send_status_id: str
-    sii_status_id: str
-    sii_track_id: str
-    dte_code: str
-    folio: str
+    folio: int
     cash_amount: int
     card_amount: int
     subtotal:int
@@ -595,8 +591,6 @@ class Dte(BaseModel):
     ticket_correlative: int
     entrance_hour: str
     exit_hour: str
-    item_quantity: int
-    sii_date: str
     added_date: str
 
 class ProvisionalIndicator(BaseModel):
