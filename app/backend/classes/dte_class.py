@@ -45,10 +45,6 @@ class DteClass:
             branch_office_id=dte_inputs['branch_office_id'],
             cashier_id=dte_inputs['cashier_id'],
             dte_type_id=dte_inputs['dte_type_id'],
-            sii_send_status_id=dte_inputs['sii_send_status_id'],
-            sii_status_id=dte_inputs['sii_status_id'],
-            sii_track_id=dte_inputs['sii_track_id'],
-            dte_code=dte_inputs['dte_code'],
             folio=dte_inputs['folio'],
             cash_amount=dte_inputs['cash_amount'],
             card_amount=dte_inputs['card_amount'],
@@ -66,8 +62,6 @@ class DteClass:
             ticket_correlative=dte_inputs['ticket_correlative'],
             entrance_hour=dte_inputs['entrance_hour'],
             exit_hour=dte_inputs['exit_hour'],
-            item_quantity=dte_inputs['item_quantity'],
-            sii_date=dte_inputs['sii_date'],
             added_date=datetime.now()
         )
 

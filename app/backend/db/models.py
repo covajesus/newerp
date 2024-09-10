@@ -254,10 +254,6 @@ class DteModel(Base):
     branch_office_id = Column(Integer)
     cashier_id = Column(Integer)
     dte_type_id = Column(Integer)
-    sii_send_status_id = Column(String)
-    sii_status_id = Column(String)
-    sii_track_id = Column(String)
-    dte_code = Column(String)
     folio = Column(String)
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
@@ -275,8 +271,6 @@ class DteModel(Base):
     ticket_correlative = Column(Integer)
     entrance_hour = Column(String)
     exit_hour = Column(String)
-    item_quantity = Column(Integer)
-    sii_date = Column(Date())
     added_date = Column(DateTime())
 
 class UserModel(Base):
