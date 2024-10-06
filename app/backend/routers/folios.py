@@ -10,6 +10,6 @@ folios = APIRouter(
 
 @folios.get("/get/{branch_office_id}/{cashier_id}/{quantity}")
 def get(branch_office_id:int, cashier_id:int, quantity:int, db: Session = Depends(get_db)):
-    data = FolioClass(db).get_folios(branch_office_id, cashier_id, quantity)
+    data = FolioClass(db).get(branch_office_id, cashier_id, quantity)
 
     return {"message": data}
