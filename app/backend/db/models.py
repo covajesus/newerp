@@ -247,6 +247,17 @@ class ScheduleModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class FolioModel(Base):
+    __tablename__ = 'folios'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    folio = Column(Integer)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    requested_status_id = Column(Integer)
+    used_status_id = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class DteModel(Base):
     __tablename__ = 'dtes'
 
