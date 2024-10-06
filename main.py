@@ -6,7 +6,6 @@ from app.backend.routers.genders import genders
 from app.backend.routers.nationalities import nationalities
 from app.backend.routers.pentions import pentions
 from app.backend.routers.banks import banks
-from app.backend.routers.meshes import meshes
 from app.backend.routers.turns import turns
 from app.backend.routers.schedule import schedule
 from app.backend.routers.account_types import account_types
@@ -62,34 +61,8 @@ from app.backend.routers.regimes import regimes
 from app.backend.routers.salary_settlements import salary_settlements
 from app.backend.routers.document_managements import document_managements
 from app.backend.routers.alerts import alerts
-from app.backend.routers.employee_contracts import employee_contracts
-from app.backend.routers.causals import causals
-from app.backend.routers.old_employees import old_employees
-from app.backend.routers.old_employee_extras import old_employee_extras
-from app.backend.routers.old_employee_labor_data import old_employee_labor_data
-from app.backend.routers.old_documents_employees import old_documents_employees
-from app.backend.routers.old_family_core_data import old_family_core_data
-from app.backend.routers.old_vacations import old_vacations
-from app.backend.routers.old_medical_licenses import old_medical_licenses
-from app.backend.routers.provisional_indicators import provisional_indicators
-from app.backend.routers.payrolls import payrolls
-from app.backend.routers.payroll_periods import payroll_periods
-from app.backend.routers.payroll_items import payroll_items
-from app.backend.routers.payroll_employees import payroll_employees
-from app.backend.routers.holidays import holidays
-from app.backend.routers.payroll_manual_inputs import payroll_manual_inputs
-from app.backend.routers.old_salary_settlements import old_salary_settlements
-from app.backend.routers.payroll_calculations import payroll_calculations
-from app.backend.routers.payroll_item_values import payroll_item_values
-from app.backend.routers.payroll_family_burdens import payroll_family_burdens
-from app.backend.routers.payroll_second_category_tax import payroll_second_category_taxes
-from app.backend.routers.social_laws import social_laws
-from app.backend.routers.secondary_category_taxes import secondary_category_taxes
-from app.backend.routers.payroll_indicators import payroll_indicators
-from app.backend.routers.payroll_afp_quotes import payroll_afp_quotes
-from app.backend.routers.payroll_umployment_insurances import payroll_umployment_insurances
-from app.backend.routers.complaints import complaints
 from app.backend.routers.deposits import deposits
+from app.backend.routers.folios import folios
 
 app = FastAPI()
 
@@ -170,7 +143,7 @@ app.include_router(salary_settlements)
 app.include_router(document_managements)
 app.include_router(alerts)
 app.include_router(deposits)
-
+app.include_router(folios)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

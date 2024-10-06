@@ -11,7 +11,6 @@ folios = APIRouter(
 
 @folios.post("/get/{branch_office_id}/{cashier_id}/{quantity}")
 def get(branch_office_id:int, cashier_id:int, quantity:int, db: Session = Depends(get_db)):
-    folio_inputs = folios.dict()
     data = FolioClass(db).get_folios(branch_office_id, cashier_id, quantity)
 
     return {"message": data}
