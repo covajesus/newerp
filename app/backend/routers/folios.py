@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import GetFolios
 from app.backend.classes.folio_class import FolioClass
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session

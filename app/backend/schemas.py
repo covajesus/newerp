@@ -1061,11 +1061,6 @@ class GetDte(BaseModel):
     rol_id: int = None
     api_token: str = None
 
-class GetFolio(BaseModel):
-    branch_office_id: int
-    cashier_id: int
-    quantity: int
-
 class LetterType(BaseModel):
     letter_type: str
     added_date: datetime
