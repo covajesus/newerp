@@ -8,7 +8,7 @@ folios = APIRouter(
     tags=["Folios"]
 )
 
-@folios.post("/get/{branch_office_id}/{cashier_id}/{quantity}")
+@folios.get("/get/{branch_office_id}/{cashier_id}/{quantity}")
 def get(branch_office_id:int, cashier_id:int, quantity:int, db: Session = Depends(get_db)):
     data = FolioClass(db).get_folios(branch_office_id, cashier_id, quantity)
 
