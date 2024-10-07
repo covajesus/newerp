@@ -1,4 +1,5 @@
 from app.backend.db.models import FolioModel
+import json
 
 class FolioClass:
     def __init__(self, db):
