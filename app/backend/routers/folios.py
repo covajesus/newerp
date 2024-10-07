@@ -16,6 +16,12 @@ def get(branch_office_id:int, cashier_id:int, quantity:int, db: Session = Depend
 
     return {"message": data}
 
+@folios.get("/update/{folio}")
+def update(folio:int, db: Session = Depends(get_db)):
+    data = FolioClass(db).update(folio)
+
+    return {"message": data}
+
 @folios.get("/caf")
 def caf(db: Session = Depends(get_db)):
     # Define el rango de folios

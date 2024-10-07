@@ -43,3 +43,10 @@ class FolioClass:
             # Captura cualquier error y retorna el mensaje de error
             error_message = str(e)
             return f"Error: {error_message}"
+
+    def update(self, folio):
+        folio = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
+        folio.used_status_id = 1
+        self.db.add(folio)
+
+        return "Folio updated successfully"
