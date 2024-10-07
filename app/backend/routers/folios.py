@@ -26,16 +26,16 @@ def caf(db: Session = Depends(get_db)):
 
     # Iterar sobre el rango y realizar la inserción para cada folio
     for folio_number in range(folio_start, folio_end + 1):
-        new_folio = FolioModel(
-            folio=folio_number,
-            branch_office_id=0,
-            cashier_id=0,
-            requested_status_id=0,
-            used_sattus_id=0,
-            added_date=current_date,
-            updated_date=current_date
-        )
-        db.add(new_folio)
+        folio = FolioModel()
+        folio.folio = folio_number
+        folio.branch_office_id = 0
+        folio.cashier_id = 0
+        folio.requested_status_id = 0
+        folio.used_status_id = 0
+        folio.added_date = current_date
+        folio.updated_date = current_date
+
+        db.add(folio)
 
     # Confirmar todos los cambios después del bucle
     db.commit()
