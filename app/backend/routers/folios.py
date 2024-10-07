@@ -16,7 +16,6 @@ def get(branch_office_id:int, cashier_id:int, quantity:int, db: Session = Depend
 
     return {"message": data}
 
-
 @folios.get("/caf")
 def caf(db: Session = Depends(get_db)):
     # Define el rango de folios
@@ -37,7 +36,7 @@ def caf(db: Session = Depends(get_db)):
 
         db.add(folio)
 
-    # Confirmar todos los cambios después del bucle
-    db.commit()
+        # Confirmar todos los cambios después del bucle
+        db.commit()
 
     return {"message": f"Inserted folios from {folio_start} to {folio_end}"}
