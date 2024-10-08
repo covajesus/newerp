@@ -40,6 +40,8 @@ def caf(db: Session = Depends(get_db)):
         folio.added_date = current_date
         folio.updated_date = current_date
 
+        db.add(folio)
+
         # Confirmar todos los cambios después del bucle
         db.commit()
 
