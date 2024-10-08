@@ -51,5 +51,6 @@ class FolioClass:
         folio = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
         folio.used_status_id = 1
         self.db.add(folio)
+        self.db.commit()
 
         return "Folio updated successfully"
