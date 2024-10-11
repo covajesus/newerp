@@ -62,7 +62,7 @@ class DteClass:
             ticket_correlative=dte_inputs['ticket_correlative'],
             entrance_hour=dte_inputs['entrance_hour'],
             exit_hour=dte_inputs['exit_hour'],
-            added_date=datetime.now()
+            added_date=dte_inputs['added_date']
         )
 
         self.db.add(dte)
