@@ -5,9 +5,9 @@ class FolioClass:
     def __init__(self, db):
         self.db = db
 
-    def get(self, branch_office_id, cashier_id, quantity):
+    def get(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
-            if quantity > 0:
+            if requested_quantity > 0:
                 # Consulta de folios disponibles con límite de cantidad especificada
                 folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).limit(1).all()
                 
