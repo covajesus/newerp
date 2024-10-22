@@ -25,7 +25,7 @@ def update(folio:int, db: Session = Depends(get_db)):
 @folios.get("/caf")
 def caf(db: Session = Depends(get_db)):
     # Define el rango de folios
-    folio_start = 17001803
+    folio_start = 17003975
     folio_end = 17021050
     current_date = datetime.now().strftime('%Y-%m-%d')
 
