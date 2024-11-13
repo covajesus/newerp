@@ -36,7 +36,7 @@ def validate(db: Session = Depends(get_db)):
     return {"message": f"Validated the quantity of folios"}
 
 @folios.get("/assignation/{folio}/{branch_office_id}/{cashier_id}")
-def validate(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
+def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
     data = FolioClass(db).assignation(folio, branch_office_id, cashier_id)
     
     return {"message": data}

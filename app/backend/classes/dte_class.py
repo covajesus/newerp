@@ -41,38 +41,43 @@ class DteClass:
         return response.text
     
     def store(self, dte_inputs):
-        dte = DteModel(
-            branch_office_id=dte_inputs['branch_office_id'],
-            cashier_id=dte_inputs['cashier_id'],
-            dte_type_id=dte_inputs['dte_type_id'],
-            folio=dte_inputs['folio'],
-            cash_amount=dte_inputs['cash_amount'],
-            card_amount=dte_inputs['card_amount'],
-            subtotal=dte_inputs['subtotal'],
-            tax=dte_inputs['tax'],
-            discount=dte_inputs['discount'],
-            total=dte_inputs['total'],
-            ticket_serial_number=dte_inputs['ticket_serial_number'],
-            ticket_hour=dte_inputs['ticket_hour'],
-            ticket_transaction_number=dte_inputs['ticket_transaction_number'],
-            ticket_dispenser_number=dte_inputs['ticket_dispenser_number'],
-            ticket_number=dte_inputs['ticket_number'],
-            ticket_station_number=dte_inputs['ticket_station_number'],
-            ticket_sa=dte_inputs['ticket_sa'],
-            ticket_correlative=dte_inputs['ticket_correlative'],
-            entrance_hour=dte_inputs['entrance_hour'],
-            exit_hour=dte_inputs['exit_hour'],
-            added_date=dte_inputs['added_date']
-        )
+        dte_count = self.db.query(DteModel).filter(DteModel.folio == dte_inputs['folio']).count()
 
-        self.db.add(dte)
+        if dte_count == 0:
+            dte = DteModel(
+                branch_office_id=dte_inputs['branch_office_id'],
+                cashier_id=dte_inputs['cashier_id'],
+                dte_type_id=dte_inputs['dte_type_id'],
+                folio=dte_inputs['folio'],
+                cash_amount=dte_inputs['cash_amount'],
+                card_amount=dte_inputs['card_amount'],
+                subtotal=dte_inputs['subtotal'],
+                tax=dte_inputs['tax'],
+                discount=dte_inputs['discount'],
+                total=dte_inputs['total'],
+                ticket_serial_number=dte_inputs['ticket_serial_number'],
+                ticket_hour=dte_inputs['ticket_hour'],
+                ticket_transaction_number=dte_inputs['ticket_transaction_number'],
+                ticket_dispenser_number=dte_inputs['ticket_dispenser_number'],
+                ticket_number=dte_inputs['ticket_number'],
+                ticket_station_number=dte_inputs['ticket_station_number'],
+                ticket_sa=dte_inputs['ticket_sa'],
+                ticket_correlative=dte_inputs['ticket_correlative'],
+                entrance_hour=dte_inputs['entrance_hour'],
+                exit_hour=dte_inputs['exit_hour'],
+                added_date=dte_inputs['added_date']
+            )
 
-        try:
-            self.db.commit()
-            return 1
-        except Exception as e:
-            error_message = str(e)
-            return f"Error: {error_message}"
+            self.db.add(dte)
+
+            try:
+                self.db.commit()
+                return 1
+            except Exception as e:
+                error_message = str(e)
+                return f"Error: {error_message}"
+        else:
+            return 2
         
 
     def delete(self, folio, branch_office_id, cashier_id):
