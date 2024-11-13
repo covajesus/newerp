@@ -73,3 +73,17 @@ class DteClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
+        
+
+    def delete(self, rut):
+        try:
+            data = self.db.query(DteModel).filter(DteModel.folio == folio).first()
+            if data:
+                self.db.delete(data)
+                self.db.commit()
+                return 1
+            else:
+                return "No data found"
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
