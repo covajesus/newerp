@@ -75,7 +75,7 @@ class DteClass:
             return f"Error: {error_message}"
         
 
-    def delete(self, rut):
+    def delete(self, folio):
         try:
             data = self.db.query(DteModel).filter(DteModel.folio == folio).first()
             if data:
