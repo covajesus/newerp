@@ -44,8 +44,8 @@ def store(dte:Dte, db: Session = Depends(get_db)):
     
     return {"message": data}
 
-@dtes.delete("/delete/{folio}")
-def delete(folio:int, db: Session = Depends(get_db)):
-    data = DteClass(db).delete(folio)
+@dtes.delete("/delete/{folio}/{branch_office_id}/{cashier_id}")
+def delete(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
+    data = DteClass(db).delete(folio, branch_office_id, cashier_id)
     
     return {"message": data}
