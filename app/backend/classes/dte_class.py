@@ -77,7 +77,7 @@ class DteClass:
 
     def delete(self, folio, branch_office_id, cashier_id):
         try:
-            data = self.db.query(DteModel).filter(DteModel.folio == folio).filter.(DteModel.branch_office_id == branch_office_id).filter(DteModel.cashier_id == cashier_id).first()
+            data = self.db.query(DteModel).filter(DteModel.folio == folio).filter(DteModel.branch_office_id == branch_office_id).filter(DteModel.cashier_id == cashier_id).first()
 
             if data:
                 self.db.delete(data)
