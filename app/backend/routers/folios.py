@@ -3,12 +3,19 @@ from app.backend.classes.folio_class import FolioClass
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.db.models import FolioModel
+from app.backend.schemas import FolioList
 from datetime import datetime
 
 folios = APIRouter(
     prefix="/folios",
     tags=["Folios"]
 )
+
+@folios.post("/")
+def get_all_folios(folio: FolioList, db: Session = Depends(get_db)):
+    data = FolioClass(db).get_all(folio.page)
+
+    return {"message": data}
 
 @folios.get("/get/{branch_office_id}/{cashier_id}/{requested_quantity}/{quantity_in_cashier}")
 def get(branch_office_id:int, cashier_id:int, requested_quantity:int, quantity_in_cashier:int, db: Session = Depends(get_db)):
@@ -22,8 +29,20 @@ def update(folio:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
-@folios.get("/caf")
-def caf(db: Session = Depends(get_db)):
+@folios.get("/validate")
+def validate(db: Session = Depends(get_db)):
+    data = FolioClass(db).validate()
+
+    return {"message": f"Validated the quantity of folios"}
+
+@folios.get("/assignation/{folio}/{branch_office_id}/{cashier_id}")
+def validate(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
+    data = FolioClass(db).assignation(folio, branch_office_id, cashier_id)
+    
+    return {"message": data}
+
+@folios.get("/get_from_caf")
+def get_from_caf(db: Session = Depends(get_db)):
     # Define el rango de folios
     folio_start = 17141051
     folio_end = 17341050

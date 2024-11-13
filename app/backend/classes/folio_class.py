@@ -5,6 +5,91 @@ class FolioClass:
     def __init__(self, db):
         self.db = db
 
+    # Funcion para obtener a todos los folios con paginacion
+    def get_all(self, page=0, items_per_page=10):
+        try:
+            if page != 0:
+                data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id). \
+                        order_by(FolioModel.folio)
+
+                total_items = data_query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+
+                if page < 1 or page > total_pages:
+                    return "Invalid page number"
+
+                data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+                if not data:
+                    return "No data found"
+
+                serialized_data = [{
+                        "id": folio.id,
+                        "folio": folio.folio,
+                        "branch_office_id": folio.branch_office_id,
+                        "cashier_id": folio.cashier_id,
+                        "requested_status_id": folio.requested_status_id,
+                        "used_status_id": folio.used_status_id,
+                    } for folio in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+            else:
+                data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id). \
+                        order_by(FolioModel.folio).all()
+
+                serialized_data = [{
+                        "id": folio.id,
+                        "folio": folio.folio,
+                        "branch_office_id": folio.branch_office_id,
+                        "cashier_id": folio.cashier_id,
+                        "requested_status_id": folio.requested_status_id,
+                        "used_status_id": folio.used_status_id,
+                    } for folio in data]
+
+                return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def validate(self):
+        try:
+            # Consulta de folios disponibles
+            folio_count = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).count()
+            
+            # Valida si el conteo es menor a 100
+            if folio_count < 100:
+                return 1  # Retorna 1 si hay menos de 100 folios
+            else:
+                return 0  # Retorna 0 si hay 100 o más folios
+        
+        except Exception as e:
+            # Captura cualquier error y retorna el mensaje de error
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def assignation(self, folio, branch_office_id, cashier_id):
+        try:
+            # Consulta de folios disponibles
+            folio_count = self.db.query(FolioModel).filter(FolioModel.folio == folio).filter(FolioModel.branch_office_id == branch_office_id).filter(FolioModel.cashier_id == cashier_id).count()
+            
+            # Valida si el conteo es menor a 100
+            if folio_count > 0:
+                return 1  # Retorna 1 si hay menos de 100 folios
+            else:
+                return 0  # Retorna 0 si hay 100 o más folios
+        
+        except Exception as e:
+            # Captura cualquier error y retorna el mensaje de error
+            error_message = str(e)
+            return f"Error: {error_message}"
+
     def get(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
             if requested_quantity > 0:

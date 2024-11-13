@@ -1272,6 +1272,9 @@ class EmployeeList(BaseModel):
     rol_id: int
     page: int
 
+class FolioList(BaseModel):
+    page: int
+
 class PayrollItemList(BaseModel):
     page: int
 
