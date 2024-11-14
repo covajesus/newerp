@@ -80,23 +80,45 @@ class DteClass:
             return 2
         
 
-    def delete(self, branch_office_id, cashier_id, added_date):
-        try:
-            # Filtra todos los registros que coincidan con los criterios especificados
-            data = self.db.query(DteModel)\
-                        .filter(DteModel.branch_office_id == branch_office_id)\
-                        .filter(DteModel.cashier_id == cashier_id)\
-                        .filter(DteModel.added_date == added_date)\
-                        .all()
+    def delete(self, folio, branch_office_id, cashier_id, added_date, single):
+        if single == 1:
+            try:
+                # Filtra todos los registros que coincidan con los criterios especificados
+                data = self.db.query(DteModel)\
+                            .filter(DteModel.branch_office_id == branch_office_id)\
+                            .filter(DteModel.cashier_id == cashier_id)\
+                            .filter(DteModel.added_date == added_date)\
+                            .filter(DteModel.folio == folio)\
+                            .first()
 
-            if data:
-                # Elimina todos los registros encontrados
-                for record in data:
-                    self.db.delete(record)
-                self.db.commit()
-                return 1
-            else:
-                return "No data found"
-        except Exception as e:
-            error_message = str(e)
-            return f"Error: {error_message}"
+                if data:
+                    # Elimina todos los registros encontrados
+                    for record in data:
+                        self.db.delete(record)
+                    self.db.commit()
+                    return 1
+                else:
+                    return "No data found"
+            except Exception as e:
+                error_message = str(e)
+                return f"Error: {error_message}"
+        else:
+            try:
+                # Filtra todos los registros que coincidan con los criterios especificados
+                data = self.db.query(DteModel)\
+                            .filter(DteModel.branch_office_id == branch_office_id)\
+                            .filter(DteModel.cashier_id == cashier_id)\
+                            .filter(DteModel.added_date == added_date)\
+                            .all()
+
+                if data:
+                    # Elimina todos los registros encontrados
+                    for record in data:
+                        self.db.delete(record)
+                    self.db.commit()
+                    return 1
+                else:
+                    return "No data found"
+            except Exception as e:
+                error_message = str(e)
+                return f"Error: {error_message}"
