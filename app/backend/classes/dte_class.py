@@ -80,12 +80,19 @@ class DteClass:
             return 2
         
 
-    def delete(self, folio, branch_office_id, cashier_id):
+    def delete(self, branch_office_id, cashier_id, added_date):
         try:
-            data = self.db.query(DteModel).filter(DteModel.folio == folio).filter(DteModel.branch_office_id == branch_office_id).filter(DteModel.cashier_id == cashier_id).first()
+            # Filtra todos los registros que coincidan con los criterios especificados
+            data = self.db.query(DteModel)\
+                        .filter(DteModel.branch_office_id == branch_office_id)\
+                        .filter(DteModel.cashier_id == cashier_id)\
+                        .filter(DteModel.added_date == added_date)\
+                        .all()
 
             if data:
-                self.db.delete(data)
+                # Elimina todos los registros encontrados
+                for record in data:
+                    self.db.delete(record)
                 self.db.commit()
                 return 1
             else:
