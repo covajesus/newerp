@@ -92,9 +92,7 @@ class DteClass:
                             .first()
 
                 if data:
-                    # Elimina todos los registros encontrados
-                    for record in data:
-                        self.db.delete(record)
+                    self.db.delete(data)
                     self.db.commit()
                     return 1
                 else:
