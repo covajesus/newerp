@@ -49,3 +49,9 @@ def delete(folio:int, branch_office_id:int, cashier_id:int, added_date:str, sing
     data = DteClass(db).delete(folio, branch_office_id, cashier_id, added_date, single)
     
     return {"message": data}
+
+@dtes.get("/existence/{folio}")
+def existence(folio:int, db: Session = Depends(get_db)):
+    data = DteClass(db).existence(folio)
+    
+    return {"message": data}

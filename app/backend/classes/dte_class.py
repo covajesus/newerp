@@ -79,7 +79,17 @@ class DteClass:
         else:
             return 2
         
-
+    def existence(self, folio):
+        # Filtra todos los registros que coincidan con los criterios especificados
+        check_existence = self.db.query(DteModel)\
+                            .filter(DteModel.folio == folio)\
+                            .count()
+        
+        if check_existence > 0:
+            return 1
+        else:
+            return 0
+                
     def delete(self, folio, branch_office_id, cashier_id, added_date, single):
         if single == 1:
             try:
