@@ -710,6 +710,14 @@ class CollectionModel(Base):
     __tablename__ = 'collections'
 
     id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    cash_gross_amount = Column(Integer)
+    cash_net_amount = Column(Integer)
+    card_gross_amount = Column(Integer)
+    card_net_amount = Column(Integer)
+    total_tickets = Column(Integer)
+    added_date = Column(Date())
 
 class DepositModel(Base):
     __tablename__ = 'deposits'
@@ -725,8 +733,8 @@ class DepositModel(Base):
     card_collection_amount = Column(Integer)
     collection_date = Column(Text)
     support = Column(Text)
-    added_date = Column(DateTime())
-    updated_date = Column(DateTime())
+    added_date = Column(Date)
+    updated_date = Column(Date)
 
 class SocialLawModel(Base):
     __tablename__ = 'social_laws'

@@ -1272,6 +1272,17 @@ class EmployeeList(BaseModel):
     rol_id: int
     page: int
 
+class StoreCollection(BaseModel):
+    branch_office_id: int
+    cashier_id: int
+    cash_gross_amount: int
+    cash_net_amount: int
+    card_gross_amount: int
+    card_net_amount: int
+    cash_gross_amount: int
+    cash_net_amount: int
+    total_tickets: int
+
 class FolioList(BaseModel):
     page: int
 
