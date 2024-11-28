@@ -29,6 +29,12 @@ def update(folio:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@folios.get("/update_billed_ticket/{folio}")
+def update(folio:int, db: Session = Depends(get_db)):
+    data = FolioClass(db).update_billed_ticket(folio)
+
+    return {"message": data}
+
 @folios.get("/validate")
 def validate(db: Session = Depends(get_db)):
     data = FolioClass(db).validate()
