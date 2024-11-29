@@ -2,6 +2,9 @@ from app.backend.db.models import CollectionModel
 from datetime import datetime
 
 class CollectionClass:
+    def __init__(self, db):
+        self.db = db
+
     def get_all(self, search_inputs = None, page = 1, items_per_page = 10):
             
         data_query = self.db.query(CollectionModel).order_by('added_date')
@@ -68,12 +71,12 @@ class CollectionClass:
 
             try:
                 self.db.commit()
-                return 1
+                return "Collection stored successfully"
             except Exception as e:
                 error_message = str(e)
                 return f"Error: {error_message}"
         else:
-            collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == current_date).first()
+            collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
             collection.cash_gross_amount = collection_inputs['cash_gross_amount']
             collection.cash_net_amount = collection_inputs['cash_net_amount']
             collection.card_gross_amount = collection_inputs['card_gross_amount']
@@ -83,4 +86,4 @@ class CollectionClass:
             self.db.add(collection)
             self.db.commit()
             
-            return 1
+            return "Collection updated successfully"
