@@ -147,11 +147,11 @@ class FolioClass:
     def update_billed_ticket(self, folio):
         folio_count = self.db.query(FolioModel).filter(FolioModel.folio == folio).count()
         if folio_count > 0:
-            folio = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
-            folio.billed_status_id = 1
-            self.db.add(folio)
+            update_folio = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
+            update_folio.billed_status_id = 1
+            self.db.add(update_folio)
             self.db.commit()
 
-            return "Folio updated successfully"
+            return "Folio "+ str(folio) +" updated successfully"
         else:
             return "Folio not found"

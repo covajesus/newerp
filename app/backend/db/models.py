@@ -255,6 +255,7 @@ class FolioModel(Base):
     cashier_id = Column(Integer)
     requested_status_id = Column(Integer)
     used_status_id = Column(Integer)
+    billed_status_id = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
