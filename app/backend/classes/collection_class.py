@@ -59,7 +59,7 @@ class CollectionClass:
             return f"Error: {error_message}"
         
     def store(self, collection_inputs):
-        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
 
