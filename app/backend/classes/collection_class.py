@@ -84,14 +84,17 @@ class CollectionClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
         else:
-            collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
-            collection.cash_gross_amount = collection_inputs['cash_gross_amount']
-            collection.cash_net_amount = collection_inputs['cash_net_amount']
-            collection.card_gross_amount = collection_inputs['card_gross_amount']
-            collection.card_net_amount = collection_inputs['card_net_amount']
-            collection.total_tickets = collection_inputs['total_tickets']
-            collection.updated_date = current_date
-            self.db.add(collection)
-            self.db.commit()
+            check_collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
+            
+            if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
+                collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
+                collection.cash_gross_amount = collection_inputs['cash_gross_amount']
+                collection.cash_net_amount = collection_inputs['cash_net_amount']
+                collection.card_gross_amount = collection_inputs['card_gross_amount']
+                collection.card_net_amount = collection_inputs['card_net_amount']
+                collection.total_tickets = collection_inputs['total_tickets']
+                collection.updated_date = current_date
+                self.db.add(collection)
+                self.db.commit()
             
             return "Collection updated successfully"
