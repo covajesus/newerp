@@ -11,7 +11,7 @@ collections = APIRouter(
 
 @collections.get("/")
 def index(db: Session = Depends(get_db)):
-    data = CollectionClass(db).get()
+    data = CollectionClass(db).get_all()
 
     return {"message": data}
 
