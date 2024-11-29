@@ -719,6 +719,7 @@ class CollectionModel(Base):
     card_net_amount = Column(Integer)
     total_tickets = Column(Integer)
     added_date = Column(Date())
+    updated_date = Column(Date())
 
 class DepositModel(Base):
     __tablename__ = 'deposits'

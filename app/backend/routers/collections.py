@@ -9,7 +9,7 @@ collections = APIRouter(
     tags=["Collections"]
 )
 
-@collections.get("/")
+@collections.post("/")
 def index(db: Session = Depends(get_db)):
     data = CollectionClass(db).get_all()
 

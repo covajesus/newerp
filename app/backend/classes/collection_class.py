@@ -1,5 +1,6 @@
 from app.backend.db.models import CollectionModel
 from datetime import datetime
+from sqlalchemy import desc
 
 class CollectionClass:
     def __init__(self, db):
@@ -7,7 +8,7 @@ class CollectionClass:
 
     def get_all(self, search_inputs = None, page = 1, items_per_page = 10):
             
-        data_query = self.db.query(CollectionModel).order_by('added_date')
+        data_query = self.db.query(CollectionModel).order_by(desc(CollectionModel.added_date))
 
         total_items = data_query.count()
         total_pages = (total_items + items_per_page - 1)
@@ -20,6 +21,13 @@ class CollectionClass:
         serialized_data = [{
             "id": collection.id,
             "branch_office_id": collection.branch_office_id,
+            "cashier_id": collection.cashier_id,
+            "cash_gross_amount": collection.cash_gross_amount,
+            "cash_net_amount": collection.cash_net_amount,
+            "card_gross_amount": collection.card_gross_amount,
+            "card_net_amount": collection.card_net_amount,
+            "total_tickets": collection.total_tickets,
+            "added_date": collection.added_date
         } for collection in data]
 
         return {
