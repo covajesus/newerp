@@ -1282,7 +1282,7 @@ class StoreCollection(BaseModel):
     cash_gross_amount: int
     cash_net_amount: int
     total_tickets: int
-    date: str
+    added_date: str
 
 class FolioList(BaseModel):
     page: int
