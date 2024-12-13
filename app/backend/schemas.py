@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from fastapi import Form
 from typing import List
+from typing import Optional
 
 class Alert(BaseModel):
     alert_type_id: int
@@ -737,30 +738,6 @@ class MedicalLicense(BaseModel):
                 ):
         return cls(medical_license_type_id=medical_license_type_id,document_type_id=document_type_id,patology_type_id=patology_type_id, rut=rut, folio=folio, since=since, until=until, status_id=status_id)
 
-class SalarySettlement(BaseModel):
-    status_id: int
-    document_type_id: int
-    rut: int
-
-    @classmethod
-    def as_form(cls, 
-                status_id: int = Form(),
-                document_type_id: int = Form(),
-                rut: int = Form(),
-                ):
-        return cls(status_id=status_id,document_type_id=document_type_id,rut=rut)
-
-class UpdateMedicalLicense(BaseModel):
-    document_employee_id: int = None
-    medical_license_type_id: int = None
-    patology_type_id: int = None
-    period: str = None
-    rut: int = None
-    folio: int = None
-    since: str = None
-    until: str = None
-    days: int = None
-    updated_date: Union[datetime, None]
 
 class Rol(BaseModel):
     rol: str
@@ -771,55 +748,42 @@ class UpdateRol(BaseModel):
     rol: str = None
     updated_date: Union[datetime, None]
 
-class HealthModel(BaseModel):
-    id: int
-    health_remuneration_code: int
-    health: str
-    rut: int
-    previred_code: int
-    added_date: str
-    updated_date: str
+class Tax(BaseModel):
+    month: int
+    year: int
 
-class UpdateHealthModel(BaseModel):
-    health_remuneration_code: int = None
-    health: str = None
-    rut: int = None
-    previred_code: int = None
-    updated_date: Union [datetime, None]
+    @classmethod
+    def as_form(cls, 
+                month: int = Form(),
+                year: int = Form()
+                ):
+        return cls(month=month, year=year)
 
-class New(BaseModel):
-    title: str
-    description: str
-    markdown_description: str
-    picture: UploadFile
-    added_date: datetime
-    updated_date: Union[datetime, None]
 
-class UpdateNew(BaseModel):
-    title: str = None
-    description: str = None
-    markdown_description: str = None
-    picture: str = None
-    updated_date: str = None
+class Contract(BaseModel):
+    rut: str
+    client: str
+    client_email: str
+    start_date: str
+    renovation_date: str
+    branch_office_id: int
+    address: str
+    duration: str
+    contract_type_id: int
 
-class Principal(BaseModel):
-    principal: str
-    added_date: datetime
-    updated_date: Union[datetime, None]
-
-class Zone(BaseModel):
-    zone: str
-    added_date: datetime
-    updated_date: Union[datetime, None]
-    
-
-class UpdatePrincipal(BaseModel):
-    principal: str = None
-    updated_date: Union[datetime, None]
-
-class UpdateZone(BaseModel):
-    zone: str = None
-    updated_date: Union[datetime, None]
+    @classmethod
+    def as_form(cls, 
+                rut: str = Form(),
+                client: str = Form(),
+                client_email: str = Form(),
+                start_date: str = Form(),
+                renovation_date: str = Form(),
+                branch_office_id: int = Form(),
+                address: str = Form(),
+                duration: str = Form(),
+                contract_type_id: int = Form()
+                ):
+        return cls(rut=rut, client=client, client_email=client_email, start_date=start_date, renovation_date=renovation_date, branch_office_id=branch_office_id, address=address, duration=duration, contract_type_id=contract_type_id)
 
 class Commune(BaseModel):
     region_id: int
@@ -832,109 +796,11 @@ class UpdateCommune(BaseModel):
     commune: str = None
     updated_date: Union[datetime, None]
 
-class Health(BaseModel):
-    health_remuneration_code: int
-    health: str
-    rut: int
-    previred_code: int
-    added_date: datetime
-    updated_date: Union[datetime, None]
-
-class UpdateHealth(BaseModel):
-    health_remuneration_code: int = None
-    health: str = None
-    rut: int = None
-    previred_code: int = None
-    updated_date: Union[datetime, None]
-
-class EmployeeBankAccount(BaseModel):
-    rut: int
-    added_date: datetime
-    updated_date: Union[datetime, None]
-
-class UpdateEmployeeBankAccount(BaseModel):
-    bank_id: int = None
-    account_type_id: int = None
-    rut: int = None
-    account_number: str = None
-
-class StoreEmployeeBankAccount(BaseModel):
-    bank_id: int = None
-    account_type_id: int = None
-    rut: int = None
-    account_number: str = None
-
-class DocumentEmployee(BaseModel):
-    status_id: int
-    document_type_id: int
-    rut: int
-
-class OldDocumentEmployee(BaseModel):
-    status_id: int
-    rut: int
-    document_type_id: int
-    support: str
-    
-class DocumentManagement(BaseModel):
-    status_id: int
-    document_type_id: int
-    rut: int
-
-class UpdateDocumentEmployee(BaseModel):
-    status_id: int = None
-    document_type_id: int = None
-    old_document_status_id: int = None
-    rut: int = None
-    since: str = None
-    until: str = None
-    no_valid_days: int = None
-    support: str = None
-
-class UploadDocumentEmployee(BaseModel):
-    id: int
-    rut: int
-    file_name: str
-    dropbox_path: str
-    support: UploadFile
-    updated_date: str = None
-
 class PayrollEmployeeInput(BaseModel):
     rut: int
     payroll_item_id: int
     amount: Union[str, None]
     period: str
-
-class VerifyComplaint(BaseModel):
-    id: str = None
-    password: str = None
-
-class Complaint(BaseModel):
-    relationship: str = None
-    incident_place: str = None
-    complaint_type: str = None
-    anonymous: str = None
-    incident_date: str = None
-    incident_place_detail: str = None
-    knowledge: str = None
-    identify: str = None
-    description: str = None
-    password: str = None
-    email: str = None
-
-    @classmethod
-    def as_form(cls,
-                relationship: str = Form(None),
-                incident_place: str = Form(None),
-                complaint_type: str = Form(None),
-                anonymous: str = Form(None),
-                incident_date: str = Form(None),
-                incident_place_detail: str = Form(None),
-                knowledge: str = Form(None),
-                identify: str = Form(None),
-                description: str = Form(None),
-                password: str = Form(None),
-                email: str = Form(None)):
-        return cls(relationship=relationship, incident_place=incident_place, complaint_type=complaint_type, anonymous=anonymous, incident_date=incident_date, incident_place_detail=incident_place_detail, knowledge=knowledge, identify=identify, description=description, password=password, email=email)
 
 class PayrollDataInput(BaseModel):
     payroll_employees: List[PayrollEmployeeInput]
@@ -1271,6 +1137,16 @@ class EmployeeList(BaseModel):
     rut: int
     rol_id: int
     page: int
+
+class ContractList(BaseModel):
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    page: int
+
+class TaxList(BaseModel):
+    month: Optional[int] = None  # Ahora es opcional
+    year: Optional[int] = None  # Ahora es opcional
+    page: int
+
 
 class StoreCollection(BaseModel):
     branch_office_id: int

@@ -309,6 +309,38 @@ class ContractTypeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class ContractTypesModel(Base):
+    __tablename__ = 'contract_types'
+
+    id = Column(Integer, primary_key=True)
+    contract_type = Column(String(255))
+
+class TaxModel(Base):
+    __tablename__ = 'taxes'
+
+    id = Column(Integer, primary_key=True)
+    month = Column(Integer)
+    year = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class ContractModel(Base):
+    __tablename__ = 'contracts'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    contract_type_id = Column(Integer)
+    rut = Column(String(255))
+    client = Column(String(255))
+    client_email = Column(String(255))
+    start_date = Column(Date())
+    renovation_date = Column(Date())
+    duration = Column(String(255))
+    address = Column(String(255))
+    support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class CivilStateModel(Base):
     __tablename__ = 'civil_states'
 

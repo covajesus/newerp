@@ -27,7 +27,8 @@ class CollectionClass:
             "card_gross_amount": collection.card_gross_amount,
             "card_net_amount": collection.card_net_amount,
             "total_tickets": collection.total_tickets,
-            "added_date": collection.added_date
+            "added_date": collection.added_date,
+            "updated_date": collection.updated_date
         } for collection in data]
 
         return {
