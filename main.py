@@ -32,15 +32,8 @@ from app.backend.routers.civil_states import civil_states
 from app.backend.routers.document_types import document_types
 from app.backend.routers.family_core_data import family_core_data
 from app.backend.routers.vacations import vacations
-from app.backend.routers.medical_licenses import medical_licenses
 from app.backend.routers.rols import rols
-from app.backend.routers.news import news
-from app.backend.routers.principals import principals
-from app.backend.routers.zones import zones
 from app.backend.routers.communes import communes
-from app.backend.routers.healths import healths
-from app.backend.routers.employee_bank_accounts import employee_bank_accounts
-from app.backend.routers.documents_employees import documents_employees
 from app.backend.routers.contract_data import contract_data
 from app.backend.routers.contract_types import contract_types
 from app.backend.routers.medical_license_types import medical_license_types
@@ -58,11 +51,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.backend.routers.progressive_vacations import progressive_vacations
 from app.backend.routers.employee_types import employee_types
 from app.backend.routers.regimes import regimes
-from app.backend.routers.salary_settlements import salary_settlements
-from app.backend.routers.document_managements import document_managements
 from app.backend.routers.alerts import alerts
 from app.backend.routers.deposits import deposits
 from app.backend.routers.folios import folios
+from app.backend.routers.files import files
+from app.backend.routers.contracts import contracts
+from app.backend.routers.taxes import taxes
 
 app = FastAPI()
 
@@ -114,15 +108,8 @@ app.include_router(civil_states)
 app.include_router(document_types)
 app.include_router(family_core_data)
 app.include_router(vacations)
-app.include_router(medical_licenses)
 app.include_router(rols)
-app.include_router(news)
-app.include_router(principals)
-app.include_router(zones)
 app.include_router(communes)
-app.include_router(healths)
-app.include_router(employee_bank_accounts)
-app.include_router(documents_employees)
 app.include_router(contract_data)
 app.include_router(contract_types)
 app.include_router(medical_license_types)
@@ -139,11 +126,12 @@ app.include_router(honorary_reasons)
 app.include_router(progressive_vacations)
 app.include_router(employee_types)
 app.include_router(regimes)
-app.include_router(salary_settlements)
-app.include_router(document_managements)
 app.include_router(alerts)
 app.include_router(deposits)
 app.include_router(folios)
+app.include_router(files)
+app.include_router(contracts)
+app.include_router(taxes)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
