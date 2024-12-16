@@ -57,7 +57,10 @@ from app.backend.routers.folios import folios
 from app.backend.routers.files import files
 from app.backend.routers.contracts import contracts
 from app.backend.routers.taxes import taxes
+<<<<<<< HEAD
 from app.backend.routers.months import months
+=======
+>>>>>>> a2d17f7f3699f92012d8a6c89e8397fd5070097d
 
 app = FastAPI()
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import HTTPException
 import json
 
+
 class ContractClass:
     def __init__(self, db: Session):
         self.db = db
