@@ -1346,6 +1346,16 @@ class OldEmployeeLaborDatumModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class PatentModel(Base):
+    __tablename__ = 'patents'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    period = Column(String(255))
+    support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class ClockUserModel(Base):
     __tablename__ = 'clock_users'
 

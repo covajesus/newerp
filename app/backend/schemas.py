@@ -757,7 +757,17 @@ class Tax(BaseModel):
                 ):
         return cls(period=period)
 
+class Patent(BaseModel):
+    branch_office_id: int
+    period: str
 
+    @classmethod
+    def as_form(cls, 
+                period: str = Form(),
+                branch_office_id: str = Form()
+                ):
+        return cls(branch_office_id=branch_office_id, period=period)
+    
 class Contract(BaseModel):
     rut: str
     client: str
@@ -1144,6 +1154,9 @@ class TaxList(BaseModel):
     period: Optional[str] = None  # Ahora es opcional
     page: int
 
+class PatentList(BaseModel):
+    period: Optional[str] = None  # Ahora es opcional
+    page: int
 
 class StoreCollection(BaseModel):
     branch_office_id: int

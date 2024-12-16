@@ -1,29 +1,30 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
-from app.backend.classes.tax_class import TaxClass
-from app.backend.schemas import Tax
-from app.backend.schemas import TaxList
+from app.backend.classes.patent_class import PatentClass
+from app.backend.schemas import Patent
+from app.backend.schemas import PatentList
+from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
 import uuid
 import json
 import base64
 
-taxes = APIRouter(
-    prefix="/taxes",
-    tags=["Taxes"]
+patents = APIRouter(
+    prefix="/patents",
+    tags=["Patentents"]
 )
 
-@taxes.post("/")
-def index(tax: TaxList, db: Session = Depends(get_db)):
-    data = TaxClass(db).get_all(tax.period, tax.page)
+@patents.post("/")
+def index(patent: PatentList, db: Session = Depends(get_db)):
+    data = PatentClass(db).get_all(patent.period, patent.page)
 
     return {"message": data}
 
-@taxes.post("/store")
+@patents.post("/store")
 def store(
-    form_data: Tax = Depends(Tax.as_form),
+    form_data: Patent = Depends(Patent.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -41,26 +42,26 @@ def store(
         message = FileClass(db).upload(support, remote_path)
 
         # Procesar los datos del formulario
-        TaxClass(db).store(form_data, remote_path)
+        PatentClass(db).store(form_data, remote_path)
 
         return {"message": message}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
-@taxes.get("/tax/{tax_id}")
+@patents.get("/patent/{tax_id}")
 def download(tax_id:int, db: Session = Depends(get_db)):
-    data = TaxClass(db).download(tax_id)
+    data = PatentClass(db).download(tax_id)
 
     return {"message": data}
 
-@taxes.delete("/delete/{id}")
+@patents.delete("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
-    tax_data = TaxClass(db).get(id)
+    patent_data = PatentClass(db).get(id)
 
-    tax_data = json.loads(tax_data)
+    patent_data = json.loads(patent_data)
 
-    file_name = tax_data["tax_data"]["support"]
+    file_name = patent_data["patent_data"]["support"]
 
     # Ruta remota del archivo
     remote_path = f"{file_name}"
@@ -70,18 +71,18 @@ def delete(id:int, db: Session = Depends(get_db)):
 
     if message == "success":
         # Eliminar el contrato de la base de datos
-        TaxClass(db).delete(id)
+        PatentClass(db).delete(id)
 
     return {"message": message}
 
-@taxes.get("/download/{id}")
+@patents.get("/download/{id}")
 def download(id: int, db: Session = Depends(get_db)):
     # Obtener los datos del contrato
-    tax_data = TaxClass(db).get(id)
 
-    tax_data = json.loads(tax_data)
-    file_name = tax_data["tax_data"]["support"]
-    print(file_name)
+    patent_data = PatentClass(db).get(id)
+
+    patent_data = json.loads(patent_data)
+    file_name = patent_data["patent_data"]["support"]
 
     # Ruta remota del archivo
     remote_path = f"{file_name}"
@@ -98,39 +99,39 @@ def download(id: int, db: Session = Depends(get_db)):
         "file_data": encoded_file
     }
     
-@taxes.get("/edit/{id}")
+@patents.get("/edit/{id}")
 def edit(id: int, db: Session = Depends(get_db)):
     try:
         # Obtener los datos del contrato
-        tax_data = TaxClass(db).get(id)
+        patent_data = PatentClass(db).get(id)
         
         # Verificar si se encontró el contrato
-        if not tax_data:
-            raise HTTPException(status_code=404, detail="Contrato no encontrado")
+        if not patent_data:
+            raise HTTPException(status_code=404, detail="Patente no encontrada")
 
         # Si el contrato se encuentra, devolver los datos
-        return {"message": tax_data}
+        return {"message": patent_data}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener el iva: {str(e)}")
 
-@taxes.put("/update/{id}")
+@patents.put("/update/{id}")
 def update(
     id: int,
-    form_data: Tax = Depends(Tax.as_form),
+    form_data: Patent = Depends(Patent.as_form),
     support: UploadFile = File(None),  # El archivo es opcional en la actualización
     db: Session = Depends(get_db)
 ):
     try:
         # Verificar si el contrato existe
-        tax_data = TaxClass(db).get(id)
-        if not tax_data:
+        patent_data = PatentClass(db).get(id)
+        if not patent_data:
             raise HTTPException(status_code=404, detail="Iva no encontrado")
 
-        tax_data = json.loads(tax_data)
+        patent_data = json.loads(patent_data)
 
         # Nombre del archivo previo
-        previous_file_name = tax_data["tax_data"]["support"]
+        previous_file_name = patent_data["patent_data"]["support"]
         remote_path_previous = f"{previous_file_name}" if previous_file_name else None
 
         new_file_name = previous_file_name  # Por defecto, mantener el archivo previo
@@ -150,9 +151,9 @@ def update(
                 FileClass(db).delete(remote_path_previous)
 
         # Actualizar los datos del contrato en la base de datos
-        TaxClass(db).update(id, form_data, new_file_name)
+        PatentClass(db).update(id, form_data, new_file_name)
 
-        return {"message": "Iva actualizado exitosamente"}
+        return {"message": "Patente actualizada exitosamente"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al actualizar el iva: {str(e)}")
