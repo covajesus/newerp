@@ -2,11 +2,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import TaxModel
 from datetime import datetime
-<<<<<<< HEAD
 from fastapi import HTTPException
 import json
-=======
->>>>>>> a2d17f7f3699f92012d8a6c89e8397fd5070097d
 
 class TaxClass:
     def __init__(self, db: Session):
