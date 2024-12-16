@@ -1,13 +1,14 @@
 from azure.storage.fileshare import ShareFileClient
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
+from azure.core.exceptions import ResourceNotFoundError
 from fastapi import UploadFile
 import os
 
 class FileClass:
     def __init__(self, db):
         self.db = db
-        self.account_name = os.getenv("ACCOUNT_NAME") # Cambia por tu nombre de cuenta
-        self.account_key = os.getenv("AZURE_STORAGE_KEY")  # Cambia por tu clave
+        self.account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+        self.account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
         self.share_name = "files" 
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
@@ -34,3 +35,52 @@ class FileClass:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
+        
+    
+    def delete(self, remote_path: str) -> str:
+        """
+        Elimina un archivo desde Azure File Share.
+        """
+        try:
+            # Crear cliente para el archivo
+            file_client = ShareFileClient(
+                account_url=f"https://erpjis.file.core.windows.net/",
+                share_name=self.share_name,
+                file_path=remote_path,
+                credential=self.account_key,
+            )
+
+            # Eliminar el archivo
+            file_client.delete_file()
+
+            return f"success"
+
+        except ResourceNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {remote_path}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al eliminar archivo: {str(e)}")
+
+
+    def download(self, remote_path: str) -> bytes:
+        """
+        Descarga un archivo desde Azure File Share.
+        """
+        try:
+            # Crear cliente para el archivo
+            file_client = ShareFileClient(
+                account_url=f"https://erpjis.file.core.windows.net/",
+                share_name=self.share_name,
+                file_path=remote_path,
+                credential=self.account_key,
+            )
+
+            # Descargar el contenido del archivo
+            download_stream = file_client.download_file()
+
+            # Leer el contenido del archivo descargado
+            file_contents = download_stream.readall()
+
+            return file_contents
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al descargar archivo: {str(e)}")

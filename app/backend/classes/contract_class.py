@@ -2,6 +2,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import ContractModel, BranchOfficeModel, ContractTypesModel
 from datetime import datetime
+from fastapi import HTTPException
+import json
 
 class ContractClass:
     def __init__(self, db: Session):
@@ -90,8 +92,49 @@ class ContractClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
+              
+    def get(self, id):
+        try:
+            data_query = self.db.query(ContractModel.id, ContractModel.client_email, ContractModel.branch_office_id, ContractModel.address, ContractModel.support, ContractModel.rut, ContractModel.client, ContractTypesModel.contract_type, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
+                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
+                        outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
+                        order_by(ContractModel.rut). \
+                        filter(ContractModel.id == id). \
+                        first()
 
+            if data_query:
+                # Serializar los datos del empleado
+                contract_data = {
+                    "id": data_query.id,
+                    "branch_office_id": data_query.branch_office_id,
+                    "address": data_query.address,
+                    "rut": data_query.rut,
+                    "client": data_query.client,
+                    "client_email": data_query.client_email,
+                    "contract_type": data_query.contract_type,
+                    "start_date": data_query.start_date.isoformat(),
+                    "duration": data_query.duration,
+                    "renovation_date": data_query.renovation_date.isoformat(),
+                    "branch_office": data_query.branch_office,
+                    "support": data_query.support
+                }
 
+                # Crear el resultado final como un diccionario
+                result = {
+                    "contract_data": contract_data
+                }
+
+                # Convierte el resultado a una cadena JSON
+                serialized_result = json.dumps(result)
+
+                return serialized_result
+
+            else:
+                return "No se encontraron datos para el campo especificado."
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
 
     def store(self, form_data, support):
         # Crear una nueva instancia de ContractModel
@@ -107,7 +150,7 @@ class ContractClass:
         contract.renovation_date = form_data.renovation_date
         contract.duration = form_data.duration
         contract.address = form_data.address
-        contract.support = support.filename
+        contract.support = support
         contract.added_date = datetime.now()
 
         # Añadir la nueva instancia a la base de datos
@@ -120,3 +163,41 @@ class ContractClass:
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
+        
+    def delete(self, id):
+        try:
+            # Borrar el contrato de la base de datos
+            self.db.query(ContractModel).filter(ContractModel.id == id).delete()
+            self.db.commit()
+
+            return {"status": "success", "message": "Contract deleted successfully"}
+
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}
+        
+    
+    def update(self, id, form_data, support_file = None):
+        """
+        Actualiza los datos del contrato en la base de datos.
+        """
+        contract = self.db.query(ContractModel).filter(ContractModel.id == id).first()
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contrato no encontrado")
+
+        # Actualizar campos
+        contract.rut = form_data.rut
+        contract.client = form_data.client
+        contract.client_email = form_data.client_email
+        contract.start_date = form_data.start_date
+        contract.renovation_date = form_data.renovation_date
+        contract.branch_office_id = form_data.branch_office_id
+        contract.address = form_data.address
+        contract.duration = form_data.duration
+        contract.contract_type_id = form_data.contract_type_id
+        if support_file != None:
+            contract.support = support_file
+
+        self.db.commit()
+        self.db.refresh(contract)
+

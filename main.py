@@ -57,6 +57,7 @@ from app.backend.routers.folios import folios
 from app.backend.routers.files import files
 from app.backend.routers.contracts import contracts
 from app.backend.routers.taxes import taxes
+from app.backend.routers.months import months
 
 app = FastAPI()
 
@@ -132,6 +133,7 @@ app.include_router(folios)
 app.include_router(files)
 app.include_router(contracts)
 app.include_router(taxes)
+app.include_router(months)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

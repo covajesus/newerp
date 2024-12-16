@@ -749,15 +749,13 @@ class UpdateRol(BaseModel):
     updated_date: Union[datetime, None]
 
 class Tax(BaseModel):
-    month: int
-    year: int
+    period: str
 
     @classmethod
     def as_form(cls, 
-                month: int = Form(),
-                year: int = Form()
+                period: str = Form()
                 ):
-        return cls(month=month, year=year)
+        return cls(period=period)
 
 
 class Contract(BaseModel):
@@ -1143,8 +1141,7 @@ class ContractList(BaseModel):
     page: int
 
 class TaxList(BaseModel):
-    month: Optional[int] = None  # Ahora es opcional
-    year: Optional[int] = None  # Ahora es opcional
+    period: Optional[str] = None  # Ahora es opcional
     page: int
 
 

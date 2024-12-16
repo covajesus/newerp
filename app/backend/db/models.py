@@ -319,10 +319,16 @@ class TaxModel(Base):
     __tablename__ = 'taxes'
 
     id = Column(Integer, primary_key=True)
-    month = Column(Integer)
-    year = Column(Integer)
+    period = Column(String(255))
+    support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+class MonthModel(Base):
+    __tablename__ = 'months'
+
+    id = Column(Integer, primary_key=True)
+    month = Column(Integer)
 
 class ContractModel(Base):
     __tablename__ = 'contracts'
