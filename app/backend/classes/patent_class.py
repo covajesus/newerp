@@ -10,71 +10,76 @@ class PatentClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, period=None, page=0, items_per_page=10):
+    def get_all(self, branch_office_id=None, semester=None, year=None, page=0, items_per_page=10):
         try:
-            # Inicialización de la variable data_query
-            data_query = None
+            # Inicialización de filtros dinámicos
+            filters = []
+            if branch_office_id is not None:
+                filters.append(PatentModel.branch_office_id == branch_office_id)
+            if semester is not None:
+                filters.append(PatentModel.semester == semester)
+            if year is not None:
+                filters.append(PatentModel.year == year)
 
-            # Comprobamos si la página es distinta de 0 y filtramos por sucursal si se proporciona el ID
-            if page != 0:
-                if period is not None:
-                    # Incluir la información de la sucursal (BranchOfficeModel)
-                    data_query = self.db.query(PatentModel.id, PatentModel.period, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id). \
-                        filter(PatentModel.period == period). \
-                        order_by(PatentModel.id)
-                else:
-                    data_query = self.db.query(PatentModel.id, PatentModel.period, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id). \
-                        order_by(PatentModel.id)
+            # Construir la consulta base con los filtros aplicados
+            query = self.db.query(
+                PatentModel.id, 
+                PatentModel.semester, 
+                PatentModel.year, 
+                BranchOfficeModel.id.label("branch_office_id"), 
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id
+            ).filter(
+                *filters
+            ).order_by(
+                PatentModel.id
+            )
 
-                # Si data_query ha sido definida, realizamos la paginación
-                if data_query:
-                    total_items = data_query.count()
-                    total_pages = (total_items + items_per_page - 1) // items_per_page
+            # Si se solicita paginación
+            if page > 0:
+                # Calcular el total de registros
+                total_items = query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
 
-                    if page < 1 or page > total_pages:
-                        return {"status": "error", "message": "Invalid page number"}
+                if page < 1 or page > total_pages:
+                    return {"status": "error", "message": "Invalid page number"}
 
-                    data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+                # Aplicar paginación en la consulta
+                data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
 
-                    if not data:
-                        return {"status": "error", "message": "No data found"}
+                if not data:
+                    return {"status": "error", "message": "No data found"}
 
-                    serialized_data = [{
-                        "id": patent.id,
-                        "period": patent.period,
-                        "branch_office": patent.branch_office,
-                        "branch_office_id": patent.branch_office_id,
-                    } for patent in data]  # Solo iteramos sobre los contratos
-
-                    return {
-                        "total_items": total_items,
-                        "total_pages": total_pages,
-                        "current_page": page,
-                        "items_per_page": items_per_page,
-                        "data": serialized_data
-                    }
-
-            # Si la página es 0, traer todos los registros sin paginación
-            else:
-                if period is not None:
-                    data_query = self.db.query(PatentModel.id, PatentModel.period, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id). \
-                        filter(PatentModel.period == period). \
-                        order_by(PatentModel.id).all()
-                else:
-                    data_query = self.db.query(PatentModel.id, PatentModel.period, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id). \
-                        order_by(PatentModel.id).all()
-
-                # Serializar los datos y formatear las fechas
+                # Serializar los datos
                 serialized_data = [{
                     "id": patent.id,
-                    "branch_office_id": patent.rut,
-                    "branch_office": patent.branch_office,
-                    "period": patent.client,
-                } for patent in data_query]
+                    "branch_office_id": patent.branch_office_id,
+                    "semester": patent.semester,
+                    "year": patent.year,
+                    "branch_office": patent.branch_office
+                } for patent in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+
+            # Si no se solicita paginación, traer todos los datos
+            else:
+                data = query.all()
+
+                # Serializar los datos
+                serialized_data = [{
+                    "id": patent.id,
+                    "branch_office_id": patent.branch_office_id,
+                    "semester": patent.semester,
+                    "year": patent.year,
+                    "branch_office": patent.branch_office
+                } for patent in data]
 
                 return serialized_data
 
@@ -84,7 +89,7 @@ class PatentClass:
               
     def get(self, id):
         try:
-            data_query = self.db.query(PatentModel.id, PatentModel.support, PatentModel.period, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
+            data_query = self.db.query(PatentModel.id, PatentModel.semester, PatentModel.year, PatentModel.support, BranchOfficeModel.id.label("branch_office_id"), BranchOfficeModel.branch_office). \
                         outerjoin(BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id). \
                         order_by(PatentModel.id). \
                         filter(PatentModel.id == id). \
@@ -96,7 +101,8 @@ class PatentClass:
                     "id": data_query.id,
                     "branch_office": data_query.branch_office,
                     "branch_office_id": data_query.branch_office_id,
-                    "period": data_query.period,
+                    "semester": data_query.semester,
+                    "year": data_query.year,
                     "support": data_query.support
                 }
 
@@ -123,7 +129,8 @@ class PatentClass:
         
         # Asignar los valores del formulario a la instancia del modelo
         patent.branch_office_id = form_data.branch_office_id
-        patent.period = form_data.period
+        patent.semester = form_data.semester
+        patent.year = form_data.year
         patent.support = support
         patent.added_date = datetime.now()
 
@@ -160,7 +167,8 @@ class PatentClass:
 
         # Actualizar campos
         patent.branch_office_id = form_data.branch_office_id
-        patent.period = form_data.period
+        patent.semester = form_data.semester
+        patent.year = form_data.year
         if support_file != None:
             patent.support = support_file
 

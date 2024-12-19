@@ -759,39 +759,43 @@ class Tax(BaseModel):
 
 class Patent(BaseModel):
     branch_office_id: int
-    period: str
+    semester: str
+    year: int
 
     @classmethod
     def as_form(cls, 
-                period: str = Form(),
-                branch_office_id: str = Form()
+                branch_office_id: int = Form(),
+                semester: str = Form(),
+                year: int = Form(),
                 ):
-        return cls(branch_office_id=branch_office_id, period=period)
+        return cls(branch_office_id=branch_office_id, semester=semester, year=year)
     
 class Contract(BaseModel):
     rut: str
     client: str
-    client_email: str
     start_date: str
     renovation_date: str
+    end_date: str
     branch_office_id: int
     address: str
-    duration: str
     contract_type_id: int
+    currency: str
+    amount: int
 
     @classmethod
     def as_form(cls, 
                 rut: str = Form(),
                 client: str = Form(),
-                client_email: str = Form(),
                 start_date: str = Form(),
                 renovation_date: str = Form(),
                 branch_office_id: int = Form(),
                 address: str = Form(),
-                duration: str = Form(),
-                contract_type_id: int = Form()
-                ):
-        return cls(rut=rut, client=client, client_email=client_email, start_date=start_date, renovation_date=renovation_date, branch_office_id=branch_office_id, address=address, duration=duration, contract_type_id=contract_type_id)
+                contract_type_id: int = Form(),
+                end_date: str = Form(),
+                currency: str = Form(),
+                amount: int = Form()
+            ):
+        return cls(rut=rut, client=client, start_date=start_date, end_date=end_date, currency=currency, amount=amount, renovation_date=renovation_date, branch_office_id=branch_office_id, address=address, contract_type_id=contract_type_id)
 
 class Commune(BaseModel):
     region_id: int
@@ -1147,6 +1151,7 @@ class EmployeeList(BaseModel):
     page: int
 
 class ContractList(BaseModel):
+    rut: Optional[str] = None  # Ahora es opcional
     branch_office_id: Optional[int] = None  # Ahora es opcional
     page: int
 
@@ -1155,7 +1160,9 @@ class TaxList(BaseModel):
     page: int
 
 class PatentList(BaseModel):
-    period: Optional[str] = None  # Ahora es opcional
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    semester: Optional[str] = None  # Ahora es opcional
+    year: Optional[int] = None  # Ahora es opcional
     page: int
 
 class StoreCollection(BaseModel):

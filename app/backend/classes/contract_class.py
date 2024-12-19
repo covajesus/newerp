@@ -10,93 +10,84 @@ class ContractClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, branch_office_id=None, page=0, items_per_page=10):
+    def get_all(self, rut=None, branch_office_id=None, page=0, items_per_page=10):
         try:
-            # Inicialización de la variable data_query
-            data_query = None
+            # Construcción de la consulta base
+            query = self.db.query(
+                ContractModel.id,
+                ContractModel.rut,
+                ContractModel.client,
+                ContractTypesModel.contract_type,
+                ContractModel.start_date,
+                ContractModel.end_date,
+                ContractModel.amount,
+                ContractModel.renovation_date,
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id
+            ).outerjoin(
+                ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id
+            ).order_by(
+                ContractModel.rut
+            )
 
-            # Comprobamos si la página es distinta de 0 y filtramos por sucursal si se proporciona el ID
-            if page != 0:
-                if branch_office_id is not None:
-                    # Incluir la información de la sucursal (BranchOfficeModel)
-                    data_query = self.db.query(ContractModel.id, ContractModel.rut, ContractModel.client, ContractTypesModel.contract_type, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
-                        outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
-                        filter(ContractModel.branch_office_id == branch_office_id). \
-                        order_by(ContractModel.rut)
-                else:
-                    data_query = self.db.query(ContractModel.id, ContractModel.rut, ContractModel.client, ContractTypesModel.contract_type, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
-                        outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
-                        order_by(ContractModel.rut)
+            # Aplicar filtros según los parámetros
+            if rut:
+                query = query.filter(ContractModel.rut == rut)
+            if branch_office_id:
+                query = query.filter(ContractModel.branch_office_id == branch_office_id)
 
-                # Si data_query ha sido definida, realizamos la paginación
-                if data_query:
-                    total_items = data_query.count()
-                    total_pages = (total_items + items_per_page - 1) // items_per_page
-
-                    if page < 1 or page > total_pages:
-                        return {"status": "error", "message": "Invalid page number"}
-
-                    data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
-
-                    if not data:
-                        return {"status": "error", "message": "No data found"}
-
-                    serialized_data = [{
-                        "id": contract.id,
-                        "rut": contract.rut,
-                        "client": contract.client,
-                        "contract_type": contract.contract_type,
-                        "branch_office": contract.branch_office,
-                        "start_date": contract.start_date.strftime('%d-%m-%Y') if contract.start_date else None,
-                        "duration": contract.duration,
-                        "renovation_date": contract.renovation_date.strftime('%d-%m-%Y') if contract.renovation_date else None
-                    } for contract in data]  # Solo iteramos sobre los contratos
-
-                    return {
-                        "total_items": total_items,
-                        "total_pages": total_pages,
-                        "current_page": page,
-                        "items_per_page": items_per_page,
-                        "data": serialized_data
-                    }
-
-            # Si la página es 0, traer todos los registros sin paginación
-            else:
-                if branch_office_id is not None:
-                    data_query = self.db.query(ContractModel.id, ContractTypesModel.contract_type, ContractModel.rut, ContractModel.client, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
-                        outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
-                        filter(ContractModel.branch_office_id == branch_office_id). \
-                        order_by(ContractModel.rut).all()
-                else:
-                    data_query = self.db.query(ContractModel.id, ContractTypesModel.contract_type, ContractModel.rut, ContractModel.client, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
-                        outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
-                        order_by(ContractModel.rut).all()
-
-                # Serializar los datos y formatear las fechas
-                serialized_data = [{
+            if page == 0:
+                # Si la página es 0, devolver todos los resultados sin paginación
+                data = query.all()
+                return [{
                     "id": contract.id,
                     "rut": contract.rut,
                     "client": contract.client,
                     "contract_type": contract.contract_type,
                     "branch_office": contract.branch_office,
                     "start_date": contract.start_date.strftime('%d-%m-%Y') if contract.start_date else None,
-                    "duration": contract.duration,
+                    "end_date": contract.end_date.strftime('%d-%m-%Y') if contract.end_date else None,
+                    "amount": contract.amount,
                     "renovation_date": contract.renovation_date.strftime('%d-%m-%Y') if contract.renovation_date else None
-                } for contract in data_query]
+                } for contract in data]
 
-                return serialized_data
+            # Paginación
+            total_items = query.count()
+            total_pages = (total_items + items_per_page - 1) // items_per_page
+
+            if page < 1 or page > total_pages:
+                return {"status": "error", "message": "Invalid page number"}
+
+            data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+            if not data:
+                return {"status": "error", "message": "No data found"}
+
+            return {
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "data": [{
+                    "id": contract.id,
+                    "rut": contract.rut,
+                    "client": contract.client,
+                    "contract_type": contract.contract_type,
+                    "branch_office": contract.branch_office,
+                    "start_date": contract.start_date.strftime('%d-%m-%Y') if contract.start_date else None,
+                    "end_date": contract.end_date.strftime('%d-%m-%Y') if contract.end_date else None,
+                    "amount": contract.amount,
+                    "renovation_date": contract.renovation_date.strftime('%d-%m-%Y') if contract.renovation_date else None
+                } for contract in data]
+            }
 
         except Exception as e:
-            error_message = str(e)
-            return {"status": "error", "message": error_message}
+            return {"status": "error", "message": str(e)}
               
     def get(self, id):
         try:
-            data_query = self.db.query(ContractModel.id, ContractModel.client_email, ContractModel.branch_office_id, ContractModel.address, ContractModel.support, ContractModel.rut, ContractModel.client, ContractTypesModel.contract_type, ContractModel.start_date, ContractModel.duration, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
+            data_query = self.db.query(ContractModel.id, ContractModel.amount, ContractModel.currency, ContractModel.branch_office_id, ContractModel.address, ContractModel.support, ContractModel.rut, ContractModel.client, ContractTypesModel.contract_type, ContractModel.start_date, ContractModel.end_date, ContractModel.renovation_date, BranchOfficeModel.branch_office). \
                         outerjoin(BranchOfficeModel, BranchOfficeModel.id == ContractModel.branch_office_id). \
                         outerjoin(ContractTypesModel, ContractTypesModel.id == ContractModel.contract_type_id). \
                         order_by(ContractModel.rut). \
@@ -111,11 +102,12 @@ class ContractClass:
                     "address": data_query.address,
                     "rut": data_query.rut,
                     "client": data_query.client,
-                    "client_email": data_query.client_email,
                     "contract_type": data_query.contract_type,
                     "start_date": data_query.start_date.isoformat(),
-                    "duration": data_query.duration,
+                    "end_date": data_query.end_date.isoformat(),
                     "renovation_date": data_query.renovation_date.isoformat(),
+                    "currency": data_query.currency,
+                    "amount": data_query.amount,
                     "branch_office": data_query.branch_office,
                     "support": data_query.support
                 }
@@ -146,11 +138,12 @@ class ContractClass:
         contract.contract_type_id = form_data.contract_type_id
         contract.rut = form_data.rut
         contract.client = form_data.client
-        contract.client_email = form_data.client_email
         contract.start_date = form_data.start_date
+        contract.end_date = form_data.end_date
         contract.renovation_date = form_data.renovation_date
-        contract.duration = form_data.duration
         contract.address = form_data.address
+        contract.currency = form_data.currency
+        contract.amount = form_data.amount
         contract.support = support
         contract.added_date = datetime.now()
 
@@ -189,12 +182,13 @@ class ContractClass:
         # Actualizar campos
         contract.rut = form_data.rut
         contract.client = form_data.client
-        contract.client_email = form_data.client_email
+        contract.amount = form_data.amount
+        contract.end_date = form_data.end_date
         contract.start_date = form_data.start_date
         contract.renovation_date = form_data.renovation_date
         contract.branch_office_id = form_data.branch_office_id
+        contract.currency = form_data.currency
         contract.address = form_data.address
-        contract.duration = form_data.duration
         contract.contract_type_id = form_data.contract_type_id
         if support_file != None:
             contract.support = support_file

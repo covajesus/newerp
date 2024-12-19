@@ -18,7 +18,7 @@ patents = APIRouter(
 
 @patents.post("/")
 def index(patent: PatentList, db: Session = Depends(get_db)):
-    data = PatentClass(db).get_all(patent.period, patent.page)
+    data = PatentClass(db).get_all(patent.branch_office_id, patent.semester, patent.year, patent.page)
 
     return {"message": data}
 
@@ -48,12 +48,6 @@ def store(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
-
-@patents.get("/patent/{tax_id}")
-def download(tax_id:int, db: Session = Depends(get_db)):
-    data = PatentClass(db).download(tax_id)
-
-    return {"message": data}
 
 @patents.delete("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):

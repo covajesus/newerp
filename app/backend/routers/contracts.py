@@ -17,7 +17,7 @@ contracts = APIRouter(
 
 @contracts.post("/")
 def index(contract: ContractList, db: Session = Depends(get_db)):
-    data = ContractClass(db).get_all(contract.branch_office_id, contract.page)
+    data = ContractClass(db).get_all(contract.rut, contract.branch_office_id, contract.page)
 
     return {"message": data}
 
