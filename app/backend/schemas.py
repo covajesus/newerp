@@ -797,6 +797,50 @@ class Contract(BaseModel):
             ):
         return cls(rut=rut, client=client, start_date=start_date, end_date=end_date, currency=currency, amount=amount, renovation_date=renovation_date, branch_office_id=branch_office_id, address=address, contract_type_id=contract_type_id)
 
+class Customer(BaseModel):
+    rut: str
+    region_id: int
+    commune_id: int
+    customer: str
+    email: str
+    phone: str
+    activity: str
+    address: str
+
+class DteList(BaseModel):
+    folio: Optional[str] = None  # Opcional con valor predeterminado None
+    branch_office_id: Optional[int] = None  # Opcional con valor predeterminado None
+    rut: Optional[str] = None  # Opcional con valor predeterminado None
+    customer: Optional[str] = None  # Opcional con valor predeterminado None
+    since: Optional[str] = None  # Opcional con valor predeterminado None
+    until: Optional[str] = None  # Opcional con valor predeterminado None
+    amount: Optional[str] = None  # Opcional con valor predeterminado None
+    supervisor_id: Optional[str] = None  # Opcional con valor predeterminado None
+    status_id: Optional[int] = None  # Opcional con valor predeterminado None
+    dte_version_id: Optional[int] = None  # Opcional con valor predeterminado None
+    dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
+    page: int = 0  # Opcional con valor predeterminado 0
+
+class CustomerList(BaseModel):
+    rut: Optional[str] = None  # Opcional con valor predeterminado None
+    page: int = 0  # Opcional con valor predeterminado 0
+
+class CollectionList(BaseModel):
+    branch_office_id: Optional[int] = None  # Opcional con valor predeterminado None
+    cashier_id: Optional[int] = None  # Opcional con valor predeterminado None
+    added_date: Optional[str] = None  # Opcional con valor predeterminado None
+    page: int = 0  # Opcional con valor predeterminado 0
+
+class UpdateCustomer(BaseModel):
+    rut: str
+    region_id: int
+    commune_id: int
+    customer: str
+    phone: str
+    email: str
+    activity: str
+    address: str
+
 class Commune(BaseModel):
     region_id: int
     commune: str
@@ -1177,7 +1221,60 @@ class StoreCollection(BaseModel):
     total_tickets: int
     added_date: str
 
+class MachineTicketList(BaseModel):
+    page: int
+
+class CustomerTicketList(BaseModel):
+    page: int
+
+class GeneratedCustomerTicketList(BaseModel):
+    page: int
+
+class RequestCaf(BaseModel):
+    amount: int
+
+class GenerateCustomerTicket(BaseModel):
+    id: Optional[int] = 0
+    branch_office_id: int
+    rut: str
+    amount: int
+    chip_id: int
+    will_save: Optional[int] = 0
+    rut: Optional[str] = None
+    region_id: Optional[int] = None
+    commune_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    activity: Optional[str] = None
+    address: Optional[str] = None
+
+class CustomerBillList(BaseModel):
+    page: int
+
+class GeneratedCustomerBillList(BaseModel):
+    page: int
+
+class GenerateCustomerBill(BaseModel):
+    id: Optional[int] = 0
+    branch_office_id: int
+    rut: str
+    amount: int
+    chip_id: int
+    will_save: Optional[int] = 0
+    rut: Optional[str] = None
+    region_id: Optional[int] = None
+    commune_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    activity: Optional[str] = None
+    address: Optional[str] = None
+
 class FolioList(BaseModel):
+    page: int
+
+class CafList(BaseModel):
     page: int
 
 class PayrollItemList(BaseModel):

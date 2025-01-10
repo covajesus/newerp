@@ -259,13 +259,25 @@ class FolioModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class CashierModel(Base):
+    __tablename__ = 'cashiers'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer)
+    cashier = Column(String(255))
+    anydesk = Column(String(255))
+    rustdesk = Column(String(255))
+
 class DteModel(Base):
     __tablename__ = 'dtes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_office_id = Column(Integer)
+    dte_version_id = Column(Integer)
     cashier_id = Column(Integer)
     dte_type_id = Column(Integer)
+    chip_id = Column(Integer)
+    status_id = Column(Integer)
+    rut = Column(String)
     folio = Column(Integer)
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
@@ -283,6 +295,7 @@ class DteModel(Base):
     ticket_correlative = Column(Integer)
     entrance_hour = Column(String)
     exit_hour = Column(String)
+    period = Column(String)
     added_date = Column(DateTime())
 
 class UserModel(Base):
@@ -345,6 +358,21 @@ class ContractModel(Base):
     currency = Column(String(255))
     amount = Column(Integer)
     support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class CustomerModel(Base):
+    __tablename__ = 'customers'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    region_id = Column(Integer)
+    commune_id = Column(Integer)
+    customer = Column(String(255))
+    email = Column(String(255))
+    phone = Column(String(255))
+    activity = Column(String(255))
+    address = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

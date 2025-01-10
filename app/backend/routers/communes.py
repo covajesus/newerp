@@ -19,6 +19,12 @@ def index(region_id:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@communes.post("/all")
+def all(db: Session = Depends(get_db)):
+    data = CommuneClass(db).get_all()
+
+    return {"message": data}
+
 @communes.post("/store")
 def store(commune:Commune, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     commune_inputs = commune.dict()

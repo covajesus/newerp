@@ -4,19 +4,12 @@ class BranchOfficeClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, rut = None, rol_id = None):
+    def get_all(self):
         try:
-            if rol_id == 3 or rol_id == 2:
-                data = self.db.query(BranchOfficeModel, SupervisorModel). \
-                    outerjoin(SupervisorModel, SupervisorModel.branch_office_id == BranchOfficeModel.id). \
-                    filter(SupervisorModel.rut == rut). \
+            data = self.db.query(BranchOfficeModel). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
-            else:
-                data = self.db.query(BranchOfficeModel).order_by(BranchOfficeModel.branch_office).all()
-
-            if not data:
-                return "No data found"
+            
             return data
         except Exception as e:
             error_message = str(e)

@@ -605,3 +605,30 @@ class HelperClass:
         
         # Formatear la fecha como "YYYY-MM-DD"
         return next_month_end.strftime("%Y-%m-%d")
+    
+    def fix_current_dte_period(period):
+        period = period.split('-')
+
+        month = period[1]
+
+        year = period[0]
+
+        return str(month) + "-" + str(year)
+    
+    def fix_last_dte_period(period):
+        period = period.split('-')
+
+        month = int(period[1]) - 1
+
+        if month == 0:
+            month = 12
+            year = int(period[0]) - 1
+        else:
+            year = period[0]
+
+        return str(month) + "-" + str(year)
+    
+    def create_period_date(period):
+        period = period.split('-')
+
+        return period[0]  + '-' + period[1] + '-01' + ' 00:00:00'

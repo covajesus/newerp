@@ -1,5 +1,7 @@
 from app.backend.db.models import FolioModel
 import json
+import requests
+import datetime
 
 class FolioClass:
     def __init__(self, db):
@@ -9,7 +11,7 @@ class FolioClass:
     def get_all(self, page=0, items_per_page=10):
         try:
             if page != 0:
-                data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.billed_status_id, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id, FolioModel.added_date, ). \
+                data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.billed_status_id, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id, FolioModel.added_date). \
                         order_by(FolioModel.folio)
 
                 total_items = data_query.count()
@@ -35,7 +37,7 @@ class FolioClass:
                     } for folio in data]
 
                 total_available_receipts = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).count()
-                
+                print(total_available_receipts)
                 return {
                     "total_items": total_items,
                     "total_pages": total_pages,
@@ -160,3 +162,49 @@ class FolioClass:
             return "Folio "+ str(folio) +" updated successfully"
         else:
             return "Folio not found"
+        
+    def request(self, amount):
+        payload = {
+            "credenciales": {
+                "rutEmisor": "76063822-6",
+                "nombreSucursal": "Casa Matriz"   
+            },
+            "codigoTipoDte": 39,
+            "ambiente": 1
+        }
+
+        headers = {
+            'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.post(
+            'https://api.simplefactura.cl/folios/consultar',
+            data=json.dumps(payload),
+            headers=headers
+        )
+
+        response_data = response.json()
+
+        if response_data.get('status') == 200:
+            data = response_data.get('data')
+
+            quantity = len(data)
+            print(quantity)
+
+            if quantity > 0:
+                folio_data = self.db.query(FolioModel).order_by(FolioModel.id.desc()).first()
+
+                last_row = data[-1]
+
+                available_caf_folios = last_row['hasta'] - folio_data.folio
+
+                print(available_caf_folios)
+
+                if available_caf_folios >= amount:
+                    last_registered_folio = folio_data.folio
+                    last_registered_folio += 1
+                    for i in range(last_registered_folio, last_registered_folio + 1):
+                        print(i)
+                else:
+                    return "No hay folios disponibles en el CAF"

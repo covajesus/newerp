@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.collection_class import CollectionClass
-from app.backend.schemas import StoreCollection
+from app.backend.schemas import StoreCollection, CollectionList
 
 collections = APIRouter(
     prefix="/collections",
@@ -10,8 +10,8 @@ collections = APIRouter(
 )
 
 @collections.post("/")
-def index(db: Session = Depends(get_db)):
-    data = CollectionClass(db).get_all()
+def index(collection: CollectionList, db: Session = Depends(get_db)):
+    data = CollectionClass(db).get_all(collection.branch_office_id, collection.cashier_id, collection.added_date, collection.page)
 
     return {"message": data}
 

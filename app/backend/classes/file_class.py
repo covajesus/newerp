@@ -37,6 +37,28 @@ class FileClass:
             raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
         
     
+    def temporal_upload(self, file_content, remote_path: str) -> str:
+        """
+        Sube un archivo al Azure File Share.
+        """
+        try:
+            # Crear cliente para el archivo
+            file_client = ShareFileClient(
+                account_url=f"https://erpjis.file.core.windows.net/",
+                share_name=self.share_name,
+                file_path=remote_path,
+                credential=self.account_key,
+            )
+
+            # Subir el archivo a Azure File Share
+            file_client.upload_file(file_content)
+
+            # Retornar mensaje de éxito
+            return f"Archivo subido exitosamente a {remote_path}"
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)})")
+                                
     def delete(self, remote_path: str) -> str:
         """
         Elimina un archivo desde Azure File Share.

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.db.database import get_db
@@ -9,6 +9,19 @@ dtes = APIRouter(
     prefix="/dtes",
     tags=["Dtes"]
 )
+
+@dtes.post("/")
+def index(dte: DteList, db: Session = Depends(get_db)):
+    data = DteClass(db).get_all(dte.branch_office_id, dte.dte_type_id, dte.dte_version_id, dte.since, dte.until, dte.subscriber, dte.page)
+
+    return {"message": data}
+
+@dtes.post("/all_with_customer")
+def index(dte: DteList, db: Session = Depends(get_db)):
+    data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_type_id, dte.dte_version_id, dte.page)
+
+    return {"message": data}
+
 
 @dtes.post("/total_quantity")
 def total_quantity(user: GetDte, session_user: UserLogin = Depends(get_current_active_user)):
@@ -53,5 +66,11 @@ def delete(folio:int, branch_office_id:int, cashier_id:int, added_date:str, sing
 @dtes.get("/existence/{folio}")
 def existence(folio:int, db: Session = Depends(get_db)):
     data = DteClass(db).existence(folio)
+    
+    return {"message": data}
+
+@dtes.get("/open_customer_billing_period/{period}")
+def existence(period:str, db: Session = Depends(get_db)):
+    data = DteClass(db).open_customer_billing_period(period)
     
     return {"message": data}
