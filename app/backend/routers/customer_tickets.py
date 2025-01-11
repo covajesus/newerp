@@ -20,10 +20,11 @@ def index(customer_ticket_inputs:CustomerTicketList, db: Session = Depends(get_d
 def store(customer_ticket_inputs:GenerateCustomerTicket, db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
-    if existence_data == 'Customer does not exist':
-        CustomerClass(db).store(customer_ticket_inputs)
-    else:
-        CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
     data = CustomerTicketClass(db).store(customer_ticket_inputs)
 

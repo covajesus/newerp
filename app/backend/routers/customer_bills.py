@@ -11,27 +11,28 @@ customer_bills = APIRouter(
 )
 
 @customer_bills.post("/")
-def index(customer_ticket_inputs:CustomerBillList, db: Session = Depends(get_db)):
-    data = CustomerBillClass(db).get_all(1, customer_ticket_inputs.page)
+def index(customer_bill_inputs:CustomerBillList, db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).get_all(1, customer_bill_inputs.page)
 
     return {"message": data}
 
 @customer_bills.post("/generate_bill")
-def store(customer_ticket_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
-    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+def store(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
 
-    if existence_data == 'Customer does not exist':
-        CustomerClass(db).store(customer_ticket_inputs)
-    else:
-        CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+    if customer_bill_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_bill_inputs)
+        else:
+            CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
 
-    data = CustomerBillClass(db).store(customer_ticket_inputs)
+    data = CustomerBillClass(db).store(customer_bill_inputs)
 
     return {"message": data}
 
 @customer_bills.post("/generated_bills")
-def generated_tickets(customer_ticket_inputs:GeneratedCustomerBillList, db: Session = Depends(get_db)):
-    data = CustomerBillClass(db).get_all(2, customer_ticket_inputs.page)
+def generated_tickets(customer_bill_inputs:GeneratedCustomerBillList, db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).get_all(2, customer_bill_inputs.page)
 
     return {"message": data}
 

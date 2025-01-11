@@ -22,7 +22,6 @@ def index(dte: DteList, db: Session = Depends(get_db)):
 
     return {"message": data}
 
-
 @dtes.post("/total_quantity")
 def total_quantity(user: GetDte, session_user: UserLogin = Depends(get_current_active_user)):
     user_inputs = user.dict()
