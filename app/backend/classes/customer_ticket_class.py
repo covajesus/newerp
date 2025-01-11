@@ -161,9 +161,13 @@ class CustomerTicketClass:
     def store(self, form_data):
         customer = CustomerClass(self.db).get_by_rut(form_data.rut)
         customer_data = json.loads(customer)
+
         code = self.pre_generate_ticket(customer_data, form_data)
 
         if code is not None:
+            if code == 402:
+                return "LibreDTE payment required"
+            
             folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
 
         if form_data.will_save == 1:
@@ -286,14 +290,16 @@ class CustomerTicketClass:
                 },
             )
             
+            print(response)
             # Manejar la respuesta
             if response.status_code == 200:
                 dte_data = response.json()
+                print(dte_data)
                 code = dte_data.get("codigo")
 
                 return code
             else:
-                return None
+                return response.status_code
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
@@ -324,6 +330,8 @@ class CustomerTicketClass:
             )
             
             # Manejar la respuesta
+            print(response)
+
             if response.status_code == 200:
                 dte_data = response.json()
                 folio = dte_data.get("folio")

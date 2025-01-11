@@ -164,6 +164,9 @@ class CustomerBillClass:
         code = self.pre_generate_bill(customer_data, form_data)
 
         if code is not None:
+            if code == 402:
+                return "LibreDTE payment required"
+            
             folio = self.generate_bill(customer_data['customer_data']['rut'], code)
 
         if form_data.will_save == 1:
@@ -334,7 +337,7 @@ class CustomerBillClass:
             else:
                 print("Error al generar el DTE:")
                 print(response.status_code, response.json())
-                return None
+                return response.status_code
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
@@ -357,8 +360,6 @@ class CustomerBillClass:
                     "Content-Type": "application/json",
                 },
             )
-
-            
             print(response.status_code)
             
             # Manejar la respuesta
