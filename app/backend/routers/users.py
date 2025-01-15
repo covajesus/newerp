@@ -35,9 +35,9 @@ def edit(id:int, session_user: UserLogin = Depends(get_current_active_user), db:
 
     return {"message": data}
 
-@users.get("/supervisor")
-def get_supervisor(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = UserClass(db).get_supervisor()
+@users.post("/supervisors")
+def supervisors(db: Session = Depends(get_db)):
+    data = UserClass(db).get_supervisors()
 
     return {"message": data}
 

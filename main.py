@@ -65,6 +65,7 @@ from app.backend.routers.customer_tickets import customer_tickets
 from app.backend.routers.customer_bills import customer_bills
 from app.backend.routers.machine_tickets import machine_tickets
 from app.backend.routers.supervisors import supervisors
+from app.backend.routers.expense_types import expense_types
 
 app = FastAPI()
 
@@ -148,6 +149,7 @@ app.include_router(customer_tickets)
 app.include_router(customer_bills)
 app.include_router(machine_tickets)
 app.include_router(supervisors)
+app.include_router(expense_types)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

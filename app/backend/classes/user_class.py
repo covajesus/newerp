@@ -27,7 +27,7 @@ class UserClass:
             return f"Error: {error_message}"
         
 
-    def get_supervisor(self):
+    def get_supervisors(self):
         try:
             data = self.db.query(UserModel).order_by(UserModel.nickname).filter(UserModel.rol_id == 3).all()
             return data

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import GenerateCustomerTicket, GeneratedCustomerTicketList, CustomerTicketList
+from app.backend.schemas import GenerateCustomerTicket, GeneratedCustomerTicketList, CustomerTicketList, GenerateCustomerCreditNoteTicket, CustomerTicketSearch, ToBeAcceptedCustomerTicket, ChangeStatusInCustomerTicket
 from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.customer_class import CustomerClass
 
@@ -16,8 +16,14 @@ def index(customer_ticket_inputs:CustomerTicketList, db: Session = Depends(get_d
 
     return {"message": data}
 
+@customer_tickets.post("/search")
+def search(customer_ticket_inputs:CustomerTicketSearch, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).search(customer_ticket_inputs.branch_office_id, customer_ticket_inputs.rut, customer_ticket_inputs.status_id, customer_ticket_inputs.supervisor_id, customer_ticket_inputs.page)
+
+    return {"message": data}
+
 @customer_tickets.post("/generate_ticket")
-def store(customer_ticket_inputs:GenerateCustomerTicket, db: Session = Depends(get_db)):
+def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
     if customer_ticket_inputs.will_save == 1:
@@ -27,6 +33,26 @@ def store(customer_ticket_inputs:GenerateCustomerTicket, db: Session = Depends(g
             CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
     data = CustomerTicketClass(db).store(customer_ticket_inputs)
+
+    return {"message": data}
+
+@customer_tickets.post("/generate_credit_note")
+def generate_credit_note(customer_credit_note_ticket_inputs:GenerateCustomerCreditNoteTicket, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).store_credit_note(customer_credit_note_ticket_inputs)
+
+    return {"message": data}
+
+@customer_tickets.post("/to_be_accepted")
+def to_be_accepted(customer_ticket_inputs:ToBeAcceptedCustomerTicket, db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+
+    data = CustomerTicketClass(db).update(customer_ticket_inputs)
 
     return {"message": data}
 
@@ -49,13 +75,25 @@ def verify(id:int, db: Session = Depends(get_db)):
     return {"message": data}
 
 @customer_tickets.get("/edit/{id}")
-def download(id:int, db: Session = Depends(get_db)):
+def edit(id:int, db: Session = Depends(get_db)):
     data = CustomerTicketClass(db).get(id)
 
     return {"message": data}
 
-@customer_tickets.get("/download/{id}")
-def download(id: int, db: Session = Depends(get_db)):
-    pdf_content = CustomerTicketClass(db).download(id)
+@customer_tickets.get("/delete/{id}")
+def delete(id:int, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).delete(id)
 
-    return pdf_content
+    return {"message": data}
+
+@customer_tickets.get("/reject/{id}")
+def reject(id:int, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).reject(id)
+
+    return {"message": data}
+
+@customer_tickets.post("/change_status")
+def change_status(customer_ticket_inputs:ChangeStatusInCustomerTicket, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).change_status(customer_ticket_inputs)
+
+    return {"message": data}

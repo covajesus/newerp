@@ -21,6 +21,12 @@ class BranchOfficeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class ExpenseTypeModel(Base):
+    __tablename__ = 'expense_types'
+
+    id = Column(Integer, primary_key=True)
+    expense_type = Column(String(255))
+    accounting_account = Column(String(255))
 
 class ZoneModel(Base):
     __tablename__ = 'zones'
@@ -277,6 +283,10 @@ class DteModel(Base):
     dte_type_id = Column(Integer)
     chip_id = Column(Integer)
     status_id = Column(Integer)
+    expense_type_id = Column(Integer)
+    payment_type_id = Column(Integer)
+    reason_id = Column(Integer)
+    payment_date = Column(String)
     rut = Column(String)
     folio = Column(Integer)
     cash_amount = Column(Integer)
@@ -296,6 +306,7 @@ class DteModel(Base):
     entrance_hour = Column(String)
     exit_hour = Column(String)
     period = Column(String)
+    comment = Column(String)
     added_date = Column(DateTime())
 
 class UserModel(Base):

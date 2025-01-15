@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.file_class import FileClass
 import requests
@@ -28,30 +28,55 @@ class CustomerBillClass:
 
             if group == 1:
                 filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
+
+                current_period = datetime.now().strftime('%m-%Y')
+                filters.append(DteModel.period == current_period)
+
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.status_id)
+                )
             else:
                 filters.append(or_(DteModel.status_id == 4, DteModel.status_id == 5))
 
-            # Construir la consulta base con los filtros aplicados
-            query = self.db.query(
-                DteModel.id, 
-                DteModel.branch_office_id, 
-                DteModel.folio, 
-                DteModel.total,
-                DteModel.added_date,
-                DteModel.rut,
-                DteModel.status_id,
-                DteModel.chip_id,
-                CustomerModel.customer,
-                BranchOfficeModel.branch_office
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-            ).outerjoin(
-                CustomerModel, CustomerModel.rut == DteModel.rut
-            ).filter(
-                *filters
-            ).order_by(
-                desc(DteModel.folio)
-            )
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.folio)
+                )
 
             # Si se solicita paginación
             if page > 0:
@@ -116,9 +141,191 @@ class CustomerBillClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
+    def search(self, branch_office_id=None, rut=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
+        try:
+            # Inicialización de filtros dinámicos
+            filters = []
+
+            if branch_office_id != None:
+                filters.append(DteModel.branch_office_id == branch_office_id)
+            if rut != None and rut != "":
+                filters.append(DteModel.rut == rut)
+            if status_id != None:
+                filters.append(DteModel.status_id == status_id)
+            if supervisor_id != None:
+                filters.append(UserModel.supervisor_id == supervisor_id)
+
+            filters.append(DteModel.dte_version_id == 1)
+            filters.append(DteModel.status_id < 4)
+            filters.append(DteModel.dte_type_id == 33)
+            filters.append(DteModel.rut != None)
+            
+            if supervisor_id != None:
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.folio)
+                )
+            else:
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.folio)
+                )
+
+            # Si se solicita paginación
+            if page > 0:
+                # Calcular el total de registros
+                total_items = query.count()
+                print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+                print(total_pages)
+                if page < 1 or page > total_pages:
+                    return {"status": "error", "message": "Invalid page number"}
+
+                # Aplicar paginación en la consulta
+                data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+                if not data:
+                    return {"status": "error", "message": "No data found"}
+
+                # Serializar los datos
+                serialized_data = [{
+                    "id": dte.id,
+                    "rut": dte.rut,
+                    "branch_office_id": dte.branch_office_id,
+                    "customer": dte.customer,
+                    "chip_id": dte.chip_id,
+                    "folio": dte.folio,
+                    "total": dte.total,
+                    "status_id": dte.status_id,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                    "branch_office": dte.branch_office
+                } for dte in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+
+            # Si no se solicita paginación, traer todos los datos
+            else:
+                data = query.all()
+
+                # Serializar los datos
+                serialized_data = [{
+                    "id": dte.id,
+                    "rut": dte.rut,
+                    "branch_office_id": dte.branch_office_id,
+                    "customer": dte.customer,
+                    "folio": dte.folio,
+                    "chip_id": dte.chip_id,
+                    "total": dte.total,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                    "branch_office": dte.branch_office,
+                    "status_id": dte.status_id
+                } for dte in data]
+
+                return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
+    
+    def update(self, form_data):
+        """
+        Actualiza los datos de la patente en la base de datos.
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        # Actualizar campos
+        dte.branch_office_id = form_data.branch_office_id
+        dte.rut = form_data.rut
+        dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
+        dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
+        dte.discount = 0
+        dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        dte.chip_id = form_data.chip_id
+        dte.status_id = 2
+
+        self.db.commit()
+        self.db.refresh(dte)
+    
+    def change_status(self, form_data):
+        """
+        Actualiza los datos de la patente en la base de datos.
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        # Actualizar campos
+        dte.expense_type_id = form_data.expense_type_id
+        dte.payment_type_id = form_data.payment_type_id
+        dte.payment_date = form_data.payment_date
+        period = form_data.period.split('-')
+        dte.period = period[1] + '-' + period[0]
+        dte.comment = form_data.comment
+        dte.status_id = 5
+
+        self.db.commit()
+        self.db.refresh(dte)
+
+
+    def reject(self, id):
+        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        dte.status_id = 3
+
+        self.db.commit()
+        self.db.refresh(dte)
+        
     def get(self, id):
         try:
-            data_query = self.db.query(DteModel.id, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.customer, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
+            data_query = self.db.query(DteModel.id, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.address, DteModel.cash_amount, CustomerModel.customer, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
                         outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id). \
                         outerjoin(CustomerModel, CustomerModel.rut == DteModel.rut). \
                         filter(DteModel.id == id). \
@@ -126,7 +333,7 @@ class CustomerBillClass:
 
             if data_query:
                 # Serializar los datos del empleado
-                customer_ticket_data = {
+                customer_bill_data = {
                     "id": data_query.id,
                     "rut": data_query.rut,
                     "branch_office_id": data_query.branch_office_id,
@@ -135,6 +342,10 @@ class CustomerBillClass:
                     "phone": data_query.phone,
                     "chip_id": data_query.chip_id,
                     "folio": data_query.folio,
+                    "activity": data_query.activity,
+                    "region_id": data_query.region_id,
+                    "commune_id": data_query.commune_id,
+                    "address": data_query.address,
                     "total": data_query.total,
                     "status_id": data_query.status_id,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
@@ -143,7 +354,7 @@ class CustomerBillClass:
 
                 # Crear el resultado final como un diccionario
                 result = {
-                    "customer_ticket_data": customer_ticket_data
+                    "customer_bill_data": customer_bill_data
                 }
 
                 # Convierte el resultado a una cadena JSON
@@ -220,6 +431,11 @@ class CustomerBillClass:
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         if form_data.chip_id == 1:
+            if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":
+                amount = form_data.amount - 5000
+            else:
+                amount = form_data.amount
+            
             data = {
                 "Encabezado": {
                     "IdDoc": {
@@ -241,7 +457,7 @@ class CustomerBillClass:
                     {
                         "NmbItem": "Venta",
                         "QtyItem": 1,
-                        "PrcItem": form_data.amount,
+                        "PrcItem": amount,
                     },
                     {
                         "NmbItem": "Chip",

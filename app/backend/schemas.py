@@ -1233,6 +1233,22 @@ class GeneratedCustomerTicketList(BaseModel):
 class RequestCaf(BaseModel):
     amount: int
 
+class ChangeStatusInCustomerBill(BaseModel):
+    id: int
+    expense_type_id: int
+    payment_type_id: int
+    payment_date: str
+    comment: str
+    period: str
+
+class ChangeStatusInCustomerTicket(BaseModel):
+    id: int
+    expense_type_id: int
+    payment_type_id: int
+    payment_date: str
+    comment: str
+    period: str
+
 class GenerateCustomerTicket(BaseModel):
     id: Optional[int] = 0
     branch_office_id: int
@@ -1249,10 +1265,60 @@ class GenerateCustomerTicket(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
 
+class ToBeAcceptedCustomerBill(BaseModel):
+    id: Optional[int] = 0
+    branch_office_id: int
+    rut: str
+    amount: int
+    chip_id: int
+    rut: Optional[str] = None
+    region_id: Optional[int] = None
+    commune_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    activity: Optional[str] = None
+    address: Optional[str] = None
+    will_save: Optional[int] = 0
+
+class ToBeAcceptedCustomerTicket(BaseModel):
+    id: Optional[int] = 0
+    branch_office_id: int
+    rut: str
+    amount: int
+    chip_id: int
+    rut: Optional[str] = None
+    region_id: Optional[int] = None
+    commune_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    activity: Optional[str] = None
+    address: Optional[str] = None
+    will_save: Optional[int] = 0
+
+class GenerateCustomerCreditNoteTicket(BaseModel):
+    id: int
+    reason_id: int
+
 class CustomerBillList(BaseModel):
     page: int
 
 class GeneratedCustomerBillList(BaseModel):
+    page: int
+
+class CustomerBillSearch(BaseModel):
+    branch_office_id: Optional[int] = None
+    rut: Optional[str] = None
+    status_id: Optional[int] = None
+    supervisor_id: Optional[int] = None
+    page: int
+
+class CustomerTicketSearch(BaseModel):
+    branch_office_id: Optional[int] = None
+    rut: Optional[str] = None
+    status_id: Optional[int] = None
+    supervisor_id: Optional[int] = None
     page: int
 
 class GenerateCustomerBill(BaseModel):
