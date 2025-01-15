@@ -380,7 +380,7 @@ class CustomerTicketClass:
             if code == 402:
                 return "LibreDTE payment required"
             
-            folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
+            folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code)
 
         if form_data.will_save == 1:
             if folio != None:
@@ -442,17 +442,36 @@ class CustomerTicketClass:
         if code is not None:
             if code == 402:
                 return "LibreDTE payment required"
-            
-            print(code)
-            exit()
-            
+
             folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code)
 
         dte.status_id = 5
         dte.reason_id = form_data.reason_id
         dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
         self.db.add(dte)
+        self.db.commit()
 
+        credit_note_dte = DteModel()
+                
+        # Asignar los valores del formulario a la instancia del modelo
+        credit_note_dte.branch_office_id = dte.branch_office_id
+        credit_note_dte.cashier_id = 0
+        credit_note_dte.dte_type_id = 61
+        credit_note_dte.dte_version_id = 1
+        credit_note_dte.status_id = 5
+        credit_note_dte.chip_id = 0
+        credit_note_dte.rut = customer_data['customer_data']['rut']
+        credit_note_dte.folio = folio
+        credit_note_dte.cash_amount = dte.cash_amount
+        credit_note_dte.card_amount = 0
+        credit_note_dte.subtotal = round(dte.cash_amount/1.19)
+        credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+        credit_note_dte.discount = 0
+        credit_note_dte.total = dte.cash_amount
+        credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        self.db.add(credit_note_dte)
+        
         try:
             self.db.commit()
             return {"status": "success", "message": "Credit Note saved successfully"}
@@ -576,36 +595,16 @@ class CustomerTicketClass:
     def pre_generate_credit_note_ticket(self, customer_data, folio, cash_amount, added_date):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
+        amount = round(cash_amount/1.19)
+
         data = {
                 "Encabezado": {
                     "IdDoc": {
                         "TipoDTE": "61",
                         "Folio": 0,
                         "FchEmis": added_date,
-                        "IndNoRebaja": None,
-                        "TipoDespacho": None,
-                        "IndTraslado": None,
-                        "TpoImpresion": None,
-                        "IndServicio": None,
-                        "MntBruto": None,
-                        "TpoTranCompra": None,
                         "TpoTranVenta": 1,
                         "FmaPago": "1",
-                        "FmaPagExp": None,
-                        "MntCancel": None,
-                        "SaldoInsol": None,
-                        "FchCancel": None,
-                        "MntPagos": None,
-                        "PeriodoDesde": None,
-                        "PeriodoHasta": None,
-                        "MedioPago": None,
-                        "TpoCtaPago": None,
-                        "NumCtaPago": None,
-                        "BcoPago": None,
-                        "TermPagoCdg": None,
-                        "TermPagoGlosa": None,
-                        "TermPagoDias": None,
-                        "FchVenc": None
                     },
                     "Emisor": {
                         "RUTEmisor": "76063822-6"
@@ -622,8 +621,8 @@ class CustomerTicketClass:
                     {
                         "NmbItem": "Nota de Crédito de Venta",
                         "QtyItem": 1,
-                        "PrcItem": cash_amount,
-                        "MontoItem": cash_amount,
+                        "PrcItem": amount,
+                        "MontoItem": amount,
                     }
                 ],
                 "Referencia": [ {
@@ -674,6 +673,47 @@ class CustomerTicketClass:
             "codigo": code
         }
             
+        try:
+            # Endpoint para generar un DTE temporal
+            url = f"https://libredte.cl/api/dte/documentos/generar?getXML=0&links=0&email=1&retry=1&gzip=0"
+            
+            # Enviar solicitud a la API
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+            
+            # Manejar la respuesta
+            print(response)
+
+            if response.status_code == 200:
+                dte_data = response.json()
+                folio = dte_data.get("folio")
+
+                return folio
+            else:
+                print("Error al generar el DTE:")
+                print(response.status_code, response.json())
+                return None
+
+        except Exception as e:
+            print("Error al conectarse a la API:", e)
+            return None
+
+    def generate_credit_note_ticket(self, customer_rut, code):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        data = {
+            "emisor": "76063822-6",
+            "receptor": customer_rut,
+            "dte": 61,
+            "codigo": code
+        }
+
         try:
             # Endpoint para generar un DTE temporal
             url = f"https://libredte.cl/api/dte/documentos/generar?getXML=0&links=0&email=1&retry=1&gzip=0"

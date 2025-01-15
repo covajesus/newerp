@@ -427,6 +427,57 @@ class CustomerBillClass:
             else:
                 return 'error'
     
+    def store_credit_note(self, form_data):
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        
+        customer = CustomerClass(self.db).get_by_rut(dte.rut)
+        customer_data = json.loads(customer)
+
+        dte_date = self.get_dte_date(dte.folio)
+
+        code = self.pre_generate_credit_note_ticket(customer_data, dte.folio, dte.cash_amount, dte_date)
+
+        if code is not None:
+            if code == 402:
+                return "LibreDTE payment required"
+
+            folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code)
+            print(folio)
+
+        dte.status_id = 5
+        dte.reason_id = form_data.reason_id
+        dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
+        self.db.add(dte)
+        self.db.commit()
+
+        credit_note_dte = DteModel()
+                
+        # Asignar los valores del formulario a la instancia del modelo
+        credit_note_dte.branch_office_id = dte.branch_office_id
+        credit_note_dte.cashier_id = 0
+        credit_note_dte.dte_type_id = 61
+        credit_note_dte.dte_version_id = 1
+        credit_note_dte.status_id = 5
+        credit_note_dte.chip_id = 0
+        credit_note_dte.rut = customer_data['customer_data']['rut']
+        credit_note_dte.folio = folio
+        credit_note_dte.cash_amount = dte.cash_amount
+        credit_note_dte.card_amount = 0
+        credit_note_dte.subtotal = round(dte.cash_amount/1.19)
+        credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+        credit_note_dte.discount = 0
+        credit_note_dte.total = dte.cash_amount
+        credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        self.db.add(credit_note_dte)
+        
+        try:
+            self.db.commit()
+            return {"status": "success", "message": "Credit Note saved successfully"}
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}
+        
     def pre_generate_bill(self, customer_data, form_data):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -519,7 +570,139 @@ class CustomerBillClass:
         except Exception as e:
             print("Error al conectarse a la API:", e)
             return None
-        
+    
+    def pre_generate_credit_note_ticket(self, customer_data, folio, cash_amount, added_date):  # Added self as the first argument
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        amount = round(cash_amount/1.19)
+
+        data = {
+                "Encabezado": {
+                    "IdDoc": {
+                        "TipoDTE": "61",
+                        "Folio": 0,
+                        "FchEmis": added_date,
+                        "TpoTranVenta": 1,
+                        "FmaPago": "1",
+                    },
+                    "Emisor": {
+                        "RUTEmisor": "76063822-6"
+                    },
+                    "Receptor": {
+                        "RUTRecep": customer_data['customer_data']['rut'],
+                        "RznSocRecep": customer_data['customer_data']['customer'],
+                        "GiroRecep": customer_data['customer_data']['activity'],
+                        "DirRecep": customer_data['customer_data']['region'],
+                        "CmnaRecep": customer_data['customer_data']['commune'],
+                    }
+                },
+                "Detalle": [
+                    {
+                        "NmbItem": "Nota de Crédito de Venta",
+                        "QtyItem": 1,
+                        "PrcItem": amount,
+                        "MontoItem": amount,
+                    }
+                ],
+                "Referencia": [ {
+                    "TpoDocRef": 33,
+                    "FolioRef": folio,
+                    "FchRef": added_date,
+                    "CodRef": 1,
+                    "RazonRef": "Anula factura o boleta"
+                }],
+            }
+        print(data)
+        try:
+            # Endpoint para generar un DTE temporal
+            url = f"https://libredte.cl/api/dte/documentos/emitir?normalizar=1&formato=json&links=0&email=0"
+            
+            # Enviar solicitud a la API
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+            
+            print(response.text)
+            # Manejar la respuesta
+            if response.status_code == 200:
+                dte_data = response.json()
+                print(dte_data)
+                code = dte_data.get("codigo")
+
+                return code
+            else:
+                return response.status_code
+
+        except Exception as e:
+            print("Error al conectarse a la API:", e)
+            return None
+    
+    def generate_credit_note_ticket(self, customer_rut, code):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        data = {
+            "emisor": "76063822-6",
+            "receptor": customer_rut,
+            "dte": 61,
+            "codigo": code
+        }
+
+        try:
+            # Endpoint para generar un DTE temporal
+            url = f"https://libredte.cl/api/dte/documentos/generar?getXML=0&links=0&email=1&retry=1&gzip=0"
+            
+            # Enviar solicitud a la API
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+            
+            # Manejar la respuesta
+            print(response)
+
+            if response.status_code == 200:
+                dte_data = response.json()
+                folio = dte_data.get("folio")
+
+                return folio
+            else:
+                print("Error al generar el DTE:")
+                print(response.status_code, response.json())
+                return None
+
+        except Exception as e:
+            print("Error al conectarse a la API:", e)
+            return None
+    
+    def get_dte_date(self, folio):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        # Endpoint para generar un DTE temporal
+        url = f"https://libredte.cl/api/dte/dte_emitidos/info/33/" + str(folio) + '/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0'
+            
+        # Enviar solicitud a la API
+        response = requests.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        response_data = response.json()
+        print(response_data)
+
+        return response_data['fecha']
+    
     def generate_bill(self, customer_rut, code):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 

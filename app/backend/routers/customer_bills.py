@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import GenerateCustomerBill, GeneratedCustomerBillList, CustomerBillList, CustomerBillSearch, ToBeAcceptedCustomerBill, ChangeStatusInCustomerBill
+from app.backend.schemas import GenerateCustomerBill, GeneratedCustomerBillList, CustomerBillList, GenerateCustomerCreditNoteBill, CustomerBillSearch, ToBeAcceptedCustomerBill, ChangeStatusInCustomerBill
 from app.backend.classes.customer_bill_class import CustomerBillClass
 from app.backend.classes.customer_class import CustomerClass
 
@@ -53,6 +53,12 @@ def to_be_accepted(customer_bill_inputs:ToBeAcceptedCustomerBill, db: Session = 
 @customer_bills.post("/generated_bills")
 def generated_tickets(customer_bill_inputs:GeneratedCustomerBillList, db: Session = Depends(get_db)):
     data = CustomerBillClass(db).get_all(2, customer_bill_inputs.page)
+
+    return {"message": data}
+
+@customer_bills.post("/generate_credit_note")
+def generate_credit_note(customer_credit_note_bill_inputs:GenerateCustomerCreditNoteBill, db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).store_credit_note(customer_credit_note_bill_inputs)
 
     return {"message": data}
 

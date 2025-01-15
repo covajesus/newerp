@@ -1301,6 +1301,10 @@ class GenerateCustomerCreditNoteTicket(BaseModel):
     id: int
     reason_id: int
 
+class GenerateCustomerCreditNoteBill(BaseModel):
+    id: int
+    reason_id: int
+
 class CustomerBillList(BaseModel):
     page: int
 
