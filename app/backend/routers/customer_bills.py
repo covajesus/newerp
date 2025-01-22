@@ -65,7 +65,6 @@ def generate_credit_note(customer_credit_note_bill_inputs:GenerateCustomerCredit
 @customer_bills.get("/download/{id}")
 def download(id:int, db: Session = Depends(get_db)):
     data = CustomerBillClass(db).download(id)
-    print(data)
 
     return {"message": data}
 
@@ -76,7 +75,7 @@ def verify(id:int, db: Session = Depends(get_db)):
     return {"message": data}
 
 @customer_bills.get("/edit/{id}")
-def download(id:int, db: Session = Depends(get_db)):
+def edit(id:int, db: Session = Depends(get_db)):
     data = CustomerBillClass(db).get(id)
 
     return {"message": data}

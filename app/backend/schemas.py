@@ -821,6 +821,20 @@ class DteList(BaseModel):
     dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0
 
+class ReceivedDteList(BaseModel):
+    folio: Optional[str] = None  # Opcional con valor predeterminado None
+    branch_office_id: Optional[int] = None  # Opcional con valor predeterminado None
+    rut: Optional[str] = None  # Opcional con valor predeterminado None
+    supplier: Optional[str] = None  # Opcional con valor predeterminado None
+    since: Optional[str] = None  # Opcional con valor predeterminado None
+    until: Optional[str] = None  # Opcional con valor predeterminado None
+    amount: Optional[str] = None  # Opcional con valor predeterminado None
+    supervisor_id: Optional[str] = None  # Opcional con valor predeterminado None
+    status_id: Optional[int] = None  # Opcional con valor predeterminado None
+    dte_version_id: Optional[int] = None  # Opcional con valor predeterminado None
+    dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
+    page: int = 0  # Opcional con valor predeterminado 0
+
 class CustomerList(BaseModel):
     rut: Optional[str] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0
@@ -1221,11 +1235,30 @@ class StoreCollection(BaseModel):
     total_tickets: int
     added_date: str
 
+class ChangeStatusReceivedTributaryDocument(BaseModel):
+    id: int
+    branch_office_id: int
+    expense_type_id: int
+    period: str
+    status_id: int
+
 class MachineTicketList(BaseModel):
     page: int
 
 class CustomerTicketList(BaseModel):
     page: int
+
+class ReceivedTributaryDocumentList(BaseModel):
+    page: int
+
+class SelectRowsToPay(BaseModel):
+    id: int
+
+class ReceivedTributaryDocumentToPay(BaseModel):
+    payment_type_id: int
+    payment_date: str
+    comment: str
+    selected_bills: List[SelectRowsToPay]  # Corregir la anotación de tipo
 
 class GeneratedCustomerTicketList(BaseModel):
     page: int
@@ -1239,7 +1272,6 @@ class ChangeStatusInCustomerBill(BaseModel):
     payment_type_id: int
     payment_date: str
     comment: str
-    period: str
 
 class ChangeStatusInCustomerTicket(BaseModel):
     id: int
@@ -1247,7 +1279,6 @@ class ChangeStatusInCustomerTicket(BaseModel):
     payment_type_id: int
     payment_date: str
     comment: str
-    period: str
 
 class GenerateCustomerTicket(BaseModel):
     id: Optional[int] = 0

@@ -21,6 +21,13 @@ class BranchOfficeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class SupplierModel(Base):
+    __tablename__ = 'suppliers'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    supplier = Column(String(255))
+
 class ExpenseTypeModel(Base):
     __tablename__ = 'expense_types'
 

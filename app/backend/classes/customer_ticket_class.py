@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
+from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
@@ -305,13 +306,15 @@ class CustomerTicketClass:
         dte.expense_type_id = form_data.expense_type_id
         dte.payment_type_id = form_data.payment_type_id
         dte.payment_date = form_data.payment_date
-        period = form_data.period.split('-')
-        dte.period = period[1] + '-' + period[0]
+        period = form_data.payment_date.split('-')
+        dte.period = period[0] + '-' + period[1]
         dte.comment = form_data.comment
         dte.status_id = 5
 
         self.db.commit()
         self.db.refresh(dte)
+
+        self.create_account_asset(dte)
 
 
     def reject(self, id):
@@ -380,7 +383,7 @@ class CustomerTicketClass:
             if code == 402:
                 return "LibreDTE payment required"
             
-            folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code)
+            folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
 
         if form_data.will_save == 1:
             if folio != None:
@@ -407,6 +410,7 @@ class CustomerTicketClass:
 
                 try:
                     self.db.commit()
+
                     return {"status": "success", "message": "Dte saved successfully"}
                 except Exception as e:
                     self.db.rollback()
@@ -428,6 +432,117 @@ class CustomerTicketClass:
                     return {"status": "error", "message": f"Error: {str(e)}"}
             else:
                 return 'error'
+            
+    def create_account_asset(self, form_data):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        if form_data.dte_type_id == 39:
+            american_date = form_data.period + '-01'
+            utf8_date = HelperClass.convert_to_utf8(american_date)
+            expense_type = self.db.query(ExpenseTypeModel).filter(
+                ExpenseTypeModel.id == form_data.expense_type_id
+            ).first()
+            branch_office = self.db.query(BranchOfficeModel).filter(
+                BranchOfficeModel.id == form_data.branch_office_id
+            ).first()
+
+            gloss = (
+                branch_office.branch_office
+                + "_"
+                + expense_type.accounting_account
+                + "_"
+                + utf8_date
+                + "_BoletaElectronica_"
+                + str(form_data.id)
+            )
+            amount = form_data.total
+        
+            data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        "111000102": amount,
+                    },
+                    "haber": {
+                        expense_type.accounting_account.strip(): round(amount / 1.19),
+                        "221000226": round(amount - (amount / 1.19)),
+                    }
+                },
+                "operacion": "I",
+                "documentos": {
+                    "emitidos": [
+                        {
+                            "dte": form_data.dte_type_id,
+                            "folio": form_data.folio,
+                        }
+                    ]
+                },
+            }
+        else:
+            american_date = form_data.period + '-01'
+            utf8_date = HelperClass.convert_to_utf8(american_date)
+            expense_type = self.db.query(ExpenseTypeModel).filter(
+                ExpenseTypeModel.id == form_data.expense_type_id
+            ).first()
+            branch_office = self.db.query(BranchOfficeModel).filter(
+                BranchOfficeModel.id == form_data.branch_office_id
+            ).first()
+
+            gloss = (
+                branch_office.branch_office
+                + "_"
+                + expense_type.accounting_account
+                + "_"
+                + utf8_date
+                + "_NotaCredito_"
+                + str(form_data.id)
+            )
+            amount = form_data.total
+        
+            data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        expense_type.accounting_account.strip(): round(amount / 1.19),
+                        "221000226": round(amount - (amount / 1.19)),
+                    },
+                    "haber": {
+                        "111000102": amount,
+                    }
+                },
+                "operacion": "I",
+                "documentos": {
+                    "emitidos": [
+                        {
+                            "dte": form_data.dte_type_id,
+                            "folio": form_data.folio,
+                        }
+                    ]
+                },
+            }
+
+        try:
+            url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+            if response.status_code == 200:
+                return "Accounting entry created successfully"
+            else:
+                return f"Accounting entry creation failed."
+
+        except Exception as e:
+            print("Error al conectarse a la API:", e)
+            return None
     
     def store_credit_note(self, form_data):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
@@ -439,47 +554,57 @@ class CustomerTicketClass:
 
         code = self.pre_generate_credit_note_ticket(customer_data, dte.folio, dte.cash_amount, dte_date)
 
+        folio = None
+
         if code is not None:
             if code == 402:
                 return "LibreDTE payment required"
 
             folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code)
 
-        dte.status_id = 5
-        dte.reason_id = form_data.reason_id
-        dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
-        self.db.add(dte)
-        self.db.commit()
-
-        credit_note_dte = DteModel()
-                
-        # Asignar los valores del formulario a la instancia del modelo
-        credit_note_dte.branch_office_id = dte.branch_office_id
-        credit_note_dte.cashier_id = 0
-        credit_note_dte.dte_type_id = 61
-        credit_note_dte.dte_version_id = 1
-        credit_note_dte.status_id = 5
-        credit_note_dte.chip_id = 0
-        credit_note_dte.rut = customer_data['customer_data']['rut']
-        credit_note_dte.folio = folio
-        credit_note_dte.cash_amount = dte.cash_amount
-        credit_note_dte.card_amount = 0
-        credit_note_dte.subtotal = round(dte.cash_amount/1.19)
-        credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
-        credit_note_dte.discount = 0
-        credit_note_dte.total = dte.cash_amount
-        credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-        self.db.add(credit_note_dte)
-        
-        try:
+        if folio != None:
+            dte.status_id = 5
+            dte.reason_id = form_data.reason_id
+            dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
+            self.db.add(dte)
             self.db.commit()
-            return {"status": "success", "message": "Credit Note saved successfully"}
-        except Exception as e:
-            self.db.rollback()
-            return {"status": "error", "message": f"Error: {str(e)}"}
 
+            credit_note_dte = DteModel()
+                    
+            # Asignar los valores del formulario a la instancia del modelo
+            credit_note_dte.branch_office_id = dte.branch_office_id
+            credit_note_dte.cashier_id = 0
+            credit_note_dte.dte_type_id = 61
+            credit_note_dte.dte_version_id = 1
+            credit_note_dte.status_id = 5
+            credit_note_dte.chip_id = 0
+            credit_note_dte.rut = customer_data['customer_data']['rut']
+            credit_note_dte.folio = folio
+            credit_note_dte.cash_amount = dte.cash_amount
+            credit_note_dte.card_amount = 0
+            credit_note_dte.subtotal = round(dte.cash_amount/1.19)
+            credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+            credit_note_dte.discount = 0
+            credit_note_dte.total = dte.cash_amount
+            credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            self.db.add(credit_note_dte)
+            
+            try:
+                self.db.commit()
+
+                self.create_account_asset(credit_note_dte)
+
+                return {"status": "success", "message": "Credit Note saved successfully"}
+            except Exception as e:
+                self.db.rollback()
+                return {"status": "error", "message": f"Error: {str(e)}"}
+        else:
+            return "Creditnote was not created"
+        
     def pre_generate_ticket(self, customer_data, form_data):  # Added self as the first argument
+        branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
+
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         if form_data.chip_id == 1:
@@ -494,7 +619,8 @@ class CustomerTicketClass:
                         "TipoDTE": 39
                     },
                     "Emisor": {
-                        "RUTEmisor": "76063822-6"
+                        "RUTEmisor": "76063822-6",
+                        'CdgSIISucur': branch_office_data.dte_code,
                     },
                     "Receptor": {
                         "RUTRecep": customer_data['customer_data']['rut'],
@@ -502,6 +628,8 @@ class CustomerTicketClass:
                         "GiroRecep": customer_data['customer_data']['activity'],
                         "DirRecep": customer_data['customer_data']['region'],
                         "CmnaRecep": customer_data['customer_data']['commune'],
+                        'Contacto': customer_data['customer_data']['email'],
+                        'CorreoRecep': customer_data['customer_data']['email'],
                     }
                 },
                 "Detalle": [
@@ -524,7 +652,8 @@ class CustomerTicketClass:
                         "TipoDTE": 39
                     },
                     "Emisor": {
-                        "RUTEmisor": "76063822-6"
+                        "RUTEmisor": "76063822-6",
+                        'CdgSIISucur': branch_office_data.dte_code,
                     },
                     "Receptor": {
                         "RUTRecep": customer_data['customer_data']['rut'],
@@ -532,6 +661,8 @@ class CustomerTicketClass:
                         "GiroRecep": customer_data['customer_data']['activity'],
                         "DirRecep": customer_data['customer_data']['region'],
                         "CmnaRecep": customer_data['customer_data']['commune'],
+                        'Contacto': customer_data['customer_data']['email'],
+                        'CorreoRecep': customer_data['customer_data']['email'],
                     }
                 },
                 "Detalle": [

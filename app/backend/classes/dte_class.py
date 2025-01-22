@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel
+from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
@@ -208,7 +208,103 @@ class DteClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
+    def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=0, items_per_page=10):
+        try:
+            # Inicialización de filtros dinámicos
+            filters = []
+            if folio is not None:
+                filters.append(DteModel.folio == folio) 
+            if branch_office_id is not None:
+                filters.append(DteModel.branch_office_id == branch_office_id)
+            if rut is not None:
+                filters.append(DteModel.rut == rut)
+            if supplier is not None:
+                filters.append(SupplierModel.supplier.like(f"%{supplier}%"))
+            if until is not None:
+                filters.append(DteModel.added_date <= until)
+            if since is not None:
+                filters.append(DteModel.added_date >= since)
+            if amount is not None:
+                filters.append(DteModel.total == amount)
+            if supervisor_id is not None:
+                filters.append(DteModel.supervisor_id == supervisor_id)
+            if status_id is not None:
+                filters.append(DteModel.status_id == status_id)
 
+            filters.append(DteModel.rut != None)
+            filters.append(DteModel.dte_version_id == dte_version_id)
+            filters.append(DteModel.dte_type_id == dte_type_id)
+
+            # Construir la consulta base con los filtros aplicados
+            query = self.db.query(
+                DteModel.id, 
+                DteModel.branch_office_id, 
+                DteModel.folio, 
+                DteModel.total, 
+                DteModel.entrance_hour,
+                DteModel.exit_hour,
+                DteModel.status_id,
+                SupplierModel.rut,
+                SupplierModel.supplier,
+                DteModel.added_date,
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+            ).outerjoin(
+                SupplierModel, SupplierModel.rut == DteModel.rut
+            ).filter(
+                *filters
+            ).order_by(
+                desc(DteModel.folio)
+            )
+
+            # Obtener la consulta SQL generada con literal_binds=True
+            query_sql = str(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+
+            # Reemplazar %% por % para corregir el problema de escape
+            query_sql = query_sql.replace('%%', '%')
+
+            # Mostrar la consulta SQL corregida
+            print("Consulta SQL corregida:", query_sql)
+
+            # Calcular el offset para la paginación
+            offset = (page - 1) * items_per_page
+
+            # Ejecutar la consulta con paginación
+            data = self.db.execute(query.statement.offset(offset).limit(items_per_page)).fetchall()
+
+            # Procesar los resultados
+            total_items = len(data)  # Total de elementos
+            total_pages = (total_items + items_per_page - 1) // items_per_page  # Calcular total de páginas
+            data_paginated = data  # Paginar los resultados según el offset y el límite
+
+            # Serializar los resultados
+            serialized_data = [{
+                "id": dte.id,
+                "branch_office_id": dte.branch_office_id,
+                "folio": dte.folio,
+                "total": dte.total,
+                "supplier": dte.supplier,
+                "rut": dte.rut,
+                "entrance_hour": dte.entrance_hour,
+                "status_id": dte.status_id,
+                "exit_hour": dte.exit_hour,
+                "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                "branch_office": dte.branch_office
+            } for dte in data_paginated]
+
+            return {
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "data": serialized_data
+            }
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
+        
     def get_total_quantity(user_inputs):
 
         if user_inputs['rol_id'] == 4 or user_inputs['rol_id'] == 5:

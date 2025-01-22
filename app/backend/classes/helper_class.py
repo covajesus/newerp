@@ -327,10 +327,39 @@ class HelperClass:
 
         return int(num_business_days)
     
+    def verificator_digit(rut):
+        rut = list(map(int, str(rut)))
+        rut.reverse()
+        
+        factors = [2, 3, 4, 5, 6, 7]
+        sum_value = sum(d * factors[i % len(factors)] for i, d in enumerate(rut))
+        
+        # Calcular el módulo 11
+        rest = sum_value % 11
+        verificator_digit = 11 - rest
+        
+        # Determinar el dígito verificador
+        if verificator_digit == 10:
+            return "K"
+        elif verificator_digit == 11:
+            return "0"
+        else:
+            return str(verificator_digit)
+
     def numeric_rut(self, rut):
         rut = rut.split('-')
 
         return rut[0]
+    
+    def convert_to_utf8(date):
+        date = date.split('-')
+        date = date[2] + "-" + date[1] + "-" + date[0]
+        return date
+    
+    def get_net(value):
+        net = round(value/1.19)
+
+        return net
     
     def how_many_entrance_days(entrance_company):
         # Verificar si la entrada no es None

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte, DteList
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.db.database import get_db
@@ -17,8 +17,14 @@ def index(dte: DteList, db: Session = Depends(get_db)):
     return {"message": data}
 
 @dtes.post("/all_with_customer")
-def index(dte: DteList, db: Session = Depends(get_db)):
+def all_with_customer(dte: DteList, db: Session = Depends(get_db)):
     data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_type_id, dte.dte_version_id, dte.page)
+
+    return {"message": data}
+
+@dtes.post("/received_tributary_documents")
+def received_tributary_documents(dte: ReceivedDteList, db: Session = Depends(get_db)):
+    data = DteClass(db).get_received_tributary_documents(dte.folio, dte.branch_office_id, dte.rut, dte.supplier, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_type_id, dte.dte_version_id, dte.page)
 
     return {"message": data}
 
