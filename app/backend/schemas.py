@@ -1384,6 +1384,12 @@ class CustomerBillSearch(BaseModel):
     customer: Optional[str] = None
     page: int
 
+class CollectionSearch(BaseModel):
+    branch_office_id: Optional[int] = None
+    cashier_id: Optional[int] = None
+    added_date: Optional[str] = None
+    page: int
+
 class CustomerTicketSearch(BaseModel):
     branch_office_id: Optional[int] = None
     rut: Optional[str] = None

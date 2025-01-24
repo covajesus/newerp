@@ -13,7 +13,8 @@ class CollectionClass:
             filters.append(CollectionModel.branch_office_id == branch_office_id)
         if cashier_id is not None:
             filters.append(CollectionModel.cashier_id == cashier_id)
-        if added_date is not None:
+        if added_date is not None and added_date != "":
+            print(added_date)
             filters.append(CollectionModel.added_date == added_date)
 
         try:
@@ -90,7 +91,7 @@ class CollectionClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
-        
+    
     def get(self, field, value):
         try:
             data = self.db.query(CollectionModel).filter(getattr(CollectionModel, field) == value).first()
