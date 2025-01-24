@@ -18,7 +18,7 @@ def index(dte: DteList, db: Session = Depends(get_db)):
 
 @dtes.post("/all_with_customer")
 def all_with_customer(dte: DteList, db: Session = Depends(get_db)):
-    data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_type_id, dte.dte_version_id, dte.page)
+    data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_version_id, dte.page)
 
     return {"message": data}
 

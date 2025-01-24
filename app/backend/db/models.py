@@ -314,6 +314,7 @@ class DteModel(Base):
     exit_hour = Column(String)
     period = Column(String)
     comment = Column(String)
+    payment_comment = Column(String)
     added_date = Column(DateTime())
 
 class UserModel(Base):

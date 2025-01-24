@@ -18,7 +18,7 @@ def index(customer_bill_inputs:CustomerBillList, db: Session = Depends(get_db)):
 
 @customer_bills.post("/search")
 def search(customer_bills:CustomerBillSearch, db: Session = Depends(get_db)):
-    data = CustomerBillClass(db).search(customer_bills.branch_office_id, customer_bills.rut, customer_bills.status_id, customer_bills.supervisor_id, customer_bills.page)
+    data = CustomerBillClass(db).search(customer_bills.branch_office_id, customer_bills.rut, customer_bills.customer, customer_bills.status_id, customer_bills.supervisor_id, customer_bills.page)
 
     return {"message": data}
 

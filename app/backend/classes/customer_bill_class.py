@@ -142,7 +142,7 @@ class CustomerBillClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
-    def search(self, branch_office_id=None, rut=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
+    def search(self, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
             filters = []
@@ -151,6 +151,8 @@ class CustomerBillClass:
                 filters.append(DteModel.branch_office_id == branch_office_id)
             if rut != None and rut != "":
                 filters.append(DteModel.rut == rut)
+            if customer is not None:
+                filters.append(CustomerModel.customer.like(f"%{customer}%"))
             if status_id != None:
                 filters.append(DteModel.status_id == status_id)
             if supervisor_id != None:
@@ -336,6 +338,8 @@ class CustomerBillClass:
                 + utf8_date
                 + "_Factura_"
                 + str(form_data.id)
+                + "_"
+                + str(form_data.folio)
             )
             amount = form_data.total
         
@@ -379,6 +383,8 @@ class CustomerBillClass:
                 + utf8_date
                 + "_NotaCredito_"
                 + str(form_data.id)
+                + "_"
+                + str(form_data.folio)
             )
             amount = form_data.total
         

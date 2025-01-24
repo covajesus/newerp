@@ -300,7 +300,7 @@ class ReceivedTributaryDocumentClass:
             dte.payment_date = form_data.payment_date
             dte.payment_type_id = form_data.payment_type_id
             dte.status_id = 5
-            dte.comment = form_data.comment
+            dte.payment_comment = form_data.comment
 
             self.db.commit()
             self.db.refresh(dte)
@@ -335,6 +335,7 @@ class ReceivedTributaryDocumentClass:
         dte.expense_type_id = form_data.expense_type_id
         dte.period = form_data.period
         dte.status_id = form_data.status_id
+        dte.comment = form_data.comment
 
         self.db.commit()
         self.db.refresh(dte)
@@ -367,6 +368,8 @@ class ReceivedTributaryDocumentClass:
             + utf8_date
             + "_FacturaCompra_"
             + str(dte.id)
+            + "_"
+            + str(dte.folio)
         )
         amount = dte.total
        
@@ -423,8 +426,6 @@ class ReceivedTributaryDocumentClass:
 
         self.db.commit()
         self.db.refresh(dte)
-
-    
 
     def get(self, id):
         try:

@@ -110,7 +110,7 @@ class DteClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
-    def get_all_with_customer(self, folio=None, branch_office_id=None, rut=None, customer=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=0, items_per_page=10):
+    def get_all_with_customer(self, folio=None, branch_office_id=None, rut=None, customer=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_version_id=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
             filters = []
@@ -135,7 +135,6 @@ class DteClass:
 
             filters.append(DteModel.rut != None)
             filters.append(DteModel.dte_version_id == dte_version_id)
-            filters.append(DteModel.dte_type_id == dte_type_id)
             filters.append(DteModel.status_id > 3)
 
             # Construir la consulta base con los filtros aplicados
@@ -149,6 +148,7 @@ class DteClass:
                 DteModel.status_id,
                 CustomerModel.rut,
                 CustomerModel.customer,
+                DteModel.dte_type_id,
                 DteModel.added_date,
                 BranchOfficeModel.branch_office
             ).outerjoin(
@@ -186,6 +186,7 @@ class DteClass:
                 "id": dte.id,
                 "branch_office_id": dte.branch_office_id,
                 "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
                 "total": dte.total,
                 "customer": dte.customer,
                 "rut": dte.rut,
