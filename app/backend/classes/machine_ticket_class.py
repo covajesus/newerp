@@ -22,7 +22,6 @@ class MachineTicketClass:
             # Inicialización de filtros dinámicos
             filters = []
 
-            filters.append(DteModel.dte_version_id == 1)
             filters.append(DteModel.dte_type_id == 39)
             filters.append(DteModel.rut == None)
 
@@ -37,18 +36,13 @@ class MachineTicketClass:
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
                 DteModel.status_id,
-                DteModel.chip_id,
-                CustomerModel.customer,
                 BranchOfficeModel.branch_office
             ).outerjoin(
                 BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-            ).outerjoin(
-                CustomerModel, CustomerModel.rut == DteModel.rut
             ).filter(
                 *filters
             ).order_by(
-                desc(DteModel.added_date),
-                desc(DteModel.rut)
+                desc(DteModel.id)
             )
 
             # Si se solicita paginación
@@ -73,10 +67,8 @@ class MachineTicketClass:
                     "id": dte.id,
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
-                    "customer": dte.customer,
                     "entrance_hour": dte.entrance_hour,
                     "exit_hour": dte.exit_hour,
-                    "chip_id": dte.chip_id,
                     "folio": dte.folio,
                     "total": dte.total,
                     "status_id": dte.status_id,
@@ -101,11 +93,9 @@ class MachineTicketClass:
                     "id": dte.id,
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
-                    "customer": dte.customer,
                     "entrance_hour": dte.entrance_hour,
                     "exit_hour": dte.exit_hour,
                     "folio": dte.folio,
-                    "chip_id": dte.chip_id,
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
