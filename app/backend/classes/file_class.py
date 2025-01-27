@@ -52,7 +52,7 @@ class FileClass:
 
             # Subir el archivo a Azure File Share
             file_client.upload_file(file_content)
-
+            print(file_client)
             # Retornar mensaje de éxito
             return f"Archivo subido exitosamente a {remote_path}"
 

@@ -1,16 +1,13 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel
-from app.backend.classes.customer_class import CustomerClass
+from app.backend.db.models import DteModel, BranchOfficeModel
 from app.backend.classes.file_class import FileClass
 import requests
 from datetime import datetime
-import json
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 import uuid
 import base64
 from sqlalchemy import or_
-from fastapi import HTTPException
 
 class MachineTicketClass:
     def __init__(self, db: Session):
@@ -107,3 +104,57 @@ class MachineTicketClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
+        
+    def download(self, id):
+        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+
+        if dte:
+            payload = {
+                "credenciales": {
+                    "rutEmisor": "76063822-6",
+                    "nombreSucursal": "Casa Matriz",
+                },
+                "dteReferenciadoExterno": {
+                    "folio": dte.folio,
+                    "codigoTipoDte": dte.dte_type_id,
+                    "ambiente": 1
+                }
+            }
+
+            url = f"https://api.simplefactura.cl/getPdf"
+
+            headers = {
+                'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+                'Content-Type': 'application/json'
+            }
+
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+            )
+
+            if response.status_code == 200:
+                pdf_content = response.content
+                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+                unique_id = uuid.uuid4().hex[:8]
+                unique_filename = f"{timestamp}_{unique_id}.pdf"
+
+                remote_path = f"{unique_filename}"
+
+                self.file_class.temporal_upload(pdf_content, remote_path)
+
+                file_contents = self.file_class.download(remote_path)
+
+                print(file_contents)
+
+                encoded_file = base64.b64encode(file_contents).decode('utf-8')
+
+                self.file_class.delete(remote_path)
+
+                return {
+                    "file_name": unique_filename,
+                    "file_data": encoded_file
+                }
+            else:
+                return None

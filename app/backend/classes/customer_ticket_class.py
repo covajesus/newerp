@@ -275,14 +275,10 @@ class CustomerTicketClass:
             return {"status": "error", "message": error_message}
     
     def update(self, form_data):
-        """
-        Actualiza los datos de la patente en la base de datos.
-        """
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         if not dte:
             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
-        # Actualizar campos
         dte.branch_office_id = form_data.branch_office_id
         dte.rut = form_data.rut
         dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
@@ -297,14 +293,10 @@ class CustomerTicketClass:
         self.db.refresh(dte)
     
     def change_status(self, form_data):
-        """
-        Actualiza los datos de la patente en la base de datos.
-        """
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         if not dte:
             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
-        # Actualizar campos
         dte.expense_type_id = form_data.expense_type_id
         dte.payment_type_id = form_data.payment_type_id
         dte.payment_date = form_data.payment_date
@@ -317,7 +309,6 @@ class CustomerTicketClass:
         self.db.refresh(dte)
 
         self.create_account_asset(dte)
-
 
     def reject(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
@@ -358,12 +349,10 @@ class CustomerTicketClass:
                     "branch_office": data_query.branch_office
                 }
 
-                # Crear el resultado final como un diccionario
                 result = {
                     "customer_ticket_data": customer_ticket_data
                 }
 
-                # Convierte el resultado a una cadena JSON
                 serialized_result = json.dumps(result)
 
                 return serialized_result

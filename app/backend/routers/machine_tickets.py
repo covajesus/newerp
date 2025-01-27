@@ -14,3 +14,9 @@ def index(machine_ticket_inputs:MachineTicketList, db: Session = Depends(get_db)
     data = MachineTicketClass(db).get_all(machine_ticket_inputs.page)
 
     return {"message": data}
+
+@machine_tickets.get("/download/{id}")
+def download(id:int, db: Session = Depends(get_db)):
+    data = MachineTicketClass(db).download(id)
+
+    return {"message": data}
