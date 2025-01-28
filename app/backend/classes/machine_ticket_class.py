@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, BranchOfficeModel
+from app.backend.db.models import DteModel, BranchOfficeModel, FolioModel
 from app.backend.classes.file_class import FileClass
 import requests
 from datetime import datetime
@@ -135,7 +135,12 @@ class MachineTicketClass:
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
                 DteModel.status_id,
-                BranchOfficeModel.branch_office
+                BranchOfficeModel.branch_office,
+                FolioModel.requested_status_id,
+                FolioModel.used_status_id,
+                FolioModel.billed_status_id
+            ).outerjoin(
+                FolioModel, FolioModel.id == DteModel.folio
             ).outerjoin(
                 BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
             ).filter(
@@ -172,7 +177,12 @@ class MachineTicketClass:
                     "total": dte.total,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "branch_office": dte.branch_office
+                    "branch_office": dte.branch_office,
+                    "requested_status_id": dte.requested_status_id,
+                    "billed_status_id": dte.billed_status_id,
+                    "used_status_id": dte.used_status_id,
+                    "used_status_id": dte.used_status_id,
+                    "billed_status_id": dte.billed_status_id
                 } for dte in data]
 
                 return {
@@ -198,7 +208,10 @@ class MachineTicketClass:
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
-                    "status_id": dte.status_id
+                    "status_id": dte.status_id,
+                    "requested_status_id": dte.requested_status_id,
+                    "used_status_id": dte.used_status_id,
+                    "billed_status_id": dte.billed_status_id
                 } for dte in data]
 
                 return serialized_data
@@ -306,7 +319,6 @@ class MachineTicketClass:
             self.db.commit()
 
             credit_note_dte = DteModel()
-                    
             credit_note_dte.branch_office_id = dte.branch_office_id
             credit_note_dte.cashier_id = 0
             credit_note_dte.dte_type_id = 61
