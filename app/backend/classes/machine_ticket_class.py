@@ -341,66 +341,67 @@ class MachineTicketClass:
         added_date = added_date.split("-")
         added_date = f"{added_date[2]}-{added_date[1]}-{added_date[0]}"
 
-        data = {
-                "Documento": {
-                    "Encabezado": {
-                        "IdDoc": {
-                            "TipoDTE": 61,
-                            "FchEmis": added_date
+        if cash_amount > 0:
+            data = {
+                    "Documento": {
+                        "Encabezado": {
+                            "IdDoc": {
+                                "TipoDTE": 61,
+                                "FchEmis": added_date
+                            },
+                            "Emisor": {
+                                "RUTEmisor": "76063822-6",
+                                "RznSoc": "Jisparking SpA",
+                                "DirOrigen": "Matucana 40",
+                                "CmnaOrigen": "Santiago"
+                            },
+                            "Receptor": {
+                                "RUTRecep":"66666666-6",
+                                "RznSocRecep": "Cliente en Sucursal"
+                            },
+                            "Totales": {
+                                "MntTotal": cash_amount
+                            }
                         },
-                        "Emisor": {
-                            "RUTEmisor": "76063822-6",
-                            "RznSoc": "Jisparking SpA",
-                            "DirOrigen": "Matucana 40",
-                            "CmnaOrigen": "Santiago"
-                        },
-                        "Receptor": {
-                            "RUTRecep":"66666666-6",
-                            "RznSocRecep": "Cliente en Sucursal"
-                        },
-                        "Totales": {
-                            "MntTotal": cash_amount
-                        }
-                    },
-                    "Detalle": [{
-                        "NroLinDet": "1",
-                        "IndExe": 0,
-                        "NmbItem": "Venta",
-                        "QtyItem": "1",
-                        "PrcItem": cash_amount,
-                        "MontoItem": cash_amount
-                    }],
-                    "Referencia":[{
-                        "NroLinRef":1,
-                        "TpoDocRef":"39",
-                        "FolioRef":str(folio),
-                        "FchRef":added_date,
-                        "CodRef":1,
-                        "RazonRef":"Nota de Crédito para Caja Automática"
-                    }]
+                        "Detalle": [{
+                            "NroLinDet": "1",
+                            "IndExe": 0,
+                            "NmbItem": "Venta",
+                            "QtyItem": "1",
+                            "PrcItem": cash_amount,
+                            "MontoItem": cash_amount
+                        }],
+                        "Referencia":[{
+                            "NroLinRef":1,
+                            "TpoDocRef":"39",
+                            "FolioRef":str(folio),
+                            "FchRef":added_date,
+                            "CodRef":1,
+                            "RazonRef":"Nota de Crédito para Caja Automática"
+                        }]
+                    }
                 }
-            }
-        
-        print(data)
+            
+            print(data)
 
-        url = f"https://api.simplefactura.cl/invoiceCreditDebitNotesV2/Casa_Matriz/6"
+            url = f"https://api.simplefactura.cl/invoiceCreditDebitNotesV2/Casa_Matriz/6"
 
-        headers = {
-                'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
-                'Content-Type': 'application/json'
-            }
-        
-        response = requests.post(
-                url,
-                json=data,
-                headers=headers,
-            )
-        
-        data = json.loads(response.text)
+            headers = {
+                    'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+                    'Content-Type': 'application/json'
+                }
+            
+            response = requests.post(
+                    url,
+                    json=data,
+                    headers=headers,
+                )
+            
+            data = json.loads(response.text)
 
-        # Extraer el folio
-        folio = data["data"]["folio"]
+            # Extraer el folio
+            folio = data["data"]["folio"]
 
-        return folio
-
-
+            return folio
+        else:
+            return None
