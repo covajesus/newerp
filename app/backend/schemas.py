@@ -1360,6 +1360,19 @@ class ToBeAcceptedCustomerTicketBill(BaseModel):
 class GenerateCustomerCreditNoteTicket(BaseModel):
     id: int
     reason_id: int
+    
+class MachineTicketSearch(BaseModel):
+    branch_office_id: Optional[int] = None
+    dte_type_id: Optional[int] = None
+    dte_version_id: Optional[int] = None
+    amount: Optional[int] = None
+    since: Optional[str] = None
+    until: Optional[str] = None
+    page: int
+
+class GenerateMachineCreditNoteTicket(BaseModel):
+    id: int
+    reason_id: int
 
 class GenerateCustomerCreditNoteTicketBill(BaseModel):
     id: int
