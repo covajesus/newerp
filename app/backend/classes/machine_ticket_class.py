@@ -140,7 +140,7 @@ class MachineTicketClass:
                 FolioModel.used_status_id,
                 FolioModel.billed_status_id
             ).outerjoin(
-                FolioModel, FolioModel.id == DteModel.folio
+                FolioModel, FolioModel.folio == DteModel.folio
             ).outerjoin(
                 BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
             ).filter(
