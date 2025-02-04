@@ -349,6 +349,7 @@ class DteClass:
                 cashier_id=dte_inputs['cashier_id'],
                 dte_type_id=dte_inputs['dte_type_id'],
                 folio=dte_inputs['folio'],
+                rut='66666666-6',
                 cash_amount=dte_inputs['cash_amount'],
                 card_amount=dte_inputs['card_amount'],
                 subtotal=dte_inputs['subtotal'],

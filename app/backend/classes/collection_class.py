@@ -1,7 +1,8 @@
-from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel
+from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel
 from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
+from sqlalchemy import func
 
 class CollectionClass:
     def __init__(self, db):
@@ -10,26 +11,26 @@ class CollectionClass:
     def get_all(self, branch_office_id = None, cashier_id = None, added_date = None, page = 1, items_per_page = 10):
         filters = []
         if branch_office_id is not None:
-            filters.append(CollectionModel.branch_office_id == branch_office_id)
+            filters.append(TotalGeneralCollectionModel.branch_office_id == branch_office_id)
         if cashier_id is not None:
-            filters.append(CollectionModel.cashier_id == cashier_id)
+            filters.append(TotalGeneralCollectionModel.cashier_id == cashier_id)
         if added_date is not None and added_date != "":
             print(added_date)
-            filters.append(CollectionModel.added_date == added_date)
+            filters.append(TotalGeneralCollectionModel.added_date == added_date)
 
         try:
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
-                CollectionModel.id, 
-                CollectionModel.branch_office_id, 
-                CollectionModel.cashier_id, 
+                TotalGeneralCollectionModel.id, 
+                TotalGeneralCollectionModel.branch_office_id, 
+                TotalGeneralCollectionModel.cashier_id, 
                 BranchOfficeModel.branch_office,
                 CashierModel.cashier,
-                CollectionModel.cash_gross_amount, 
-                CollectionModel.card_gross_amount,
-                CollectionModel.total_tickets, 
-                CollectionModel.added_date
-            ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == CollectionModel.branch_office_id).outerjoin(CashierModel, CashierModel.id == CollectionModel.cashier_id).filter(*filters).order_by(desc(CollectionModel.added_date))
+                TotalGeneralCollectionModel.total, 
+                TotalGeneralCollectionModel.card_total_collections,
+                TotalGeneralCollectionModel.total_tickets, 
+                TotalGeneralCollectionModel.added_date
+            ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == TotalGeneralCollectionModel.branch_office_id).outerjoin(CashierModel, CashierModel.id == TotalGeneralCollectionModel.cashier_id).filter(*filters).order_by(desc(TotalGeneralCollectionModel.added_date))
 
             # Si se solicita paginación
             if page > 0:
@@ -55,8 +56,8 @@ class CollectionClass:
                     "branch_office": collection.branch_office,
                     "cashier_id": collection.cashier_id,
                     "cashier": collection.cashier,
-                    "cash_gross_amount": collection.cash_gross_amount,
-                    "card_gross_amount": collection.card_gross_amount,
+                    "cash_gross_amount": collection.total,
+                    "card_gross_amount": collection.card_total_collections,
                     "total_tickets": collection.total_tickets,
                     "added_date": collection.added_date
                 } for collection in data]
@@ -92,6 +93,33 @@ class CollectionClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
+    def total_collection(self, branch_office_id, collection_date):
+        try:
+            result = self.db.query(
+                func.sum(TotalGeneralCollectionModel.total).label('total'),
+                TotalGeneralCollectionModel.id.label('collection_id')
+            ).filter(
+                TotalGeneralCollectionModel.branch_office_id == branch_office_id
+            ).filter(
+                TotalGeneralCollectionModel.added_date == collection_date
+            ).group_by(TotalGeneralCollectionModel.id).all()  # Agrupamos por el id
+
+            if result:
+                # Si hay resultados, asumimos que sólo te interesa el primer resultado
+                # Aquí podrías cambiar la lógica dependiendo de si quieres manejar todos los ids
+                total_sum = result[0][0]
+                collection_id = result[0][1]
+                return {
+                    'total': total_sum if total_sum else 0,
+                    'collection_id': collection_id
+                }
+            else:
+                return {'total': 0, 'collection_id': None}
+        except Exception as e:
+            error_message = str(e)
+            return {'error': error_message}
+
+
     def get(self, field, value):
         try:
             data = self.db.query(CollectionModel).filter(getattr(CollectionModel, field) == value).first()

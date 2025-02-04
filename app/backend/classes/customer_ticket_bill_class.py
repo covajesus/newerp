@@ -28,6 +28,7 @@ class CustomerTicketBillClass:
             filters.append(DteModel.dte_version_id == 1)
             filters.append(DteModel.status_id > 3)
             filters.append(DteModel.rut != None)
+            filters.append(DteModel.rut != '66666666-6')
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
@@ -130,6 +131,7 @@ class CustomerTicketBillClass:
             filters.append(DteModel.dte_version_id == 1)
             filters.append(DteModel.status_id > 3)
             filters.append(DteModel.rut != None)
+            filters.append(DteModel.rut != '66666666-6')
             
             if supervisor_id != None:
                 # Construir la consulta base con los filtros aplicados

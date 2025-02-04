@@ -33,6 +33,7 @@ class MachineTicketClass:
                 DteModel.rut,
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
+                DteModel.dte_type_id,
                 DteModel.status_id,
                 BranchOfficeModel.branch_office
             ).outerjoin(
@@ -66,6 +67,7 @@ class MachineTicketClass:
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
                     "entrance_hour": dte.entrance_hour,
+                    "dte_type_id": dte.dte_type_id,
                     "exit_hour": dte.exit_hour,
                     "folio": dte.folio,
                     "total": dte.total,
@@ -92,6 +94,7 @@ class MachineTicketClass:
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
                     "entrance_hour": dte.entrance_hour,
+                    "dte_type_id": dte.dte_type_id,
                     "exit_hour": dte.exit_hour,
                     "folio": dte.folio,
                     "total": dte.total,
@@ -115,16 +118,15 @@ class MachineTicketClass:
                 filters.append(DteModel.branch_office_id == branch_office_id)
             if amount is not None:
                 filters.append(DteModel.total == amount)
-            if dte_type_id is not None:
-                filters.append(DteModel.dte_type_id == dte_type_id)
             if until is not None:
                 filters.append(DteModel.added_date <= until)  # Fecha desde
             if since is not None:
                 filters.append(DteModel.added_date >= since)  # Fecha hasta
+            if dte_type_id is not None:
+                filters.append(DteModel.dte_type_id == dte_type_id)
 
-            filters.append(DteModel.rut == None)
-
-            # Construir la consulta base con los filtros aplicados
+            filters.append(DteModel.rut == '66666666-6')
+            
             query = self.db.query(
                 DteModel.id, 
                 DteModel.branch_office_id, 
@@ -135,6 +137,7 @@ class MachineTicketClass:
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
                 DteModel.status_id,
+                DteModel.dte_type_id,
                 BranchOfficeModel.branch_office,
                 FolioModel.requested_status_id,
                 FolioModel.used_status_id,
@@ -148,7 +151,6 @@ class MachineTicketClass:
             ).order_by(
                 desc(DteModel.id)
             )
-
             print(query)
             if page > 0:
                 # Calcular el total de registros
@@ -173,6 +175,7 @@ class MachineTicketClass:
                     "branch_office_id": dte.branch_office_id,
                     "entrance_hour": dte.entrance_hour,
                     "exit_hour": dte.exit_hour,
+                    "dte_type_id": dte.dte_type_id,
                     "folio": dte.folio,
                     "total": dte.total,
                     "status_id": dte.status_id,
@@ -206,6 +209,7 @@ class MachineTicketClass:
                     "exit_hour": dte.exit_hour,
                     "folio": dte.folio,
                     "total": dte.total,
+                    "dte_type_id": dte.dte_type_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
                     "status_id": dte.status_id,
@@ -338,6 +342,17 @@ class MachineTicketClass:
             self.db.add(credit_note_dte)
             
             try:
+                self.db.commit()
+
+                folio_credit_note = FolioModel()
+                folio_credit_note.folio = folio
+                folio_credit_note.requested_status_id = 1
+                folio_credit_note.used_status_id = 1
+                folio_credit_note.billed_status_id = 1
+                folio_credit_note.branch_office_id = dte.branch_office_id
+                folio_credit_note.cashier_id = dte.cashier_id
+                folio_credit_note.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                self.db.add(folio_credit_note)
                 self.db.commit()
 
                 self.create_account_asset(credit_note_dte)

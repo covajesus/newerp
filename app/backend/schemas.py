@@ -757,6 +757,31 @@ class Tax(BaseModel):
                 ):
         return cls(period=period)
 
+class Deposit(BaseModel):
+    branch_office_id: int
+    total: int
+    collection_date: str
+    collection_id: int
+    collection_amount: int
+    payment_type_id: int
+    deposited_amount: int
+    deposit_date: str
+    payment_number: str
+
+    @classmethod
+    def as_form(cls,
+                branch_office_id: int = Form(),
+                total: int = Form(),
+                collection_id: int = Form(),
+                collection_amount: int = Form(),
+                collection_date: str = Form(),
+                payment_type_id: int = Form(),
+                deposited_amount: int = Form(),
+                deposit_date: str = Form(),
+                payment_number: str = Form()
+                ):
+        return cls(branch_office_id=branch_office_id, total=total, collection_amount=collection_amount, collection_id=collection_id, collection_date=collection_date, payment_type_id=payment_type_id, deposited_amount=deposited_amount, deposit_date=deposit_date, payment_number=payment_number)
+
 class Patent(BaseModel):
     branch_office_id: int
     semester: str
@@ -769,7 +794,7 @@ class Patent(BaseModel):
                 year: int = Form(),
                 ):
         return cls(branch_office_id=branch_office_id, semester=semester, year=year)
-    
+        
 class Contract(BaseModel):
     rut: str
     client: str
@@ -1220,6 +1245,13 @@ class PatentList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
     semester: Optional[str] = None  # Ahora es opcional
     year: Optional[int] = None  # Ahora es opcional
+    page: int
+
+class DepositList(BaseModel):
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    since: Optional[str] = None  # Ahora es opcional
+    until: Optional[str] = None  # Ahora es opcional
+    status_id: Optional[int] = None  # Ahora es opcional
     page: int
 
 class StoreCollection(BaseModel):

@@ -28,3 +28,9 @@ def search(collection_inputs:CollectionSearch, db: Session = Depends(get_db)):
     data = CollectionClass(db).get_all(collection_inputs.branch_office_id, collection_inputs.cashier_id, collection_inputs.added_date, collection_inputs.page)
 
     return {"message": data}
+
+@collections.get("/total_collection/{branch_office_id}/{collection_date}")
+def total_collection(branch_office_id:int, collection_date: str, db: Session = Depends(get_db)):
+    data = CollectionClass(db).total_collection(branch_office_id, collection_date)
+
+    return {"message": data}

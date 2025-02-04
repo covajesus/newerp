@@ -568,7 +568,7 @@ class CustomerTicketClass:
                     
             # Asignar los valores del formulario a la instancia del modelo
             credit_note_dte.branch_office_id = dte.branch_office_id
-            credit_note_dte.cashier_id = 0
+            credit_note_dte.cashier_id = dte.cashier_id
             credit_note_dte.dte_type_id = 61
             credit_note_dte.dte_version_id = 1
             credit_note_dte.status_id = 5

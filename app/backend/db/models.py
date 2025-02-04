@@ -280,6 +280,16 @@ class CashierModel(Base):
     anydesk = Column(String(255))
     rustdesk = Column(String(255))
 
+class TotalGeneralCollectionModel(Base):
+    __tablename__ = 'total_general_collections'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    total = Column(Integer)
+    card_total_collections = Column(Integer)
+    total_tickets = Column(Integer)
+    added_date = Column(DateTime())
+
 class DteModel(Base):
     __tablename__ = 'dtes'
 
@@ -812,13 +822,12 @@ class DepositModel(Base):
 
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
-    deposit_type_id = Column(Integer)
+    payment_type_id = Column(Integer)
     collection_id = Column(Integer)
     status_id = Column(Integer)
-    deposit_amount = Column(Integer)
-    deposit_number = Column(Integer)
+    deposited_amount = Column(Integer)
+    payment_number = Column(Integer)
     collection_amount = Column(Integer)
-    card_collection_amount = Column(Integer)
     collection_date = Column(Text)
     support = Column(Text)
     added_date = Column(Date)
