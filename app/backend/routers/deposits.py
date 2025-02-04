@@ -51,7 +51,6 @@ def support(id: int, db: Session = Depends(get_db)):
 
     return {"message": file}
 
-    
 @deposits.post("/store")
 def store(
     form_data: Deposit = Depends(Deposit.as_form),
@@ -82,5 +81,11 @@ def store(
 @deposits.get("/accept/{id}")
 def accept(id:int, db: Session = Depends(get_db)):
     data = DepositClass(db).accept(id)
+
+    return {"message": data}
+
+@deposits.get("/reject/{id}")
+def accept(id:int, db: Session = Depends(get_db)):
+    data = DepositClass(db).reject(id)
 
     return {"message": data}

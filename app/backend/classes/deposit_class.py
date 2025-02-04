@@ -212,6 +212,20 @@ class DepositClass:
         self.db.commit()
         self.db.refresh(deposit)
 
+    def reject(self, id):
+        """
+        Actualiza los datos de la patente en la base de datos.
+        """
+        deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
+        if not deposit:
+            raise HTTPException(status_code=404, detail="Patente no encontrada")
+
+        # Actualizar campos
+        deposit.status_id = 3
+
+        self.db.commit()
+        self.db.refresh(deposit)
+
     def update(self, id, form_data, support_file = None):
         """
         Actualiza los datos de la patente en la base de datos.
