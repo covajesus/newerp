@@ -12,6 +12,7 @@ class FileClass:
         self.account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
         self.account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
         self.share_name = "files" 
+        self.sas = os.getenv("AZURE_SAS")
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
         """
@@ -112,22 +113,7 @@ class FileClass:
     def get(self, remote_path: str) -> str:
 
         try:
-            # Generar un SAS Token con permisos de lectura para el archivo
-            sas_token = generate_file_sas(
-                account_name=self.account_name,
-                share_name=self.share_name,
-                file_path=remote_path,
-                account_key=self.account_key,
-                permission=FileSasPermissions(read=True),
-                expiry=datetime.utcnow() + timedelta(hours=1),  # Válido por 1 hora
-            )
-
-            # Construir la URL pública con el SAS Token
-            public_url = f"https://{self.account_name}.file.core.windows.net/{self.share_name}/{remote_path}?{sas_token}"
-
-            # Opcionalmente, puedes devolver el contenido del archivo
-            # download_stream = file_client.download_file()
-            # file_contents = download_stream.readall()
+            public_url = f"https://{self.account_name}.file.core.windows.net/{self.share_name}/{remote_path}?{self.sas}"
 
             return public_url
 
