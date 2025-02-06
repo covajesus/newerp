@@ -12,7 +12,7 @@ class FileClass:
         self.account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
         self.account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
         self.share_name = "files" 
-        self.sas = os.getenv("AZURE_SAS")
+        self.sas = os.getenv("AZURE_STORAGE_SAS_TOKEN")
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
         """
@@ -39,7 +39,6 @@ class FileClass:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
         
-    
     def temporal_upload(self, file_content, remote_path: str) -> str:
         """
         Sube un archivo al Azure File Share.

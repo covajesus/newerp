@@ -7,6 +7,7 @@ class BranchOfficeClass:
     def get_all(self):
         try:
             data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             
@@ -17,7 +18,7 @@ class BranchOfficeClass:
     
     def get(self, field, value):
         try:
-            data = self.db.query(BranchOfficeModel).filter(getattr(BranchOfficeModel, field) == value).first()
+            data = self.db.query(BranchOfficeModel).filter(getattr(BranchOfficeModel, field) == value).filter(BranchOfficeModel.status_id == 7).first()
             return data
         except Exception as e:
             error_message = str(e)

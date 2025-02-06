@@ -290,6 +290,29 @@ class TotalGeneralCollectionModel(Base):
     total_tickets = Column(Integer)
     added_date = Column(DateTime())
 
+class TotalCollectionModel(Base):
+    __tablename__ = 'total_collections'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    cash_total = Column(Integer)
+    card_total = Column(Integer)
+    total_tickets = Column(Integer)
+    added_date = Column(DateTime())
+
+class TotalDetailCollectionModel(Base):
+    __tablename__ = 'total_detail_collections'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    cash_total = Column(Integer)
+    card_total = Column(Integer)
+    total_tickets = Column(Integer)
+    dtes_cash_total = Column(Integer)
+    dtes_card_total = Column(Integer)
+    dtes_total_tickets = Column(Integer)
+    added_date = Column(DateTime())
+
 class DteModel(Base):
     __tablename__ = 'dtes'
 

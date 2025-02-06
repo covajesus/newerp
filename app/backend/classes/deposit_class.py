@@ -186,18 +186,6 @@ class DepositClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def delete(self, id):
-        try:
-            # Borrar el contrato de la base de datos
-            self.db.query(PatentModel).filter(PatentModel.id == id).delete()
-            self.db.commit()
-
-            return {"status": "success", "message": "Patent deleted successfully"}
-
-        except Exception as e:
-            self.db.rollback()
-            return {"status": "error", "message": f"Error: {str(e)}"}
-        
     def accept(self, id):
         """
         Actualiza los datos de la patente en la base de datos.

@@ -33,10 +33,11 @@ def store(
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
+        file_category_name = 'patent'
         unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
         # Ruta remota en Azure
-        remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
+        remote_path = f"{file_category_name}_{unique_filename}"  # Organizar archivos en una carpeta específica
 
         # Subir el archivo a Azure File Share
         message = FileClass(db).upload(support, remote_path)

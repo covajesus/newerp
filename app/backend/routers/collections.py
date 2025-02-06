@@ -15,6 +15,18 @@ def index(collection: CollectionList, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@collections.post("/detail")
+def detail(collection: CollectionList, db: Session = Depends(get_db)):
+    data = CollectionClass(db).get_all_with_detail(collection.branch_office_id, collection.cashier_id, collection.added_date, collection.page)
+
+    return {"message": data}
+
+@collections.post("/detail/search")
+def detail(collection: CollectionList, db: Session = Depends(get_db)):
+    data = CollectionClass(db).get_all_with_detail(collection.branch_office_id, collection.cashier_id, collection.added_date, collection.page)
+
+    return {"message": data}
+
 @collections.post("/store")
 def store(store_collection: StoreCollection, db: Session = Depends(get_db)):
     collection_inputs = store_collection.dict()
