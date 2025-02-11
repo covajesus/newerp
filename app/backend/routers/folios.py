@@ -20,7 +20,7 @@ def get_all_folios(folio: FolioList, db: Session = Depends(get_db)):
 def get(branch_office_id:int, cashier_id:int, requested_quantity:int, quantity_in_cashier:int, db: Session = Depends(get_db)):
     data = FolioClass(db).get(branch_office_id, cashier_id, requested_quantity, quantity_in_cashier)
 
-    return {"message": data}
+    return {"message": ''}
 
 @folios.get("/update/{folio}")
 def update(folio:int, db: Session = Depends(get_db)):
