@@ -277,6 +277,7 @@ class CashierModel(Base):
     __tablename__ = 'cashiers'
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_office_id = Column(Integer)
+    folio_segment_id = Column(Integer)
     cashier = Column(String(255))
     anydesk = Column(String(255))
     rustdesk = Column(String(255))
