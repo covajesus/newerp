@@ -266,6 +266,7 @@ class FolioModel(Base):
     folio = Column(Integer)
     branch_office_id = Column(Integer)
     cashier_id = Column(Integer)
+    folio_segment_id = Column(Integer)
     requested_status_id = Column(Integer)
     used_status_id = Column(Integer)
     billed_status_id = Column(Integer)
