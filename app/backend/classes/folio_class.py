@@ -150,10 +150,7 @@ class FolioClass:
                 # Consulta de folios disponibles con límite de cantidad especificada
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
 
-                if cashier.folio_segment_id == 0: 
-                    folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == 0).limit(1).all()
-                else:
-                    folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
+                folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
 
                 # Verifica si hay folios disponibles
                 if not folios:
