@@ -32,7 +32,7 @@ def get(branch_office_id:int, cashier_id:int, requested_quantity:int, quantity_i
 def get_folios(branch_office_id:int, cashier_id:int, requested_quantity:int, quantity_in_cashier:int, db: Session = Depends(get_db)):
     data = FolioClass(db).get_folio(branch_office_id, cashier_id, requested_quantity, quantity_in_cashier)
 
-    return {"message": data}
+    return {"message": '1'}
 
 @folios.get("/update/{folio}")
 def update(folio:int, db: Session = Depends(get_db)):
