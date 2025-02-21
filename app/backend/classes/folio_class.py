@@ -96,6 +96,53 @@ class FolioClass:
             # Captura cualquier error y retorna el mensaje de error
             error_message = str(e)
             return f"Error: {error_message}"
+        
+    def get_folio(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
+        try:
+            if requested_quantity > 0:
+                # Consulta de cajero para obtener el folio_segment_id
+                cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
+
+                if not cashier:
+                    return "Cajero no encontrado."
+
+                # Consulta para obtener el folio disponible (limitado a 1 folio)
+                query = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0)
+
+                if cashier.folio_segment_id == 0:
+                    query = query.filter(FolioModel.folio_segment_id == 0)
+                else:
+                    query = query.filter(FolioModel.folio_segment_id == cashier.folio_segment_id)
+
+                # Obtener un solo folio disponible
+                folio = query.first()
+
+                if not folio:
+                    return "No hay folios disponibles con el estado solicitado."
+
+                # Actualizar el folio directamente
+                folio.branch_office_id = branch_office_id
+                folio.cashier_id = cashier_id
+                folio.requested_status_id = 1
+
+                # Confirmar los cambios en la base de datos
+                self.db.commit()
+
+                # Serialización del folio actualizado
+                folio_dict = {
+                    "id": folio.id,
+                    "folio": folio.folio,
+                    "branch_office_id": folio.branch_office_id,
+                    "cashier_id": folio.cashier_id,
+                    "requested_status_id": folio.requested_status_id,
+                }
+
+                return json.dumps(folio_dict)
+            else:
+                return "La cantidad solicitada debe ser mayor a 0."
+        except Exception as e:
+            # Captura cualquier error y retorna el mensaje de error
+            return f"Error: {str(e)}"
 
     def get(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
