@@ -19,6 +19,8 @@ vacations = APIRouter(
 def index(rut: int, page: int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = VacationClass(db).get_all(rut, page)
 
+    print(1)
+
     return {"message": data}
 
 @vacations.get("/get_all_with_no_pagination/{rut}")
