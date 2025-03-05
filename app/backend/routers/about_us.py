@@ -10,6 +10,8 @@ from app.backend.classes.dropbox_class import DropboxClass
 from app.backend.classes.about_us_class import AboutUsClass
 from fastapi import File, UploadFile
 import dropbox
+from fastapi import HTTPException
+from app.backend.classes.authentication_class import AuthenticationClass
 
 about_us = APIRouter(
     prefix="/about_us",

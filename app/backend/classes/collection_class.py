@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
+from app.backend.classes.authentication_class import AuthenticationClass
 
 class CollectionClass:
     def __init__(self, db):
@@ -224,7 +225,6 @@ class CollectionClass:
             error_message = str(e)
             return {'error': error_message}
 
-
     def get(self, field, value):
         try:
             data = self.db.query(CollectionModel).filter(getattr(CollectionModel, field) == value).first()
@@ -249,6 +249,11 @@ class CollectionClass:
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
+
+        check_token = AuthenticationClass(self.db).check_token()
+
+        if check_token['expiresIn'] == 0 or check_token['expiresIn'] < 0:
+            AuthenticationClass(self.db).get_token()
 
         if collection_count == 0:
             collection = CollectionModel(

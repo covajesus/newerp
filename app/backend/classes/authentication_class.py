@@ -1,13 +1,13 @@
 from app.backend.db.models import UserModel, EmployeeModel
 from fastapi import HTTPException, Depends
 from app.backend.auth.auth_user import pwd_context, get_user
+from app.backend.classes.setting_class import SettingClass
 from datetime import datetime, timedelta
 from typing import Union
 import os
 from jose import jwt
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import requests
+import json
 import bcrypt
 
 class AuthenticationClass:
@@ -51,8 +51,6 @@ class AuthenticationClass:
             error_message = str(e)
             return f"Error: {error_message}" 
 
-
-
     def update_password(self, user_inputs):
         existing_user = self.db.query(UserModel).filter(UserModel.visual_rut == user_inputs.visual_rut).one_or_none()
 
@@ -79,6 +77,49 @@ class AuthenticationClass:
         hashed_string = bcrypt.hashpw(encoded_string, salt)
 
         return hashed_string
+    
+    def get_token(self):
+        payload = {
+            "email": "jesuscova@jisparking.com",
+            "password": "Jgames88!"
+        }
+
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        url = f"https://api.simplefactura.cl/token"
+
+        response = requests.post(
+            url,
+            data=json.dumps(payload),
+            headers=headers
+        )
+
+        response_data = response.json()
+
+        SettingClass(self.db).update(response_data['accessToken'])
+
+        return response_data
+    
+    def check_token(self):
+        setting_data = SettingClass(self.db).get()
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {setting_data.simplefactura_token}'
+        }
+
+        url = f"https://api.simplefactura.cl/token/expire"
+
+        response = requests.get(
+            url,
+            headers=headers
+        )
+
+        response_data = response.json()
+
+        return response_data
     
     # def forgot(self, data):
     #     # Configurar los detalles del correo

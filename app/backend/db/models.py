@@ -1305,6 +1305,7 @@ class SettingModel(Base):
     id = Column(Integer, primary_key=True)
     dropbox_token = Column(Text)
     facebook_token = Column(Text)
+    simplefactura_token = Column(Text)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
