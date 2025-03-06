@@ -794,7 +794,20 @@ class Patent(BaseModel):
                 year: int = Form(),
                 ):
         return cls(branch_office_id=branch_office_id, semester=semester, year=year)
-        
+
+class CarbonMonoxide(BaseModel):
+    branch_office_id: int
+    measure_value: str
+    added_date: str
+
+    @classmethod
+    def as_form(cls, 
+                branch_office_id: int = Form(),
+                measure_value: str = Form(),
+                added_date: str = Form(),
+                ):
+        return cls(branch_office_id=branch_office_id, measure_value=measure_value, added_date=added_date)
+      
 class Contract(BaseModel):
     rut: str
     client: str
@@ -831,6 +844,10 @@ class Customer(BaseModel):
     phone: str
     activity: str
     address: str
+
+class CarbonMonoxideList(BaseModel):
+    branch_office_id: Optional[int] = None
+    page: int = 0
 
 class DteList(BaseModel):
     folio: Optional[str] = None  # Opcional con valor predeterminado None
