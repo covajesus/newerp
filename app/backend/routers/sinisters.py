@@ -1,60 +1,54 @@
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from app.backend.db.database import get_db
-from app.backend.classes.carbon_monoxide_class import CarbonMonoxideClass
+from app.backend.classes.sinister_class import SinisterClass
 from app.backend.classes.file_class import FileClass
-from app.backend.schemas import CarbonMonoxideList, CarbonMonoxide
+from app.backend.schemas import SinisterList, Sinister
 from sqlalchemy.orm import Session
 from datetime import datetime
 import base64
 import json
 import uuid
 
-carbon_monoxides = APIRouter(
+sinisters = APIRouter(
     prefix="/carbon_monoxides",
     tags=["CarbonMonoxides"]
 )
 
-@carbon_monoxides.post("/")
-def index(dte: CarbonMonoxideList, db: Session = Depends(get_db)):
-    setting_data = CarbonMonoxideClass(db).get_all(dte.branch_office_id, dte.page)
+@sinisters.post("/")
+def index(dte: SinisterList, db: Session = Depends(get_db)):
+    setting_data = SinisterClass(db).get_all(dte.branch_office_id, dte.page)
 
     return {"message": setting_data}
 
-@carbon_monoxides.post("/store")
+@sinisters.post("/store")
 def store(
-    form_data: CarbonMonoxide = Depends(CarbonMonoxide.as_form),
+    form_data: Sinister = Depends(Sinister.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
     try:
-        # Generar un nombre único para el archivo
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
+        unique_id = uuid.uuid4().hex[:8]
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
-        file_category_name = 'carbon_monoxide'
+        file_category_name = 'sinister'
         unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
-        # Ruta remota en Azure
-        remote_path = f"{file_category_name}_{unique_filename}"  # Organizar archivos en una carpeta específica
-
-        # Subir el archivo a Azure File Share
+        remote_path = f"{file_category_name}_{unique_filename}"
         message = FileClass(db).upload(support, remote_path)
-
-        # Procesar los datos del formulario
-        CarbonMonoxideClass(db).store(form_data, remote_path)
+        SinisterClass(db).store(form_data, remote_path)
 
         return {"message": message}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
     
-@carbon_monoxides.delete("/delete/{id}")
+@sinisters.delete("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
-    patent_data = CarbonMonoxideClass(db).get(id)
+    sinister_data = SinisterClass(db).get(id)
 
-    patent_data = json.loads(patent_data)
+    sinister_data = json.loads(sinister_data)
 
-    file_name = patent_data["carbon_monoxide_data"]["support"]
+    file_name = sinister_data["sinister_data"]["support"]
 
     # Ruta remota del archivo
     remote_path = f"{file_name}"
@@ -64,16 +58,16 @@ def delete(id:int, db: Session = Depends(get_db)):
 
     if message == "success":
         # Eliminar el contrato de la base de datos
-        CarbonMonoxideClass(db).delete(id)
+        SinisterClass(db).delete(id)
 
     return {"message": message}
 
-@carbon_monoxides.get("/download/{id}")
+@sinisters.get("/download/{id}")
 def download(id: int, db: Session = Depends(get_db)):
-    carbon_monoxide_data = CarbonMonoxideClass(db).get(id)
+    sinister_data = SinisterClass(db).get(id)
 
-    carbon_monoxide_data = json.loads(carbon_monoxide_data)
-    file_name = carbon_monoxide_data["carbon_monoxide_data"]["support"]
+    sinister_data = json.loads(sinister_data)
+    file_name = sinister_data["sinister_data"]["support"]
 
     # Ruta remota del archivo
     remote_path = f"{file_name}"
@@ -90,15 +84,15 @@ def download(id: int, db: Session = Depends(get_db)):
         "file_data": encoded_file
     }
     
-@carbon_monoxides.get("/edit/{id}")
+@sinisters.get("/edit/{id}")
 def edit(id: int, db: Session = Depends(get_db)):
     try:
         # Obtener los datos del contrato
-        patent_data = CarbonMonoxideClass(db).get(id)
+        patent_data = SinisterClass(db).get(id)
         
         # Verificar si se encontró el contrato
         if not patent_data:
-            raise HTTPException(status_code=404, detail="Patente no encontrada")
+            raise HTTPException(status_code=404, detail="Siniestro no encontrada")
 
         # Si el contrato se encuentra, devolver los datos
         return {"message": patent_data}

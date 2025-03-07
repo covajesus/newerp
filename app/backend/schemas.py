@@ -807,7 +807,47 @@ class CarbonMonoxide(BaseModel):
                 added_date: str = Form(),
                 ):
         return cls(branch_office_id=branch_office_id, measure_value=measure_value, added_date=added_date)
-      
+
+class Sinister(BaseModel):
+    branch_office_id: int
+    sinister_date: str
+    client_name: str
+    client_rut: str
+    client_phone: str
+    client_email: str
+    brand: str
+    model: str
+    patent: str
+    year: str
+    color: str
+    description: str
+
+    @classmethod
+    def as_form(cls,
+                branch_office_id: int = Form(),
+                sinister_date: str = Form(),
+                client_name: str = Form(),
+                client_rut: str = Form(),
+                client_phone: str = Form(),
+                client_email: str = Form(),
+                brand: str = Form(),
+                model: str = Form(),
+                patent: str = Form(),
+                year: str = Form(),
+                color: str = Form(),
+                description: str = Form()
+                ):
+        return cls(branch_office_id=branch_office_id, sinister_date=sinister_date, client_name=client_name, client_rut=client_rut, client_phone=client_phone, client_email=client_email, brand=brand, model=model, patent=patent, year=year, color=color, description=description)
+
+class BankStatement(BaseModel):
+    period: str
+
+    @classmethod
+    def as_form(cls, 
+                period: str = Form()
+            ):
+        return cls(period=period)
+
 class Contract(BaseModel):
     rut: str
     client: str
@@ -846,6 +886,10 @@ class Customer(BaseModel):
     address: str
 
 class CarbonMonoxideList(BaseModel):
+    branch_office_id: Optional[int] = None
+    page: int = 0
+
+class SinisterList(BaseModel):
     branch_office_id: Optional[int] = None
     page: int = 0
 

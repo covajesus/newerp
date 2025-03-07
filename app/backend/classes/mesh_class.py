@@ -207,8 +207,6 @@ class MeshClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
-  
-    
     def validate(self, mesh_data):
         mesh_data = self.db.query(MeshModel).filter_by(rut=mesh_data['rut'], period=mesh_data['period']).first()
         return mesh_data

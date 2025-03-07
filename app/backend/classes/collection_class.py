@@ -30,7 +30,8 @@ class CollectionClass:
                 TotalGeneralCollectionModel.total, 
                 TotalGeneralCollectionModel.card_total_collections,
                 TotalGeneralCollectionModel.total_tickets, 
-                TotalGeneralCollectionModel.added_date
+                TotalGeneralCollectionModel.added_date,
+                TotalGeneralCollectionModel.updated_date,
             ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == TotalGeneralCollectionModel.branch_office_id).outerjoin(CashierModel, CashierModel.id == TotalGeneralCollectionModel.cashier_id).filter(*filters).order_by(desc(TotalGeneralCollectionModel.added_date))
 
             # Si se solicita paginación
@@ -60,7 +61,8 @@ class CollectionClass:
                     "cash_gross_amount": collection.total,
                     "card_gross_amount": collection.card_total_collections,
                     "total_tickets": collection.total_tickets,
-                    "added_date": collection.added_date
+                    "added_date": collection.added_date,
+                    "updated_date": collection.updated_date
                 } for collection in data]
 
                 return {
@@ -85,7 +87,8 @@ class CollectionClass:
                     "cash_gross_amount": collection.cash_gross_amount,
                     "card_gross_amount": collection.card_gross_amount,
                     "total_tickets": collection.total_tickets,
-                    "added_date": collection.added_date
+                    "added_date": collection.added_date,
+                    "updated_date": collection.updated_date
                 } for collection in data]
 
                 return serialized_data

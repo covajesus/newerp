@@ -291,6 +291,7 @@ class TotalGeneralCollectionModel(Base):
     card_total_collections = Column(Integer)
     total_tickets = Column(Integer)
     added_date = Column(DateTime())
+    updated_date = Column(DateTime())
 
 class TotalCollectionModel(Base):
     __tablename__ = 'total_collections'
@@ -1305,6 +1306,69 @@ class CarbonMonoxideModel(Base):
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
     measure_value = Column(String(255))
+    support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class BankStatementModel(Base):
+    __tablename__ = 'bank_statements'
+
+    id = Column(Integer, primary_key=True)
+    bank_statement_type_id = Column(Integer)
+    rut = Column(String(255))
+    deposit_number = Column(String(255))
+    amount = Column(Integer)
+    period = Column(String(255))
+
+class ComparationPendingDtesBankStatementModel(Base):
+    __tablename__ = 'comparation_pending_dtes_bank_statements'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    customer = Column(String(255))
+    folio = Column(Integer)
+    branch_office = Column(String(255))
+    amount = Column(Integer)
+    bank_statement_type_id = Column(Integer)
+    bank_statement_period = Column(String(255))
+    bank_statement_amount = Column(Integer)
+    bank_statement_rut = Column(String(255))
+    deposit_number = Column(String(255))
+
+class ComparationPendingDepositsBankStatementModel(Base):
+    __tablename__ = 'comparation_pending_deposits_bank_statements'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    payment_type_id = Column(Integer)
+    collection_id = Column(Integer)
+    branch_office = Column(String(255))
+    status_id = Column(Integer)
+    payment_number = Column(Integer)
+    collection_amount = Column(Integer)
+    deposited_amount = Column(Integer)
+    collection_date = Column(String(255))
+    bank_statement_type_id = Column(Integer)
+    bank_statement_amount = Column(Integer)
+    bank_statement_rut = Column(String(255))
+    deposit_number = Column(String(255))
+
+class SinisterModel(Base):
+    __tablename__ = 'sinisters'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    sinister_date = Column(String(255))
+    client_name = Column(String(255))
+    client_last_name = Column(String(255))
+    client_email = Column(String(255))
+    client_phone = Column(String(255))
+    brand = Column(String(255))
+    model = Column(String(255))
+    year = Column(String(255))
+    patent = Column(String(255))
+    color = Column(String(255))
+    description = Column(String(255))
     support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())

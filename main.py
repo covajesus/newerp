@@ -72,6 +72,8 @@ from app.backend.routers.cashiers import cashiers
 from app.backend.routers.biller_data import biller_data
 from app.backend.routers.settings import settings
 from app.backend.routers.carbon_monoxides import carbon_monoxides
+from app.backend.routers.sinisters import sinisters
+from app.backend.routers.bank_statements import bank_statements
 
 app = FastAPI()
 
@@ -162,6 +164,8 @@ app.include_router(cashiers)
 app.include_router(biller_data)
 app.include_router(settings)
 app.include_router(carbon_monoxides)
+app.include_router(sinisters)
+app.include_router(bank_statements)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
