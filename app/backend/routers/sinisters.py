@@ -15,8 +15,8 @@ sinisters = APIRouter(
 )
 
 @sinisters.post("/")
-def index(dte: SinisterList, db: Session = Depends(get_db)):
-    setting_data = SinisterClass(db).get_all(dte.branch_office_id, dte.page)
+def index(sinister: SinisterList, db: Session = Depends(get_db)):
+    setting_data = SinisterClass(db).get_all(sinister.branch_office_id, sinister.page)
 
     return {"message": setting_data}
 

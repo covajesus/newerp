@@ -18,7 +18,9 @@ class SinisterClass:
             query = self.db.query(
                 SinisterModel.id, 
                 SinisterModel.branch_office_id,
+                SinisterModel.status_id,
                 SinisterModel.sinister_date, 
+                SinisterModel.client_rut,
                 SinisterModel.client_name,
                 SinisterModel.client_last_name,
                 SinisterModel.client_phone,
@@ -59,7 +61,9 @@ class SinisterClass:
                 serialized_data = [{
                     "id": sinister.id,
                     "branch_office_id": sinister.branch_office_id,
-                    "sinister_date": sinister.sinister_date.strftime('%d-%m-%Y') if sinister.sinister_date else None,
+                    "status_id": sinister.status_id,
+                    "sinister_date": sinister.sinister_date,
+                    "client_rut": sinister.client_rut,
                     "client_name": sinister.client_name,
                     "client_last_name": sinister.client_last_name,
                     "client_phone": sinister.client_phone,
@@ -86,7 +90,9 @@ class SinisterClass:
                 serialized_data = [{
                     "id": sinister.id,
                     "branch_office_id": sinister.branch_office_id,
-                    "sinister_date": sinister.sinister_date.strftime('%d-%m-%Y') if sinister.sinister_date else None,
+                    "status_id": sinister.status_id,
+                    "sinister_date": sinister.sinister_date,
+                    "client_rut": sinister.client_rut,
                     "client_name": sinister.client_name,
                     "client_last_name": sinister.client_last_name,
                     "client_phone": sinister.client_phone,
