@@ -253,11 +253,6 @@ class CollectionClass:
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
 
-        check_token = AuthenticationClass(self.db).check_token()
-
-        if check_token['expiresIn'] == 0 or check_token['expiresIn'] < 0:
-            AuthenticationClass(self.db).get_token()
-
         if collection_count == 0:
             collection = CollectionModel(
                 branch_office_id=collection_inputs['branch_office_id'],
