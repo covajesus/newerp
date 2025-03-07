@@ -812,6 +812,7 @@ class Sinister(BaseModel):
     branch_office_id: int
     sinister_date: str
     client_name: str
+    client_last_name: str
     client_rut: str
     client_phone: str
     client_email: str
@@ -827,6 +828,7 @@ class Sinister(BaseModel):
                 branch_office_id: int = Form(),
                 sinister_date: str = Form(),
                 client_name: str = Form(),
+                client_last_name: str = Form(),
                 client_rut: str = Form(),
                 client_phone: str = Form(),
                 client_email: str = Form(),
@@ -837,7 +839,7 @@ class Sinister(BaseModel):
                 color: str = Form(),
                 description: str = Form()
                 ):
-        return cls(branch_office_id=branch_office_id, sinister_date=sinister_date, client_name=client_name, client_rut=client_rut, client_phone=client_phone, client_email=client_email, brand=brand, model=model, patent=patent, year=year, color=color, description=description)
+        return cls(branch_office_id=branch_office_id, sinister_date=sinister_date, client_name=client_name, client_last_name=client_last_name, client_rut=client_rut, client_phone=client_phone, client_email=client_email, brand=brand, model=model, patent=patent, year=year, color=color, description=description)
 
 class BankStatement(BaseModel):
     period: str

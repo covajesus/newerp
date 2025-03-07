@@ -9,10 +9,10 @@ from datetime import datetime, timedelta
 class FileClass:
     def __init__(self, db):
         self.db = db
-        self.account_name = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME")
-        self.account_key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY")
+        self.account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+        self.account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
         self.share_name = "files" 
-        self.sas = os.environ.get("AZURE_STORAGE_SAS_TOKEN")
+        self.sas = os.getenv("AZURE_STORAGE_SAS_TOKEN")
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
         """

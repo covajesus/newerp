@@ -10,8 +10,8 @@ import json
 import uuid
 
 sinisters = APIRouter(
-    prefix="/carbon_monoxides",
-    tags=["CarbonMonoxides"]
+    prefix="/sinisters",
+    tags=["Sinisters"]
 )
 
 @sinisters.post("/")

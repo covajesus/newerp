@@ -1358,7 +1358,9 @@ class SinisterModel(Base):
 
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
+    status_id = Column(Integer)
     sinister_date = Column(String(255))
+    client_rut = Column(String(255))
     client_name = Column(String(255))
     client_last_name = Column(String(255))
     client_email = Column(String(255))

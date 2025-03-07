@@ -135,7 +135,6 @@ class CollectionClass:
                     )
             
             # Si se solicita paginación
-            print(query)
             if page > 0:
                 # Calcular el total de registros
                 total_items = query.count()
@@ -262,7 +261,8 @@ class CollectionClass:
                 card_gross_amount=collection_inputs['card_gross_amount'],
                 card_net_amount=collection_inputs['card_net_amount'],
                 total_tickets=collection_inputs['total_tickets'],
-                added_date=collection_inputs['added_date']
+                added_date=collection_inputs['added_date'],
+                updated_date=current_date
             )
 
             self.db.add(collection)

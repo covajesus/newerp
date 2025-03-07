@@ -107,11 +107,12 @@ class SinisterClass:
             return {"status": "error", "message": error_message}
         
     def store(self, form_data, support):
-        # Crear una nueva instancia de ContractModel
         sinister = SinisterModel()
         sinister.branch_office_id = form_data.branch_office_id
+        sinister.status_id = 1
         sinister.sinister_date = form_data.sinister_date
         sinister.client_name = form_data.client_name
+        sinister.client_rut = form_data.client_rut
         sinister.client_last_name = form_data.client_last_name
         sinister.client_phone = form_data.client_phone
         sinister.client_email = form_data.client_email
@@ -120,13 +121,12 @@ class SinisterClass:
         sinister.year = form_data.year
         sinister.patent = form_data.patent
         sinister.color = form_data.color
+        sinister.description = form_data.description
         sinister.support = support
         sinister.added_date = datetime.now()
 
-        # Añadir la nueva instancia a la base de datos
         self.db.add(sinister)
 
-        # Intentar hacer commit y manejar posibles errores
         try:
             self.db.commit()
             return {"status": "success", "message": "Sinister saved successfully"}
@@ -140,6 +140,7 @@ class SinisterClass:
                             SinisterModel.id,
                             SinisterModel.branch_office_id,
                             SinisterModel.sinister_date,
+                            SinisterModel.client_rut,
                             SinisterModel.client_name,
                             SinisterModel.client_last_name,
                             SinisterModel.client_phone,
@@ -162,6 +163,7 @@ class SinisterClass:
                     "id": data_query.id,
                     "branch_office_id": data_query.branch_office_id,
                     "sinister_date": data_query.sinister_date.strftime('%d-%m-%Y') if data_query.sinister_date else None,
+                    "client_rut": data_query.client_rut,
                     "client_name": data_query.client_name,
                     "client_last_name": data_query.client_last_name,
                     "client_phone": data_query.client_phone,
