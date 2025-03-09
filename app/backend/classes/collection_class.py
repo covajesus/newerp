@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
-from app.backend.classes.authentication_class import AuthenticationClass
+import pytz
 
 class CollectionClass:
     def __init__(self, db):
@@ -248,7 +248,8 @@ class CollectionClass:
             return f"Error: {error_message}"
         
     def store(self, collection_inputs):
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        tz = pytz.timezone('America/Santiago')
+        current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
 
@@ -274,17 +275,20 @@ class CollectionClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
         else:
-            check_collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
+            check_collection = self.db.query(CollectionModel).filter(
+                CollectionModel.cashier_id == collection_inputs['cashier_id'],
+                CollectionModel.branch_office_id == collection_inputs['branch_office_id'],
+                CollectionModel.added_date == collection_inputs['added_date']
+            ).first()
             
             if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
-                collection = self.db.query(CollectionModel).filter(CollectionModel.cashier_id == collection_inputs['cashier_id']).filter(CollectionModel.branch_office_id == collection_inputs['branch_office_id']).filter(CollectionModel.added_date == collection_inputs['added_date']).first()
-                collection.cash_gross_amount = collection_inputs['cash_gross_amount']
-                collection.cash_net_amount = collection_inputs['cash_net_amount']
-                collection.card_gross_amount = collection_inputs['card_gross_amount']
-                collection.card_net_amount = collection_inputs['card_net_amount']
-                collection.total_tickets = collection_inputs['total_tickets']
-                collection.updated_date = current_date
-                self.db.add(collection)
+                check_collection.cash_gross_amount = collection_inputs['cash_gross_amount']
+                check_collection.cash_net_amount = collection_inputs['cash_net_amount']
+                check_collection.card_gross_amount = collection_inputs['card_gross_amount']
+                check_collection.card_net_amount = collection_inputs['card_net_amount']
+                check_collection.total_tickets = collection_inputs['total_tickets']
+                check_collection.updated_date = current_date
+                self.db.add(check_collection)
                 self.db.commit()
             
             return "Collection updated successfully"
