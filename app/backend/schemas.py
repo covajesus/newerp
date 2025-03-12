@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from fastapi import UploadFile, File
 from typing import Union, List, Dict, Optional
 from datetime import datetime
@@ -886,6 +886,10 @@ class Customer(BaseModel):
     phone: str
     activity: str
     address: str
+
+class ReportRequest(BaseModel):
+    selected_carbon_monoxides: list[dict]
+    email: EmailStr
 
 class CarbonMonoxideList(BaseModel):
     branch_office_id: Optional[int] = None

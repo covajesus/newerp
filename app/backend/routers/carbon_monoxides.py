@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from app.backend.db.database import get_db
 from app.backend.classes.carbon_monoxide_class import CarbonMonoxideClass
+from app.backend.classes.email_class import EmailClass
 from app.backend.classes.file_class import FileClass
-from app.backend.schemas import CarbonMonoxideList, CarbonMonoxide
+from app.backend.schemas import CarbonMonoxideList, CarbonMonoxide, ReportRequest
 from sqlalchemy.orm import Session
 from datetime import datetime
 import base64
@@ -27,20 +28,16 @@ def store(
     db: Session = Depends(get_db)
 ):
     try:
-        # Generar un nombre único para el archivo
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
         file_category_name = 'carbon_monoxide'
         unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
-        # Ruta remota en Azure
-        remote_path = f"{file_category_name}_{unique_filename}"  # Organizar archivos en una carpeta específica
+        remote_path = f"{file_category_name}_{unique_filename}"
 
-        # Subir el archivo a Azure File Share
         message = FileClass(db).upload(support, remote_path)
 
-        # Procesar los datos del formulario
         CarbonMonoxideClass(db).store(form_data, remote_path)
 
         return {"message": message}
@@ -56,14 +53,11 @@ def delete(id:int, db: Session = Depends(get_db)):
 
     file_name = patent_data["carbon_monoxide_data"]["support"]
 
-    # Ruta remota del archivo
     remote_path = f"{file_name}"
 
-    # Eliminar el archivo desde Azure File Share
     message = FileClass(db).delete(remote_path)
 
     if message == "success":
-        # Eliminar el contrato de la base de datos
         CarbonMonoxideClass(db).delete(id)
 
     return {"message": message}
@@ -75,16 +69,12 @@ def download(id: int, db: Session = Depends(get_db)):
     carbon_monoxide_data = json.loads(carbon_monoxide_data)
     file_name = carbon_monoxide_data["carbon_monoxide_data"]["support"]
 
-    # Ruta remota del archivo
     remote_path = f"{file_name}"
 
-    # Descargar archivo desde Azure File Share
     file_contents = FileClass(db).download(remote_path)
 
-    # Convertir el contenido del archivo a base64
     encoded_file = base64.b64encode(file_contents).decode('utf-8')
 
-    # Retornar el nombre del archivo y su contenido como base64
     return {
         "file_name": file_name,
         "file_data": encoded_file
@@ -106,3 +96,23 @@ def edit(id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener el iva: {str(e)}")
 
+@carbon_monoxides.post("/send_report")
+def send_report(request: ReportRequest, db: Session = Depends(get_db)):
+    for item in request.selected_carbon_monoxides:
+        carbon_monoxide = CarbonMonoxideClass(db).get(item["id"])
+
+        data = json.loads(carbon_monoxide)
+
+        email_content = "<h2>Reporte de Monóxido de Carbono</h2><ul>"
+
+        email_content += f"<li>ID: {data["carbon_monoxide_data"]["id"]}, Nivel: {data["carbon_monoxide_data"]["branch_office"]}</li>"
+    email_content += "</ul>"
+
+
+    result = EmailClass().send_email(
+        receiver_email=request.email,
+        subject="Reporte de Monóxido de Carbono",
+        message=email_content
+    )
+
+    return {"message": result}

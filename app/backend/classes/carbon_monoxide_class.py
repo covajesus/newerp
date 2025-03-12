@@ -29,9 +29,7 @@ class CarbonMonoxideClass:
                 desc(CarbonMonoxideModel.added_date)
             )
 
-            # Si se solicita paginación
             if page > 0:
-                # Calcular el total de registros
                 total_items = query.count()
                 print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
@@ -40,13 +38,11 @@ class CarbonMonoxideClass:
                 if page < 1 or page > total_pages:
                     return {"status": "error", "message": "Invalid page number"}
 
-                # Aplicar paginación en la consulta
                 data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
 
                 if not data:
                     return {"status": "error", "message": "No data found"}
 
-                # Serializar los datos
                 serialized_data = [{
                     "id": carbon_measure.id,
                     "branch_office_id": carbon_measure.branch_office_id,
@@ -80,19 +76,15 @@ class CarbonMonoxideClass:
             return {"status": "error", "message": error_message}
         
     def store(self, form_data, support):
-        # Crear una nueva instancia de ContractModel
         carbon_monoxide = CarbonMonoxideModel()
         
-        # Asignar los valores del formulario a la instancia del modelo
         carbon_monoxide.branch_office_id = form_data.branch_office_id
         carbon_monoxide.measure_value = form_data.measure_value
         carbon_monoxide.support = support
         carbon_monoxide.added_date = datetime.now()
 
-        # Añadir la nueva instancia a la base de datos
         self.db.add(carbon_monoxide)
 
-        # Intentar hacer commit y manejar posibles errores
         try:
             self.db.commit()
             return {"status": "success", "message": "Carbon monoxide saved successfully"}

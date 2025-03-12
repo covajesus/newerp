@@ -4,6 +4,7 @@ from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
 import pytz
+from app.backend.classes.authentication_class import AuthenticationClass
 
 class CollectionClass:
     def __init__(self, db):
@@ -210,11 +211,9 @@ class CollectionClass:
                 TotalGeneralCollectionModel.branch_office_id == branch_office_id
             ).filter(
                 TotalGeneralCollectionModel.added_date == collection_date
-            ).group_by(TotalGeneralCollectionModel.id).all()  # Agrupamos por el id
+            ).group_by(TotalGeneralCollectionModel.id).all()
 
             if result:
-                # Si hay resultados, asumimos que sólo te interesa el primer resultado
-                # Aquí podrías cambiar la lógica dependiendo de si quieres manejar todos los ids
                 total_sum = result[0][0]
                 collection_id = result[0][1]
                 return {
@@ -252,6 +251,10 @@ class CollectionClass:
         current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
+
+        check_token_status = AuthenticationClass(self.db).check_token()
+
+        print(check_token_status)
 
         if collection_count == 0:
             collection = CollectionModel(
