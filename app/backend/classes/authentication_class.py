@@ -117,6 +117,8 @@ class AuthenticationClass:
             headers=headers
         )
 
+        print(response)
+
         response_data = response.json()
 
         return response_data
