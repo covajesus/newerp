@@ -101,25 +101,42 @@ class AuthenticationClass:
         SettingClass(self.db).update(response_data['accessToken'])
 
         return response_data
-    
+
     def check_token(self):
         setting_data = SettingClass(self.db).get()
+        token = setting_data.simplefactura_token
+
+        if not token:
+            print("Error: No se encontró un token válido.")
+            return None
 
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {setting_data.simplefactura_token}'
+            'Authorization': f'Bearer {token}'
         }
 
-        url = f"https://api.simplefactura.cl/token/expire"
+        url = "https://api.simplefactura.cl/token/expire"
 
-        response = requests.get(
-            url,
-            headers=headers
-        )
+        response = requests.get(url, headers=headers)
 
-        print(response)
+        print(f"Status Code: {response.status_code}")
 
-        return "1"
+        if response.status_code == 401:
+            print("Error 401: Token inválido o caducado. Verifica que sea correcto y vigente.")
+            return None
+
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After", "No especificado")
+            print(f"Error 429: Demasiadas solicitudes. Espera {retry_after} segundos.")
+            return None
+
+        try:
+            return response.json()
+        except requests.exceptions.JSONDecodeError:
+            print("No se pudo decodificar la respuesta JSON.")
+            print(response.text)
+            return None
+
     
     # def forgot(self, data):
     #     # Configurar los detalles del correo
