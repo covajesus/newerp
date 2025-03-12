@@ -223,7 +223,7 @@ class FolioClass:
         }
 
         headers = {
-            'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI1ZDM1MWY0OC1iZTgzLTQ4MjgtODc3ZC1jMGE4MzNjYTVlMjEiLCJ1bmlxdWVfbmFtZSI6Implc3VzY292YUBqaXNwYXJraW5nLmNvbSIsIm5iZiI6MTc0MTgwOTcxMSwiZXhwIjoxNzQxODk2MTEwLCJpYXQiOjE3NDE4MDk3MTEsImlzcyI6Imh0dHBzOi8vYXBwLnNpbXBsZWZhY3R1cmEuY2wiLCJhdWQiOiJodHRwczovL2FwcC5zaW1wbGVmYWN0dXJhLmNsIn0.QJVCFicLskINEDaeQls0rlaMvVT5zozvRqDifFmzPJ8',
             'Content-Type': 'application/json'
         }
 
