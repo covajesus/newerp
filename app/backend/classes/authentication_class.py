@@ -119,9 +119,7 @@ class AuthenticationClass:
 
         print(response)
 
-        response_data = response.json()
-
-        return response_data
+        return "1"
     
     # def forgot(self, data):
     #     # Configurar los detalles del correo
