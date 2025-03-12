@@ -105,8 +105,9 @@ def send_report(request: ReportRequest, db: Session = Depends(get_db)):
 
         email_content = "<h2>Reporte de Monóxido de Carbono</h2><ul>"
 
-        email_content += f"<li>ID: {data["carbon_monoxide_data"]["id"]}, Nivel: {data["carbon_monoxide_data"]["branch_office"]}</li>"
-    email_content += "</ul>"
+        carbon_data = data["carbon_monoxide_data"]
+        email_content += "<li>ID: " + str(carbon_data["id"]) + ", Nivel: " + str(carbon_data["branch_office"]) + "</li>"
+        email_content += "</ul>"
 
 
     result = EmailClass().send_email(
