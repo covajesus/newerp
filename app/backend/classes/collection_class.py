@@ -1,5 +1,6 @@
 from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel
 from datetime import datetime
+from app.backend.classes.setting_class import SettingClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
@@ -255,7 +256,10 @@ class CollectionClass:
         check_token_status = AuthenticationClass(self.db).check_token()
 
         if check_token_status == 0:
-            print(check_token_status)
+            print('El token estáa vencido.')
+            AuthenticationClass(self.db).get_token()
+        else:
+            print('El token está vigente.')
 
         if collection_count == 0:
             collection = CollectionModel(

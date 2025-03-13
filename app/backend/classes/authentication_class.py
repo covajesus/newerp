@@ -68,7 +68,7 @@ class AuthenticationClass:
         self.db.commit()
 
         return 1
-
+        
     def generate_bcrypt_hash(self, input_string):
         encoded_string = input_string.encode('utf-8')
 
