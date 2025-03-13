@@ -122,12 +122,9 @@ class AuthenticationClass:
         print(f"Status Code: {response.status_code}")
 
         if response.status_code == 401:
-            print("Error 401: Token inválido o caducado. Verifica que sea correcto y vigente.")
             return 0
 
         if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After", "No especificado")
-            print(f"Error 429: Demasiadas solicitudes. Espera {retry_after} segundos.")
             return 2
 
         try:

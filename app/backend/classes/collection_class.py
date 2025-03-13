@@ -254,6 +254,9 @@ class CollectionClass:
 
         check_token_status = AuthenticationClass(self.db).check_token()
 
+        if check_token_status == 0:
+            print(check_token_status)
+
         if collection_count == 0:
             collection = CollectionModel(
                 branch_office_id=collection_inputs['branch_office_id'],
