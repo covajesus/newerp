@@ -123,21 +123,20 @@ class AuthenticationClass:
 
         if response.status_code == 401:
             print("Error 401: Token inválido o caducado. Verifica que sea correcto y vigente.")
-            return None
+            return 0
 
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After", "No especificado")
             print(f"Error 429: Demasiadas solicitudes. Espera {retry_after} segundos.")
-            return None
+            return 2
 
         try:
             return response.json()
         except requests.exceptions.JSONDecodeError:
             print("No se pudo decodificar la respuesta JSON.")
             print(response.text)
-            return None
+            return 3
 
-    
     # def forgot(self, data):
     #     # Configurar los detalles del correo
     #     msg = MIMEMultipart('alternative')
