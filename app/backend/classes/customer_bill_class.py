@@ -18,7 +18,7 @@ class CustomerBillClass:
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
 
-    def get_all(self, group = 1, page=0, items_per_page=10):
+    def get_all(self, rol_id = None, group = 1, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
             filters = []

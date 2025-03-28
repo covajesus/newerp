@@ -358,14 +358,67 @@ class UserModel(Base):
 
     id = Column(Integer, primary_key=True)
     rol_id = Column(Integer, ForeignKey('rols.id'))
-    clock_rol_id = Column(Integer)
-    status_id = Column(Integer)
     rut = Column(Integer)
-    visual_rut = Column(String(20))
-    nickname = Column(String(255))
-    password = Column(Text())
+    branch_office_id = Column(Integer)
+    full_name = Column(String(255))
+    email = Column(String(255))
+    phone = Column(Text())
     hashed_password = Column(Text())
-    disabled = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class CapitulationModel(Base):
+    __tablename__ = 'capitulations'
+
+    id = Column(Integer, primary_key=True)
+    document_date = Column(String(255))
+    status_id = Column(Integer)
+    supplier_rut = Column(String(255))
+    document_number = Column(String(255))
+    document_type_id = Column(Integer)
+    capitulation_type_id = Column(Integer)
+    branch_office_id = Column(Integer)
+    expense_type_id = Column(Integer)
+    user_rut = Column(String(255))
+    description = Column(String(255))
+    amount = Column(Integer)
+    support = Column(String(255))
+    why_was_rejected = Column(String(255))
+    payment_date = Column(String(255))
+    payment_number = Column(String(255))
+    payment_support = Column(String(255))
+    period = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class CashReserveModel(Base):
+    __tablename__ = 'cash_reserves'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    cashier_id = Column(Integer)
+    amount = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class IntershipModel(Base):
+    __tablename__ = 'interships'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    intern = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class IntershipAnswerModel(Base):
+    __tablename__ = 'interships_answers'
+
+    id = Column(Integer, primary_key=True)
+    intership_id = Column(Integer)
+    question_id = Column(Integer)
+    answer_id = Column(Integer)
+    observation = Column(String(255))
+    support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
@@ -1359,6 +1412,11 @@ class SinisterModel(Base):
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
     status_id = Column(Integer)
+    sinister_type_id = Column(Integer)
+    protected_area_id = Column(Integer)
+    registered_event_id = Column(Integer)
+    notified_security_id = Column(Integer)
+    denounced_authorities_id = Column(Integer)
     sinister_date = Column(String(255))
     client_rut = Column(String(255))
     client_name = Column(String(255))
@@ -1535,12 +1593,22 @@ class MedicalLicenseTypeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
-
 class CausalModel(Base):
     __tablename__ = 'causals'
     
     id = Column(Integer, primary_key=True)
     end_document_status_id = Column(Integer, ForeignKey('end_document_statuses.id'))
     causal = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class SinisterReviewModel(Base):
+    __tablename__ = 'sinisters_reviews'
+    
+    id = Column(Integer, primary_key=True)
+    sinister_id = Column(Integer)
+    sinister_step_type_id = Column(Integer)
+    review_description = Column(String(255))
+    support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())

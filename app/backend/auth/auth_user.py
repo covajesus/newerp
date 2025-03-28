@@ -27,17 +27,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
     
 def get_current_active_user(current_user: UserModel = Depends(get_current_user)):
-    if current_user.disabled == 1:
-        raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
 def get_user(rut):
     db: Session = next(get_db())
 
-    user = db.query(EmployeeModel.signature_type_id, EmployeeModel.signature, JobPositionModel.job_position, EmployeeLaborDatumModel.entrance_company, UserModel.id, UserModel.visual_rut, UserModel.rut, UserModel.disabled, UserModel.hashed_password, UserModel.nickname, UserModel.rol_id, UserModel.status_id, EmployeeModel.names, EmployeeModel.father_lastname, EmployeeModel.mother_lastname). \
-                    outerjoin(EmployeeModel, EmployeeModel.rut == UserModel.rut). \
-                    outerjoin(EmployeeLaborDatumModel, EmployeeLaborDatumModel.rut == UserModel.rut). \
-                    outerjoin(JobPositionModel, JobPositionModel.id == EmployeeLaborDatumModel.job_position_id). \
+    user = db.query(UserModel). \
                     filter(UserModel.rut == rut). \
                     first()
     

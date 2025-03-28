@@ -1,3 +1,4 @@
+import json
 from app.backend.db.models import UserModel, EmployeeModel
 from app.backend.auth.auth_user import generate_bcrypt_hash
 from datetime import datetime
@@ -8,25 +9,106 @@ class UserClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self):
+    def get_all(self, rut=None, page=0, items_per_page=10):
         try:
-            data = self.db.query(UserModel).order_by(UserModel.id).all()
-            if not data:
-                return "No data found"
-            return data
+            filters = []
+            if rut is not None:
+                filters.append(UserModel.rut == rut)
+
+            query = self.db.query(
+                UserModel.id, 
+                UserModel.rut, 
+                UserModel.full_name, 
+                UserModel.rol_id, 
+                UserModel.email,
+                UserModel.phone,
+                UserModel.added_date
+            ).filter(
+                *filters
+            ).order_by(
+                UserModel.rut
+            )
+
+            if page > 0:
+                total_items = query.count()
+                total_pages = (total_items + items_per_page - 1)
+
+                if page < 1 or page > total_pages:
+                    return {"status": "error", "message": "Invalid page number"}
+
+                data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+                if not data:
+                    return {"status": "error", "message": "No data found"}
+
+                serialized_data = [{
+                    "id": user.id,
+                    "rut": user.rut,
+                    "full_name": user.full_name,
+                    "rol_id": user.rol_id,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "added_date": user.added_date
+                } for user in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+
+            else:
+                data = query.all()
+
+                serialized_data = [{
+                    "id": user.id,
+                    "rut": user.rut,
+                    "full_name": user.full_name,
+                    "rol_id": user.rol_id,
+                    "email": user.email,
+                    "phone": user.phone,
+                    "added_date": user.added_date
+                } for user in data]
+
+                return serialized_data
+
         except Exception as e:
             error_message = str(e)
-            return f"Error: {error_message}"
+            return {"status": "error", "message": error_message}
     
     def get(self, field, value):
         try:
-            data = self.db.query(UserModel).filter(getattr(UserModel, field) == value).first()
-            return data
+            data_query = self.db.query(UserModel).filter(getattr(UserModel, field) == value).first()
+
+            if data_query:
+                user_data = {
+                    "id": data_query.id,
+                    "rut": data_query.rut,
+                    "full_name": data_query.full_name,
+                    "rol_id": data_query.rol_id,
+                    "email": data_query.email,
+                    "phone": data_query.phone,
+                    "hashed_password": data_query.hashed_password,
+                    "added_date": data_query.added_date
+                }
+
+                result = {
+                    "user_data": user_data
+                }
+
+                serialized_result = json.dumps(result)
+
+                return serialized_result
+
+            else:
+                return "No se encontraron datos para el campo especificado."
+
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
         
-
     def get_supervisors(self):
         try:
             data = self.db.query(UserModel).order_by(UserModel.nickname).filter(UserModel.rol_id == 3).all()
@@ -36,18 +118,14 @@ class UserClass:
             return f"Error: {error_message}"  
     
     def store(self, user_inputs):
-        numeric_rut = HelperClass().numeric_rut(user_inputs['rut'])
-        nickname = HelperClass().nickname(user_inputs['names'], user_inputs['father_lastname'])
-
         user = UserModel()
-        user.rut = numeric_rut
-        user.rol_id = 1
-        user.clock_rol_id = user_inputs['clock_rol_id']
-        user.status_id = 1
-        user.visual_rut = user_inputs['rut']
-        user.nickname = nickname
+        user.rut = user_inputs['rut']
+        user.rol_id = user_inputs['rol_id']
+        user.branch_office_id = user_inputs['branch_office_id']
+        user.full_name = user_inputs['full_name']
         user.hashed_password = generate_bcrypt_hash(user_inputs['password'])
-        user.disabled = 0
+        user.email = user_inputs['email']
+        user.phone = user_inputs['phone']
         user.added_date = datetime.now()
         user.updated_date = datetime.now()
 
@@ -61,11 +139,11 @@ class UserClass:
         
     def delete(self, id):
         try:
-            data = self.db.query(UserModel).filter(UserModel.rut == id).first()
+            data = self.db.query(UserModel).filter(UserModel.id == id).first()
             if data:
                 self.db.delete(data)
                 self.db.commit()
-                return 1
+                return 'success'
             else:
                 return "No data found"
         except Exception as e:
@@ -87,38 +165,19 @@ class UserClass:
         except Exception as e:
             return 0
 
-    def update(self, id, user_inputs):
-        user = self.db.query(UserModel).filter(UserModel.rut == id).first()
+    def update(self, id, form_data):
+        user = self.db.query(UserModel).filter(UserModel.id == id).first()
 
-        if 'rut' in user_inputs and user_inputs['rut'] is not None:
-            numeric_rut = HelperClass().numeric_rut(user_inputs['rut'])
-            user.rut = numeric_rut
-
-        if 'rol_id' in user_inputs and user_inputs['rol_id'] is not None:
-            user.rol_id = user_inputs['rol_id']
-
-        if 'clock_rol_id' in user_inputs and user_inputs['clock_rol_id'] is not None:
-            user.clock_rol_id = user_inputs['clock_rol_id']
-        
-        if 'status_id' in user_inputs and user_inputs['status_id'] is not None:
-            user.status_id = user_inputs['status_id']
-
-        if 'rut' in user_inputs and user_inputs['rut'] is not None:
-            user.visual_rut = user_inputs['rut']
-
-        if 'names' in user_inputs and user_inputs['names'] is not None and 'father_lastname' in user_inputs and user_inputs['father_lastname'] is not None:
-            nickname = HelperClass().nickname(user_inputs['names'], user_inputs['father_lastname'])
-            user.nickname = nickname
-
-        if 'password' in user_inputs and user_inputs['password'] is not None:
-            user.hashed_password = generate_bcrypt_hash(user_inputs['password'])
-        
-        if 'disabled' in user_inputs and user_inputs['disabled'] is not None:
-            user.disabled = user_inputs['disabled']
+        user.rol_id = form_data['rol_id']
+        user.rut = form_data['rut']
+        user.full_name = form_data['full_name']
+        user.email = form_data['email']
+        user.phone = form_data['phone']
 
         user.updated_date = datetime.now()
 
         self.db.add(user)
+
         try:
             self.db.commit()
 

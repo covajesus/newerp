@@ -8,12 +8,16 @@ class CarbonMonoxideClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, branch_office_id=None, page=0, items_per_page=10):
+    def get_all(self, branch_office_id=None, since_date=None, until_date=None, page=0, items_per_page=10):
         try:
             filters = []
 
             if branch_office_id is not None:
                 filters.append(CarbonMonoxideModel.branch_office_id == branch_office_id)
+            if since_date is not None and since_date != "":
+                filters.append(CarbonMonoxideModel.added_date >= since_date)
+            if until_date is not None and until_date != "":
+                filters.append(CarbonMonoxideModel.added_date <= until_date)
 
             query = self.db.query(
                 CarbonMonoxideModel.id, 

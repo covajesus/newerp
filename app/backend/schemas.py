@@ -174,13 +174,12 @@ class UpdateEmployee(BaseModel):
 
 class UserLogin(BaseModel):
     rol_id: Union[int, None]
-    clock_rol_id: Union[int, None]
-    status_id: Union[int, None]
     rut: Union[int, None]
-    visual_rut: Union[str, None]
-    nickname: Union[str, None]
+    branch_office_id: Union[int, None]
+    full_name: Union[str, None]
+    email: Union[str, None]
+    phone: Union[str, None]
     hashed_password: Union[str, None]
-    disabled: Union[int, None]
 
 class RecoverUser(BaseModel):
     rut: str
@@ -188,21 +187,19 @@ class RecoverUser(BaseModel):
 
 class User(BaseModel):
     rol_id: int
-    clock_rol_id: int
-    status_id: int
+    branch_office_id: Union[int, None]
     rut: str
-    names: str
-    father_lastname: str
+    full_name: str
+    email: str
     password: str
-    disabled: int
-    added_date: datetime
-    updated_date: Union[datetime, None]
+    phone: str
 
 class UpdateUser(BaseModel):
-    clock_rol_id: int = None
+    rol_id: int = None
     rut: str = None
-    names: str = None
-    father_lastname: str = None
+    full_name: str = None
+    email: str = None
+    phone: str = None
 
 class Uniform(BaseModel):
     uniform_type_id: int
@@ -795,6 +792,68 @@ class Patent(BaseModel):
                 ):
         return cls(branch_office_id=branch_office_id, semester=semester, year=year)
 
+class UpdateCapitulation(BaseModel):
+    id: int
+    question: str
+    why_was_rejected: str = None
+
+    @classmethod
+    def as_form(cls,
+                id: int = Form(),
+                question: str = Form(),
+                why_was_rejected: str = Form(None)
+                ):
+        return cls(id=id, question=question, why_was_rejected=why_was_rejected)
+
+class PayCapitulation(BaseModel):
+    id: int
+    payment_date: str
+    payment_number: str
+
+    @classmethod
+    def as_form(cls,
+                id: int = Form(),
+                payment_date: str = Form(),
+                payment_number: str = Form()
+                ):
+        return cls(id=id, payment_date=payment_date, payment_number=payment_number)
+
+class ImputeCapitulation(BaseModel):
+    id: int
+    period: str
+
+    @classmethod
+    def as_form(cls,
+                id: int = Form(),
+                period: str = Form()
+                ):
+        return cls(id=id, period=period)
+    
+class Capitulation(BaseModel):
+    document_date: str
+    supplier_rut: str
+    document_number: str
+    document_type_id: int
+    capitulation_type_id: int
+    branch_office_id: int
+    expense_type_id: int
+    description: str
+    amount: int
+
+    @classmethod
+    def as_form(cls,
+                document_date: str = Form(),
+                supplier_rut: str = Form(),
+                document_number: str = Form(),
+                document_type_id: int = Form(),
+                capitulation_type_id: int = Form(),
+                branch_office_id: int = Form(),
+                expense_type_id: int = Form(),
+                description: str = Form(),
+                amount: int = Form()
+                ):
+        return cls(document_date=document_date, supplier_rut=supplier_rut, document_number=document_number, document_type_id=document_type_id, capitulation_type_id=capitulation_type_id, branch_office_id=branch_office_id, expense_type_id=expense_type_id, description=description, amount=amount)
+    
 class CarbonMonoxide(BaseModel):
     branch_office_id: int
     measure_value: str
@@ -808,38 +867,68 @@ class CarbonMonoxide(BaseModel):
                 ):
         return cls(branch_office_id=branch_office_id, measure_value=measure_value, added_date=added_date)
 
+class SinisterReview(BaseModel):
+    sinister_id: int
+    sinister_step_type_id: int
+    sinister_version_id: int
+    review_description: Optional[str] = None
+    answer_step_1: Optional[int] = None
+
+    @classmethod
+    def as_form(cls,
+                sinister_id: int = Form(),
+                sinister_step_type_id: int = Form(),
+                sinister_version_id: int = Form(),
+                review_description: str = Form(None),
+                answer_step_1: int = Form(None)
+                ):
+        return cls(sinister_id=sinister_id, sinister_step_type_id=sinister_step_type_id, sinister_version_id=sinister_version_id, review_description=review_description, answer_step_1=answer_step_1)
+
+class DepositIds(BaseModel):
+    deposit_ids: List[int]
+    
 class Sinister(BaseModel):
     branch_office_id: int
+    sinister_type_id: int
+    protected_area_id: Optional[int] = None
+    registered_event_id: Optional[int] = None
+    notified_security_id: Optional[int] = None
+    denounced_authorities_id: Optional[int] = None
     sinister_date: str
     client_name: str
     client_last_name: str
     client_rut: str
     client_phone: str
     client_email: str
-    brand: str
-    model: str
-    patent: str
-    year: str
-    color: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    patent: Optional[str] = None
+    year: Optional[str] = None
+    color: Optional[str] = None
     description: str
 
     @classmethod
     def as_form(cls,
                 branch_office_id: int = Form(),
+                sinister_type_id: int = Form(),
+                protected_area_id: int = Form(None),
+                registered_event_id: int = Form(None),
+                notified_security_id: int = Form(None),
+                denounced_authorities_id: int = Form(None),
                 sinister_date: str = Form(),
                 client_name: str = Form(),
                 client_last_name: str = Form(),
                 client_rut: str = Form(),
                 client_phone: str = Form(),
                 client_email: str = Form(),
-                brand: str = Form(),
-                model: str = Form(),
-                patent: str = Form(),
-                year: str = Form(),
-                color: str = Form(),
+                brand: Optional[str] = Form(None),
+                model: Optional[str] = Form(None),
+                patent: Optional[str] = Form(None),
+                year: Optional[str] = Form(None),
+                color: Optional[str] = Form(None),
                 description: str = Form()
                 ):
-        return cls(branch_office_id=branch_office_id, sinister_date=sinister_date, client_name=client_name, client_last_name=client_last_name, client_rut=client_rut, client_phone=client_phone, client_email=client_email, brand=brand, model=model, patent=patent, year=year, color=color, description=description)
+        return cls(branch_office_id=branch_office_id, sinister_type_id=sinister_type_id, protected_area_id=protected_area_id, registered_event_id=registered_event_id, notified_security_id=notified_security_id, denounced_authorities_id=denounced_authorities_id, sinister_date=sinister_date, client_name=client_name, client_last_name=client_last_name, client_rut=client_rut, client_phone=client_phone, client_email=client_email, brand=brand, model=model, patent=patent, year=year, color=color, description=description)
 
 class BankStatement(BaseModel):
     period: str
@@ -891,8 +980,27 @@ class ReportRequest(BaseModel):
     selected_carbon_monoxides: list[dict]
     email: EmailStr
 
+class CashReserve(BaseModel):
+    branch_office_id: int
+    cashier_id: int
+    amount: int
+
+    @classmethod
+    def as_form(cls,
+                branch_office_id: int = Form(),
+                cashier_id: int = Form,
+                amount: int = Form()
+            ):
+        return cls(branch_office_id=branch_office_id, cashier_id=cashier_id, amount=amount)
+
+class CashReserveList(BaseModel):
+    branch_office_id: Optional[int] = None
+    page: int = 0
+
 class CarbonMonoxideList(BaseModel):
     branch_office_id: Optional[int] = None
+    since_date: Optional[str] = None
+    until_date: Optional[str] = None
     page: int = 0
 
 class SinisterList(BaseModel):
@@ -1312,6 +1420,18 @@ class PatentList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
     semester: Optional[str] = None  # Ahora es opcional
     year: Optional[int] = None  # Ahora es opcional
+    page: int
+
+class CapitulationList(BaseModel):
+    page: int
+
+class IntershipList(BaseModel):
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    intern: Optional[str] = None  # Ahora es opcional
+    page: int
+
+class UserList(BaseModel):
+    rut: Optional[str] = None  # Ahora es opcional
     page: int
 
 class DepositList(BaseModel):

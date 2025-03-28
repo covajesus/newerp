@@ -11,8 +11,8 @@ branch_offices = APIRouter(
 )
 
 @branch_offices.get("/")
-def index(db: Session = Depends(get_db)):
-    data = BranchOfficeClass(db).get_all()
+def index(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).get_all(session_user.rol_id, session_user.rut, session_user.branch_office_id)
 
     return {"message": data}
 

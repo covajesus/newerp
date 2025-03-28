@@ -4,10 +4,23 @@ class BranchOfficeClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self):
+    def get_all(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            data = self.db.query(BranchOfficeModel). \
+            if rol_id == 1 or rol_id == 2:
+                data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            elif rol_id == 3:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.principal_supervisor == rut). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            else:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.id == branch_office_id). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             

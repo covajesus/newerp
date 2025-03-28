@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import json
+from sqlalchemy import case
 
 class DepositClass:
     def __init__(self, db: Session):
@@ -22,7 +23,14 @@ class DepositClass:
                 filters.append(DepositModel.added_date >= since)
             if until is not None:
                 filters.append(DepositModel.added_date <= until)
-            
+
+            # Definir la prioridad de orden para status_id
+            status_order = case(
+                (DepositModel.status_id == 1, 1),
+                (DepositModel.status_id == 3, 2),
+                (DepositModel.status_id == 6, 3),
+                else_=4  # Otros valores de status_id van al final
+            )
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
@@ -41,38 +49,41 @@ class DepositClass:
             ).filter(
                 *filters
             ).order_by(
-                DepositModel.id
+                status_order,  # Primero ordenamos por prioridad de status_id
+                DepositModel.id  # Luego, ordenamos por ID dentro de cada grupo
             )
 
             # Si se solicita paginación
             if page > 0:
-                # Calcular el total de registros
                 total_items = query.count()
                 total_pages = (total_items + items_per_page - 1) // items_per_page
 
                 if page < 1 or page > total_pages:
                     return {"status": "error", "message": "Invalid page number"}
 
-                # Aplicar paginación en la consulta
                 data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
 
                 if not data:
                     return {"status": "error", "message": "No data found"}
 
-                # Serializar los datos
-                serialized_data = [{
-                    "id": deposit.id,
-                    "branch_office_id": deposit.branch_office_id,
-                    "payment_type_id": deposit.payment_type_id,
-                    "collection_id": deposit.collection_id,
-                    "status_id": deposit.status_id,
-                    "deposited_amount": deposit.deposited_amount,
-                    "payment_number": deposit.payment_number,
-                    "collection_amount": deposit.collection_amount,
-                    "collection_date": deposit.collection_date,
-                    "branch_office": deposit.branch_office
-                } for deposit in data]
+            else:
+                data = query.all()
 
+            # Serializar los datos
+            serialized_data = [{
+                "id": deposit.id,
+                "branch_office_id": deposit.branch_office_id,
+                "payment_type_id": deposit.payment_type_id,
+                "collection_id": deposit.collection_id,
+                "status_id": deposit.status_id,
+                "deposited_amount": deposit.deposited_amount,
+                "payment_number": deposit.payment_number,
+                "collection_amount": deposit.collection_amount,
+                "collection_date": deposit.collection_date,
+                "branch_office": deposit.branch_office
+            } for deposit in data]
+
+            if page > 0:
                 return {
                     "total_items": total_items,
                     "total_pages": total_pages,
@@ -80,31 +91,12 @@ class DepositClass:
                     "items_per_page": items_per_page,
                     "data": serialized_data
                 }
-
-            # Si no se solicita paginación, traer todos los datos
             else:
-                data = query.all()
-
-                # Serializar los datos
-                serialized_data = [{
-                    "id": deposit.id,
-                    "branch_office_id": deposit.branch_office_id,
-                    "payment_type_id": deposit.payment_type_id,
-                    "collection_id": deposit.collection_id,
-                    "status_id": deposit.status_id,
-                    "deposited_amount": deposit.deposited_amount,
-                    "payment_number": deposit.payment_number,
-                    "collection_amount": deposit.collection_amount,
-                    "collection_date": deposit.collection_date,
-                    "branch_office": deposit.branch_office
-                } for deposit in data]
-
                 return serialized_data
 
         except Exception as e:
-            error_message = str(e)
-            return {"status": "error", "message": error_message}
-              
+            return {"status": "error", "message": str(e)}
+            
     def get(self, id):
         try:
             data_query = self.db.query(

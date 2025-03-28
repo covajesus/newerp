@@ -16,10 +16,10 @@ carbon_monoxides = APIRouter(
 )
 
 @carbon_monoxides.post("/")
-def index(dte: CarbonMonoxideList, db: Session = Depends(get_db)):
-    setting_data = CarbonMonoxideClass(db).get_all(dte.branch_office_id, dte.page)
+def index(carbon_monoxide: CarbonMonoxideList, db: Session = Depends(get_db)):
+    carbon_monoxide_data = CarbonMonoxideClass(db).get_all(carbon_monoxide.branch_office_id, carbon_monoxide.since_date, carbon_monoxide.until_date, carbon_monoxide.page)
 
-    return {"message": setting_data}
+    return {"message": carbon_monoxide_data}
 
 @carbon_monoxides.post("/store")
 def store(
@@ -98,22 +98,26 @@ def edit(id: int, db: Session = Depends(get_db)):
 
 @carbon_monoxides.post("/send_report")
 def send_report(request: ReportRequest, db: Session = Depends(get_db)):
+    print(request.selected_carbon_monoxides)
+
+    email_content = "<h2>Reporte de Monóxido de Carbono</h2>"
+
     for item in request.selected_carbon_monoxides:
         carbon_monoxide = CarbonMonoxideClass(db).get(item["id"])
-
         data = json.loads(carbon_monoxide)
 
-        email_content = "<h2>Reporte de Monóxido de Carbono</h2><ul>"
-
         carbon_data = data["carbon_monoxide_data"]
-        email_content += "<li>ID: " + str(carbon_data["id"]) + ", Nivel: " + str(carbon_data["branch_office"]) + "</li>"
+        file_support = FileClass(db).get(carbon_data["support"])
+
+        if file_support:
+            email_content += f'<img src="{file_support}" height="400" /><br>'
+
+        email_content += "<ul>"
+        email_content += "<li>Sucursal: " + str(carbon_data["branch_office"]) + ". Fecha de Registro: " + str(carbon_data["added_date"]) + ", Medición: " + str(carbon_data["measure_value"]) + ".</li>"
         email_content += "</ul>"
 
+    email_client = EmailClass("informacion@jisparking.com", "pksh nfit pcwj dfte")
 
-    result = EmailClass().send_email(
-        receiver_email=request.email,
-        subject="Reporte de Monóxido de Carbono",
-        message=email_content
-    )
+    result = email_client.send_email(request.email, "Informe de Monóxido de Carbono", email_content)
 
     return {"message": result}

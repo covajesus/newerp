@@ -1,51 +1,47 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import BranchOfficeModel, PatentModel
+from app.backend.db.models import BranchOfficeModel, PatentModel, CashReserveModel, CashierModel
 from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import json
+from sqlalchemy import func
 
-class PatentClass:
+class CashReserveClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, branch_office_id=None, semester=None, year=None, page=0, items_per_page=10):
+    def get_all(self, branch_office_id=None, page=0, items_per_page=10):
         try:
-            # Inicialización de filtros dinámicos
+        
             filters = []
             if branch_office_id is not None:
-                filters.append(PatentModel.branch_office_id == branch_office_id)
-            if semester is not None:
-                filters.append(PatentModel.semester == semester)
-            if year is not None:
-                filters.append(PatentModel.year == year)
-
-            # Construir la consulta base con los filtros aplicados
+                filters.append(CashReserveModel.branch_office_id == branch_office_id)
+         
             query = self.db.query(
-                PatentModel.id, 
-                PatentModel.semester, 
-                PatentModel.year, 
-                BranchOfficeModel.id.label("branch_office_id"), 
-                BranchOfficeModel.branch_office
+                CashReserveModel.id, 
+                CashReserveModel.branch_office_id, 
+                CashReserveModel.cashier_id,
+                CashReserveModel.amount,
+                BranchOfficeModel.branch_office,
+                func.date_format(CashReserveModel.added_date, '%d-%m-%Y').label('added_date')
             ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == PatentModel.branch_office_id
+                BranchOfficeModel, BranchOfficeModel.id == CashReserveModel.branch_office_id
+            ).outerjoin(
+                CashierModel, CashierModel.id == CashReserveModel.cashier_id
             ).filter(
                 *filters
             ).order_by(
-                PatentModel.id
+                CashReserveModel.id
             )
 
-            # Si se solicita paginación
             if page > 0:
-                # Calcular el total de registros
                 total_items = query.count()
-                total_pages = (total_items + items_per_page - 1) // items_per_page
+                total_pages = (total_items + items_per_page - 1)
 
                 if page < 1 or page > total_pages:
                     return {"status": "error", "message": "Invalid page number"}
 
-                # Aplicar paginación en la consulta
                 data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
 
                 if not data:
@@ -53,12 +49,13 @@ class PatentClass:
 
                 # Serializar los datos
                 serialized_data = [{
-                    "id": patent.id,
-                    "branch_office_id": patent.branch_office_id,
-                    "semester": patent.semester,
-                    "year": patent.year,
-                    "branch_office": patent.branch_office
-                } for patent in data]
+                    "id": cash_reserve.id,
+                    "branch_office_id": cash_reserve.branch_office_id,
+                    "cashier_id": cash_reserve.cashier_id,
+                    "amount": cash_reserve.amount,
+                    "branch_office": cash_reserve.branch_office,
+                    "added_date": cash_reserve.added_date
+                } for cash_reserve in data]
 
                 return {
                     "total_items": total_items,
@@ -74,12 +71,13 @@ class PatentClass:
 
                 # Serializar los datos
                 serialized_data = [{
-                    "id": patent.id,
-                    "branch_office_id": patent.branch_office_id,
-                    "semester": patent.semester,
-                    "year": patent.year,
-                    "branch_office": patent.branch_office
-                } for patent in data]
+                    "id": cash_reserve.id,
+                    "branch_office_id": cash_reserve.branch_office_id,
+                    "cashier_id": cash_reserve.cashier_id,
+                    "amount": cash_reserve.amount,
+                    "branch_office": cash_reserve.branch_office,
+                    "added_date": cash_reserve.added_date
+                } for cash_reserve in data]
 
                 return serialized_data
 
@@ -123,30 +121,28 @@ class PatentClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def store(self, form_data, support):
-        patent = PatentModel()
-        
-        patent.branch_office_id = form_data.branch_office_id
-        patent.semester = form_data.semester
-        patent.year = form_data.year
-        patent.support = support
-        patent.added_date = datetime.now()
+    def store(self, form_data):
+        cash_reserve = CashReserveModel()
+        cash_reserve.branch_office_id = form_data.branch_office_id
+        cash_reserve.cashier_id = form_data.cashier_id
+        cash_reserve.amount = form_data.amount
+        cash_reserve.added_date = datetime.now()
 
-        self.db.add(patent)
+        self.db.add(cash_reserve)
 
         try:
             self.db.commit()
-            return {"status": "success", "message": "Patent saved successfully"}
+            return {"status": "success", "message": "Cash reserve saved successfully"}
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
     def delete(self, id):
         try:
-            self.db.query(PatentModel).filter(PatentModel.id == id).delete()
+            self.db.query(CashReserveModel).filter(CashReserveModel.id == id).delete()
             self.db.commit()
 
-            return {"status": "success", "message": "Patent deleted successfully"}
+            return {"status": "success", "message": "Cash reserve deleted successfully"}
 
         except Exception as e:
             self.db.rollback()

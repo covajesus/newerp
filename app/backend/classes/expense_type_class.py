@@ -14,3 +14,14 @@ class ExpenseTypeClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
+        
+    def get(self, id):
+        try:
+            data = self.db.query(ExpenseTypeModel). \
+                    filter(ExpenseTypeModel.id == id). \
+                    first()
+            
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"

@@ -1,7 +1,8 @@
 from app.backend.db.models import UserModel, EmployeeModel
-from fastapi import HTTPException, Depends
-from app.backend.auth.auth_user import pwd_context, get_user
+from fastapi import HTTPException
+from app.backend.auth.auth_user import pwd_context
 from app.backend.classes.setting_class import SettingClass
+from app.backend.classes.user_class import UserClass
 from datetime import datetime, timedelta
 from typing import Union
 import os
@@ -15,14 +16,15 @@ class AuthenticationClass:
         self.db = db
 
     def authenticate_user(self, rut, password):
-        user = get_user(rut)
+        user = UserClass(self.db).get('rut', rut)
+        response_data = json.loads(user)
 
         if not user:
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
 
-        if not self.verify_password(password, user.hashed_password):
+        if not self.verify_password(password, response_data["user_data"]["hashed_password"]):
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
-        return user
+        return response_data
         
     def verify_password(self, plain_password, hashed_password):
         return pwd_context.verify(plain_password, hashed_password)
@@ -35,9 +37,9 @@ class AuthenticationClass:
             expires = datetime.utcnow() + time_expire
 
         data_copy.update({"exp": expires})
-        token_jwt = jwt.encode(data_copy, os.environ['SECRET_KEY'], algorithm=os.environ['ALGORITHM'])
+        token = jwt.encode(data_copy, os.environ['SECRET_KEY'], algorithm=os.environ['ALGORITHM'])
 
-        return token_jwt
+        return token
     
     def forgot(self, data):
         try:
@@ -60,9 +62,9 @@ class AuthenticationClass:
         existing_user_data = user_inputs.dict(exclude_unset=True)
         for key, value in existing_user_data.items():
             print(key, value)
-            if key == 'hashed_password':  # If the key is 'hashed_password', we need to hash the value
+            if key == 'hashed_password':
                 value = self.generate_bcrypt_hash(value)
-            if hasattr(existing_user, key):  # Check if the user has this attribute
+            if hasattr(existing_user, key):
                 setattr(existing_user, key, value)
 
         self.db.commit()
@@ -77,30 +79,6 @@ class AuthenticationClass:
         hashed_string = bcrypt.hashpw(encoded_string, salt)
 
         return hashed_string
-    
-    def get_token(self):
-        payload = {
-            "email": "jesuscova@jisparking.com",
-            "password": "Jgames88!"
-        }
-
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        url = f"https://api.simplefactura.cl/token"
-
-        response = requests.post(
-            url,
-            data=json.dumps(payload),
-            headers=headers
-        )
-
-        response_data = response.json()
-
-        SettingClass(self.db).update(response_data['accessToken'])
-
-        return response_data
 
     def check_token(self):
         setting_data = SettingClass(self.db).get()

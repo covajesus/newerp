@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
-from app.backend.schemas import BankStatement
+from app.backend.schemas import BankStatement, DepositIds
 from fastapi import UploadFile, File, HTTPException
 from app.backend.classes.bank_statement_class import BankStatementClass
 from datetime import datetime
@@ -75,3 +75,13 @@ def deposit_accept(
     message = BankStatementClass(db).deposit_accept(id)
 
     return {"message": message}
+
+@bank_statements.post("/deposit/massive_accept")
+def massive_accept(data: DepositIds, db: Session = Depends(get_db)):
+    results = []
+    
+    for deposit_id in data.deposit_ids:
+        response = BankStatementClass(db).deposit_accept(deposit_id)
+        results.append({"id": deposit_id, "message": response})
+
+    return {"message": "Depósitos procesados correctamente", "details": results}
