@@ -6,7 +6,7 @@ class BranchOfficeClass:
 
     def get_all(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            if rol_id == 1 or rol_id == 2:
+            if rol_id == 1 or rol_id == 2 or rol_id == 5:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     order_by(BranchOfficeModel.branch_office). \
