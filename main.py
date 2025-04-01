@@ -57,6 +57,7 @@ from app.backend.routers.cash_reserves import cash_reserves
 from app.backend.routers.interships import interships
 
 app = FastAPI()
+application = app
 
 os.environ['SECRET_KEY'] = '7de4c36b48fce8dcb3a4bb527ba62d789ebf3d3a7582472ee49d430b01a7f868'
 os.environ['ALGORITHM'] = 'HS256'
