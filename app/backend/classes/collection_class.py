@@ -257,7 +257,6 @@ class CollectionClass:
 
         if check_token_status == 0:
             print('El token estáa vencido.')
-            AuthenticationClass(self.db).get_token()
         else:
             print('El token está vigente.')
 
