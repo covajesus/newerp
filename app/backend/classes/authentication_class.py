@@ -107,8 +107,6 @@ class AuthenticationClass:
     def check_simplefactura_token(self):
         setting_data = SettingClass(self.db).get()
         token = setting_data.simplefactura_token
-        print(22222)
-        print(token)
 
         if not token:
             print("Error: No se encontró un token válido.")
