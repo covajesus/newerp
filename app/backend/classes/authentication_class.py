@@ -80,7 +80,25 @@ class AuthenticationClass:
 
         return hashed_string
 
-    def check_token(self):
+    def create_simplefactura_token(self):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        url = "https://api.simplefactura.cl/token"
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            access_token = data.get("accessToken")
+            print("Access Token:", access_token)
+            SettingClass(self.db).update(access_token)
+        else:
+            print("Error al obtener el token:", response.status_code, response.text)
+            return None
+        
+    def check_simplefactura_token(self):
         setting_data = SettingClass(self.db).get()
         token = setting_data.simplefactura_token
 

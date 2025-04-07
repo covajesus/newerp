@@ -239,7 +239,6 @@ class FolioClass:
             data = response_data.get('data')
 
             quantity = len(data)
-            print(quantity)
 
             if quantity > 0:
                 folio_data = self.db.query(FolioModel).order_by(FolioModel.id.desc()).first()

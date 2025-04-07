@@ -256,7 +256,9 @@ class CollectionClass:
         check_token_status = AuthenticationClass(self.db).check_token()
 
         if check_token_status == 0:
-            print('El token estáa vencido.')
+            print('El token está vencido.')
+
+            AuthenticationClass(self.db).create_simplefactura_token()
         else:
             print('El token está vigente.')
 
