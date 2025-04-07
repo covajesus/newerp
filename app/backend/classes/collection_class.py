@@ -253,7 +253,7 @@ class CollectionClass:
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
 
-        check_token_status = AuthenticationClass(self.db).check_token()
+        check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
 
         if check_token_status == 0:
             print('El token está vencido.')
