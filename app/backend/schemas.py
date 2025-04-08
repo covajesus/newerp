@@ -1448,8 +1448,6 @@ class StoreCollection(BaseModel):
     cash_net_amount: int
     card_gross_amount: int
     card_net_amount: int
-    cash_gross_amount: int
-    cash_net_amount: int
     total_tickets: int
     added_date: str
 
