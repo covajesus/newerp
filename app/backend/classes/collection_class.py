@@ -248,7 +248,6 @@ class CollectionClass:
             return f"Error: {error_message}"
         
     def store(self, collection_inputs):
-        print(collection_inputs)
         tz = pytz.timezone('America/Santiago')
         current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -291,11 +290,14 @@ class CollectionClass:
                 CollectionModel.added_date == collection_inputs['added_date']
             ).first()
             
-            print(check_collection.added_date)
-            print(collection_inputs['added_date'])
-            
             if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
-                print(check_collection.id)
-
+                check_collection.cash_gross_amount = collection_inputs['cash_gross_amount']
+                check_collection.cash_net_amount = collection_inputs['cash_net_amount']
+                check_collection.card_gross_amount = collection_inputs['card_gross_amount']
+                check_collection.card_net_amount = collection_inputs['card_net_amount']
+                check_collection.total_tickets = collection_inputs['total_tickets']
+                check_collection.updated_date = current_date
+                self.db.add(check_collection)
+                self.db.commit()
             
             return "Collection updated successfully"
