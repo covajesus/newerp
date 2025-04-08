@@ -284,7 +284,7 @@ class CollectionClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
         else:
-            check_collection = self.db.query(CollectionModel).filter(
+            check_collection = self.db.query(CollectionModel.cash_gross_amount).filter(
                 CollectionModel.cashier_id == collection_inputs['cashier_id'],
                 CollectionModel.branch_office_id == collection_inputs['branch_office_id'],
                 CollectionModel.added_date == collection_inputs['added_date']
