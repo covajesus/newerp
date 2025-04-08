@@ -294,7 +294,7 @@ class CollectionClass:
             print(check_collection.cash_gross_amount)
             
             if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
-                print(collection_inputs['cash_gross_amount'])
-                
+                print(check_collection.id)
+
             
             return "Collection updated successfully"
