@@ -291,7 +291,7 @@ class CollectionClass:
                 CollectionModel.added_date == collection_inputs['added_date']
             ).first()
             
-            print(CollectionModel.added_date)
+            print(check_collection.added_date)
             print(collection_inputs['added_date'])
             
             if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
