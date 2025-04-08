@@ -248,6 +248,7 @@ class CollectionClass:
             return f"Error: {error_message}"
         
     def store(self, collection_inputs):
+        print(collection_inputs)
         tz = pytz.timezone('America/Santiago')
         current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
