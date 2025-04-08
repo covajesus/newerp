@@ -284,7 +284,7 @@ class CollectionClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
         else:
-            check_collection = self.db.query(CollectionModel.cash_gross_amount).filter(
+            check_collection = self.db.query(CollectionModel.cash_gross_amount, CollectionModel.cash_net_amount, CollectionModel.card_gross_amount, CollectionModel.card_net_amount, CollectionModel.total_tickets).filter(
                 CollectionModel.cashier_id == collection_inputs['cashier_id'],
                 CollectionModel.branch_office_id == collection_inputs['branch_office_id'],
                 CollectionModel.added_date == collection_inputs['added_date']
@@ -293,13 +293,14 @@ class CollectionClass:
             print(check_collection.cash_gross_amount)
             
             if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
-                check_collection.cash_gross_amount = collection_inputs['cash_gross_amount']
-                check_collection.cash_net_amount = collection_inputs['cash_net_amount']
-                check_collection.card_gross_amount = collection_inputs['card_gross_amount']
-                check_collection.card_net_amount = collection_inputs['card_net_amount']
-                check_collection.total_tickets = collection_inputs['total_tickets']
-                check_collection.updated_date = current_date
-                self.db.add(check_collection)
+                update_cashier = self.db.query(CashierModel).filter(CashierModel.id == check_collection.id).first()
+                update_cashier.cash_gross_amount = collection_inputs['cash_gross_amount']
+                update_cashier.cash_net_amount = collection_inputs['cash_net_amount']
+                update_cashier.card_gross_amount = collection_inputs['card_gross_amount']
+                update_cashier.card_net_amount = collection_inputs['card_net_amount']
+                update_cashier.total_tickets = collection_inputs['total_tickets']
+                update_cashier.updated_date = current_date
+                self.db.add(update_cashier)
                 self.db.commit()
             
             return "Collection updated successfully"
