@@ -413,6 +413,9 @@ class DteClass:
                 return f"Error: {error_message}"
         else:
             try:
+                print(branch_office_id)
+                print(cashier_id)
+                print(added_date)
                 # Filtra todos los registros que coincidan con los criterios especificados
                 data = self.db.query(DteModel)\
                             .filter(DteModel.branch_office_id == branch_office_id)\
