@@ -399,7 +399,7 @@ class DteClass:
                 data = self.db.query(DteModel)\
                             .filter(DteModel.branch_office_id == branch_office_id)\
                             .filter(DteModel.cashier_id == cashier_id)\
-                            .filter(DteModel.added_date == added_date)\
+                            .filter(cast(DteModel.added_date, Date) == added_date)\
                             .filter(DteModel.folio == folio)\
                             .first()
 
