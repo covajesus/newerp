@@ -3,6 +3,7 @@ from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, Su
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
+from sqlalchemy import cast, Date
 
 class DteClass:
     def __init__(self, db):
@@ -413,14 +414,11 @@ class DteClass:
                 return f"Error: {error_message}"
         else:
             try:
-                print(branch_office_id)
-                print(cashier_id)
-                print(added_date)
                 # Filtra todos los registros que coincidan con los criterios especificados
                 data = self.db.query(DteModel)\
                             .filter(DteModel.branch_office_id == branch_office_id)\
                             .filter(DteModel.cashier_id == cashier_id)\
-                            .filter(DteModel.added_date == added_date)\
+                            .filter(cast(DteModel.added_date, Date) == added_date)\
                             .all()
 
                 if data:
