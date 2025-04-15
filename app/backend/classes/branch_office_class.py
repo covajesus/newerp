@@ -15,7 +15,6 @@ class BranchOfficeClass:
             else:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.id == branch_office_id). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             
