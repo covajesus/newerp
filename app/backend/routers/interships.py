@@ -94,7 +94,8 @@ def store(
 
         observation_value = observations[i] if i < len(observations) and observations[i] else None
 
-        # Insertar la respuesta, con o sin imagen
+        print(questions[i])
+        print(observation_value)
         IntershipClass(db).store_answer(
             internship_id,
             questions[i],
