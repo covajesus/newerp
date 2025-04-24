@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.backend.classes.authentication_class import AuthenticationClass
 from app.backend.classes.rol_class import RolClass
 from datetime import timedelta
+from app.backend.auth.auth_user import get_current_active_user, create_new_access_token
+from app.backend.schemas import UserLogin
 import json
 
 authentications = APIRouter(
@@ -45,4 +47,12 @@ def logout(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
         "rol_id": user.rol_id,
         "nickname": user.nickname,
         "token_type": "bearer"
+    }
+
+@authentications.post("/authentications/refresh")
+def refresh_token(session_user: UserLogin = Depends(get_current_active_user)):
+    new_token = create_new_access_token(user=session_user)
+    return {
+        "access_token": new_token,
+        "expires_in": 1800
     }
