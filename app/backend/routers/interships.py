@@ -71,8 +71,8 @@ def store(
     branch_office_id: int = Form(...),
     questions: List[str] = Form(...),
     answers: List[str] = Form(...),
-    observations: Optional[List[str]] = Form(None),  # ahora opcional
-    files: Optional[List[UploadFile]] = File(None),  # ahora opcional
+    observations: List[str] = Form(None),  # ahora opcional
+    files: List[UploadFile] = File(None),  # ahora opcional
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
