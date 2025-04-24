@@ -92,12 +92,14 @@ def store(
 
             FileClass(db).upload(support, remote_path)
 
+        observation_value = observations[i] if observations[i] else None
+
         # Insertar la respuesta, con o sin imagen
         IntershipClass(db).store_answer(
             internship_id,
             questions[i],
             answers[i],
-            observations[i],
+            observation_value,
             remote_path  # Puede ser None si no hay archivo
         )
 
