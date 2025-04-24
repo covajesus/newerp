@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Form, HTTPException
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.db.database import get_db
@@ -71,18 +71,19 @@ def store(
     branch_office_id: int = Form(...),
     questions: List[str] = Form(...),
     answers: List[str] = Form(...),
-    observations: List[str] = Form(...),
-    files: List[UploadFile] = File(...),
+    observations: Optional[List[str]] = Form(None),  # ahora opcional
+    files: Optional[List[UploadFile]] = File(None),  # ahora opcional
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     internship_id = IntershipClass(db).store(branch_office_id, session_user.rut)
 
     for i in range(len(questions)):
-        support = files[i] if i < len(files) else None
+        # Manejo del archivo
+        support = files[i] if files and i < len(files) else None
         remote_path = None
 
-        if support and support.filename:  # Verifica si realmente hay un archivo subido
+        if support and support.filename:
             timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
             unique_id = uuid.uuid4().hex[:8]
             file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
@@ -92,16 +93,18 @@ def store(
 
             FileClass(db).upload(support, remote_path)
 
-        observation_value = observations[i] if i < len(observations) and observations[i] else None
+        # Manejo de observación
+        observation_value = (
+            observations[i] if observations and i < len(observations) and observations[i] else None
+        )
 
-        print(questions[i])
-        print(observation_value)
+        # Guardar respuesta
         IntershipClass(db).store_answer(
             internship_id,
             questions[i],
             answers[i],
             observation_value,
-            remote_path  # Puede ser None si no hay archivo
+            remote_path
         )
 
     return {"message": "Pasantía creada con éxito", "internship_id": internship_id}
