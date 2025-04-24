@@ -49,7 +49,7 @@ def logout(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
         "token_type": "bearer"
     }
 
-@authentications.post("/authentications/refresh")
+@authentications.post("/refresh")
 def refresh_token(session_user: UserLogin = Depends(get_current_active_user)):
     new_token = create_new_access_token(user=session_user)
     return {
