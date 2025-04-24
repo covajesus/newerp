@@ -60,11 +60,10 @@ class AlertClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
-    def store(self, alert_inputs):
+    def store(self):
         alert = AlertModel()
-        alert.status_id = alert_inputs['status_id']
-        alert.alert_type_id = alert_inputs['alert_type_id']
-        alert.rut = alert_inputs['rut']
+        alert.status_id = 1
+        alert.alert_type_id = 1
         alert.added_date = datetime.now()
 
         self.db.add(alert)

@@ -1,4 +1,6 @@
 from app.backend.db.models import FolioModel, CashierModel
+from app.backend.classes.setting_class import SettingClass
+from app.backend.classes.alert_class import AlertClass
 import json
 import requests
 import datetime
@@ -67,10 +69,8 @@ class FolioClass:
         
     def validate(self):
         try:
-            # Consulta de folios disponibles
             folio_count = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).count()
             
-            # Valida si el conteo es menor a 100
             if folio_count < 100:
                 return 1  # Retorna 1 si hay menos de 100 folios
             else:
@@ -144,11 +144,32 @@ class FolioClass:
             # Captura cualquier error y retorna el mensaje de error
             return f"Error: {str(e)}"
 
+    def validate_caf_limit(self, folio_segment_id):
+        try:
+            settings = SettingClass(self.db).get()
+            if settings:
+                folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == folio_segment_id).count()
+                caf_limit = settings.caf_limit
+
+                if folios < caf_limit:
+                    return 1
+                else:
+                    return 0
+            else:
+                return 3
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
     def get(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
             if requested_quantity > 0:
-                # Consulta de folios disponibles con límite de cantidad especificada
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
+
+                validate_caf_limit = self.validate_caf_limit(self.db, cashier.folio_segment_id)
+
+                if validate_caf_limit == 1:
+                    AlertClass(self.db).store()
 
                 folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
 

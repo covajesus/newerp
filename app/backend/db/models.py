@@ -704,7 +704,6 @@ class AlertModel(Base):
     id = Column(Integer, primary_key=True)
     alert_type_id = Column(Integer)
     status_id = Column(Integer)
-    rut = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
