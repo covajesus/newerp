@@ -83,7 +83,7 @@ def store(
         support = files[i] if files and i < len(files) else None
         remote_path = None
 
-        if support and support.filename:
+        if support and support.filename != "empty-file.jpg":
             timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
             unique_id = uuid.uuid4().hex[:8]
             file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
