@@ -92,10 +92,7 @@ def store(
 
             FileClass(db).upload(support, remote_path)
 
-        try:
-            observation_value = observations[i] if observations[i] else None
-        except IndexError:
-            observation_value = None  # Si el índice no existe, asigna None
+        observation_value = observations[i] if i < len(observations) and observations[i] else None
 
         # Insertar la respuesta, con o sin imagen
         IntershipClass(db).store_answer(
