@@ -1,44 +1,29 @@
 import os
-import uuid
 from fastapi import HTTPException, UploadFile
 
 class FileClass:
     def __init__(self, db):
         self.db = db
         self.files_dir = "/var/www/jisbackend.com/files"
-        self.base_url = "https://jisbackend.com/files"
+        self.base_url = "http://jisbackend.com/files"
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
         try:
-            # Generar un nombre único para el archivo con UUID
-            unique_filename = f"{uuid.uuid4().hex}_{remote_path}"
-            full_path = os.path.join(self.files_dir, unique_filename)
-            
-            # Crear directorios si no existen
+            full_path = os.path.join(self.files_dir, remote_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            # Guardar el archivo
             with open(full_path, "wb") as f:
                 f.write(file.file.read())
-            
-            return f"Archivo subido exitosamente a {unique_filename}"
+            return f"Archivo subido exitosamente a {remote_path}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
 
     def temporal_upload(self, file_content: bytes, remote_path: str) -> str:
         try:
-            # Generar un nombre único para el archivo con UUID
-            unique_filename = f"{uuid.uuid4().hex}_{remote_path}"
-            full_path = os.path.join(self.files_dir, unique_filename)
-            
-            # Crear directorios si no existen
+            full_path = os.path.join(self.files_dir, remote_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            # Guardar el archivo
             with open(full_path, "wb") as f:
                 f.write(file_content)
-            
-            return f"Archivo subido exitosamente a {unique_filename}"
+            return f"Archivo subido exitosamente a {remote_path}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
 
@@ -69,4 +54,3 @@ class FileClass:
             return f"{self.base_url}/{remote_path}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al generar URL del archivo: {str(e)}")
-
