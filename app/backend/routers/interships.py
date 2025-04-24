@@ -76,29 +76,29 @@ def store(
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    
     internship_id = IntershipClass(db).store(branch_office_id, session_user.rut)
 
-    data = {
-        "branch_office_id": branch_office_id,
-        "questions": questions,
-        "answers": answers,
-        "observations": observations,
-        "files": files
-    }
+    for i in range(len(questions)):
+        support = files[i] if i < len(files) else None
+        remote_path = None
 
-    for i in range(len(data["questions"])):
-        support = data['files'][i]
-        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_id = uuid.uuid4().hex[:8]
-        file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
-        file_category_name = 'intership'
-        unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
+        if support and support.filename:  # Verifica si realmente hay un archivo subido
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]
+            file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
+            file_category_name = 'intership'
+            unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
+            remote_path = f"{file_category_name}_{unique_filename}"
 
-        remote_path = f"{file_category_name}_{unique_filename}"
+            FileClass(db).upload(support, remote_path)
 
-        FileClass(db).upload(support, remote_path)
-
-        IntershipClass(db).store_answer(internship_id, data['questions'][i], data['answers'][i], data['observations'][i], remote_path)
+        # Insertar la respuesta, con o sin imagen
+        IntershipClass(db).store_answer(
+            internship_id,
+            questions[i],
+            answers[i],
+            observations[i],
+            remote_path  # Puede ser None si no hay archivo
+        )
 
     return {"message": "Pasantía creada con éxito", "internship_id": internship_id}
