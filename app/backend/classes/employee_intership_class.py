@@ -131,7 +131,9 @@ class EmployeeIntershipClass:
             data_query = self.db.query(
                             EmployeeIntershipModel.id, 
                             EmployeeIntershipModel.intern, 
-                            EmployeeIntershipModel.branch_office_id, 
+                            EmployeeIntershipModel.branch_office_id,
+                            EmployeeIntershipModel.observations,
+                            EmployeeIntershipModel.support, 
                             func.date_format(EmployeeIntershipModel.added_date, "%d-%m-%Y").label("added_date"),
                             UserModel.full_name,
                             BranchOfficeModel.id.label("branch_office_id"), 
@@ -147,6 +149,8 @@ class EmployeeIntershipClass:
                     "branch_office": data_query.branch_office,
                     "branch_office_id": data_query.branch_office_id,
                     "intern": data_query.intern,
+                    "observations": data_query.observations,
+                    "support": data_query.support,
                     "full_name": data_query.full_name,
                     "added_date": data_query.added_date
                 }
