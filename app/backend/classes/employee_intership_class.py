@@ -179,14 +179,12 @@ class EmployeeIntershipClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def store_answer(self, intership_id, question_id, answer_id, observation, support):
+    def store_answer(self, intership_id, question_id, answer_id):
         intership_answer = IntershipAnswerModel()
 
         intership_answer.intership_id = intership_id
         intership_answer.question_id = question_id
         intership_answer.answer_id = answer_id
-        intership_answer.observation = observation
-        intership_answer.support = support
         intership_answer.added_date = datetime.now()
 
         self.db.add(intership_answer)
