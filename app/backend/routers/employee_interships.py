@@ -77,9 +77,9 @@ def store(
     db: Session = Depends(get_db)
 ):
     remote_path = None
-    if file and file.filename:
 
-        internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, '1.jpg')
+
+    internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, '1.jpg')
 
    
 
