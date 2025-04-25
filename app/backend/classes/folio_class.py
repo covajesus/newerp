@@ -147,7 +147,7 @@ class FolioClass:
     def a (self):
         self.validate_caf_limit(self.db, 1)
 
-        return 
+        return "1"
     
     def validate_caf_limit(self, folio_segment_id):
         try:
