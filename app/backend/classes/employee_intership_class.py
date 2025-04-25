@@ -22,6 +22,8 @@ class EmployeeIntershipClass:
                     EmployeeIntershipModel.id, 
                     EmployeeIntershipModel.intern, 
                     EmployeeIntershipModel.branch_office_id, 
+                    EmployeeIntershipModel.observations,
+                    EmployeeIntershipModel.support,
                     func.date_format(EmployeeIntershipModel.added_date, "%d-%m-%Y").label("added_date"),
                     UserModel.full_name,
                     BranchOfficeModel.id.label("branch_office_id"), 
@@ -40,6 +42,8 @@ class EmployeeIntershipClass:
                     EmployeeIntershipModel.id, 
                     EmployeeIntershipModel.intern, 
                     EmployeeIntershipModel.branch_office_id, 
+                    EmployeeIntershipModel.observations,
+                    EmployeeIntershipModel.support,
                     func.date_format(EmployeeIntershipModel.added_date, "%d-%m-%Y").label("added_date"),
                     UserModel.full_name,
                     BranchOfficeModel.id.label("branch_office_id"), 
@@ -72,6 +76,8 @@ class EmployeeIntershipClass:
                     "id": intership.id,
                     "branch_office_id": intership.branch_office_id,
                     "intern": intership.intern,
+                    "observations": intership.observations,
+                    "support": intership.support,
                     "full_name": intership.full_name,
                     "added_date": intership.added_date,
                     "branch_office": intership.branch_office
@@ -93,6 +99,8 @@ class EmployeeIntershipClass:
                     "branch_office_id": intership.branch_office_id,
                     "intern": intership.intern,
                     "full_name": intership.full_name,
+                    "observations": intership.observations,
+                    "support": intership.support,
                     "added_date": intership.added_date,
                     "branch_office": intership.branch_office
                 } for intership in data]
