@@ -166,11 +166,6 @@ class FolioClass:
             if requested_quantity > 0:
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
 
-                validate_caf_limit = self.validate_caf_limit(self.db, cashier.folio_segment_id)
-
-                if validate_caf_limit == 1:
-                    AlertClass(self.db).store()
-
                 folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
 
                 # Verifica si hay folios disponibles
