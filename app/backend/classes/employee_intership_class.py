@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.backend.db.models import IntershipModel, IntershipAnswerModel, BranchOfficeModel, UserModel
+from app.backend.db.models import EmployeeIntershipModel, EmployeeIntershipAnswerModel, BranchOfficeModel, UserModel
 from sqlalchemy import func
 
 class EmployeeIntershipClass:
@@ -162,7 +162,7 @@ class EmployeeIntershipClass:
             return f"Error: {error_message}"
 
     def store(self, branch_office_id, intern, observation, support):
-        intership = IntershipModel()
+        intership = EmployeeIntershipModel()
         
         intership.branch_office_id = branch_office_id
         intership.intern = intern
@@ -180,7 +180,7 @@ class EmployeeIntershipClass:
             return {"status": "error", "message": f"Error: {str(e)}"}
         
     def store_answer(self, intership_id, question_id, answer_id):
-        intership_answer = IntershipAnswerModel()
+        intership_answer = EmployeeIntershipAnswerModel()
 
         intership_answer.intership_id = intership_id
         intership_answer.question_id = question_id

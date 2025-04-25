@@ -410,6 +410,27 @@ class IntershipModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class EmployeeIntershipModel(Base):
+    __tablename__ = 'employees_interships'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    intern = Column(String(255))
+    observation = Column(String(255))
+    support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class EmployeeIntershipAnswerModel(Base):
+    __tablename__ = 'employees_interships_answers'
+
+    id = Column(Integer, primary_key=True)
+    intership_id = Column(Integer)
+    question_id = Column(Integer)
+    answer_id = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class IntershipAnswerModel(Base):
     __tablename__ = 'interships_answers'
 
