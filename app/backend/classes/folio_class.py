@@ -144,11 +144,6 @@ class FolioClass:
             # Captura cualquier error y retorna el mensaje de error
             return f"Error: {str(e)}"
     
-    def a (self):
-        self.validate_caf_limit(1)
-
-        return "1"
-    
     def validate_caf_limit(self, folio_segment_id):
         try:
             settings = SettingClass(self.db).get()
@@ -171,7 +166,7 @@ class FolioClass:
             if requested_quantity > 0:
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
 
-                validate_caf_limit
+                self.validate_caf_limit(cashier.folio_segment_id)
 
                 folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
 
