@@ -89,6 +89,11 @@ def store(
 
         internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, remote_path)
 
-   
+    for i in range(len(questions)):
+        EmployeeIntershipClass(db).store_answer(
+            internship_id,
+            questions[i],
+            answers[i]
+        )
 
     return {"message": "Pasantía creada con éxito", "internship_id": internship_id}
