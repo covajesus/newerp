@@ -145,7 +145,7 @@ class FolioClass:
             return f"Error: {str(e)}"
     
     def a (self):
-        self.validate_caf_limit(self.db, 1)
+        self.validate_caf_limit(1)
 
         return "1"
     
