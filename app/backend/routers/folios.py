@@ -58,6 +58,12 @@ def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = D
     
     return {"message": data}
 
+@folios.get("/validate")
+def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
+    data = FolioClass(db).validate_caf_limit(1)
+    
+    return {"message": data}
+
 @folios.get("/get_from_caf")
 def get_from_caf(db: Session = Depends(get_db)):
     # Define el rango de folios
