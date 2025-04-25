@@ -171,8 +171,6 @@ class FolioClass:
                 if validate_response == 1:
                     AlertClass(self.db).send_email(1, cashier.folio_segment_id)
 
-                exit()
-
                 folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == cashier.folio_segment_id).limit(1).all()
 
                 # Verifica si hay folios disponibles
