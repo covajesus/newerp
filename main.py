@@ -56,6 +56,7 @@ from app.backend.routers.capitulations import capitulations
 from app.backend.routers.cash_reserves import cash_reserves
 from app.backend.routers.interships import interships
 from app.backend.routers.honorary_reasons import honorary_reasons
+from app.backend.routers.employee_interships import employee_interships
 
 app = FastAPI()
 application = app
@@ -131,6 +132,7 @@ app.include_router(capitulations)
 app.include_router(cash_reserves)
 app.include_router(interships)
 app.include_router(honorary_reasons)
+app.include_router(employee_interships)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
