@@ -1439,6 +1439,7 @@ class SettingModel(Base):
     dropbox_token = Column(Text)
     facebook_token = Column(Text)
     simplefactura_token = Column(Text)
+    caf_limit = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
