@@ -62,7 +62,7 @@ def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = D
 def assignation(db: Session = Depends(get_db)):
     data = FolioClass(db).a()
     
-    return {"message": data}
+    return {"message": "1"}
 
 @folios.get("/get_from_caf")
 def get_from_caf(db: Session = Depends(get_db)):
