@@ -58,8 +58,8 @@ def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = D
     
     return {"message": data}
 
-@folios.get("/validate")
-def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = Depends(get_db)):
+@folios.get("/validate_1")
+def assignation(db: Session = Depends(get_db)):
     data = FolioClass(db).validate_caf_limit(1)
     
     return {"message": data}
