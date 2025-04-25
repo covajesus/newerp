@@ -142,7 +142,8 @@ class AlertClass:
 
         # Usuarios a quienes se debe enviar el correo
         alert_users = self.db.query(AlertUserModel).filter(AlertUserModel.alert_type_id == alert_type_id).all()
-
+        return 1
+    
         for alert_user in alert_users:
             response = self.validate_existence_alert(alert_user.user_id, alert_type_id)
 
