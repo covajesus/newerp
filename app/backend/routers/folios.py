@@ -60,7 +60,7 @@ def assignation(folio:int, branch_office_id:int, cashier_id:int, db: Session = D
 
 @folios.get("/validate_1")
 def assignation(db: Session = Depends(get_db)):
-    data = FolioClass(db).validate_caf_limit(1)
+    data = FolioClass(db).a()
     
     return {"message": data}
 
