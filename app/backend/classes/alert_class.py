@@ -1,6 +1,8 @@
-from app.backend.db.models import AlertModel, AlertTypeModel
+from app.backend.db.models import AlertModel, AlertTypeModel, AlertUserModel, UserModel
+from app.backend.classes.email_class import EmailClass
 import json
-from datetime import datetime
+from datetime import datetime, date
+from sqlalchemy import cast, Date
 
 class AlertClass:
     def __init__(self, db):
@@ -109,3 +111,48 @@ class AlertClass:
                 return 0
         else:
             return 0
+        
+    def validate_existence_alert(self, alert_user_id, alert_type_id):
+        try:
+            today = date.today()
+
+            data = self.db.query(AlertModel).filter(
+                AlertModel.alert_user_id == alert_user_id,
+                AlertModel.alert_type_id == alert_type_id,
+                cast(AlertModel.created_at, Date) == today
+            ).first()
+
+            if data:
+                return 1
+            else:
+                return 0
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def send_email(self, alert_type_id, folio_segment_id):
+        email_content = "<h2>Informe de CAF</h2>"
+        email_content += "<ul>"
+        email_content += f"<li>El segmento: {folio_segment_id} NO tiene folios disponibles.</li>"
+        email_content += "</ul>"
+
+        # Cliente de correo
+        email_client = EmailClass("informacion@jisparking.com", "pksh nfit pcwj dfte")
+
+        # Usuarios a quienes se debe enviar el correo
+        alert_users = self.db.query(AlertUserModel).filter(AlertUserModel.alert_type_id == alert_type_id).all()
+
+        for alert_user in alert_users:
+            response = self.validate_existence_alert(alert_user.user_id, alert_type_id)
+
+            if response == 0:
+                user = self.db.query(UserModel).filter(UserModel.id == alert_user.user_id).first()
+
+                email_client.send_email(user.email, "Informe de CAF", email_content)
+
+                alert = AlertModel()
+                alert.alert_user_id = alert_user.user_id
+                alert.alert_type_id = alert_type_id
+                alert.added_date = datetime.now()
+                self.db.commit()

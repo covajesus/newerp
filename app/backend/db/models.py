@@ -702,6 +702,7 @@ class AlertModel(Base):
     __tablename__ = 'alerts'
 
     id = Column(Integer, primary_key=True)
+    alert_user_id = Column(Integer)
     alert_type_id = Column(Integer)
     status_id = Column(Integer)
     added_date = Column(DateTime())
@@ -1440,6 +1441,15 @@ class SettingModel(Base):
     facebook_token = Column(Text)
     simplefactura_token = Column(Text)
     caf_limit = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class AlertUserModel(Base):
+    __tablename__ = 'alert_users'
+
+    id = Column(Integer, primary_key=True)
+    alert_type_id = Column(Text)
+    user_id = Column(Text)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
