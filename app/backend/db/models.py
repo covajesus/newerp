@@ -677,7 +677,7 @@ class HonoraryReasonModel(Base):
     __tablename__ = 'honorary_reasons'
 
     id = Column(Integer, primary_key=True)
-    reason = Column(String(255))
+    honorary_reason = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
