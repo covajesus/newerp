@@ -78,22 +78,9 @@ def store(
 ):
     remote_path = None
     if file and file.filename:
-        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_id = uuid.uuid4().hex[:8]
-        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-        file_category_name = 'intership'
-        unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
-        remote_path = f"{file_category_name}_{unique_filename}"
 
-        FileClass(db).upload(file, remote_path)
+        internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, '1.jpg')
 
-        internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, remote_path)
-
-    for i in range(len(questions)):
-        EmployeeIntershipClass(db).store_answer(
-            internship_id,
-            questions[i],
-            answers[i]
-        )
+   
 
     return {"message": "Pasantía creada con éxito", "internship_id": internship_id}
