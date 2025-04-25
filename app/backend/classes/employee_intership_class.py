@@ -111,15 +111,11 @@ class EmployeeIntershipClass:
 
         if not intership_answer:
             return {
-                "answer": '',
-                "observation": '',
-                "image": ''
+                "answer": ''
             }
         else:
             return {
-                "answer": intership_answer.answer_id,
-                "observation": intership_answer.observation,
-                "image": intership_answer.support
+                "answer": intership_answer.answer_id
             }
         
     def get(self, id):
