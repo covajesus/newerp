@@ -416,7 +416,7 @@ class EmployeeIntershipModel(Base):
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
     intern = Column(String(255))
-    observation = Column(String(255))
+    observations = Column(String(255))
     support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())

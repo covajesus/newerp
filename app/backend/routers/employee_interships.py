@@ -71,7 +71,7 @@ def store(
     branch_office_id: int = Form(...),
     questions: List[str] = Form(...),
     answers: List[str] = Form(...),
-    observation: Optional[str] = Form(None),
+    observations: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -79,7 +79,7 @@ def store(
     remote_path = None
 
 
-    internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observation, '1.jpg')
+    internship_id = EmployeeIntershipClass(db).store(branch_office_id, session_user.rut, observations, '1.jpg')
 
    
 

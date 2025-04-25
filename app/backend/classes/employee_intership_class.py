@@ -10,12 +10,12 @@ class EmployeeIntershipClass:
         self.db = db
 
 
-    def store(self, branch_office_id, intern, observation, support):
+    def store(self, branch_office_id, intern, observations, support):
         intership = EmployeeIntershipModel()
         
         intership.branch_office_id = branch_office_id
         intership.intern = intern
-        intership.observation = observation
+        intership.observations = observations
         intership.support = support
         intership.added_date = datetime.now()
 
