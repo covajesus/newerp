@@ -1,0 +1,258 @@
+from app.backend.db.models import HonoraryModel, EmployeeModel, EmployeeLaborDatumModel, UserModel, BranchOfficeModel, SupervisorModel, BankModel, RegionModel, CommuneModel, HonoraryReasonModel
+from sqlalchemy import desc
+from datetime import datetime
+from app.backend.classes.hr_setting_class import HrSettingClass
+from app.backend.classes.commune_class import CommuneClass
+from app.backend.classes.helper_class import HelperClass
+import requests
+import json
+from sqlalchemy import func
+
+class HonoraryClass:
+    def __init__(self, db):
+        self.db = db
+
+    def get_all(self, rut=None, rol_id=None, page=1, items_per_page=10):
+        try:
+            if rol_id == '1' or rol_id == '2':
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                    outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
+                    outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
+                    outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
+                    order_by(HonoraryModel.added_date.desc())
+                
+                data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+                total_items = data_query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+
+                if page < 1 or page > total_pages:
+                    return "Invalid page number"
+
+                if not data:
+                    return "No data found"
+
+                serialized_data = [{
+                    "status_id": honorary.status_id,
+                    "id": honorary.id,
+                    "requested_by": honorary.full_name,
+                    "honorary_reason": honorary.honorary_reason,
+                    "replacement_employee_rut": honorary.replacement_employee_rut,
+                    "replacement_employee_full_name": honorary.replacement_employee_full_name,
+                    "added_date": honorary.added_date
+                } for honorary in data]
+
+            else:
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                    outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
+                    outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
+                    outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
+                    filter(HonoraryModel.requested_by == rut). \
+                    order_by(HonoraryModel.added_date.desc())
+
+                data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+                total_items = data_query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+
+                if page < 1 or page > total_pages:
+                    return "Invalid page number"
+
+                if not data:
+                    return "No data found"
+
+                # Serializar los datos
+                serialized_data = [{
+                    "status_id": honorary.status_id,
+                    "id": honorary.id,
+                    "requested_by": honorary.full_name,
+                    "honorary_reason": honorary.honorary_reason,
+                    "rut": honorary.replacement_employee_rut,
+                    "full_name": honorary.replacement_employee_full_name,
+                    "added_date": honorary.added_date
+                } for honorary in data]
+
+            return {
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "data": serialized_data
+            }
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+
+    
+    def get(self, field, value):
+        try:
+            data = self.db.query(HonoraryModel).filter(getattr(HonoraryModel, field) == value).first()
+
+            serialized_data = {
+                "honorary_reason_id": data.honorary_reason_id,
+                "branch_office_id": data.branch_office_id,
+                "foreigner_id": data.foreigner_id,
+                "bank_id": data.bank_id,
+                "schedule_id": data.schedule_id,
+                "region_id": data.region_id,
+                "commune_id": data.commune_id,
+                "requested_by": data.requested_by,
+                "status_id": data.status_id,
+                "employee_to_replace": str(data.employee_to_replace),
+                "replacement_employee_rut": str(data.replacement_employee_rut),
+                "replacement_employee_full_name": data.replacement_employee_full_name,
+                "address": str(data.address),
+                "account_number": str(data.account_number),
+                "start_date": str(data.start_date),
+                "end_date": str(data.end_date),
+                "amount": str(data.amount),
+                "observation": str(data.observation),
+            }
+
+            return json.dumps(serialized_data)
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+    
+    def store(self, requested_by, honorary_inputs):
+        try:
+            honorary = HonoraryModel()
+            honorary.honorary_reason_id = honorary_inputs.honorary_reason_id
+            honorary.branch_office_id = honorary_inputs.branch_office_id
+            honorary.foreigner_id = honorary_inputs.foreigner_id
+            honorary.bank_id = honorary_inputs.bank_id
+            honorary.schedule_id = honorary_inputs.schedule_id
+            honorary.region_id = honorary_inputs.region_id
+            honorary.commune_id = honorary_inputs.commune_id
+            honorary.requested_by = requested_by
+            honorary.status_id = 14
+            honorary.employee_to_replace = honorary_inputs.employee_to_replace
+            honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
+            honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
+            honorary.address = honorary_inputs.address
+            honorary.account_number = honorary_inputs.account_number
+            if honorary_inputs.start_date != 'None' and honorary_inputs.start_date != None:
+                honorary.start_date = honorary_inputs.start_date
+            if honorary_inputs.end_date != 'None' and honorary_inputs.end_date != None:
+                honorary.end_date = honorary_inputs.end_date
+            honorary.observation = honorary_inputs.observation
+            honorary.amount = honorary_inputs.amount
+            honorary.added_date = datetime.now()
+            honorary.updated_date = datetime.now()
+
+            self.db.add(honorary)
+            self.db.commit()
+            return 1
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def generate(self, id, honorary_inputs):
+        try:
+            print(honorary_inputs)
+            honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+            honorary.honorary_reason_id = honorary_inputs.honorary_reason_id
+            honorary.branch_office_id = honorary_inputs.branch_office_id
+            honorary.foreigner_id = honorary_inputs.foreigner_id
+            honorary.bank_id = honorary_inputs.bank_id
+            honorary.schedule_id = honorary_inputs.schedule_id
+            honorary.region_id = honorary_inputs.region_id
+            honorary.commune_id = honorary_inputs.commune_id
+            honorary.status_id = 2
+            honorary.employee_to_replace = honorary_inputs.employee_to_replace
+            honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
+            honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
+            honorary.address = honorary_inputs.address
+            honorary.account_number = honorary_inputs.account_number
+            if honorary_inputs.start_date != 'None' and honorary_inputs.start_date != None:
+                honorary.start_date = honorary_inputs.start_date
+            if honorary_inputs.end_date != 'None' and honorary_inputs.end_date != None:
+                honorary.end_date = honorary_inputs.end_date
+            honorary.observation = honorary_inputs.observation
+            honorary.amount = honorary_inputs.amount
+            honorary.added_date = datetime.now()
+            honorary.updated_date = datetime.now()
+
+            self.db.add(honorary)
+            self.db.commit()
+
+            if honorary_inputs.foreigner_id == 1:
+                self.send(honorary_inputs)
+
+            return 1
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def delete(self, id):
+        try:
+            data = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+            if data:
+                self.db.delete(data)
+                self.db.commit()
+                return 1
+            else:
+                return "No data found"
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def validate(self, data):
+        data = self.db.query(HonoraryModel).filter(HonoraryModel.replacement_employee_rut == data.replacement_employee_rut).filter(func.date(HonoraryModel.added_date) == str(data.added_date)[:10]).count()
+            
+        return data
+        
+    def send(self, data):
+        print(2222222222222222)
+        hr_settings = HrSettingClass(self.db).get()
+
+        commune = CommuneClass(self.db).get('id', data.commune_id)
+        current_date = HelperClass().get_time_Y_m_d()
+        
+        amount = HelperClass().remove_from_string('.', str(data.amount))
+        amount = round(int(amount) / float(hr_settings.percentage_honorary_bill))
+
+        url = "https://apigateway.cl/api/v1/sii/bte/emitidas/emitir"
+
+        payload = json.dumps({
+                                "auth": {
+                                    "pass": {
+                                    "rut": "76063822-6",
+                                    "clave": "JYM1"
+                                    }
+                                },
+                                "boleta": {
+                                    
+                                    "Encabezado": {
+                                        "IdDoc": {
+                                            "FchEmis": current_date
+                                        },
+                                        "Emisor": {
+                                            "RUTEmisor": '76063822-6'
+                                        },
+                                        "Receptor": {
+                                            "RUTRecep": data.replacement_employee_rut,
+                                            "RznSocRecep": data.replacement_employee_full_name,
+                                            "DirRecep": data.address,
+                                            "CmnaRecep": commune.commune
+                                        }
+                                    },
+                                    "Detalle": [
+                                        {
+                                            "NmbItem": 'Boleta de Honorarios para ' + data.replacement_employee_full_name,
+                                            "MontoItem": amount
+                                        }
+                                    ]
+                                }
+                            })
+        
+        headers = {
+            'Authorization': 'Bearer ' + str(hr_settings.apigetaway_token),
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        print(response.text)
+
+        return 1

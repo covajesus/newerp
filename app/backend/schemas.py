@@ -346,28 +346,57 @@ class GenerateHonorary(BaseModel):
     observation: str
 
 class Honorary(BaseModel):
-    reason_id: int
+    honorary_reason_id: int
     branch_office_id: int
     foreigner_id: int
     bank_id: int
     schedule_id: int
     region_id: int
     commune_id: int
-    requested_by: int
-    status_id: int
-    accountability_status_id: int
-    employee_to_replace: int
-    rut: str
-    full_name: str
-    email: str
+    employee_to_replace: str
+    replacement_employee_rut: Union[str, None]
+    replacement_employee_full_name: str
     address: str
     account_number: str
-    start_date: str
-    end_date: str
+    start_date: Union[str, None]
+    end_date: Union[str, None]
     observation: str
     amount: int
     observation: str
 
+    @classmethod
+    def as_form(cls,
+                honorary_reason_id: int = Form(),
+                branch_office_id: int = Form(),
+                foreigner_id: int = Form(),
+                bank_id: int = Form(),
+                schedule_id: int = Form(),
+                region_id: int = Form(),
+                commune_id: int = Form(),
+                employee_to_replace: str = Form(),
+                replacement_employee_rut: str = Form(None),
+                replacement_employee_full_name: str = Form(),
+                address: str = Form(),
+                account_number: str = Form(),
+                start_date: str = Form(None),
+                end_date: str = Form(None),
+                amount: int = Form(),
+                observation: str = Form()
+                ):
+        
+        return cls(honorary_reason_id=honorary_reason_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
+
+class ValidateHonoraryRut(BaseModel):
+    replacement_employee_rut: str
+    added_date: str
+
+    @classmethod
+    def as_form(cls, 
+                replacement_employee_rut: str = Form(),
+                added_date: str = Form()
+                ):
+        return cls(replacement_employee_rut=replacement_employee_rut, added_date=added_date)
+   
 class PayrollSecondCategoryTax(BaseModel):
     period: str
     since_1: str
@@ -1667,6 +1696,4 @@ class AlertList(BaseModel):
     page: int
 
 class HonoraryList(BaseModel):
-    rut: int
-    rol_id: int
     page: int

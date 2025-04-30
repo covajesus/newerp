@@ -143,7 +143,6 @@ class BankModel(Base):
     __tablename__ = 'banks'
 
     id = Column(Integer, primary_key=True)
-    visibility_id = Column(Integer)
     bank = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
@@ -1026,9 +1025,8 @@ class HrSettingModel(Base):
     __tablename__ = 'hr_settings'
 
     id = Column(Integer, primary_key=True)
-    minimal_income = Column(Integer)
-    top_gratification = Column(Integer)
     percentage_honorary_bill = Column(String(255))
+    apigetaway_token = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
@@ -1053,20 +1051,18 @@ class HonoraryModel(Base):
     __tablename__ = 'honoraries'
 
     id = Column(Integer, primary_key=True)
-    reason_id = Column(Integer)
-    branch_office_id = Column(Integer, ForeignKey('branch_offices.id'))
+    honorary_reason_id = Column(Integer)
+    branch_office_id = Column(Integer)
     foreigner_id = Column(Integer)
-    bank_id = Column(Integer, ForeignKey('banks.id'))
+    bank_id = Column(Integer)
     schedule_id = Column(Integer)
-    region_id = Column(Integer, ForeignKey('regions.id'))
-    commune_id = Column(Integer, ForeignKey('communes.id'))
+    region_id = Column(Integer)
+    commune_id = Column(Integer)
     requested_by = Column(Integer)
     status_id = Column(Integer)
-    accountability_status_id = Column(Integer)
     employee_to_replace = Column(Integer)
-    rut = Column(Integer)
-    full_name = Column(String(255))
-    email = Column(String(255))
+    replacement_employee_rut = Column(Integer)
+    replacement_employee_full_name = Column(String(255))
     address = Column(String(255))
     account_number = Column(String(255))
     start_date = Column(Date())
