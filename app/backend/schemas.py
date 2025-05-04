@@ -847,6 +847,38 @@ class PayCapitulation(BaseModel):
                 ):
         return cls(id=id, payment_date=payment_date, payment_number=payment_number)
 
+class ImputeHonorary(BaseModel):
+    id: int
+    period: str
+    expense_type_id: int
+
+    @classmethod
+    def as_form(cls,
+                id: int = Form(),
+                period: str = Form(),
+                expense_type_id: int = Form()
+                ):
+        return cls(id=id, period=period, expense_type_id=expense_type_id)
+
+class UpdateSetting(BaseModel):
+    dropbox_token: str
+    facebook_token: str
+    simplefactura_token: str
+    caf_limit: str
+    percentage_honorary_bill: str
+    apigetaway_token: str
+
+    @classmethod
+    def as_form(cls,
+                dropbox_token: str = Form(),
+                facebook_token: str = Form(),
+                simplefactura_token: str = Form(),
+                caf_limit: str = Form(),
+                percentage_honorary_bill: str = Form(),
+                apigetaway_token: str = Form()
+                ):
+        return cls(dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
+    
 class ImputeCapitulation(BaseModel):
     id: int
     period: str

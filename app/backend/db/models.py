@@ -1458,6 +1458,8 @@ class SettingModel(Base):
     facebook_token = Column(Text)
     simplefactura_token = Column(Text)
     caf_limit = Column(Integer)
+    percentage_honorary_bill = Column(Text)
+    apigetaway_token = Column(Text)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

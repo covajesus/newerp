@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URI = "mysql+pymysql://admin:Chile2025!@localhost:3306/jisparking"
+SQLALCHEMY_DATABASE_URI = "mysql+pymysql://admin:Chile2025!@jisbackend.com:3306/jisparking"
 
 # Crear el motor con echo=True para activar el registro de consultas
 engine = create_engine(SQLALCHEMY_DATABASE_URI, pool_size=20, max_overflow=0, echo=False)
