@@ -1,12 +1,13 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import BranchOfficeModel, CapitulationModel, ExpenseTypeModel, UserModel
+from app.backend.db.models import BranchOfficeModel, CapitulationModel, ExpenseTypeModel, UserModel, TotalAcceptedCapitulations
 from app.backend.classes.helper_class import HelperClass
 from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import requests
 import json
+from sqlalchemy import cast, String
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -124,12 +125,36 @@ class CapitulationClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
-              
+    
+    def total_accepted_capitulations(self):
+        try:
+            query = self.db.query(
+                TotalAcceptedCapitulations.rut,
+                TotalAcceptedCapitulations.full_name,
+                TotalAcceptedCapitulations.amount
+            ).order_by(
+                TotalAcceptedCapitulations.rut
+            )
+
+            data = query.all()
+
+            serialized_data = [{
+                "rut": capitulation.rut,
+                "full_name": capitulation.full_name,
+                "amount": capitulation.amount
+            } for capitulation in data]
+
+            return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
+        
     def get(self, id):
         try:
             data_query = self.db.query(
                 CapitulationModel.id,
-                CapitulationModel.document_date,
+                cast(CapitulationModel.document_date, String).label("document_date"),
                 CapitulationModel.supplier_rut,
                 CapitulationModel.document_number,
                 CapitulationModel.document_type_id,
@@ -144,7 +169,7 @@ class CapitulationClass:
                 ExpenseTypeModel.id.label("expense_type_id"),
                 ExpenseTypeModel.expense_type,
                 UserModel.full_name,
-                CapitulationModel.payment_date,
+                cast(CapitulationModel.payment_date, String).label("payment_date"),
                 CapitulationModel.payment_number,
                 CapitulationModel.period,
                 CapitulationModel.payment_support

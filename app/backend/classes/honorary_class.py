@@ -224,7 +224,7 @@ class HonoraryClass:
                 + str(form_data.id)
             )
         gross_amount = HelperClass().remove_from_string('.', str(honorary.amount))
-        gross_amount = round(int(gross_amount) / float(settings.percentage_honorary_bill))
+        gross_amount = round(int(gross_amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
         tax = int(gross_amount) - int(honorary.amount)
         net_amount = round(gross_amount - tax)
         
@@ -262,17 +262,15 @@ class HonoraryClass:
                 },
             )
 
-        if response.status_code == 200:
-            honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == form_data.id).first()
-            honorary.status_id = 15
-            honorary.updated_date = datetime.now()
+        honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == form_data.id).first()
+        honorary.status_id = 15
+        honorary.updated_date = datetime.now()
 
-            self.db.add(honorary)
-            self.db.commit()
+        self.db.add(honorary)
+        self.db.commit()
 
-            return "Accounting entry created successfully"
-        else:
-            return f"Accounting entry creation failed."
+        return "Accounting entry created successfully"
+
         
     def send(self, data):
         settings = SettingClass(self.db).get()
@@ -281,7 +279,7 @@ class HonoraryClass:
         current_date = HelperClass().get_time_Y_m_d()
         
         amount = HelperClass().remove_from_string('.', str(data.amount))
-        amount = round(int(amount) / float(settings.percentage_honorary_bill))
+        amount = round(int(amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
 
         url = "https://apigateway.cl/api/v1/sii/bte/emitidas/emitir"
 
@@ -318,7 +316,7 @@ class HonoraryClass:
                             })
         
         headers = {
-            'Authorization': 'Bearer ' + str(settings.apigetaway_token),
+            'Authorization': 'Bearer ' + str(settings["setting_data"]["apigetaway_token"]),
             'Content-Type': 'application/json'
         }
 

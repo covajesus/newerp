@@ -21,6 +21,28 @@ class BranchOfficeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class DemarcationModel(Base):
+    __tablename__ = 'demarcations'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    material_costs = Column(Integer)
+    labor_costs = Column(Integer)
+    made_parking_lines = Column(Integer)
+    made_road_signage = Column(Integer)
+    made_disability = Column(Integer)
+    made_island = Column(Integer)
+    made_pregnant = Column(Integer)
+    made_wall = Column(Integer)
+    file_made_parking_lines = Column(String(255))
+    file_made_road_signage = Column(String(255))
+    file_made_disability = Column(String(255))
+    file_made_island = Column(String(255))
+    file_made_pregnant = Column(String(255))
+    file_made_wall = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class SupplierModel(Base):
     __tablename__ = 'suppliers'
 
@@ -389,6 +411,14 @@ class CapitulationModel(Base):
     period = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+class TotalAcceptedCapitulations(Base):
+    __tablename__ = 'total_accepted_capitulations'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    full_name = Column(String(255))
+    amount = Column(Integer)
 
 class CashReserveModel(Base):
     __tablename__ = 'cash_reserves'
@@ -1454,6 +1484,8 @@ class SettingModel(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
+    honorary_open_period = Column(Text)
+    honorary_close_period = Column(Text)
     dropbox_token = Column(Text)
     facebook_token = Column(Text)
     simplefactura_token = Column(Text)

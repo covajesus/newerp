@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from app.backend.routers.branch_offices import branch_offices
@@ -58,9 +59,15 @@ from app.backend.routers.interships import interships
 from app.backend.routers.honorary_reasons import honorary_reasons
 from app.backend.routers.employee_interships import employee_interships
 from app.backend.routers.honoraries import honoraries
+from app.backend.routers.demarcations import demarcations
 
 app = FastAPI()
 application = app
+
+FILES_DIR = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
+
+# Montar como directorio estático
+app.mount("/files", StaticFiles(directory=FILES_DIR), name="files")
 
 os.environ['SECRET_KEY'] = '7de4c36b48fce8dcb3a4bb527ba62d789ebf3d3a7582472ee49d430b01a7f868'
 os.environ['ALGORITHM'] = 'HS256'
@@ -135,6 +142,7 @@ app.include_router(interships)
 app.include_router(honorary_reasons)
 app.include_router(employee_interships)
 app.include_router(honoraries)
+app.include_router(demarcations)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

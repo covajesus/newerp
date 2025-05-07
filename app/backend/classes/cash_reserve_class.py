@@ -22,6 +22,7 @@ class CashReserveClass:
                 CashReserveModel.id, 
                 CashReserveModel.branch_office_id, 
                 CashReserveModel.cashier_id,
+                CashierModel.cashier,
                 CashReserveModel.amount,
                 BranchOfficeModel.branch_office,
                 func.date_format(CashReserveModel.added_date, '%d-%m-%Y').label('added_date')
@@ -52,6 +53,7 @@ class CashReserveClass:
                     "id": cash_reserve.id,
                     "branch_office_id": cash_reserve.branch_office_id,
                     "cashier_id": cash_reserve.cashier_id,
+                    "cashier": cash_reserve.cashier,
                     "amount": cash_reserve.amount,
                     "branch_office": cash_reserve.branch_office,
                     "added_date": cash_reserve.added_date
@@ -74,6 +76,7 @@ class CashReserveClass:
                     "id": cash_reserve.id,
                     "branch_office_id": cash_reserve.branch_office_id,
                     "cashier_id": cash_reserve.cashier_id,
+                    "cashier": cash_reserve.cashier,
                     "amount": cash_reserve.amount,
                     "branch_office": cash_reserve.branch_office,
                     "added_date": cash_reserve.added_date

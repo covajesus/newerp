@@ -17,7 +17,7 @@ def get_token(db: Session = Depends(get_db)):
 
 @settings.get("/edit/{id}")
 def edit(id:int, db: Session = Depends(get_db)):
-    settings = SettingClass(db).get(id)
+    settings = SettingClass(db).get()
 
     return {"message": settings}
 

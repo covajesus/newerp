@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.classes.file_class import FileClass
 from app.backend.classes.cash_reserve_class import CashReserveClass
 from app.backend.schemas import CashReserve
 from app.backend.schemas import CashReserveList

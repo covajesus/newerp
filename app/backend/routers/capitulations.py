@@ -133,6 +133,7 @@ def pay(
 def support(id: int, db: Session = Depends(get_db)):
 
     capitulation = CapitulationClass(db).get(id)
+    print(capitulation)
 
     capitulation_data = json.loads(capitulation)
     remote_path = capitulation_data["capitulation_data"]["support"]
@@ -152,3 +153,9 @@ def payment_support(id: int, db: Session = Depends(get_db)):
     file = FileClass(db).get(remote_path)
 
     return {"message": file}
+
+@capitulations.get("/total_accepted_capitulations")
+def paymenttotal_accepted_capitulations_support(db: Session = Depends(get_db)):
+    capitulations = CapitulationClass(db).total_accepted_capitulations()
+
+    return {"message": capitulations}

@@ -861,6 +861,8 @@ class ImputeHonorary(BaseModel):
         return cls(id=id, period=period, expense_type_id=expense_type_id)
 
 class UpdateSetting(BaseModel):
+    honorary_open_period: str
+    honorary_close_period: str
     dropbox_token: str
     facebook_token: str
     simplefactura_token: str
@@ -870,6 +872,8 @@ class UpdateSetting(BaseModel):
 
     @classmethod
     def as_form(cls,
+                honorary_open_period: str = Form(),
+                honorary_close_period: str = Form(),
                 dropbox_token: str = Form(),
                 facebook_token: str = Form(),
                 simplefactura_token: str = Form(),
@@ -877,7 +881,7 @@ class UpdateSetting(BaseModel):
                 percentage_honorary_bill: str = Form(),
                 apigetaway_token: str = Form()
                 ):
-        return cls(dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
+        return cls(honorary_open_period=honorary_open_period, honorary_close_period=honorary_close_period, dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
     
 class ImputeCapitulation(BaseModel):
     id: int
@@ -1041,21 +1045,91 @@ class ReportRequest(BaseModel):
     selected_carbon_monoxides: list[dict]
     email: EmailStr
 
+from fastapi import Form
+from pydantic import BaseModel
+
 class CashReserve(BaseModel):
     branch_office_id: int
     cashier_id: int
     amount: int
 
     @classmethod
-    def as_form(cls,
-                branch_office_id: int = Form(),
-                cashier_id: int = Form,
-                amount: int = Form()
-            ):
-        return cls(branch_office_id=branch_office_id, cashier_id=cashier_id, amount=amount)
+    def as_form(
+        cls,
+        branch_office_id: int = Form(...),
+        cashier_id: int = Form(...),
+        amount: int = Form(...)
+    ):
+        return cls(
+            branch_office_id=branch_office_id,
+            cashier_id=cashier_id,
+            amount=amount
+        )
+
+from fastapi import Form, UploadFile
+from pydantic import BaseModel
+from typing import Optional
+
+class Demarcation(BaseModel):
+    branch_office_id: int
+    material_costs: str
+    labor_costs: str
+    made_parking_lines: int
+    made_road_signage: int
+    made_disability: int
+    made_island: int
+    made_pregnant: int
+    made_wall: int
+
+    file_made_parking_lines: Optional[UploadFile] = None
+    file_made_road_signage: Optional[UploadFile] = None
+    file_made_disability: Optional[UploadFile] = None
+    file_made_island: Optional[UploadFile] = None
+    file_made_pregnant: Optional[UploadFile] = None
+    file_made_wall: Optional[UploadFile] = None
+
+    @classmethod
+    def as_form(
+        cls,
+        branch_office_id: int = Form(...),
+        material_costs: str = Form(...),
+        labor_costs: str = Form(...),
+        made_parking_lines: int = Form(...),
+        made_road_signage: int = Form(...),
+        made_disability: int = Form(...),
+        made_island: int = Form(...),
+        made_pregnant: int = Form(...),
+        made_wall: int = Form(...),
+        file_made_parking_lines: Optional[UploadFile] = None,
+        file_made_road_signage: Optional[UploadFile] = None,
+        file_made_disability: Optional[UploadFile] = None,
+        file_made_island: Optional[UploadFile] = None,
+        file_made_pregnant: Optional[UploadFile] = None,
+        file_made_wall: Optional[UploadFile] = None
+    ):
+        return cls(
+            branch_office_id=branch_office_id,
+            material_costs=material_costs,
+            labor_costs=labor_costs,
+            made_parking_lines=made_parking_lines,
+            made_road_signage=made_road_signage,
+            made_disability=made_disability,
+            made_island=made_island,
+            made_pregnant=made_pregnant,
+            made_wall=made_wall,
+            file_made_parking_lines=file_made_parking_lines,
+            file_made_road_signage=file_made_road_signage,
+            file_made_disability=file_made_disability,
+            file_made_island=file_made_island,
+            file_made_pregnant=file_made_pregnant,
+            file_made_wall=file_made_wall,
+        )
 
 class CashReserveList(BaseModel):
     branch_office_id: Optional[int] = None
+    page: int = 0
+
+class DemarcationList(BaseModel):
     page: int = 0
 
 class CarbonMonoxideList(BaseModel):
