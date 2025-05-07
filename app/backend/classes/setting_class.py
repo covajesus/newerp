@@ -57,3 +57,12 @@ class SettingClass:
         self.db.commit()
 
         return settings
+    
+    def update_token(self, access_token):
+        settings = self.db.query(SettingModel).filter(SettingModel.id == 1).first()
+
+        settings.simplefactura_token = access_token
+
+        self.db.commit()
+
+        return settings

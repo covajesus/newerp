@@ -98,7 +98,7 @@ class AuthenticationClass:
             data = response.json()
             access_token = data.get("accessToken")
             print("Access Token:", access_token)
-            SettingClass(self.db).update(access_token)
+            SettingClass(self.db).update_token(access_token)
             return access_token
         else:
             print("Error al obtener el token:", response.status_code, response.text)
