@@ -13,7 +13,9 @@ settings = APIRouter(
 def get_token(db: Session = Depends(get_db)):
     setting_data = SettingClass(db).get()
 
-    return {"message": setting_data}
+    token = setting_data["setting_data"]["simplefactura_token"]
+
+    return {"message": token}
 
 @settings.get("/edit/{id}")
 def edit(id:int, db: Session = Depends(get_db)):
