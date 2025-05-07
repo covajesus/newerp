@@ -106,7 +106,7 @@ class AuthenticationClass:
             
     def check_simplefactura_token(self):
         setting_data = SettingClass(self.db).get()
-        token = setting_data.simplefactura_token
+        token = setting_data["setting_data"]["simplefactura_token"]
         
         headers = {
             'Content-Type': 'application/json',
