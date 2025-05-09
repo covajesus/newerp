@@ -149,8 +149,6 @@ class AlertClass:
             if response == 0:
                 user = self.db.query(UserModel).filter(UserModel.id == alert_user.user_id).first()
 
-                email_client.send_email(user.email, "Informe de CAF", email_content)
-
                 alert = AlertModel()
                 alert.alert_user_id = user.id
                 alert.alert_type_id = alert_type_id
@@ -158,4 +156,5 @@ class AlertClass:
                 alert.added_date = datetime.now()
                 alert.updated_date = datetime.now()
                 self.db.add(alert)
-                self.db.commit()
+                if(self.db.commit()):
+                    email_client.send_email(user.email, "Informe de CAF", email_content)
