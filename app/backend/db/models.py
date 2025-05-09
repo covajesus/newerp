@@ -755,8 +755,8 @@ class AlertModel(Base):
     alert_user_id = Column(Integer)
     alert_type_id = Column(Integer)
     status_id = Column(Integer)
-    added_date = Column(DateTime())
-    updated_date = Column(DateTime())
+    added_date = Column(Date())
+    updated_date = Column(Date())
 
 class IndicatorType(Base):
     __tablename__ = 'indicator_types'

@@ -149,12 +149,20 @@ class AlertClass:
             if response == 0:
                 user = self.db.query(UserModel).filter(UserModel.id == alert_user.user_id).first()
 
-                alert = AlertModel()
-                alert.alert_user_id = user.id
-                alert.alert_type_id = alert_type_id
-                alert.status_id = 1
-                alert.added_date = datetime.now()
-                alert.updated_date = datetime.now()
-                self.db.add(alert)
-                if(self.db.commit()):
+                try:
+                    alert = AlertModel()
+                    alert.alert_user_id = user.id
+                    alert.alert_type_id = alert_type_id
+                    alert.status_id = 1
+                    alert.added_date = date.today() 
+                    alert.updated_date = date.today()
+
+                    self.db.add(alert)
+                    self.db.commit()
+
+                    # Solo se envía si el commit fue exitoso
                     email_client.send_email(user.email, "Informe de CAF", email_content)
+
+                except Exception as e:
+                    self.db.rollback()
+                    print(f"Error al guardar o enviar: {e}")
