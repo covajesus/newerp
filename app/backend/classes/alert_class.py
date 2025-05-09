@@ -119,7 +119,7 @@ class AlertClass:
             data = self.db.query(AlertModel).filter(
                 AlertModel.alert_user_id == alert_user_id,
                 AlertModel.alert_type_id == alert_type_id,
-                cast(AlertModel.created_at, Date) == today
+                cast(AlertModel.added_date, Date) == today
             ).first()
 
             if data:
@@ -134,7 +134,7 @@ class AlertClass:
     def send_email(self, alert_type_id, folio_segment_id):
         email_content = "<h2>Informe de CAF</h2>"
         email_content += "<ul>"
-        email_content += f"<li>El segmento: {folio_segment_id} NO tiene folios disponibles.</li>"
+        email_content += f"<li>El segmento <strong>{folio_segment_id}</strong>  NO tiene folios disponibles. Por favor cargar nuevos en Simple Factura.</li>"
         email_content += "</ul>"
 
         # Cliente de correo
@@ -149,10 +149,13 @@ class AlertClass:
             if response == 0:
                 user = self.db.query(UserModel).filter(UserModel.id == alert_user.user_id).first()
 
-                email_client.send_email(user.email, "Informe de CAF", email_content)
+                email_client.send_email('jesuscova@jisparking.com', "Informe de CAF", email_content)
 
                 alert = AlertModel()
-                alert.alert_user_id = alert_user.user_id
+                alert.alert_user_id = user.id
                 alert.alert_type_id = alert_type_id
+                alert.status_id = 1
                 alert.added_date = datetime.now()
+                alert.updated_date = datetime.now()
+                self.db.add(alert)
                 self.db.commit()

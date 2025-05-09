@@ -12,7 +12,7 @@ honoraries = APIRouter(
 
 @honoraries.post("/")
 def index(honorary: HonoraryList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = HonoraryClass(db).get_all(session_user.rut, session_user.rol_id, honorary.page)
+    data = HonoraryClass(db).get_all(honorary.rut, session_user.rut, session_user.rol_id, honorary.page)
 
     return {"message": data}
 

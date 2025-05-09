@@ -1499,8 +1499,8 @@ class AlertUserModel(Base):
     __tablename__ = 'alert_users'
 
     id = Column(Integer, primary_key=True)
-    alert_type_id = Column(Text)
-    user_id = Column(Text)
+    alert_type_id = Column(Integer)
+    user_id = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

@@ -12,14 +12,24 @@ class HonoraryClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, rut=None, rol_id=None, page=1, items_per_page=10):
+    def get_all(self, search_branch_office_id=None, search_rut=None, rut=None, rol_id=None, page=1, items_per_page=10):
+
         try:
+            filters = []
+            if search_branch_office_id is not None:
+                filters.append(HonoraryModel.branch_office_id == search_branch_office_id)
+
+            if search_rut is not None:
+                filters.append(HonoraryModel.replacement_employee_rut == search_rut)
+
             if rol_id == '1' or rol_id == '2':
                 data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
-                    order_by(HonoraryModel.added_date.desc())
+                    filter(
+                        *filters
+                    ).order_by(HonoraryModel.added_date.desc())
                 
                 data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
                 total_items = data_query.count()
@@ -47,7 +57,9 @@ class HonoraryClass:
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
                     filter(HonoraryModel.requested_by == rut). \
-                    order_by(HonoraryModel.added_date.desc())
+                    filter(
+                        *filters
+                    ).order_by(HonoraryModel.added_date.desc())
 
                 data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
                 total_items = data_query.count()

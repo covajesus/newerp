@@ -16,6 +16,12 @@ def index(alert: AlertList, session_user: UserLogin = Depends(get_current_active
     
     return {"message": data}
 
+@alerts.get("/send")
+def send(db: Session = Depends(get_db)):
+    data = AlertClass(db).send_email(1, 1)
+    
+    return {"message": data}
+
 @alerts.post("/store")
 def store(alert:Alert, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     alert_inputs = alert.dict()
