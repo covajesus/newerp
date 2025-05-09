@@ -149,7 +149,7 @@ class AlertClass:
             if response == 0:
                 user = self.db.query(UserModel).filter(UserModel.id == alert_user.user_id).first()
 
-                email_client.send_email('jesuscova@jisparking.com', "Informe de CAF", email_content)
+                email_client.send_email(user.email, "Informe de CAF", email_content)
 
                 alert = AlertModel()
                 alert.alert_user_id = user.id
