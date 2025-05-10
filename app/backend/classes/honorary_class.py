@@ -19,7 +19,7 @@ class HonoraryClass:
             if search_branch_office_id is not None:
                 filters.append(HonoraryModel.branch_office_id == search_branch_office_id)
 
-            if search_rut is not None:
+            if search_rut is not None and search_rut != '':
                 filters.append(HonoraryModel.replacement_employee_rut == search_rut)
 
             if rol_id == '1' or rol_id == '2':

@@ -861,6 +861,8 @@ class ImputeHonorary(BaseModel):
         return cls(id=id, period=period, expense_type_id=expense_type_id)
 
 class UpdateSetting(BaseModel):
+    capitulation_open_period: str
+    capitulation_close_period: str
     honorary_open_period: str
     honorary_close_period: str
     dropbox_token: str
@@ -872,6 +874,8 @@ class UpdateSetting(BaseModel):
 
     @classmethod
     def as_form(cls,
+                capitulation_open_period: str = Form(),
+                capitulation_close_period: str = Form(),
                 honorary_open_period: str = Form(),
                 honorary_close_period: str = Form(),
                 dropbox_token: str = Form(),
@@ -881,7 +885,7 @@ class UpdateSetting(BaseModel):
                 percentage_honorary_bill: str = Form(),
                 apigetaway_token: str = Form()
                 ):
-        return cls(honorary_open_period=honorary_open_period, honorary_close_period=honorary_close_period, dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
+        return cls(capitulation_open_period=capitulation_open_period, capitulation_close_period=capitulation_close_period, honorary_open_period=honorary_open_period, honorary_close_period=honorary_close_period, dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
     
 class ImputeCapitulation(BaseModel):
     id: int
@@ -1643,7 +1647,11 @@ class ChangeStatusInCustomerTicketBill(BaseModel):
     expense_type_id: int
     payment_type_id: int
     payment_date: str
+    period: str
     comment: str
+
+class CustomerCollection(BaseModel):
+    period: str
 
 class GenerateCustomerTicket(BaseModel):
     id: Optional[int] = 0

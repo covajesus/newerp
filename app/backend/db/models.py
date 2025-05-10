@@ -942,6 +942,7 @@ class CollectionModel(Base):
     cash_net_amount = Column(Integer)
     card_gross_amount = Column(Integer)
     card_net_amount = Column(Integer)
+    subscriber_amount = Column(Integer)
     total_tickets = Column(Integer)
     added_date = Column(Date())
     updated_date = Column(DateTime())
@@ -1480,10 +1481,19 @@ class SinisterModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class WhatsappTemplateModel(Base):
+    __tablename__ = 'whatsapp_templates'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Text)
+    template = Column(Text)
+
 class SettingModel(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
+    capitulation_close_period = Column(Text)
+    capitulation_open_period = Column(Text)
     honorary_open_period = Column(Text)
     honorary_close_period = Column(Text)
     dropbox_token = Column(Text)

@@ -222,17 +222,15 @@ class FolioClass:
             return "Folio not found"
 
     def update_billed_ticket(self, folio):
-        folio_count = self.db.query(FolioModel).filter(FolioModel.folio == folio).count()
-        if folio_count > 0:
-            update_folio = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
-            update_folio.billed_status_id = 1
-            self.db.add(update_folio)
-            self.db.commit()
-
-            return "Folio "+ str(folio) +" updated successfully"
-        else:
-            return "Folio not found"
+        folio_record = self.db.query(FolioModel).filter(FolioModel.folio == folio).first()
         
+        if folio_record:
+            folio_record.billed_status_id = 1
+            self.db.commit()
+            return f"Folio {folio} updated successfully"
+        
+        return "Folio not found"
+
     def request(self, amount):
         payload = {
             "credenciales": {

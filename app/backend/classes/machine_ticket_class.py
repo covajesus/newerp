@@ -21,7 +21,7 @@ class MachineTicketClass:
             filters = []
 
             filters.append(DteModel.dte_type_id == 39)
-            filters.append(DteModel.rut == None)
+            filters.append(DteModel.rut == "66666666-6")
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
@@ -41,7 +41,7 @@ class MachineTicketClass:
             ).filter(
                 *filters
             ).order_by(
-                desc(DteModel.id)
+                desc(DteModel.added_date)
             )
 
             # Si se solicita paginación

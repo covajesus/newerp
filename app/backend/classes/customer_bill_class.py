@@ -502,6 +502,8 @@ class CustomerBillClass:
         if form_data.will_save == 1:
             if folio != None:
                 dte = DteModel()
+
+                period = datetime.now().strftime('%m-%Y')
                 
                 # Asignar los valores del formulario a la instancia del modelo
                 dte.branch_office_id = form_data.branch_office_id
@@ -518,6 +520,7 @@ class CustomerBillClass:
                 dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
                 dte.discount = 0
                 dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+                dte.period = period
                 dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
                 self.db.add(dte)
