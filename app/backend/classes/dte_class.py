@@ -391,7 +391,19 @@ class DteClass:
             return 1
         else:
             return 0
-                
+
+    def validate_quantity_tickets(self, total_machine_ticket, branch_office_id, cashier_id, added_date):
+        quantity = self.db.query(DteModel)\
+                            .filter(DteModel.branch_office_id == branch_office_id)\
+                            .filter(DteModel.cashier_id == cashier_id)\
+                            .filter(cast(DteModel.added_date, Date) == added_date)\
+                            .count()
+
+        if quantity != total_machine_ticket:
+            return 0
+        else:
+            return 1
+
     def delete(self, folio, branch_office_id, cashier_id, added_date, single):
         if single == 1:
             try:

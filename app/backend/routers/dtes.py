@@ -62,6 +62,12 @@ def store(dte:Dte, db: Session = Depends(get_db)):
     
     return {"message": data}
 
+@dtes.get("/validate_quantity_tickets/{total_machine_ticket}/{branch_office_id}/{cashier_id}/{added_date}")
+def validate_quantity_tickets(total_machine_ticket:int, branch_office_id:int, cashier_id:int, added_date:str, db: Session = Depends(get_db)):
+    data = DteClass(db).validate_quantity_tickets(total_machine_ticket, branch_office_id, cashier_id, added_date)
+    
+    return {"message": data}
+
 @dtes.delete("/delete/{folio}/{branch_office_id}/{cashier_id}/{added_date}/{single}")
 def delete(folio:int, branch_office_id:int, cashier_id:int, added_date:str, single:int, db: Session = Depends(get_db)):
     data = DteClass(db).delete(folio, branch_office_id, cashier_id, added_date, single)
