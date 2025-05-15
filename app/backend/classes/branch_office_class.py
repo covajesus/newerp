@@ -23,6 +23,18 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
+    def get_with_machine(self):
+        try:
+            data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.getaway_machine_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
     def get(self, field, value):
         try:
             data = self.db.query(BranchOfficeModel).filter(getattr(BranchOfficeModel, field) == value).filter(BranchOfficeModel.status_id == 7).first()

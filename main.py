@@ -61,6 +61,8 @@ from app.backend.routers.employee_interships import employee_interships
 from app.backend.routers.honoraries import honoraries
 from app.backend.routers.demarcations import demarcations
 from app.backend.routers.customer_collections import customer_collections
+from app.backend.routers.maintenances import maintenances
+from app.backend.routers.redcomercio_data import redcomercio_data
 
 app = FastAPI()
 application = app
@@ -145,6 +147,8 @@ app.include_router(employee_interships)
 app.include_router(honoraries)
 app.include_router(demarcations)
 app.include_router(customer_collections)
+app.include_router(maintenances)
+app.include_router(redcomercio_data)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

@@ -246,7 +246,39 @@ class CollectionClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
-        
+    
+    def store_redcomercio (self, cashier_id, branch_office_id, gross_total, cash_total, total_tickets, date):
+        collection = CollectionModel(
+                branch_office_id=branch_office_id,
+                cashier_id=cashier_id,
+                cash_gross_amount=gross_total,
+                cash_net_amount=cash_total,
+                card_gross_amount=0,
+                card_net_amount=0,
+                total_tickets=total_tickets,
+                added_date=date
+            )
+
+        self.db.add(collection)
+
+        self.db.commit()
+
+    def update_redcomercio (self, cashier_id, branch_office_id, gross_total, cash_total, total_tickets, date):
+        collection = self.db.query(CollectionModel).filter(
+            CollectionModel.cashier_id == cashier_id,
+            CollectionModel.branch_office_id == branch_office_id,
+            CollectionModel.added_date == date
+        ).first()
+
+        if collection:
+            collection.cash_gross_amount = gross_total
+            collection.cash_net_amount = cash_total
+            collection.total_tickets = total_tickets
+
+            self.db.commit()
+        else:
+            return "No se encontró la colección para actualizar."
+
     def store(self, collection_inputs):
         tz = pytz.timezone('America/Santiago')
         current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')

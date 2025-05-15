@@ -6,6 +6,8 @@ from app.backend.classes.capitulation_class import CapitulationClass
 from app.backend.schemas import Capitulation, CapitulationList, UpdateCapitulation, PayCapitulation, ImputeCapitulation
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
+from typing import List
+from fastapi import Form
 import uuid
 import json
 from app.backend.auth.auth_user import get_current_active_user
@@ -103,6 +105,20 @@ def impute(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al actualizar la rendición: {str(e)}")
+
+@capitulations.get("/pay/details/{rut}")
+def pay_detail(
+    rut: str,
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        message = CapitulationClass(db).get_all_accepted(rut)
+
+        return {"message": message}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
     
 @capitulations.post("/pay")
 def pay(
@@ -112,19 +128,20 @@ def pay(
     db: Session = Depends(get_db)
 ):
     try:
-        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_id = uuid.uuid4().hex[:8]
-        file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
-        file_category_name = 'pay_capitulation'
-        unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
+        for selected_capitulation in form_data.selected_capitulations:
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]
+            file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
+            file_category_name = 'pay_capitulation'
+            unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
-        remote_path = f"{file_category_name}_{unique_filename}"
+            remote_path = f"{file_category_name}_{unique_filename}"
 
-        message = FileClass(db).upload(support, remote_path)
+            message = FileClass(db).upload(support, remote_path)
 
-        CapitulationClass(db).pay(form_data, remote_path)
+            CapitulationClass(db).pay(selected_capitulation, form_data, remote_path)
 
-        return {"message": message}
+        return {"message": 'Pagado con éxito'}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")

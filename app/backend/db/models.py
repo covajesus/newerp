@@ -13,6 +13,7 @@ class BranchOfficeModel(Base):
     segment_id = Column(Integer, ForeignKey('segments.id'))
     zone_id = Column(Integer, ForeignKey('zones.id'))
     principal_id = Column(Integer, ForeignKey('principals.id'))
+    getaway_machine_id = Column(Integer)
     status_id = Column(Integer)
     visibility_id = Column(Integer)
     opening_date = Column(Integer)
@@ -298,6 +299,7 @@ class CashierModel(Base):
     __tablename__ = 'cashiers'
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_office_id = Column(Integer)
+    getaway_machine_id = Column(Integer)
     folio_segment_id = Column(Integer)
     cashier = Column(String(255))
     anydesk = Column(String(255))
@@ -1487,6 +1489,25 @@ class WhatsappTemplateModel(Base):
     id = Column(Integer, primary_key=True)
     title = Column(Text)
     template = Column(Text)
+
+class MaintenanceModel(Base):
+    __tablename__ = 'maintenances'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    maintenance_date = Column(Date())
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class MaintenanceDataModel(Base):
+    __tablename__ = 'maintenance_data'
+
+    id = Column(Integer, primary_key=True)
+    maintenance_id = Column(Integer)
+    file_number = Column(Integer)
+    support = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
 
 class SettingModel(Base):
     __tablename__ = 'settings'

@@ -126,6 +126,79 @@ class CapitulationClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
+    def get_all_accepted(self, rut=None):
+        try:
+            # Inicialización de filtros dinámicos
+            filters = []
+
+            filters.append(CapitulationModel.status_id == 2)
+            filters.append(CapitulationModel.user_rut == rut)
+
+            # Construir la consulta base con los filtros aplicados
+            query = self.db.query(
+                CapitulationModel.id,
+                CapitulationModel.document_date,
+                CapitulationModel.supplier_rut,
+                CapitulationModel.document_number,
+                CapitulationModel.document_type_id,
+                CapitulationModel.capitulation_type_id,
+                CapitulationModel.branch_office_id,
+                CapitulationModel.expense_type_id,
+                CapitulationModel.description,
+                CapitulationModel.amount,
+                CapitulationModel.support,
+                CapitulationModel.status_id,
+                BranchOfficeModel.id.label("branch_office_id"), 
+                BranchOfficeModel.branch_office,
+                ExpenseTypeModel.id.label("expense_type_id"),
+                ExpenseTypeModel.expense_type,
+                UserModel.full_name,
+                CapitulationModel.payment_date,
+                CapitulationModel.payment_number,
+                CapitulationModel.period,
+                CapitulationModel.payment_support
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == CapitulationModel.branch_office_id
+            ).outerjoin(
+                ExpenseTypeModel, ExpenseTypeModel.id == CapitulationModel.expense_type_id
+            ).outerjoin(
+                UserModel, UserModel.rut == CapitulationModel.user_rut
+            ).filter(
+                *filters
+            ).order_by(
+                CapitulationModel.id
+            )
+
+            data = query.all()
+
+            serialized_data = [{
+                    "id": capitulation.id,
+                    "document_date": capitulation.document_date,
+                    "supplier_rut": capitulation.supplier_rut,
+                    "document_number": capitulation.document_number,
+                    "document_type_id": capitulation.document_type_id,
+                    "capitulation_type_id": capitulation.capitulation_type_id,
+                    "branch_office_id": capitulation.branch_office_id,
+                    "branch_office": capitulation.branch_office,
+                    "expense_type_id": capitulation.expense_type_id,
+                    "expense_type": capitulation.expense_type,
+                    "description": capitulation.description,
+                    "amount": capitulation.amount,
+                    "support": capitulation.support,
+                    "full_name": capitulation.full_name,
+                    "status_id": capitulation.status_id,
+                    "payment_date": capitulation.payment_date,
+                    "payment_number": capitulation.payment_number,
+                    "period": capitulation.period,
+                    "payment_support": capitulation.payment_support
+            } for capitulation in data]
+
+            return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
+        
     def total_accepted_capitulations(self):
         try:
             query = self.db.query(
@@ -246,8 +319,8 @@ class CapitulationClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
     
-    def pay(self, form_data, support):
-        capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.id == form_data.id).first()
+    def pay(self, id, form_data, support):
+        capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.id == id).first()
         capitulation.payment_date = form_data.payment_date
         capitulation.payment_number = form_data.payment_number
         capitulation.status_id = 13

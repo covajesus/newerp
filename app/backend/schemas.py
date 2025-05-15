@@ -835,17 +835,17 @@ class UpdateCapitulation(BaseModel):
         return cls(id=id, question=question, why_was_rejected=why_was_rejected)
 
 class PayCapitulation(BaseModel):
-    id: int
     payment_date: str
     payment_number: str
+    selected_capitulations: List[int]
 
     @classmethod
     def as_form(cls,
-                id: int = Form(),
                 payment_date: str = Form(),
-                payment_number: str = Form()
+                payment_number: str = Form(),
+                selected_capitulations: List[int] = Form(...),
                 ):
-        return cls(id=id, payment_date=payment_date, payment_number=payment_number)
+        return cls(payment_date=payment_date, payment_number=payment_number, selected_capitulations=selected_capitulations)
 
 class ImputeHonorary(BaseModel):
     id: int
@@ -1568,6 +1568,11 @@ class IntershipList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
     intern: Optional[str] = None  # Ahora es opcional
     page: int
+
+class MaintenanceList(BaseModel):
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    page: int
+
 
 class UserList(BaseModel):
     rut: Optional[str] = None  # Ahora es opcional

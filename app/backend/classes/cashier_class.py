@@ -24,3 +24,12 @@ class CashierClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
+        
+    def get_with_machine(self, id):
+        try:
+            data = self.db.query(CashierModel).filter(CashierModel.getaway_machine_id == 1). filter(CashierModel.branch_office_id == id).first()
+            
+            return data.id
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
