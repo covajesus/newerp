@@ -44,8 +44,7 @@ def refresh(db: Session = Depends(get_db)):
                     "Content-Type": "application/json",
                 },
             )
-            print(response.status_code)
-            print(response.text)
+
             if response.status_code == 200:
                 dte_data = response.json()
 
