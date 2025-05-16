@@ -44,6 +44,8 @@ class IntershipClass:
                     BranchOfficeModel.branch_office
                 ).outerjoin(
                     BranchOfficeModel, BranchOfficeModel.id == IntershipModel.branch_office_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == IntershipModel.intern
                 ).filter(
                     IntershipModel.intern == rut
                 ).filter(
