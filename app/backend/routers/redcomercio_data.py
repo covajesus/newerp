@@ -40,8 +40,8 @@ def refresh(db: Session = Depends(get_db)):
                     "Content-Type": "application/json",
                 },
             )
-            print(response.status_code)
-            if response.status_code == 200:
+     
+            if response.get('status') == 200:
                 dte_data = response.json()
 
                 gross_total = 0
@@ -57,7 +57,7 @@ def refresh(db: Session = Depends(get_db)):
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
 
                 check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
-                print(check_existence)
+
                 if check_existence == 0:
                     CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                 else:
