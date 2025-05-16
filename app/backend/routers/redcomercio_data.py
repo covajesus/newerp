@@ -25,11 +25,6 @@ def refresh(db: Session = Depends(get_db)):
     until = now.strftime('%Y-%m-%d')
     since = now.strftime('%Y-%m-%d')
 
-    until = date.today().strftime('%Y-%m-%d')
-    since = date.today().strftime('%Y-%m-%d')
-
-    print(until)
-
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
     if isinstance(branch_offices, list):
