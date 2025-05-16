@@ -408,7 +408,7 @@ class DteClass:
         amount = self.db.query(func.sum(DteModel.cash_amount))\
             .filter(DteModel.branch_office_id == branch_office_id)\
             .filter(DteModel.cashier_id == cashier_id)\
-            .filter(DteModel.sttaus_id == 5)\
+            .filter(DteModel.status_id == 5)\
             .filter(cast(DteModel.added_date, Date) == added_date)\
             .scalar()
 
