@@ -247,12 +247,12 @@ class CollectionClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
-    def store_redcomercio (self, cashier_id, branch_office_id, gross_total, cash_total, total_tickets, date):
+    def store_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = CollectionModel(
                 branch_office_id=branch_office_id,
                 cashier_id=cashier_id,
                 cash_gross_amount=gross_total,
-                cash_net_amount=cash_total,
+                cash_net_amount=net_total,
                 card_gross_amount=0,
                 card_net_amount=0,
                 total_tickets=total_tickets,
@@ -263,7 +263,7 @@ class CollectionClass:
 
         self.db.commit()
 
-    def update_redcomercio (self, cashier_id, branch_office_id, gross_total, cash_total, total_tickets, date):
+    def update_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = self.db.query(CollectionModel).filter(
             CollectionModel.cashier_id == cashier_id,
             CollectionModel.branch_office_id == branch_office_id,
@@ -272,7 +272,7 @@ class CollectionClass:
 
         if collection:
             collection.cash_gross_amount = gross_total
-            collection.cash_net_amount = cash_total
+            collection.cash_net_amount = net_total
             collection.total_tickets = total_tickets
 
             self.db.commit()

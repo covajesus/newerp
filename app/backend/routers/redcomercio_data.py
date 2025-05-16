@@ -46,11 +46,12 @@ def refresh(db: Session = Depends(get_db)):
 
                 gross_total = 0
                 total_tickets = 0
+                net_total = 0
                 added_date = date.today().strftime('%Y-%m-%d')
 
                 for dte_datum in dte_data:
                     gross_total = gross_total + dte_datum['total']
-                    cash_total = round(dte_datum['total']/1.19)
+                    net_total = net_total + round(dte_datum['total']/1.19)
                     total_tickets = total_tickets + 1
                   
             cashier_id = CashierClass(db).get_with_machine(branch_office.id)
@@ -58,8 +59,8 @@ def refresh(db: Session = Depends(get_db)):
             check_exitence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
 
             if check_exitence == 0:
-                CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, cash_total, total_tickets, added_date)
+                CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
             else:
-                CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, cash_total, total_tickets, added_date)
+                CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
 
     return {"status": "Redcomercio data updated successfully"}
