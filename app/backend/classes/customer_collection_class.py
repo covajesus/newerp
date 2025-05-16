@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.backend.db.models import DteModel, CollectionModel
+from app.backend.classes.cashier_class import CashierClass
 from sqlalchemy import func
 
 class CustomerCollectionClass:
@@ -27,15 +28,19 @@ class CustomerCollectionClass:
         for result in results:
             branch_office_id = result.branch_office_id
             total_amount = int(result.total_amount)
+
+            subscriber_cashier = CashierClass(self.db).get_subscriber_cashier(branch_office_id)
             
             check_existence = self.db.query(CollectionModel).filter(
                 CollectionModel.branch_office_id == branch_office_id,
+                CollectionModel.cashier_id == subscriber_cashier.id,
                 CollectionModel.added_date == date
             ).count()
-
+ 
             if check_existence > 0:
                 collection = self.db.query(CollectionModel).filter(
                     CollectionModel.branch_office_id == branch_office_id,
+                    CollectionModel.cashier_id == subscriber_cashier.id,
                     CollectionModel.added_date == date
                 ).first()
 
@@ -47,7 +52,7 @@ class CustomerCollectionClass:
             else:
                 collection = CollectionModel()
                 collection.branch_office_id = branch_office_id
-                collection.cashier_id = form_data.cashier_id
+                collection.cashier_id = subscriber_cashier.id
                 collection.subscriber_amount = total_amount
                 collection.total_tickets = result.total_tickets
                 collection.added_date = date

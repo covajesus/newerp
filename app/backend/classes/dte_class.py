@@ -3,7 +3,7 @@ from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, Su
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
-from sqlalchemy import cast, Date
+from sqlalchemy import cast, Date, func
 
 class DteClass:
     def __init__(self, db):
@@ -403,6 +403,16 @@ class DteClass:
             return 0
         else:
             return 1
+        
+    def verifiy_credit_note_amount(self, branch_office_id, cashier_id, added_date):
+        amount = self.db.query(func.sum(DteModel.cash_amount))\
+            .filter(DteModel.branch_office_id == branch_office_id)\
+            .filter(DteModel.cashier_id == cashier_id)\
+            .filter(DteModel.sttaus_id == 5)\
+            .filter(cast(DteModel.added_date, Date) == added_date)\
+            .scalar()
+
+        return amount or 0  # Retorna 0 si amount es None
 
     def delete(self, folio, branch_office_id, cashier_id, added_date, single):
         if single == 1:

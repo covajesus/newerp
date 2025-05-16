@@ -1731,6 +1731,7 @@ class MachineTicketSearch(BaseModel):
     dte_type_id: Optional[int] = None
     dte_version_id: Optional[int] = None
     amount: Optional[int] = None
+    folio: Optional[int] = None
     since: Optional[str] = None
     until: Optional[str] = None
     page: int

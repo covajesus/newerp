@@ -28,7 +28,7 @@ def generate_credit_note(machine_credit_note_ticket_inputs:GenerateMachineCredit
     return {"message": data}
 
 @machine_tickets.post("/search")
-def search(machine_credit_note_ticket_inputs: MachineTicketSearch, db: Session = Depends(get_db)):
-    data = MachineTicketClass(db).search(machine_credit_note_ticket_inputs.branch_office_id, machine_credit_note_ticket_inputs.dte_type_id, machine_credit_note_ticket_inputs.amount, machine_credit_note_ticket_inputs.since, machine_credit_note_ticket_inputs.until, machine_credit_note_ticket_inputs.page)
+def search(machine_ticket_inputs: MachineTicketSearch, db: Session = Depends(get_db)):
+    data = MachineTicketClass(db).search(machine_ticket_inputs.folio, machine_ticket_inputs.branch_office_id, machine_ticket_inputs.dte_type_id, machine_ticket_inputs.amount, machine_ticket_inputs.since, machine_ticket_inputs.until, machine_ticket_inputs.page)
 
     return {"message": data}

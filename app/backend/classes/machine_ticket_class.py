@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
+from app.backend.classes.setting_class import SettingClass
 import uuid
 import base64
 from sqlalchemy import or_
@@ -109,11 +110,13 @@ class MachineTicketClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
-    def search(self, branch_office_id=None, dte_type_id=None, amount=None, since=None, until=None, page=0, items_per_page=10):
+    def search(self, folio=None, branch_office_id=None, dte_type_id=None, amount=None, since=None, until=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
             filters = []
 
+            if folio is not None:
+                filters.append(DteModel.folio == folio)
             if branch_office_id is not None:
                 filters.append(DteModel.branch_office_id == branch_office_id)
             if amount is not None:
@@ -368,6 +371,9 @@ class MachineTicketClass:
         added_date = added_date.split("-")
         added_date = f"{added_date[2]}-{added_date[1]}-{added_date[0]}"
 
+        setting_data = SettingClass(self.db).get()
+        token = setting_data["setting_data"]["simplefactura_token"]
+
         if cash_amount > 0:
             data = {
                     "Documento": {
@@ -414,7 +420,7 @@ class MachineTicketClass:
             url = f"https://api.simplefactura.cl/invoiceCreditDebitNotesV2/Casa_Matriz/6"
 
             headers = {
-                    'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+                    'Authorization': f'Bearer {token}',
                     'Content-Type': 'application/json'
                 }
             

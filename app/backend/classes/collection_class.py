@@ -1,6 +1,7 @@
 from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel
 from datetime import datetime
 from app.backend.classes.setting_class import SettingClass
+from app.backend.classes.dte_class import DteClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
@@ -287,6 +288,8 @@ class CollectionClass:
 
         collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
 
+        credit_note_amount = DteClass(self.db).verifiy_credit_note_amount(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
+
         check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
 
         if check_token_status == 0:
@@ -296,12 +299,19 @@ class CollectionClass:
         else:
             print('El token está vigente.')
 
+        if credit_note_amount > 0:
+            cash_gross_total = int(collection_inputs['cash_gross_amount']) - int(credit_note_amount)
+            cash_net_total = round(int(cash_net_total)/1.19)
+        else:
+            cash_gross_total = int(collection_inputs['cash_gross_amount'])
+            cash_net_total = round(int(collection_inputs['cash_net_amount'])/1.19)
+
         if collection_count == 0:
             collection = CollectionModel(
                 branch_office_id=collection_inputs['branch_office_id'],
                 cashier_id=collection_inputs['cashier_id'],
-                cash_gross_amount=collection_inputs['cash_gross_amount'],
-                cash_net_amount=collection_inputs['cash_net_amount'],
+                cash_gross_amount=cash_gross_total,
+                cash_net_amount=cash_net_total,
                 card_gross_amount=collection_inputs['card_gross_amount'],
                 card_net_amount=collection_inputs['card_net_amount'],
                 total_tickets=collection_inputs['total_tickets'],

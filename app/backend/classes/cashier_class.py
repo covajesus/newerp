@@ -24,7 +24,15 @@ class CashierClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
-        
+
+    def get_subscriber_cashier(self, branch_office_id):
+        try:
+            data = self.db.query(CashierModel).filter(CashierModel.branch_office_id == branch_office_id).filter(CashierModel.folio_segment_id == 9).first()
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+         
     def get_with_machine(self, id):
         try:
             data = self.db.query(CashierModel).filter(CashierModel.getaway_machine_id == 1). filter(CashierModel.branch_office_id == id).first()
