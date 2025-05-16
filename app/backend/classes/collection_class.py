@@ -256,7 +256,8 @@ class CollectionClass:
                 card_gross_amount=0,
                 card_net_amount=0,
                 total_tickets=total_tickets,
-                added_date=date
+                added_date=date,
+                updated_date=str(date) + " 00:00:00"
             )
 
         self.db.add(collection)
@@ -274,6 +275,7 @@ class CollectionClass:
             collection.cash_gross_amount = gross_total
             collection.cash_net_amount = net_total
             collection.total_tickets = total_tickets
+            collection.updated_date = str(date) + " 00:00:00"
 
             self.db.commit()
         else:
