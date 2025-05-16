@@ -28,6 +28,8 @@ def refresh(db: Session = Depends(get_db)):
     until = date.today().strftime('%Y-%m-%d')
     since = date.today().strftime('%Y-%m-%d')
 
+    print(until)
+
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
     if isinstance(branch_offices, list):
@@ -47,7 +49,8 @@ def refresh(db: Session = Depends(get_db)):
                     "Content-Type": "application/json",
                 },
             )
-
+            print(response.status_code)
+            print(response.text)
             if response.status_code == 200:
                 dte_data = response.json()
 
