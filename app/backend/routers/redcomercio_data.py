@@ -51,7 +51,7 @@ def refresh(db: Session = Depends(get_db)):
                 gross_total = 0
                 total_tickets = 0
                 net_total = 0
-                added_date = date.today().strftime('%Y-%m-%d')
+                added_date = now.strftime('%Y-%m-%d')
 
                 for dte_datum in dte_data:
                     gross_total = gross_total + dte_datum['total']
@@ -61,7 +61,7 @@ def refresh(db: Session = Depends(get_db)):
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
 
                 check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
-                print(check_existence)
+                
                 if check_existence == 0:
                     CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                 else:
