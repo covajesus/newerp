@@ -1,6 +1,6 @@
 from datetime import datetime
 import json
-from fastapi import HTTPException
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from app.backend.db.models import MaintenanceModel, MaintenanceDataModel, BranchOfficeModel
 from sqlalchemy import func
@@ -26,7 +26,7 @@ class MaintenanceClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    MaintenanceModel.id
+                    desc(MaintenanceModel.id)
                 )
 
             if page > 0:
