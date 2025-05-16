@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 import requests
 from app.backend.classes.collection_class import CollectionClass
 from app.backend.classes.cashier_class import CashierClass
-from datetime import date
+from datetime import date, datetime
+import pytz
 
 redcomercio_data = APIRouter(
     prefix="/redcomercio_data",
@@ -17,6 +18,12 @@ def refresh(db: Session = Depends(get_db)):
     TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
     url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822-6"
+
+    tz = pytz.timezone('America/Santiago')
+    now = datetime.now(tz)  # obtienes la fecha y hora actual en la zona horaria
+
+    until = now.strftime('%Y-%m-%d')
+    since = now.strftime('%Y-%m-%d')
 
     until = date.today().strftime('%Y-%m-%d')
     since = date.today().strftime('%Y-%m-%d')
@@ -41,9 +48,6 @@ def refresh(db: Session = Depends(get_db)):
                 },
             )
 
-
-            print(response.text)
-     
             if response.status_code == 200:
                 dte_data = response.json()
 
