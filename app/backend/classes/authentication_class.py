@@ -44,7 +44,7 @@ class AuthenticationClass:
     def forgot(self, data):
         try:
             query = self.db.query(EmployeeModel).filter(EmployeeModel.personal_email == data.email).first()
-            if not query:00
+            if not query:
                 return 0
             else:
                 print(query.names)
