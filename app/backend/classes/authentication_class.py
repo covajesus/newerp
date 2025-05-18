@@ -32,7 +32,7 @@ class AuthenticationClass:
     def create_token(self, data: dict, time_expire: Union[datetime, None] = None):
         data_copy = data.copy()
         if time_expire is None:
-            expires = datetime.utcnow() + timedelta(minutes=30)
+            expires = datetime.utcnow() + timedelta(minutes=1000000)
         else:
             expires = datetime.utcnow() + time_expire
 
@@ -44,7 +44,7 @@ class AuthenticationClass:
     def forgot(self, data):
         try:
             query = self.db.query(EmployeeModel).filter(EmployeeModel.personal_email == data.email).first()
-            if not query:
+            if not query:00
                 return 0
             else:
                 print(query.names)

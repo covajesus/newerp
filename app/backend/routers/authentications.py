@@ -19,7 +19,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)
 
     rol = RolClass(db).get('id', user["user_data"]["rol_id"])
-    token_expires = timedelta(minutes=30)
+    token_expires = timedelta(minutes=1000000)
     token = AuthenticationClass(db).create_token({'sub': str(user["user_data"]["rut"])}, token_expires)
     expires_in_seconds = token_expires.total_seconds()
 
