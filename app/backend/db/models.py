@@ -355,6 +355,7 @@ class DteModel(Base):
     payment_date = Column(String)
     rut = Column(String)
     folio = Column(Integer)
+    denied_folio = Column(Integer)
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
     subtotal = Column(Integer)

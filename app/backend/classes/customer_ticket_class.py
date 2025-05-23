@@ -30,6 +30,7 @@ class CustomerTicketClass:
             filters.append(DteModel.rut != None)
 
             if group == 1:
+                print(222)
                 filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
 
                 current_period = datetime.now().strftime('%m-%Y')

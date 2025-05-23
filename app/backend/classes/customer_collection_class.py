@@ -21,6 +21,7 @@ class CustomerCollectionClass:
                 func.count(DteModel.id).label("total_tickets")
             )
             .filter(DteModel.period == period)
+            .filter(DteModel.status_id == 5)
             .group_by(DteModel.branch_office_id)
             .all()
         )

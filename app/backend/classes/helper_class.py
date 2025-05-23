@@ -655,6 +655,11 @@ class HelperClass:
         else:
             year = period[0]
 
+        if month < 10:
+            month = "0" + str(month)
+        else:
+            month = str(month)
+
         return str(month) + "-" + str(year)
     
     def create_period_date(period):

@@ -4,6 +4,7 @@ from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
 from sqlalchemy import cast, Date, func
+from datetime import datetime, timedelta
 
 class DteClass:
     def __init__(self, db):
@@ -393,16 +394,18 @@ class DteClass:
             return 0
 
     def validate_quantity_tickets(self, total_machine_ticket, branch_office_id, cashier_id, added_date):
-        quantity = self.db.query(DteModel)\
-                            .filter(DteModel.branch_office_id == branch_office_id)\
-                            .filter(DteModel.cashier_id == cashier_id)\
-                            .filter(cast(DteModel.added_date, Date) == added_date)\
-                            .count()
+        # Convertir added_date (que debe ser un objeto date) a rango datetime para un día completo
+        start_date = datetime.combine(added_date, datetime.min.time())
+        end_date = start_date + timedelta(days=1)
 
-        if quantity != total_machine_ticket:
-            return 0
-        else:
-            return 1
+        quantity = self.db.query(DteModel)\
+            .filter(DteModel.branch_office_id == branch_office_id)\
+            .filter(DteModel.cashier_id == cashier_id)\
+            .filter(DteModel.added_date >= start_date)\
+            .filter(DteModel.added_date < end_date)\
+            .count()
+
+        return 1 if quantity == total_machine_ticket else 0
         
     def verifiy_credit_note_amount(self, branch_office_id, cashier_id, added_date):
         amount = self.db.query(func.sum(DteModel.cash_amount))\
@@ -456,13 +459,19 @@ class DteClass:
                 return f"Error: {error_message}"
             
     def open_customer_billing_period(self, period):
+        print(period)
         current_period = HelperClass.fix_current_dte_period(period)
+
+        print(current_period)
         last_period = HelperClass.fix_last_dte_period(period)
+        print(last_period)
 
         dte_data = self.db.query(DteModel)\
                             .filter(DteModel.period == last_period)\
                             .filter(DteModel.status_id == 5)\
                             .all()
+
+        print(dte_data)
         
         if dte_data:
             for dte_datum in dte_data:
@@ -475,7 +484,7 @@ class DteClass:
                     dte_type_id=dte_datum.dte_type_id,
                     dte_version_id=1,
                     chip_id=0,
-                    status_id=2,
+                    status_id=1,
                     cash_amount=dte_datum.cash_amount,
                     card_amount=0,
                     subtotal=dte_datum.subtotal,

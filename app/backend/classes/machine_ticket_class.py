@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from app.backend.db.models import DteModel, BranchOfficeModel, FolioModel
+from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 import requests
 from datetime import datetime
@@ -154,7 +155,17 @@ class MachineTicketClass:
             ).order_by(
                 desc(DteModel.id)
             )
-            print(query)
+
+            check_credit_note_existence = self.db.query(DteModel).filter(
+                DteModel.denied_folio == folio
+            ).count()
+
+            if check_credit_note_existence > 0:
+                have_credit_note = 1
+            else:
+                have_credit_note = 0
+
+        
             if page > 0:
                 # Calcular el total de registros
                 total_items = query.count()
@@ -187,8 +198,7 @@ class MachineTicketClass:
                     "requested_status_id": dte.requested_status_id,
                     "billed_status_id": dte.billed_status_id,
                     "used_status_id": dte.used_status_id,
-                    "used_status_id": dte.used_status_id,
-                    "billed_status_id": dte.billed_status_id
+                    "have_credit_note": have_credit_note
                 } for dte in data]
 
                 return {
@@ -218,7 +228,8 @@ class MachineTicketClass:
                     "status_id": dte.status_id,
                     "requested_status_id": dte.requested_status_id,
                     "used_status_id": dte.used_status_id,
-                    "billed_status_id": dte.billed_status_id
+                    "billed_status_id": dte.billed_status_id,
+                    "have_credit_note": have_credit_note
                 } for dte in data]
 
                 return serialized_data
@@ -228,6 +239,8 @@ class MachineTicketClass:
             return {"status": "error", "message": error_message}
         
     def download(self, id):
+        setting_data = SettingClass(self.db).get()
+        token = setting_data["setting_data"]["simplefactura_token"]
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
 
         if dte:
@@ -246,7 +259,7 @@ class MachineTicketClass:
             url = f"https://api.simplefactura.cl/getPdf"
 
             headers = {
-                'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+                'Authorization': f'Bearer {token}',
                 'Content-Type': 'application/json'
             }
 
@@ -282,6 +295,9 @@ class MachineTicketClass:
                 return None
             
     def get_dte_date(self, folio):
+        setting_data = SettingClass(self.db).get()
+        token = setting_data["setting_data"]["simplefactura_token"]
+
         payload = {
                 "credenciales": {
                     "rutEmisor": "76063822-6",
@@ -297,7 +313,7 @@ class MachineTicketClass:
         url = f"https://api.simplefactura.cl/documentIssued"
         
         headers = {
-                'Authorization': 'Basic cm9kcmlnb2NhYmV6YXNAamlzcGFya2luZy5jb206Um9ybzIwMjQu',
+                'Authorization': f'Bearer {token}',
                 'Content-Type': 'application/json'
             }
         
@@ -306,6 +322,8 @@ class MachineTicketClass:
                 json=payload,
                 headers=headers,
             )
+        
+        print(response.text)
 
         response_data = response.json()
 
@@ -315,8 +333,15 @@ class MachineTicketClass:
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         
         dte_date = self.get_dte_date(dte.folio)
+        dte_date_detail = dte_date.split("T")
+        dte_date_detail = str(dte_date_detail[0]) + " 00:00:00"
 
-        folio = self.generate_credit_note_ticket(dte.folio, dte.cash_amount, dte_date)
+        if int(dte.cash_amount) > 0:
+            amount = dte.cash_amount
+        else:
+            amount = dte.card_amount
+
+        folio = self.generate_credit_note_ticket(dte.folio, amount, dte_date)
 
         if folio != None:
             dte.status_id = 5
@@ -325,22 +350,42 @@ class MachineTicketClass:
             self.db.add(dte)
             self.db.commit()
 
-            credit_note_dte = DteModel()
-            credit_note_dte.branch_office_id = dte.branch_office_id
-            credit_note_dte.cashier_id = 0
-            credit_note_dte.dte_type_id = 61
-            credit_note_dte.dte_version_id = 1
-            credit_note_dte.status_id = 5
-            credit_note_dte.chip_id = 0
-            credit_note_dte.rut = '66666666-6'
-            credit_note_dte.folio = folio
-            credit_note_dte.cash_amount = dte.cash_amount
-            credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = round(dte.cash_amount/1.19)
-            credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
-            credit_note_dte.discount = 0
-            credit_note_dte.total = dte.cash_amount
-            credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            if int(dte.cash_amount) > 0:
+                credit_note_dte = DteModel()
+                credit_note_dte.branch_office_id = dte.branch_office_id
+                credit_note_dte.cashier_id = 0
+                credit_note_dte.dte_type_id = 61
+                credit_note_dte.dte_version_id = 1
+                credit_note_dte.status_id = 5
+                credit_note_dte.chip_id = 0
+                credit_note_dte.rut = '66666666-6'
+                credit_note_dte.folio = folio
+                credit_note_dte.denied_folio = dte.folio
+                credit_note_dte.cash_amount = -abs(int(amount))
+                credit_note_dte.card_amount = 0
+                credit_note_dte.subtotal = -abs(round(int(amount)/1.19))
+                credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(amount)/1.19))
+                credit_note_dte.discount = 0
+                credit_note_dte.total = -abs(int(amount))
+                credit_note_dte.added_date = dte_date_detail
+            else:
+                credit_note_dte = DteModel()
+                credit_note_dte.branch_office_id = dte.branch_office_id
+                credit_note_dte.cashier_id = 0
+                credit_note_dte.dte_type_id = 61
+                credit_note_dte.dte_version_id = 1
+                credit_note_dte.status_id = 5
+                credit_note_dte.chip_id = 0
+                credit_note_dte.rut = '66666666-6'
+                credit_note_dte.folio = folio
+                credit_note_dte.denied_folio = dte.folio
+                credit_note_dte.cash_amount = 0
+                credit_note_dte.card_amount = -abs(int(amount))
+                credit_note_dte.subtotal = -abs(round(int(amount)/1.19))
+                credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(amount)/1.19))
+                credit_note_dte.discount = 0
+                credit_note_dte.total = -abs(int(amount))
+                credit_note_dte.added_date = dte_date_detail
 
             self.db.add(credit_note_dte)
             
@@ -367,14 +412,78 @@ class MachineTicketClass:
         else:
             return "Creditnote was not created"
         
+    def create_account_asset(self, form_data):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        period_date = form_data.added_date.strftime("%Y-%m")
+
+        american_date = str(period_date) + '-01'
+        utf8_date = HelperClass.convert_to_utf8(american_date)
+        expense_type = '441000102'
+        branch_office = self.db.query(BranchOfficeModel).filter(
+            BranchOfficeModel.id == form_data.branch_office_id
+        ).first()
+
+        gloss = (
+                branch_office.branch_office
+                + "_"
+                + expense_type
+                + "_"
+                + utf8_date
+                + "_NotaCredito_"
+                + str(form_data.id)
+                + "_"
+                + str(form_data.folio)
+            )
+        amount = form_data.total
+        
+        data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        expense_type: round(int(amount)/1.19),
+                        "221000226": round(int(amount) - (int(amount)/1.19)),
+                    },
+                    "haber": {
+                        "111000102": int(amount),
+                    }
+                },
+                "operacion": "I",
+                "documentos": {
+                    "emitidos": [
+                        {
+                            "dte": form_data.dte_type_id,
+                            "folio": form_data.folio,
+                        }
+                    ]
+                },
+            }
+
+        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+        response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if response.status_code == 200:
+            return "Accounting entry created successfully"
+        else:
+            return f"Accounting entry creation failed."
+        
     def generate_credit_note_ticket(self, folio, cash_amount, added_date):
-        added_date = added_date.split("-")
-        added_date = f"{added_date[2]}-{added_date[1]}-{added_date[0]}"
+        added_date = added_date.split("T")
+        added_date = added_date[0]
 
         setting_data = SettingClass(self.db).get()
         token = setting_data["setting_data"]["simplefactura_token"]
 
-        if cash_amount > 0:
+        if int(cash_amount) > 0:
             data = {
                     "Documento": {
                         "Encabezado": {
@@ -415,7 +524,7 @@ class MachineTicketClass:
                     }
                 }
             
-            print(data)
+            print(2222222222222222323)
 
             url = f"https://api.simplefactura.cl/invoiceCreditDebitNotesV2/Casa_Matriz/6"
 
@@ -429,6 +538,8 @@ class MachineTicketClass:
                     json=data,
                     headers=headers,
                 )
+            
+            print(22222)
             
             data = json.loads(response.text)
 

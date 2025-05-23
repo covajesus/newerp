@@ -29,6 +29,7 @@ class CustomerTicketBillClass:
             filters.append(DteModel.status_id > 3)
             filters.append(DteModel.rut != None)
             filters.append(DteModel.rut != '66666666-6')
+            filters.append(or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39))
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
@@ -372,11 +373,11 @@ class CustomerTicketBillClass:
                 "glosa": gloss,
                 "detalle": {
                     "debe": {
-                        expense_type: round(amount / 1.19),
-                        "221000226": round(amount - (amount / 1.19)),
+                        expense_type: round(int(amount)/1.19),
+                        "221000226": round(int(amount) - (int(amount)/1.19)),
                     },
                     "haber": {
-                        "111000102": amount,
+                        "111000102": int(amount),
                     }
                 },
                 "operacion": "I",
@@ -447,18 +448,23 @@ class CustomerTicketBillClass:
             credit_note_dte.chip_id = 0
             credit_note_dte.rut = customer_data['customer_data']['rut']
             credit_note_dte.folio = folio
-            credit_note_dte.cash_amount = dte.cash_amount
+            credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
             credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = round(dte.cash_amount/1.19)
-            credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+            credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+            credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
             credit_note_dte.discount = 0
-            credit_note_dte.total = dte.cash_amount
+            credit_note_dte.total = -abs(int(dte.cash_amount))
             credit_note_dte.period = period
             credit_note_dte.added_date = dte.added_date
 
             self.db.add(credit_note_dte)
             self.db.commit()
             self.create_account_asset(credit_note_dte)
+
+            update_dte = self.db.query(DteModel).filter(DteModel.folio == dte.folio).first()
+            update_dte.status_id = 5
+            self.db.add(update_dte)
+            self.db.commit()
         else:
             return "Creditnote was not created"
     
@@ -484,7 +490,7 @@ class CustomerTicketBillClass:
     def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        amount = round(cash_amount/1.19)
+        amount = round(int(cash_amount)/1.19)
 
         data = {
                 "Encabezado": {
