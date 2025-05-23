@@ -393,9 +393,13 @@ class DteClass:
         else:
             return 0
 
+    from datetime import datetime, timedelta
+
     def validate_quantity_tickets(self, total_machine_ticket, branch_office_id, cashier_id, added_date):
-        # Convertir added_date (que debe ser un objeto date) a rango datetime para un día completo
-        start_date = datetime.combine(added_date, datetime.min.time())
+        # Convertir string a date
+        added_date_obj = datetime.strptime(added_date, "%Y-%m-%d").date()
+
+        start_date = datetime.combine(added_date_obj, datetime.min.time())
         end_date = start_date + timedelta(days=1)
 
         quantity = self.db.query(DteModel)\
@@ -406,6 +410,7 @@ class DteClass:
             .count()
 
         return 1 if quantity == total_machine_ticket else 0
+
         
     def verifiy_credit_note_amount(self, branch_office_id, cashier_id, added_date):
         amount = self.db.query(func.sum(DteModel.cash_amount))\
