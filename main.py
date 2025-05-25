@@ -64,7 +64,7 @@ from app.backend.routers.customer_collections import customer_collections
 from app.backend.routers.maintenances import maintenances
 from app.backend.routers.redcomercio_data import redcomercio_data
 
-app = FastAPI()
+app = FastAPI(root_path="/api")
 application = app
 
 # FILES_DIR = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
