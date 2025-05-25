@@ -12,6 +12,7 @@ settings = APIRouter(
 @settings.get("/get_token")
 def get_token(db: Session = Depends(get_db)):
     setting_data = SettingClass(db).get()
+    print(setting_data)
 
     # Devuelve el contenido directamente dentro de "message"
     return {"message": setting_data["setting_data"]}
