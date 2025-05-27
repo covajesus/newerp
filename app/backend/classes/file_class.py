@@ -5,7 +5,7 @@ class FileClass:
     def __init__(self, db):
         self.db = db
         self.files_dir = "/var/www/jisbackend.com/public_html/files"
-        self.base_url = "https://jisbackend.com/public_html/files"
+        self.base_url = "https://jisbackend.com/files"
         # self.files_dir = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
         # self.base_url = "http://127.0.0.1:8000/files"
 
