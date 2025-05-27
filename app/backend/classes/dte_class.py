@@ -464,7 +464,6 @@ class DteClass:
                 return f"Error: {error_message}"
             
     def open_customer_billing_period(self, period):
-        print(period)
         current_period = HelperClass.fix_current_dte_period(period)
 
         print(current_period)
