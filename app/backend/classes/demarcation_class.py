@@ -164,23 +164,25 @@ class DemarcationClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def store(self, form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6):
+    def store(self, form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6, remote_path7):
         demarcation = DemarcationModel()
         demarcation.branch_office_id = form_data.branch_office_id
         demarcation.material_costs = form_data.material_costs
         demarcation.labor_costs = form_data.labor_costs
-        demarcation.made_parking_lines = form_data.made_parking_lines
+        demarcation.made_arrows = form_data.made_arrows
+        demarcation.made_pedestrian_crossing = form_data.made_pedestrian_crossing
         demarcation.made_road_signage = form_data.made_road_signage
         demarcation.made_disability = form_data.made_disability
         demarcation.made_island = form_data.made_island
         demarcation.made_pregnant = form_data.made_pregnant
         demarcation.made_wall = form_data.made_wall
-        demarcation.file_made_parking_lines = remote_path1
-        demarcation.file_made_road_signage = remote_path2
-        demarcation.file_made_disability = remote_path3
-        demarcation.file_made_island = remote_path4
-        demarcation.file_made_pregnant = remote_path5
-        demarcation.file_made_wall = remote_path6
+        demarcation.file_made_arrows = remote_path1
+        demarcation.file_made_pedestrian_crossing = remote_path2
+        demarcation.file_made_road_signage = remote_path3
+        demarcation.file_made_disability = remote_path4
+        demarcation.file_made_island = remote_path5
+        demarcation.file_made_pregnant = remote_path6
+        demarcation.file_made_wall = remote_path7
         demarcation.added_date = datetime.now()
 
         self.db.add(demarcation)

@@ -58,41 +58,19 @@ def store(
                 elif i == 6:
                     remote_path6 = f"{file_category_name}_{unique_filename}"
                     message = FileClass(db).upload(file, remote_path6)
+                elif i == 7:
+                    remote_path7 = f"{file_category_name}_{unique_filename}"
+                    message = FileClass(db).upload(file, remote_path7)
 
                 i += 1
 
-
-    DemarcationClass(db).store(form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6)
+    DemarcationClass(db).store(form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6, remote_path7)
 
 @demarcations.delete("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
     message = DemarcationClass(db).delete(id)
 
     return {"message": message}
-
-@demarcations.get("/download/{id}")
-def download(id: int, db: Session = Depends(get_db)):
-    # Obtener los datos del contrato
-
-    patent_data = PatentClass(db).get(id)
-
-    patent_data = json.loads(patent_data)
-    file_name = patent_data["patent_data"]["support"]
-
-    # Ruta remota del archivo
-    remote_path = f"{file_name}"
-
-    # Descargar archivo desde Azure File Share
-    file_contents = FileClass(db).download(remote_path)
-
-    # Convertir el contenido del archivo a base64
-    encoded_file = base64.b64encode(file_contents).decode('utf-8')
-
-    # Retornar el nombre del archivo y su contenido como base64
-    return {
-        "file_name": file_name,
-        "file_data": encoded_file
-    }
     
 @demarcations.get("/edit/{id}")
 def edit(id: int, db: Session = Depends(get_db)):

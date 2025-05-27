@@ -1078,14 +1078,16 @@ class Demarcation(BaseModel):
     branch_office_id: int
     material_costs: str
     labor_costs: str
-    made_parking_lines: int
+    made_arrows: int
+    made_pedestrian_crossing: int
     made_road_signage: int
     made_disability: int
     made_island: int
     made_pregnant: int
     made_wall: int
 
-    file_made_parking_lines: Optional[UploadFile] = None
+    file_made_arrows: Optional[UploadFile] = None
+    file_made_pedestrian_crossing: Optional[UploadFile] = None
     file_made_road_signage: Optional[UploadFile] = None
     file_made_disability: Optional[UploadFile] = None
     file_made_island: Optional[UploadFile] = None
@@ -1098,13 +1100,15 @@ class Demarcation(BaseModel):
         branch_office_id: int = Form(...),
         material_costs: str = Form(...),
         labor_costs: str = Form(...),
-        made_parking_lines: int = Form(...),
+        made_arrows: int = Form(...),
+        made_pedestrian_crossing: int = Form(...),
         made_road_signage: int = Form(...),
         made_disability: int = Form(...),
         made_island: int = Form(...),
         made_pregnant: int = Form(...),
         made_wall: int = Form(...),
-        file_made_parking_lines: Optional[UploadFile] = None,
+        file_made_arrows: Optional[UploadFile] = None,
+        file_made_pedestrian_crossing: Optional[UploadFile] = None,
         file_made_road_signage: Optional[UploadFile] = None,
         file_made_disability: Optional[UploadFile] = None,
         file_made_island: Optional[UploadFile] = None,
@@ -1115,13 +1119,15 @@ class Demarcation(BaseModel):
             branch_office_id=branch_office_id,
             material_costs=material_costs,
             labor_costs=labor_costs,
-            made_parking_lines=made_parking_lines,
+            made_arrows=made_arrows,
+            made_pedestrian_crossing=made_pedestrian_crossing,
             made_road_signage=made_road_signage,
             made_disability=made_disability,
             made_island=made_island,
             made_pregnant=made_pregnant,
             made_wall=made_wall,
-            file_made_parking_lines=file_made_parking_lines,
+            file_made_arrows=file_made_arrows,
+            file_made_pedestrian_crossing=file_made_pedestrian_crossing,
             file_made_road_signage=file_made_road_signage,
             file_made_disability=file_made_disability,
             file_made_island=file_made_island,
