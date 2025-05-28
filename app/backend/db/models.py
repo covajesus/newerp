@@ -37,7 +37,6 @@ class DemarcationModel(Base):
     made_wall = Column(Integer)
     file_made_arrows = Column(String(255))
     file_made_pedestrian_crossing = Column(String(255))
-    file_made_road_signage = Column(String(255))
     file_made_disability = Column(String(255))
     file_made_island = Column(String(255))
     file_made_pregnant = Column(String(255))
