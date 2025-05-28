@@ -26,7 +26,7 @@ class MaintenanceClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    desc(MaintenanceModel.added_date)
+                    MaintenanceModel.added_date.desc()
                 )
 
             if page > 0:
@@ -121,7 +121,6 @@ class MaintenanceClass:
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-          
     def get(self, id):
         try:
             data_query = self.db.query(
