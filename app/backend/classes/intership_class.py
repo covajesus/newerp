@@ -12,6 +12,7 @@ class IntershipClass:
     def get_all(self, branch_office_id=None, intern=None, rol_id=None, rut=None, page=0, items_per_page=10):
         try:
             filters = []
+
             if branch_office_id is not None:
                 filters.append(IntershipModel.branch_office_id == branch_office_id)
             if intern is not None:
@@ -26,12 +27,14 @@ class IntershipClass:
                     UserModel.full_name,
                     BranchOfficeModel.id.label("branch_office_id"), 
                     BranchOfficeModel.branch_office
+                ).join(
+                    UserModel, UserModel.rut == IntershipModel.intern
                 ).outerjoin(
                     BranchOfficeModel, BranchOfficeModel.id == IntershipModel.branch_office_id
                 ).filter(
                     *filters
                 ).order_by(
-                    IntershipModel.id
+                    IntershipModel.added_date.desc()
                 )
             else:
                 query = self.db.query(
@@ -51,7 +54,7 @@ class IntershipClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    IntershipModel.id
+                    IntershipModel.added_date.desc()
                 )
 
             if page > 0:

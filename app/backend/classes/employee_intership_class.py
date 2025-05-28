@@ -12,6 +12,7 @@ class EmployeeIntershipClass:
     def get_all(self, branch_office_id=None, intern=None, rol_id=None, rut=None, page=0, items_per_page=10):
         try:
             filters = []
+            print(branch_office_id)
             if branch_office_id is not None:
                 filters.append(EmployeeIntershipModel.branch_office_id == branch_office_id)
             if intern is not None:
@@ -35,7 +36,7 @@ class EmployeeIntershipClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    EmployeeIntershipModel.id
+                    EmployeeIntershipModel.added_date.desc()
                 )
             else:
                 query = self.db.query(
@@ -57,7 +58,7 @@ class EmployeeIntershipClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    EmployeeIntershipModel.id
+                    EmployeeIntershipModel.added_date.desc()
                 )
 
             if page > 0:
