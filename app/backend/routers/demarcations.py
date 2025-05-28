@@ -58,13 +58,10 @@ def store(
                 elif i == 6:
                     remote_path6 = f"{file_category_name}_{unique_filename}"
                     message = FileClass(db).upload(file, remote_path6)
-                elif i == 7:
-                    remote_path7 = f"{file_category_name}_{unique_filename}"
-                    message = FileClass(db).upload(file, remote_path7)
 
                 i += 1
 
-    DemarcationClass(db).store(form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6, remote_path7)
+    DemarcationClass(db).store(form_data, remote_path1, remote_path2, remote_path3, remote_path4, remote_path5, remote_path6)
 
 @demarcations.delete("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
