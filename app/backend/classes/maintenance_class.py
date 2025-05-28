@@ -26,7 +26,7 @@ class MaintenanceClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    desc(MaintenanceModel.id)
+                    desc(MaintenanceModel.added_date)
                 )
 
             if page > 0:
