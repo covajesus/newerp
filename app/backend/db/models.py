@@ -31,7 +31,6 @@ class DemarcationModel(Base):
     labor_costs = Column(Integer)
     made_arrows = Column(Integer)
     made_pedestrian_crossing = Column(Integer)
-    made_road_signage = Column(Integer)
     made_disability = Column(Integer)
     made_island = Column(Integer)
     made_pregnant = Column(Integer)

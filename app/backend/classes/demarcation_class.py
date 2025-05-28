@@ -171,7 +171,6 @@ class DemarcationClass:
         demarcation.labor_costs = form_data.labor_costs
         demarcation.made_arrows = form_data.made_arrows
         demarcation.made_pedestrian_crossing = form_data.made_pedestrian_crossing
-        demarcation.made_road_signage = form_data.made_road_signage
         demarcation.made_disability = form_data.made_disability
         demarcation.made_island = form_data.made_island
         demarcation.made_pregnant = form_data.made_pregnant

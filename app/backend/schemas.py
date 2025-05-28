@@ -1080,7 +1080,6 @@ class Demarcation(BaseModel):
     labor_costs: str
     made_arrows: int
     made_pedestrian_crossing: int
-    made_road_signage: int
     made_disability: int
     made_island: int
     made_pregnant: int
@@ -1088,7 +1087,6 @@ class Demarcation(BaseModel):
 
     file_made_arrows: Optional[UploadFile] = None
     file_made_pedestrian_crossing: Optional[UploadFile] = None
-    file_made_road_signage: Optional[UploadFile] = None
     file_made_disability: Optional[UploadFile] = None
     file_made_island: Optional[UploadFile] = None
     file_made_pregnant: Optional[UploadFile] = None
@@ -1102,7 +1100,6 @@ class Demarcation(BaseModel):
         labor_costs: str = Form(...),
         made_arrows: int = Form(...),
         made_pedestrian_crossing: int = Form(...),
-        made_road_signage: int = Form(...),
         made_disability: int = Form(...),
         made_island: int = Form(...),
         made_pregnant: int = Form(...),
@@ -1121,7 +1118,6 @@ class Demarcation(BaseModel):
             labor_costs=labor_costs,
             made_arrows=made_arrows,
             made_pedestrian_crossing=made_pedestrian_crossing,
-            made_road_signage=made_road_signage,
             made_disability=made_disability,
             made_island=made_island,
             made_pregnant=made_pregnant,
