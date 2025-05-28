@@ -178,10 +178,10 @@ class DemarcationClass:
         demarcation.made_wall = form_data.made_wall
         demarcation.file_made_arrows = remote_path1
         demarcation.file_made_pedestrian_crossing = remote_path2
-        demarcation.file_made_road_signage = remote_path3
-        demarcation.file_made_disability = remote_path4
-        demarcation.file_made_island = remote_path5
-        demarcation.file_made_pregnant = remote_path6
+        demarcation.file_made_disability = remote_path3
+        demarcation.file_made_island = remote_path4
+        demarcation.file_made_pregnant = remote_path5
+        demarcation.file_made_wall = remote_path6
         demarcation.added_date = datetime.now()
 
         self.db.add(demarcation)
