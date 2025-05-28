@@ -128,6 +128,7 @@ class EmployeeIntershipClass:
             }
         
     def get(self, id):
+        print(2)
         try:
             data_query = self.db.query(
                             EmployeeIntershipModel.id, 
