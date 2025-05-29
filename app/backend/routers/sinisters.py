@@ -81,6 +81,7 @@ def download(id: int, db: Session = Depends(get_db)):
 def edit(id: int, db: Session = Depends(get_db)):
     try:
         sinister_data = SinisterClass(db).get(id)
+        print(22222)
         
         if not sinister_data:
             raise HTTPException(status_code=404, detail="Siniestro no encontrada")

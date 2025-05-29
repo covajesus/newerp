@@ -1,7 +1,7 @@
 from app.backend.db.models import SinisterModel, BranchOfficeModel, SinisterReviewModel
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
-from datetime import datetime
+from datetime import date, datetime
 import json
 from fastapi import HTTPException
 
@@ -223,7 +223,7 @@ class SinisterClass:
                     "notified_security_id": data_query.notified_security_id,
                     "denounced_authorities_id": data_query.denounced_authorities_id,
                     "description": data_query.description,
-                    "sinister_date": data_query.sinister_date,
+                    "sinister_date": data_query.sinister_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(data_query.sinister_date, (date, datetime)) else data_query.sinister_date,
                     "client_rut": data_query.client_rut,
                     "client_name": data_query.client_name,
                     "client_last_name": data_query.client_last_name,
