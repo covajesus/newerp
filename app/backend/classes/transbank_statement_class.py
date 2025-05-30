@@ -209,16 +209,14 @@ class TransbankStatementClass:
                 check_branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
                         filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
                         count()
-                print('Codigo')
-                print(check_branch_office_transbank_statement)
-                print(row.get("Fecha Venta", ""))
 
                 if check_branch_office_transbank_statement > 0:
-                    print(branch_office_transbank_statement.branch_office_id)
+                    print(row)
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.added_date = datetime.now()
                     transbank_statement.original_date = row.get("Name", "")
+                    transbank_statement.code = row.get("Fecha Venta", "")
                     self.db.add(transbank_statement)
                     self.db.commit()
             
