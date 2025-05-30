@@ -146,11 +146,15 @@ class TransbankStatementClass:
                         count()
 
                 if check_branch_office_transbank_statement > 0:
-                    object_date = index
-                    date_dt = datetime.strptime(object_date, "%d/%m/%Y %H:%M")
+                    fecha_str = index
+                    print(fecha_str)
+                    fecha_dt = datetime.strptime(fecha_str, "%d/%m/%Y %H:%M")
+                    print(f"Fecha original: {fecha_str}")
+                    fecha_formateada = fecha_dt.strftime("%Y-%m-%d")
+                    print(fecha_formateada)
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
-                    transbank_statement.original_date = date_dt.strftime("%Y-%m-%d")
+                    transbank_statement.original_date = fecha_formateada
                     transbank_statement.code = row.get("Fecha Venta", "")
                     transbank_statement.branch_office_name = row.get("Local", "")
                     transbank_statement.sale_type = row.get("Identificación Local", "")
