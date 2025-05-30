@@ -52,6 +52,8 @@ def refresh(db: Session = Depends(get_db)):
             if response.status_code == 200:
                 dte_data = response.json()
 
+                cashier_id = CashierClass(db).get_with_machine(branch_office.id)
+
                 check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, dte_datum['fecha'])
 
                 gross_total = 0
@@ -60,8 +62,6 @@ def refresh(db: Session = Depends(get_db)):
                 added_date = dte_datum['fecha']
 
                 for dte_datum in dte_data:
-                    cashier_id = CashierClass(db).get_with_machine(branch_office.id)
-
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
