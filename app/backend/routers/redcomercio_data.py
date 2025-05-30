@@ -6,6 +6,7 @@ import requests
 from app.backend.classes.collection_class import CollectionClass
 from app.backend.classes.cashier_class import CashierClass
 from datetime import date, datetime
+from datetime import timedelta
 import pytz
 
 redcomercio_data = APIRouter(
@@ -23,7 +24,7 @@ def refresh(db: Session = Depends(get_db)):
     now = datetime.now(tz)  # obtienes la fecha y hora actual en la zona horaria
 
     until = now.strftime('%Y-%m-%d')
-    since = now.strftime('%Y-%m-%d')
+    since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
