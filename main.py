@@ -64,6 +64,9 @@ from app.backend.routers.customer_collections import customer_collections
 from app.backend.routers.maintenances import maintenances
 from app.backend.routers.redcomercio_data import redcomercio_data
 from app.backend.routers.transbank_statements import transbank_statements
+from app.backend.routers.segments import segments
+from app.backend.routers.zones import zones
+from app.backend.routers.principals import principals
 
 app = FastAPI(root_path="/api")
 application = app
@@ -151,6 +154,9 @@ app.include_router(customer_collections)
 app.include_router(maintenances)
 app.include_router(redcomercio_data)
 app.include_router(transbank_statements)
+app.include_router(segments)
+app.include_router(zones)
+app.include_router(principals)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
