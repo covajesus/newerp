@@ -113,7 +113,6 @@ class TransbankStatementClass:
     def read_store_bank_statement(self, file_url, period):
         try:
             fixed_period = HelperClass.fix_current_dte_period(period)
-            datetime = fixed_period + "-01 00:00:00"
             date = fixed_period + "-01"
 
             self.db.execute(text("TRUNCATE TABLE transbank_statements"))
@@ -147,11 +146,8 @@ class TransbankStatementClass:
 
                 if check_branch_office_transbank_statement > 0:
                     fecha_str = index
-                    print(fecha_str)
                     fecha_dt = datetime.strptime(fecha_str, "%d/%m/%Y %H:%M")
-                    print(f"Fecha original: {fecha_str}")
                     fecha_formateada = fecha_dt.strftime("%Y-%m-%d")
-                    print(fecha_formateada)
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.original_date = fecha_formateada
@@ -202,7 +198,7 @@ class TransbankStatementClass:
                         collection.card_gross_amount += item.total
                         collection.card_net_amount += card_net_amount
                         collection.total_tickets += item.total_tickets
-                        collection.updated_date = datetime
+                        collection.updated_date = item.added_date
 
                         self.db.commit()
                     else:
@@ -215,7 +211,7 @@ class TransbankStatementClass:
                             card_net_amount=card_net_amount,
                             total_tickets=item.total_tickets,
                             added_date=date,
-                            updated_date=datetime
+                            updated_date= item.original_date,
                         )
 
                         self.db.add(collection)
