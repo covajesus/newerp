@@ -29,7 +29,7 @@ def store(
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
-        file_category_name = 'bank_statements'
+        file_category_name = 'transbank_statements'
         unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
         remote_path = f"{file_category_name}_{unique_filename}"
@@ -38,10 +38,9 @@ def store(
 
         file_url = FileClass(db).get(remote_path)
 
-        excel_data = TransbankStatementClass(db).read_store_bank_statement(file_url, form_data.period)
+        TransbankStatementClass(db).read_store_bank_statement(file_url, form_data.period)
 
-        exit()
-        return {"message": message, "file_url": file_url, "data": excel_data}
+        return {"message": "Cartola de transbank cargada exitosamente", "file_url": file_url}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")

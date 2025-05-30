@@ -304,6 +304,7 @@ class CashierModel(Base):
     cashier = Column(String(255))
     anydesk = Column(String(255))
     rustdesk = Column(String(255))
+    transbank_status_id = Column(Integer)
 
 class TotalGeneralCollectionModel(Base):
     __tablename__ = 'total_general_collections'
