@@ -13,7 +13,7 @@ class TransbankStatementClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_comparation_pending_deposits_bank_statements(self, page=1, items_per_page=99999999):
+    def get_all(self, page=1, items_per_page=10):
         try:
             if page != 0:
                 data_query = self.db.query(TransbankStatementModel.id, 
