@@ -58,7 +58,7 @@ def refresh(db: Session = Depends(get_db)):
                 net_total = 0
                 
                 for dte_datum in dte_data:
-                    added_date = dte_datum['fecha'])
+                    added_date = dte_datum['fecha']
                     check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
                    
                     if check_existence == 0:
