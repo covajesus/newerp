@@ -644,6 +644,15 @@ class HelperClass:
 
         return str(year) + "-" + str(month)
     
+    def fix_period(period):
+        period = period.split('-')
+
+        month = period[1]
+
+        year = period[0]
+
+        return str(month) + "-" + str(year)
+    
     def fix_last_dte_period(period):
         period = period.split('-')
 

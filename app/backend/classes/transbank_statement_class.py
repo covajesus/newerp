@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel
+from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, TransbankTotalModel, CollectionModel, CashierModel
 from app.backend.classes.helper_class import HelperClass
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -16,21 +16,27 @@ class TransbankStatementClass:
     def get_all(self, page=1, items_per_page=10):
         try:
             if page != 0:
-                data_query = self.db.query(TransbankStatementModel.id, 
-                                           TransbankStatementModel.branch_office_id, 
-                                           TransbankStatementModel.original_date,
-                                           TransbankStatementModel.code,
-                                           TransbankStatementModel.branch_office_name,
-                                           TransbankStatementModel.sale_type,
-                                           TransbankStatementModel.payment_type,
-                                           TransbankStatementModel.card_number,
-                                           TransbankStatementModel.sale_description,
-                                           TransbankStatementModel.amount,
-                                           TransbankStatementModel.value_1,
-                                           TransbankStatementModel.value_2,
-                                           TransbankStatementModel.value_3,
-                                           TransbankStatementModel.value_4). \
-                        order_by(TransbankStatementModel.id)
+                data_query = (
+                    self.db.query(
+                        TransbankStatementModel.id,
+                        TransbankStatementModel.branch_office_id,
+                        TransbankStatementModel.original_date,
+                        TransbankStatementModel.code,
+                        TransbankStatementModel.branch_office_name,
+                        TransbankStatementModel.sale_type,
+                        TransbankStatementModel.payment_type,
+                        TransbankStatementModel.card_number,
+                        TransbankStatementModel.sale_description,
+                        TransbankStatementModel.amount,
+                        TransbankStatementModel.value_1,
+                        TransbankStatementModel.value_2,
+                        TransbankStatementModel.value_3,        
+                        TransbankStatementModel.value_4,
+                        BranchOfficeModel.branch_office.label("branch_office")
+                    )
+                    .outerjoin(BranchOfficeModel, BranchOfficeModel.id == TransbankStatementModel.branch_office_id)
+                    .order_by(TransbankStatementModel.id)
+                )
 
                 total_items = data_query.count()
                 total_pages = (total_items + items_per_page - 1) // items_per_page
@@ -54,6 +60,7 @@ class TransbankStatementClass:
                         "card_number": transbank_statement.card_number,
                         "sale_description": transbank_statement.sale_description,
                         "amount": transbank_statement.amount,
+                        "branch_office": transbank_statement.branch_office,
                     } for transbank_statement in data]
 
                 total_available_receipts = self.db.query(TransbankStatementModel).count()
@@ -105,6 +112,9 @@ class TransbankStatementClass:
 
     def read_store_bank_statement(self, file_url, period):
         try:
+            fixed_period = HelperClass.fix_current_dte_period(period)
+            date = fixed_period + "-01 00:00:00"
+
             self.db.execute(text("TRUNCATE TABLE transbank_statements"))
             self.db.commit()
             response = requests.get(file_url)
@@ -138,7 +148,6 @@ class TransbankStatementClass:
                 if check_branch_office_transbank_statement > 0:
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
-                    transbank_statement.added_date = datetime.now()
                     transbank_statement.original_date = row.get("Name:", "")
                     transbank_statement.code = row.get("Fecha Venta", "")
                     transbank_statement.branch_office_name = row.get("Local", "")
@@ -151,8 +160,34 @@ class TransbankStatementClass:
                     transbank_statement.value_2 = row.get("Monto Exento", "")
                     transbank_statement.value_3 = row.get("Código Autorización", "")
                     transbank_statement.value_4 = row.get("N° Cuotas", "")
+                    transbank_statement.added_date = date
                     self.db.add(transbank_statement)
                     self.db.commit()
+
+            transbank_total = self.db.query(TransbankTotalModel).all()
+
+            for item in transbank_total:
+                cashier = self.db.query(CashierModel). \
+                        filter(CashierModel.branch_office_id == item.branch_office_id). \
+                        filter(CashierModel.transbank_status_id == 1). \
+                        first()
+                
+                card_net_amount = round(item.amount/1.19)
+
+                collection = CollectionModel(
+                    branch_office_id=item.branch_office_id,
+                    cashier_id=cashier.id,
+                    cash_gross_amount=0,
+                    cash_net_amount=0,
+                    card_gross_amount=transbank_total,
+                    card_net_amount=card_net_amount,
+                    total_tickets=0,
+                    added_date=date,
+                    updated_date=date
+                )
+
+                self.db.add(collection)
+                self.db.commit()
 
             return 1
 
