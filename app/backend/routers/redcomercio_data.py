@@ -47,7 +47,6 @@ def refresh(db: Session = Depends(get_db)):
                     "Content-Type": "application/json",
                 },
             )
-            print(response.text)
 
             if response.status_code == 200:
                 dte_data = response.json()
@@ -60,9 +59,10 @@ def refresh(db: Session = Depends(get_db)):
                 total_tickets = 0
                 net_total = 0
                 added_date = dte_datum['fecha']
-
+                
                 for dte_datum in dte_data:
                     print(dte_datum)
+              
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
