@@ -195,8 +195,22 @@ class TransbankStatementClass:
             if start_index is None:
                 raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
 
+            # Crea un nuevo archivo virtual solo con la tabla
+            data_lines = "\n".join(lines[start_index:])
+            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str)
+            df = df.fillna("")
+            
+            # Procesamiento de datos como en tu código original
+            for index, row in df.iterrows():
+                print(row)
+
+            
+            exit()
+
+            return bank_statement
+
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error al leer el .dat: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al leer el Transbank: {str(e)}")
             
     def customer_accept(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
