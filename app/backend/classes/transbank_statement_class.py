@@ -202,17 +202,17 @@ class TransbankStatementClass:
             
             # Procesamiento de datos como en tu código original
             for index, row in df.iterrows():
-                brannch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
+                branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
                         filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
                         first()
-
-                transbank_statement = TransbankStatementModel()
-                transbank_statement.branch_office_id = brannch_office_transbank_statement.branch_office_id if brannch_office_transbank_statement else None
-                transbank_statement.added_date = datetime.now()
-                transbank_statement.original_date = row.get("Name", "")
-                self.db.add(transbank_statement)
-                self.db.commit()
                 
+                if not branch_office_transbank_statement:
+                    transbank_statement = TransbankStatementModel()
+                    transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
+                    transbank_statement.added_date = datetime.now()
+                    transbank_statement.original_date = row.get("Name", "")
+                    self.db.add(transbank_statement)
+                    self.db.commit()
             
             exit()
 
