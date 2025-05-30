@@ -1424,6 +1424,34 @@ class BankStatementModel(Base):
     amount = Column(Integer)
     period = Column(String(255))
 
+class TransbankStatementModel(Base):
+    __tablename__ = 'transbank_statements'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    original_date = Column(String(255))
+    code = Column(String(255))
+    branch_office_name = Column(String(255))
+    sale_type = Column(String(255))
+    payment_type = Column(String(255))
+    card_number = Column(String(255))
+    sale_description = Column(String(255))
+    amount = Column(String(255))
+    value_1 = Column(String(255))
+    value_2 = Column(String(255))
+    value_3 = Column(String(255))
+    value_4 = Column(String(255))
+    added_date = Column(DateTime())
+
+class BranchOfficesTransbankStatementsModel(Base):
+    __tablename__ = 'branch_offices_transbanks'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    transbank_code = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class ComparationPendingDtesBankStatementModel(Base):
     __tablename__ = 'comparation_pending_dtes_bank_statements'
 

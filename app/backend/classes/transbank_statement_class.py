@@ -1,11 +1,11 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import BankStatementModel, ComparationPendingDtesBankStatementModel, DteModel, ComparationPendingDepositsBankStatementModel, DepositModel
+from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, ComparationPendingDtesBankStatementModel, DteModel, ComparationPendingDepositsBankStatementModel, DepositModel
 from app.backend.classes.helper_class import HelperClass
 from fastapi import HTTPException
 from sqlalchemy import text
 import requests
-from io import BytesIO, StringIO
+from io import StringIO
 import pandas as pd
 import re
 
@@ -202,8 +202,16 @@ class TransbankStatementClass:
             
             # Procesamiento de datos como en tu código original
             for index, row in df.iterrows():
-                print(row)
+                brannch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
+                        filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Código Autorización", "")). \
+                        first()
 
+                transbank_statement = TransbankStatementModel()
+                transbank_statement.branch_office_id = brannch_office_transbank_statement.branch_office_id if brannch_office_transbank_statement else None
+                transbank_statement.added_date = datetime.now()
+                self.db.add(transbank_statement)
+                self.db.commit()
+                
             
             exit()
 
