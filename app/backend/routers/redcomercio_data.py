@@ -25,6 +25,8 @@ def refresh(db: Session = Depends(get_db)):
 
     until = now.strftime('%Y-%m-%d')
     since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
+    print(until)
+    print(since)
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
