@@ -63,7 +63,7 @@ from app.backend.routers.demarcations import demarcations
 from app.backend.routers.customer_collections import customer_collections
 from app.backend.routers.maintenances import maintenances
 from app.backend.routers.redcomercio_data import redcomercio_data
-from app.backend.routers.transbank_statements import transbank_statements
+from app.backend.routers.transbank_statements import transbank_statements2
 
 app = FastAPI(root_path="/api")
 application = app
