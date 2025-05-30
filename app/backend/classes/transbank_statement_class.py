@@ -173,14 +173,14 @@ class TransbankStatementClass:
                         filter(CashierModel.transbank_status_id == 1). \
                         first()
                 
-                card_net_amount = round(item.amount/1.19)
+                card_net_amount = round(item.total/1.19)
 
                 collection = CollectionModel(
                     branch_office_id=item.branch_office_id,
                     cashier_id=cashier.id,
                     cash_gross_amount=0,
                     cash_net_amount=0,
-                    card_gross_amount=item.amount,
+                    card_gross_amount=item.total,
                     card_net_amount=card_net_amount,
                     total_tickets=0,
                     added_date=date,
