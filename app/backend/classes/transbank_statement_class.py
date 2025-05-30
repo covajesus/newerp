@@ -173,22 +173,28 @@ class TransbankStatementClass:
                         filter(CashierModel.transbank_status_id == 1). \
                         first()
                 
+                check_cashier = self.db.query(CashierModel). \
+                        filter(CashierModel.branch_office_id == item.branch_office_id). \
+                        filter(CashierModel.transbank_status_id == 1). \
+                        count()
+                
                 card_net_amount = round(item.total/1.19)
 
-                collection = CollectionModel(
-                    branch_office_id=item.branch_office_id,
-                    cashier_id=cashier.id,
-                    cash_gross_amount=0,
-                    cash_net_amount=0,
-                    card_gross_amount=item.total,
-                    card_net_amount=card_net_amount,
-                    total_tickets=0,
-                    added_date=date,
-                    updated_date=datetime
-                )
+                if check_cashier > 0:
+                    collection = CollectionModel(
+                        branch_office_id=item.branch_office_id,
+                        cashier_id=cashier.id,
+                        cash_gross_amount=0,
+                        cash_net_amount=0,
+                        card_gross_amount=item.total,
+                        card_net_amount=card_net_amount,
+                        total_tickets=0,
+                        added_date=date,
+                        updated_date=datetime
+                    )
 
-                self.db.add(collection)
-                self.db.commit()
+                    self.db.add(collection)
+                    self.db.commit()
 
             return 1
 
