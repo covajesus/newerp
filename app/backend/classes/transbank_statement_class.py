@@ -146,7 +146,7 @@ class TransbankStatementClass:
                     transbank_statement.payment_type = row.get("Tipo Movimiento", "")
                     transbank_statement.card_number = row.get("Tipo Tarjeta", "")
                     transbank_statement.sale_description = row.get("Identificador", "")
-                    transbank_statement.amount = row.get("Tipo Cuota", "")
+                    transbank_statement.amount = valor = int(row.get("Tipo Cuota", "0").replace(".", ""))
                     transbank_statement.value_1 = row.get("Monto Afecto", "")
                     transbank_statement.value_2 = row.get("Monto Exento", "")
                     transbank_statement.value_3 = row.get("Código Autorización", "")
