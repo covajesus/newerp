@@ -238,15 +238,14 @@ class CollectionClass:
         
     def existence(self, branch_office_id, cashier_id, added_date):
         try:
-            existence = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.cashier_id == cashier_id).filter(CollectionModel.added_date == added_date).count()
+            existence = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.cashier_id == cashier_id).filter(CollectionModel.added_date == added_date).first()
             
-            if existence > 0:
-                return 1
+            if existence:
+                return existence
             else:
                 return 0
         except Exception as e:
-            error_message = str(e)
-            return f"Error: {error_message}"
+            return 0
     
     def store_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = CollectionModel(
