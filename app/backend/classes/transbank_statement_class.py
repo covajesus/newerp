@@ -113,7 +113,8 @@ class TransbankStatementClass:
     def read_store_bank_statement(self, file_url, period):
         try:
             fixed_period = HelperClass.fix_current_dte_period(period)
-            date = fixed_period + "-01 00:00:00"
+            datetime = fixed_period + "-01 00:00:00"
+            date = fixed_period + "-01"
 
             self.db.execute(text("TRUNCATE TABLE transbank_statements"))
             self.db.commit()
@@ -155,12 +156,12 @@ class TransbankStatementClass:
                     transbank_statement.payment_type = row.get("Tipo Movimiento", "")
                     transbank_statement.card_number = row.get("Tipo Tarjeta", "")
                     transbank_statement.sale_description = row.get("Identificador", "")
-                    transbank_statement.amount = valor = int(row.get("Tipo Cuota", "0").replace(".", ""))
+                    transbank_statement.amount = int(row.get("Tipo Cuota", "0").replace(".", ""))
                     transbank_statement.value_1 = row.get("Monto Afecto", "")
                     transbank_statement.value_2 = row.get("Monto Exento", "")
                     transbank_statement.value_3 = row.get("Código Autorización", "")
                     transbank_statement.value_4 = row.get("N° Cuotas", "")
-                    transbank_statement.added_date = date
+                    transbank_statement.added_date = datetime
                     self.db.add(transbank_statement)
                     self.db.commit()
 
@@ -183,7 +184,7 @@ class TransbankStatementClass:
                     card_net_amount=card_net_amount,
                     total_tickets=0,
                     added_date=date,
-                    updated_date=date
+                    updated_date=datetime
                 )
 
                 self.db.add(collection)
