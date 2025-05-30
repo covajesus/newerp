@@ -63,6 +63,7 @@ def refresh(db: Session = Depends(get_db)):
                     print(added_date)
                     check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
                     print(2222222)
+                    print(cashier_id)
                     print(check_existence)
                     if check_existence == 0:
                         gross_total = dte_datum['total']
