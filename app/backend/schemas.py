@@ -15,7 +15,7 @@ class Alert(BaseModel):
 class UpdateAlert(BaseModel):
     status_id: int = None
 
-class BranchOffice(BaseModel):
+class CreateBranchOffice(BaseModel):
     branch_office: str
     address: str
     region_id: int
@@ -25,11 +25,9 @@ class BranchOffice(BaseModel):
     principal_id: int
     status_id: int
     visibility_id: int
+    getaway_machine_id: int
     opening_date: str
-    dte_code: int
-    principal_supervisor: int
-    added_date: datetime
-    updated_date: Union[datetime, None]
+    principal_supervisor: str
 
 class Employee(BaseModel):
     rut: str

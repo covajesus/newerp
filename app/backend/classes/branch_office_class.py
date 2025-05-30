@@ -54,10 +54,23 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
-    def store(self, branchOffice_inputs):
+    def store(self, branch_office_inputs):
         try:
-            data = BranchOfficeModel(**branchOffice_inputs)
-            self.db.add(data)
+            branch_office = BranchOfficeModel()
+            branch_office.branch_office = branch_office_inputs.branch_office
+            branch_office.address = branch_office_inputs.address
+            branch_office.region_id = branch_office_inputs.region_id
+            branch_office.commune_id = branch_office_inputs.commune_id
+            branch_office.segment_id = branch_office_inputs.segment_id
+            branch_office.zone_id = branch_office_inputs.zone_id
+            branch_office.principal_id = branch_office_inputs.principal_id
+            branch_office.principal_supervisor = branch_office_inputs.principal_supervisor
+            branch_office.getaway_machine_id = branch_office_inputs.getaway_machine_id
+            branch_office.status_id = branch_office_inputs.status_id
+            branch_office.visibility_id = branch_office_inputs.visibility_id
+            branch_office.opening_date = branch_office_inputs.opening_date
+            
+            self.db.add(branch_office)
             self.db.commit()
             return 1
         except Exception as e:

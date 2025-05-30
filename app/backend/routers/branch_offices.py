@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import BranchOffice, UpdateBranchOffice, UserLogin
+from app.backend.schemas import CreateBranchOffice, UpdateBranchOffice, UserLogin
 from app.backend.classes.branch_office_class import BranchOfficeClass
 from app.backend.auth.auth_user import get_current_active_user
 
@@ -23,9 +23,8 @@ def get_full_data(session_user: UserLogin = Depends(get_current_active_user), db
     return {"message": data}
 
 @branch_offices.post("/store")
-def store(branch_office:BranchOffice, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    branch_office_inputs = branch_office.dict()
-    data = BranchOfficeClass(db).store(branch_office_inputs)
+def store(branch_office:CreateBranchOffice, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).store(branch_office)
 
     return {"message": data}
 
