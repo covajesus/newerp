@@ -48,7 +48,6 @@ def refresh(db: Session = Depends(get_db)):
                 },
             )
 
-
             if response.status_code == 200:
                 dte_data = response.json()
 
@@ -59,21 +58,13 @@ def refresh(db: Session = Depends(get_db)):
                 net_total = 0
                 
                 for dte_datum in dte_data:
-                    added_date = dte_datum['fecha']
-                    print('Sucursal' + str(branch_office.id))
-                    print(added_date)
+                    added_date = dte_datum['fecha'])
                     check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
                    
-                    print(cashier_id)
-                    print(check_existence)
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
                         total_tickets = 1
-
-                        print(gross_total)
-                        print(net_total)
-                        print(total_tickets)
 
                         CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                     else:
