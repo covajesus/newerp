@@ -75,8 +75,7 @@ def refresh(db: Session = Depends(get_db)):
                         print(net_total)
                         print(total_tickets)
 
-                        if cashier_id is None:
-                            CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+                        CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                     else:
                         gross_total = check_existence.cash_gross_amount + dte_datum['total']
                         net_total = round(gross_total/1.19)
