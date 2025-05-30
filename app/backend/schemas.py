@@ -1008,6 +1008,15 @@ class BankStatement(BaseModel):
             ):
         return cls(period=period)
 
+class TransbankStatement(BaseModel):
+    period: str
+
+    @classmethod
+    def as_form(cls, 
+                period: str = Form()
+            ):
+        return cls(period=period)
+    
 class Contract(BaseModel):
     rut: str
     client: str
@@ -1131,6 +1140,9 @@ class Demarcation(BaseModel):
 
 class CashReserveList(BaseModel):
     branch_office_id: Optional[int] = None
+    page: int = 0
+
+class TransbankStatementList(BaseModel):
     page: int = 0
 
 class DemarcationList(BaseModel):

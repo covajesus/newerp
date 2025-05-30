@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
-from app.backend.schemas import BankStatement, DepositIds
+from app.backend.schemas import TransbankStatement, TransbankStatementList
 from fastapi import UploadFile, File, HTTPException
 from app.backend.classes.transbank_statement_class import TransbankStatementClass
 from datetime import datetime
@@ -13,9 +13,15 @@ transbank_statements = APIRouter(
     tags=["TransbankStatements"]
 )
 
+@transbank_statements.post("/")
+def index(transbank: TransbankStatementList, db: Session = Depends(get_db)):
+    data = TransbankStatementClass(db).get_all(transbank.page)
+
+    return {"message": data}
+
 @transbank_statements.post("/store")
 def store(
-    form_data: BankStatement = Depends(BankStatement.as_form),
+    form_data: TransbankStatement = Depends(TransbankStatement.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
