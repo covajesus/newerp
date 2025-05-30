@@ -23,6 +23,17 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
+    def get_full_data(self):
+        try:
+            data = self.db.query(BranchOfficeModel). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+
     def get_with_machine(self):
         try:
             data = self.db.query(BranchOfficeModel). \

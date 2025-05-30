@@ -16,6 +16,12 @@ def index(session_user: UserLogin = Depends(get_current_active_user), db: Sessio
 
     return {"message": data}
 
+@branch_offices.post("/get_full_data/")
+def get_full_data(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).get_full_data()
+
+    return {"message": data}
+
 @branch_offices.post("/store")
 def store(branch_office:BranchOffice, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     branch_office_inputs = branch_office.dict()
