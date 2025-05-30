@@ -60,9 +60,10 @@ def refresh(db: Session = Depends(get_db)):
                 
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
+                    print('Sucursal' + str(branch_office.id))
                     print(added_date)
                     check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
-                    print(2222222)
+                   
                     print(cashier_id)
                     print(check_existence)
                     if check_existence == 0:
