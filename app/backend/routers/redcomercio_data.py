@@ -61,7 +61,8 @@ def refresh(db: Session = Depends(get_db)):
                     gross_total = gross_total + dte_datum['total']
                     net_total = net_total + round(dte_datum['total']/1.19)
                     total_tickets = total_tickets + 1
-                  
+                
+                print(branch_office.id)
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
                 print(222222222)
                 print(cashier_id)
