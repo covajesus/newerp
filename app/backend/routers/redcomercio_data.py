@@ -48,17 +48,20 @@ def refresh(db: Session = Depends(get_db)):
                 },
             )
 
+            print(response.text)
+            exit()
+
             if response.status_code == 200:
                 dte_data = response.json()
 
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
-
-                check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, dte_datum['fecha'])
+                added_date = dte_datum['fecha']
+            
+                check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
 
                 gross_total = 0
                 total_tickets = 0
                 net_total = 0
-                added_date = dte_datum['fecha']
                 
                 for dte_datum in dte_data:
                     print(dte_datum)
