@@ -25,6 +25,8 @@ def refresh(db: Session = Depends(get_db)):
 
     until = now.strftime('%Y-%m-%d')
     since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
+    print(until)
+    print(since)
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
@@ -45,6 +47,7 @@ def refresh(db: Session = Depends(get_db)):
                     "Content-Type": "application/json",
                 },
             )
+            print(response.text)
 
             if response.status_code == 200:
                 dte_data = response.json()
@@ -60,12 +63,12 @@ def refresh(db: Session = Depends(get_db)):
                     total_tickets = total_tickets + 1
                   
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
-
+                print(222222222)
+                print(cashier_id)
                 check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
-                
+                print(check_existence)
                 if check_existence == 0:
                     if cashier_id is None:
-                        print(cashier_id)
                         CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                 else:
                     CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
