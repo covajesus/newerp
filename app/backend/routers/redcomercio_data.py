@@ -48,8 +48,6 @@ def refresh(db: Session = Depends(get_db)):
                 },
             )
 
-            print(response.text)
-            exit()
 
             if response.status_code == 200:
                 dte_data = response.json()
@@ -65,7 +63,8 @@ def refresh(db: Session = Depends(get_db)):
                 
                 for dte_datum in dte_data:
                     print(dte_datum)
-              
+                    print(333333333333333333333333333)
+                    exit()
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
