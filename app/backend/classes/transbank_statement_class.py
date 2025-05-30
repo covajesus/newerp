@@ -202,7 +202,7 @@ class TransbankStatementClass:
             
             # Procesamiento de datos como en tu código original
             for index, row in df.iterrows():
-                print(row.get("Código Autorización", ""))
+                print(row.get("Local", ""))
                 brannch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
                         filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Código Autorización", "")). \
                         first()
