@@ -116,55 +116,6 @@ class TransbankStatementClass:
             datetime = fixed_period + "-01 00:00:00"
             date = fixed_period + "-01"
 
-            self.db.execute(text("TRUNCATE TABLE transbank_statements"))
-            self.db.commit()
-            response = requests.get(file_url)
-
-            response.raise_for_status()
-            content = response.content.decode('latin1')
-            lines = content.splitlines()
-            start_index = None
-            for i, line in enumerate(lines):
-                if line.startswith("Fecha Venta"):
-                    start_index = i
-                    break
-
-            if start_index is None:
-                raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
-
-            data_lines = "\n".join(lines[start_index:])
-            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str)
-            df = df.fillna("")
-            
-            # Procesamiento de datos como en tu código original
-            for index, row in df.iterrows():
-                branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
-                        first()
-                
-                check_branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
-                        count()
-
-                if check_branch_office_transbank_statement > 0:
-                    transbank_statement = TransbankStatementModel()
-                    transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
-                    transbank_statement.original_date = row.get("Name:", "")
-                    transbank_statement.code = row.get("Fecha Venta", "")
-                    transbank_statement.branch_office_name = row.get("Local", "")
-                    transbank_statement.sale_type = row.get("Identificación Local", "")
-                    transbank_statement.payment_type = row.get("Tipo Movimiento", "")
-                    transbank_statement.card_number = row.get("Tipo Tarjeta", "")
-                    transbank_statement.sale_description = row.get("Identificador", "")
-                    transbank_statement.amount = int(row.get("Tipo Cuota", "0").replace(".", ""))
-                    transbank_statement.value_1 = row.get("Monto Afecto", "")
-                    transbank_statement.value_2 = row.get("Monto Exento", "")
-                    transbank_statement.value_3 = row.get("Código Autorización", "")
-                    transbank_statement.value_4 = row.get("N° Cuotas", "")
-                    transbank_statement.added_date = datetime
-                    self.db.add(transbank_statement)
-                    self.db.commit()
-
             transbank_total = self.db.query(TransbankTotalModel).all()
 
             for item in transbank_total:
@@ -180,6 +131,8 @@ class TransbankStatementClass:
                 
                 card_net_amount = round(item.total/1.19)
 
+                print("Total Items")
+
                 if check_cashier > 0:
                     collection = CollectionModel(
                         branch_office_id=item.branch_office_id,
@@ -188,7 +141,7 @@ class TransbankStatementClass:
                         cash_net_amount=0,
                         card_gross_amount=item.total,
                         card_net_amount=card_net_amount,
-                        total_tickets=0,
+                        total_tickets=item.total_tickets,
                         added_date=date,
                         updated_date=datetime
                     )
