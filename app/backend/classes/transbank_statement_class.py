@@ -137,7 +137,6 @@ class TransbankStatementClass:
             df = df.fillna("")
             
             for index, row in df.iterrows():
-                print(index)
                 branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
                         filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
                         first()
@@ -147,9 +146,10 @@ class TransbankStatementClass:
                         count()
 
                 if check_branch_office_transbank_statement > 0:
+                    object_date = index
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
-                    transbank_statement.original_date = row.get("Name:", "")
+                    transbank_statement.original_date = object_date.strftime("%Y-%m-%d")
                     transbank_statement.code = row.get("Fecha Venta", "")
                     transbank_statement.branch_office_name = row.get("Local", "")
                     transbank_statement.sale_type = row.get("Identificación Local", "")
