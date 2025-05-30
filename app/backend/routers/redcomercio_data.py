@@ -64,7 +64,9 @@ def refresh(db: Session = Depends(get_db)):
                 check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
                 
                 if check_existence == 0:
-                    CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+                    if cashier_id is None:
+                        print(cashier_id)
+                        CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                 else:
                     CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
 
