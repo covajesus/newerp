@@ -311,6 +311,7 @@ class TransbankTotalModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_office_id = Column(Integer)
     total = Column(Integer)
+    total_tickets = Column(Integer)
 
 class TotalGeneralCollectionModel(Base):
     __tablename__ = 'total_general_collections'
