@@ -256,6 +256,7 @@ class CollectionClass:
                 cash_net_amount=net_total,
                 card_gross_amount=0,
                 card_net_amount=0,
+                subscribers=0,
                 total_tickets=total_tickets,
                 added_date=date,
                 updated_date=str(date) + " 00:00:00"
