@@ -111,6 +111,8 @@ class TransbankStatementClass:
             return f"Error: {error_message}"
 
     def read_store_bank_statement(self, file_url, period):
+        print(2222222222222222222222222222222222222222222222222222222)
+        exit()
         try:
             fixed_period = HelperClass.fix_current_dte_period(period)
             datetime = fixed_period + "-01 00:00:00"
