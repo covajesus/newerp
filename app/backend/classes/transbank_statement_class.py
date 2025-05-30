@@ -132,6 +132,12 @@ class TransbankStatementClass:
                 card_net_amount = round(item.total/1.19)
 
                 print("Total Items")
+                print(check_cashier)
+                print(item.branch_office_id)
+                print(item.total)
+                print(item.total_tickets)
+                print(card_net_amount)
+                print(date)
 
                 if check_cashier > 0:
                     collection = CollectionModel(
