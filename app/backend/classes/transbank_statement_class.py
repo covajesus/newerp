@@ -207,6 +207,7 @@ class TransbankStatementClass:
                         first()
                 
                 if not branch_office_transbank_statement:
+                    print(branch_office_transbank_statement.branch_office_id)
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.added_date = datetime.now()
