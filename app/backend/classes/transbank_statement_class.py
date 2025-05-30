@@ -209,7 +209,10 @@ class TransbankStatementClass:
                 check_branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
                         filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
                         count()
-                
+                print('Codigo')
+                print(check_branch_office_transbank_statement)
+                print(row.get("Fecha Venta", ""))
+
                 if check_branch_office_transbank_statement > 0:
                     print(branch_office_transbank_statement.branch_office_id)
                     transbank_statement = TransbankStatementModel()
