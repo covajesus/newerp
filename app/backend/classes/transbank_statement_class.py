@@ -183,7 +183,7 @@ class TransbankStatementClass:
             response = requests.get(file_url)
 
             response.raise_for_status()
-            content = response.content.decode("utf-8")
+            content = response.content.decode('latin1')
             # Encuentra la línea donde comienzan los datos (cabecera de tabla)
             lines = content.splitlines()
             start_index = None
