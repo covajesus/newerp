@@ -313,6 +313,7 @@ class TransbankTotalModel(Base):
     branch_office_id = Column(Integer)
     total = Column(Integer)
     total_tickets = Column(Integer)
+    added_date = Column(Date())
 
 class TotalGeneralCollectionModel(Base):
     __tablename__ = 'total_general_collections'

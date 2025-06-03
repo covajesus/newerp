@@ -211,7 +211,7 @@ class TransbankStatementClass:
                             card_net_amount=card_net_amount,
                             total_tickets=item.total_tickets,
                             added_date=date,
-                            updated_date= item.original_date,
+                            updated_date=item.added_date,
                         )
 
                         self.db.add(collection)
