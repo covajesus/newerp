@@ -29,6 +29,21 @@ class WhatsappClass:
 
         print('Enviando mensaje de WhatsApp')
 
+        required_fields = {
+            "Tipo DTE": dte_data.dte_type_id,
+            "Folio": dte_data.folio,
+            "Fecha": added_date_str,
+            "Total": dte_data.total,
+            "Sucursal": branch_office.branch_office,
+            "Supervisor": user.full_name,
+            "Teléfono": user.phone,
+            "Email": user.email
+        }
+
+        for label, value in required_fields.items():
+            if value is None or str(value).strip() == "":
+                raise ValueError(f"El campo '{label}' está vacío o no definido.")
+
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer.phone}",
