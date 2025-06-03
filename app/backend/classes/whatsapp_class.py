@@ -73,8 +73,6 @@ class WhatsappClass:
                         ]
                     }
                 }
-        
-        print(response)
 
         response = requests.post(url, json=payload, headers=headers)
 
