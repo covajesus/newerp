@@ -17,6 +17,7 @@ class WhatsappClass:
         image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
+        print(token)
 
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
         headers = {
