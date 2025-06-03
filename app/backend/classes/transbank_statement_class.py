@@ -196,27 +196,7 @@ class TransbankStatementClass:
                 card_net_amount = round(item.total/1.19)
 
                 if check_cashier > 0:
-                    check_collection = self.db.query(CollectionModel). \
-                        filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                        filter(CollectionModel.cashier_id == cashier.id). \
-                        filter(CollectionModel.added_date == date). \
-                        count()
-                    
-                    if check_collection > 0:
-                        collection = self.db.query(CollectionModel). \
-                            filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                            filter(CollectionModel.cashier_id == cashier.id). \
-                            filter(CollectionModel.added_date == date). \
-                            first()
-
-                        collection.card_gross_amount += item.total
-                        collection.card_net_amount += card_net_amount
-                        collection.total_tickets += item.total_tickets
-                        collection.updated_date = item.added_date
-
-                        self.db.commit()
-                    else:
-                        collection = CollectionModel(
+                    collection = CollectionModel(
                             branch_office_id=item.branch_office_id,
                             cashier_id=cashier.id,
                             cash_gross_amount=0,
@@ -228,8 +208,8 @@ class TransbankStatementClass:
                             updated_date=item.added_date,
                         )
 
-                        self.db.add(collection)
-                        self.db.commit()
+                    self.db.add(collection)
+                    self.db.commit()
 
             return 1
 
