@@ -17,10 +17,12 @@ class UpdateAlert(BaseModel):
 
 class CreateBranchOffice(BaseModel):
     branch_office: str
+    dte_code: str
     address: str
     region_id: int
     commune_id: int
     segment_id: int
+    basement_id: int
     zone_id: int
     principal_id: int
     status_id: int
@@ -58,20 +60,61 @@ class OldEmployee(BaseModel):
     privilege: Union[int, None]
 
 class UpdateBranchOffice(BaseModel):
+    id: int
     branch_office: str = None
     address: str = None
-    region_id: int = None
+    region_id: str = None
     commune_id: int = None
     segment_id: int = None
-    zone_id: int = None
+    zone_id: str = None
     principal_id: int = None
+    basement_id: int = None
     status_id: int = None
     visibility_id: int = None
+    dte_code: str = None
     opening_date: str = None
-    dte_code: int = None
-    principal_supervisor: int = None
-    updated_date: Union[datetime, None]
+    closing_date: str = None
+    principal_supervisor: str = None
+    getaway_machine_id: int = None
 
+    @classmethod
+    def as_form(cls,
+        id: int = Form(None),
+        branch_office: str = Form(None),
+        address: str = Form(None),
+        region_id: str = Form(None),
+        commune_id: int = Form(None),
+        segment_id: int = Form(None),
+        zone_id: str = Form(None),
+        principal_id: int = Form(None),
+        basement_id: int = Form(None),
+        status_id: int = Form(None),
+        visibility_id: int = Form(None),
+        dte_code: str = Form(None),
+        opening_date: str = Form(None),
+        closing_date: str = Form(None),
+        principal_supervisor: str = Form(None),
+        getaway_machine_id: int = Form(None)
+    ):
+        return cls(
+            id=id,
+            branch_office=branch_office,
+            address=address,
+            region_id=region_id,
+            commune_id=commune_id,
+            segment_id=segment_id,
+            zone_id=zone_id,
+            principal_id=principal_id,
+            basement_id=basement_id,
+            status_id=status_id,
+            visibility_id=visibility_id,
+            dte_code=dte_code,
+            opening_date=opening_date,
+            closing_date=closing_date,
+            principal_supervisor=principal_supervisor,
+            getaway_machine_id=getaway_machine_id
+        )
+    
 class Gender(BaseModel):
     gender: str
     added_date: datetime
