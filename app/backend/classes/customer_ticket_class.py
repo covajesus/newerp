@@ -436,6 +436,8 @@ class CustomerTicketClass:
                 try:
                     self.db.commit()
 
+                    print("Empieza envio de whatsapp")
+
                     WhatsappClass(self.db).send(dte, form_data.rut)
 
                     return {"status": "success", "message": "Dte saved successfully"}

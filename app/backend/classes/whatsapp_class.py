@@ -11,7 +11,7 @@ class WhatsappClass:
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://jisbackend.com/files"
+        image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
         headers = {
@@ -20,6 +20,8 @@ class WhatsappClass:
                 }
         
         added_date_str = dte_data.added_date.strftime('%Y-%m-%d')
+
+        print('Enviando mensaje de WhatsApp')
 
         payload = {
                     "messaging_product": "whatsapp",
