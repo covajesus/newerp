@@ -25,6 +25,29 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
+    def get_all_basement(self, rol_id = None, rut = None, branch_office_id = None):
+        try:
+            if rol_id == 3:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.basement_id == 1). \
+                    filter(BranchOfficeModel.principal_supervisor == rut). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            else:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.basement_id == 1). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
     def get_full_data(self):
         try:
             data = self.db.query(BranchOfficeModel). \

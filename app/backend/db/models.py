@@ -16,6 +16,7 @@ class BranchOfficeModel(Base):
     getaway_machine_id = Column(Integer)
     status_id = Column(Integer)
     visibility_id = Column(Integer)
+    basement_id = Column(Integer)
     opening_date = Column(Integer)
     dte_code = Column(Integer)
     principal_supervisor = Column(Integer)
