@@ -73,7 +73,7 @@ class BranchOfficeClass:
         
     def get(self, field, value):
         try:
-            data = self.db.query(BranchOfficeModel).filter(getattr(BranchOfficeModel, field) == value).filter(BranchOfficeModel.status_id == 7).first()
+            data = self.db.query(BranchOfficeModel).filter(getattr(BranchOfficeModel, field) == value).first()
             return data
         except Exception as e:
             error_message = str(e)
