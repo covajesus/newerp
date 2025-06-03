@@ -11,7 +11,7 @@ class WhatsappClass:
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://www.dropbox.com/scl/fi/j8u57kwxt4usb0r29vj1f/prueba.pdf?rlkey=jxex87wvf2xr0062pc31uzg80&st=2247hchj&dl=0"
+        image = "https://jisbackend.com/files"
 
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
         headers = {
