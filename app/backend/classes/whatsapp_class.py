@@ -25,7 +25,7 @@ class WhatsappClass:
                     "Content-Type": "application/json"
                 }
         
-        added_date_str = dte_data.added_date.strftime('%Y-%m-%d')
+        added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
 
         print('Enviando mensaje de WhatsApp')
 
@@ -43,6 +43,11 @@ class WhatsappClass:
         for label, value in required_fields.items():
             if value is None or str(value).strip() == "":
                 raise ValueError(f"El campo '{label}' está vacío o no definido.")
+            
+        if dte_data.dte_type_id == 39:
+            dte_type = "boleta"
+        else:
+            dte_type = "factura"
 
         payload = {
                     "messaging_product": "whatsapp",
@@ -67,7 +72,7 @@ class WhatsappClass:
                             {
                                 "type": "body",
                                 "parameters": [
-                                    {"type": "text", "text": "Boleta"},
+                                    {"type": "text", "text": str(dte_type)},
                                     {"type": "text", "text": str(dte_data.folio)},
                                     {"type": "text", "text": added_date_str},
                                     {"type": "text", "text": str(dte_data.total)},
