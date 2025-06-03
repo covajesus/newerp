@@ -9,12 +9,14 @@ class BranchOfficeClass:
             if rol_id == 3:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
                     filter(BranchOfficeModel.principal_supervisor == rut). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             else:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             
