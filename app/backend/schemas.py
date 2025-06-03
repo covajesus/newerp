@@ -63,7 +63,7 @@ class UpdateBranchOffice(BaseModel):
     id: int
     branch_office: str = None
     address: str = None
-    region_id: str = None
+    region_id: int = None
     commune_id: int = None
     segment_id: int = None
     zone_id: str = None
@@ -82,7 +82,7 @@ class UpdateBranchOffice(BaseModel):
         id: int = Form(None),
         branch_office: str = Form(None),
         address: str = Form(None),
-        region_id: str = Form(None),
+        region_id: int = Form(None),
         commune_id: int = Form(None),
         segment_id: int = Form(None),
         zone_id: str = Form(None),

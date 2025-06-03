@@ -124,17 +124,13 @@ class BranchOfficeClass:
             if not existing_branch_office:
                 return "No data found"
             
-            region = self.db.query(RegionModel).filter(RegionModel.region == form_data.region_id).first()
-
-            zone = self.db.query(ZoneModel).filter(ZoneModel.zone == form_data.zone_id).first()
-
             existing_branch_office.branch_office = form_data.branch_office
             existing_branch_office.address = form_data.address
             existing_branch_office.dte_code = form_data.dte_code
-            existing_branch_office.region_id = region.id
+            existing_branch_office.region_id = form_data.region_id
             existing_branch_office.commune_id = form_data.commune_id
             existing_branch_office.segment_id = form_data.segment_id
-            existing_branch_office.zone_id = zone.id
+            existing_branch_office.zone_id = form_data.zone_id
             existing_branch_office.principal_id = form_data.principal_id
             existing_branch_office.principal_supervisor = form_data.principal_supervisor
             existing_branch_office.getaway_machine_id = form_data.getaway_machine_id
