@@ -146,9 +146,22 @@ class TransbankStatementClass:
 
                 if check_branch_office_transbank_statement > 0:
                     string_date = index
-                    print(index)
-                    string_date = datetime.strptime(string_date, "%d/%m/%Y %H:%M")
-                    formatted_date = string_date.strftime("%Y-%m-%d")
+                    raw_date = string_date.strip()
+
+                    # Try parsing the date with possible formats
+                    parsed_date = None
+                    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
+                        try:
+                            parsed_date = datetime.strptime(raw_date, fmt)
+                            break
+                        except ValueError:
+                            continue
+
+                    if not parsed_date:
+                        raise ValueError(f"Invalid date format: '{raw_date}'")
+
+                    formatted_date = parsed_date.strftime("%Y-%m-%d")
+
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.original_date = formatted_date
