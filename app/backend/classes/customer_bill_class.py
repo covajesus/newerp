@@ -487,7 +487,34 @@ class CustomerBillClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
-        
+    
+    def save_pdf_bill(self, folio):
+        folio = folio
+        tipo_dte = 39
+        rut_emisor = '76063822'
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        # URL completa
+        url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/{tipo_dte}/{folio}/{rut_emisor}?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+
+        # Headers con token de autenticación
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {TOKEN}'
+        }
+
+        # Realizar la solicitud
+        response = requests.get(url, headers=headers)
+
+        # Verificar respuesta
+        if response.status_code != 200:
+            print(f"Error {response.status_code}: {response.text}")
+        else:
+            # Guardar el PDF en disco
+            with open(f'files/{folio}.pdf', 'wb') as f:
+                f.write(response.content)
+            print(f'PDF guardado como {folio}.pdf')
+
     def store(self, form_data):
         customer = CustomerClass(self.db).get_by_rut(form_data.rut)
         customer_data = json.loads(customer)
@@ -498,6 +525,8 @@ class CustomerBillClass:
                 return "LibreDTE payment required"
             
             folio = self.generate_bill(customer_data['customer_data']['rut'], code)
+
+            self.save_pdf_bill(folio)
 
         if form_data.will_save == 1:
             if folio != None:
