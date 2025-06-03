@@ -72,9 +72,9 @@ class WhatsappClass:
                                     {"type": "text", "text": added_date_str},
                                     {"type": "text", "text": str(dte_data.total)},
                                     {"type": "text", "text": branch_office.branch_office},
-                                    {"type": "text", "text": user.full_name},
-                                    {"type": "text", "text": user.phone},
-                                    {"type": "text", "text": user.email},
+                                    {"type": "text", "text": customer.customer},
+                                    {"type": "text", "text": customer.phone},
+                                    {"type": "text", "text": customer.email},
                                 ]
                             },
                             {
