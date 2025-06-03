@@ -35,7 +35,7 @@ class WhatsappClass:
             "Fecha": added_date_str,
             "Total": dte_data.total,
             "Sucursal": branch_office.branch_office,
-            "Supervisor": customer.full_name,
+            "Supervisor": customer.customer,
             "Teléfono": customer.phone,
             "Email": customer.email
         }
