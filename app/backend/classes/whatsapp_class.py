@@ -35,9 +35,9 @@ class WhatsappClass:
             "Fecha": added_date_str,
             "Total": dte_data.total,
             "Sucursal": branch_office.branch_office,
-            "Supervisor": customer.customer,
-            "Teléfono": customer.phone,
-            "Email": customer.email
+            "Supervisor": user.full_name,
+            "Teléfono": user.phone,
+            "Email": user.email
         }
 
         for label, value in required_fields.items():
@@ -72,9 +72,9 @@ class WhatsappClass:
                                     {"type": "text", "text": added_date_str},
                                     {"type": "text", "text": str(dte_data.total)},
                                     {"type": "text", "text": branch_office.branch_office},
-                                    {"type": "text", "text": customer.customer},
-                                    {"type": "text", "text": customer.phone},
-                                    {"type": "text", "text": customer.email},
+                                    {"type": "text", "text": user.full_name},
+                                    {"type": "text", "text": user.phone},
+                                    {"type": "text", "text": user.email},
                                 ]
                             },
                             {
