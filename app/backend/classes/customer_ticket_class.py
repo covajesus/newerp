@@ -389,7 +389,7 @@ class CustomerTicketClass:
             print(f"Error {response.status_code}: {response.text}")
         else:
             # Guardar el PDF en disco
-            with open(f'{folio}.pdf', 'wb') as f:
+            with open(f'/files/{folio}.pdf', 'wb') as f:
                 f.write(response.content)
             print(f'PDF guardado como {folio}.pdf')
 
