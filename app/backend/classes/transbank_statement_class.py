@@ -146,6 +146,7 @@ class TransbankStatementClass:
 
                 if check_branch_office_transbank_statement > 0:
                     string_date = index
+                    print(index)
                     string_date = datetime.strptime(string_date, "%d/%m/%Y %H:%M")
                     formatted_date = string_date.strftime("%Y-%m-%d")
                     transbank_statement = TransbankStatementModel()
