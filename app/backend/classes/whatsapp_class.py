@@ -1,11 +1,14 @@
 import requests
 from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel
+import os
+from dotenv import load_dotenv
+load_dotenv() 
 
 class WhatsappClass:
     def __init__(self, db):
         self.db = db
 
-    def send(self, dte_data, customer_rut):
+    def send(self, dte_data, customer_rut): 
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == customer_rut).first()
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
@@ -13,9 +16,11 @@ class WhatsappClass:
 
         image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
+        token = os.getenv('LIBREDTE_TOKEN')
+
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
         headers = {
-                    "Authorization": "Bearer EAAFYECjSEkQBALIHAvaWZBgoyZAQE21IdNlgjUuKf8CRY0DZAuJiLcnuZBRgjl4YGtN7YxGNvxpNjaeHH66VPeWqhjZBca3xMbI3DlZCh1qQCHHyCbw9dJaMvsIGa60vpxZAJ5m7QdwZAtwO71wPR68gSq0P9JeV50BDNgRzBqNYf0OocDMAVg2f",
+                    "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json"
                 }
         
