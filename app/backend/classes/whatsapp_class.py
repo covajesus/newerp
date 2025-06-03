@@ -67,7 +67,7 @@ class WhatsappClass:
                             {
                                 "type": "body",
                                 "parameters": [
-                                    {"type": "text", "text": str(dte_data.dte_type_id)},
+                                    {"type": "text", "text": "Boleta"},
                                     {"type": "text", "text": str(dte_data.folio)},
                                     {"type": "text", "text": added_date_str},
                                     {"type": "text", "text": str(dte_data.total)},
