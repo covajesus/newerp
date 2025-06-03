@@ -72,8 +72,8 @@ class UpdateBranchOffice(BaseModel):
     status_id: int = None
     visibility_id: int = None
     dte_code: str = None
-    opening_date: str = None
-    closing_date: str = None
+    opening_date: Union[str, None]
+    closing_date: Union[str, None]
     principal_supervisor: str = None
     getaway_machine_id: int = None
 
