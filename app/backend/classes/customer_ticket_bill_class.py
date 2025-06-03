@@ -51,7 +51,7 @@ class CustomerTicketBillClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.added_date
+                DteModel.added_date.desc()
             )
             
             # Si se solicita paginación
