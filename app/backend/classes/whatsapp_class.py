@@ -27,8 +27,6 @@ class WhatsappClass:
         
         added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
 
-        print('Enviando mensaje de WhatsApp')
-
         required_fields = {
             "Tipo DTE": dte_data.dte_type_id,
             "Folio": dte_data.folio,

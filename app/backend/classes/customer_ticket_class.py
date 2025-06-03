@@ -366,7 +366,7 @@ class CustomerTicketClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
-    def save_pdf_ticket_bill(self, folio):
+    def save_pdf_ticket(self, folio):
         folio = folio
         tipo_dte = 39
         rut_emisor = '76063822'
@@ -405,7 +405,7 @@ class CustomerTicketClass:
             
             folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
 
-            self.save_pdf_ticket_bill(folio)
+            self.save_pdf_ticket(folio)
 
         if form_data.will_save == 1:
             if folio != None:
