@@ -1,4 +1,4 @@
-from app.backend.db.models import BranchOfficeModel, SupervisorModel
+from app.backend.db.models import BranchOfficeModel, RegionModel, ZoneModel
 
 class BranchOfficeClass:
     def __init__(self, db):
@@ -83,6 +83,7 @@ class BranchOfficeClass:
         try:
             branch_office = BranchOfficeModel()
             branch_office.branch_office = branch_office_inputs.branch_office
+            branch_office.dte_code = branch_office_inputs.dte_code
             branch_office.address = branch_office_inputs.address
             branch_office.region_id = branch_office_inputs.region_id
             branch_office.commune_id = branch_office_inputs.commune_id
@@ -91,6 +92,7 @@ class BranchOfficeClass:
             branch_office.principal_id = branch_office_inputs.principal_id
             branch_office.principal_supervisor = branch_office_inputs.principal_supervisor
             branch_office.getaway_machine_id = branch_office_inputs.getaway_machine_id
+            branch_office.basement_id = branch_office_inputs.basement_id
             branch_office.status_id = branch_office_inputs.status_id
             branch_office.visibility_id = branch_office_inputs.visibility_id
             branch_office.opening_date = branch_office_inputs.opening_date
@@ -115,16 +117,34 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
-    def update(self, id, branch_office):
-        existing_branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == id).one_or_none()
+    def update(self, form_data):
+        try:
+            existing_branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.id).one_or_none()
 
-        if not existing_branch_office:
-            return "No data found"
+            if not existing_branch_office:
+                return "No data found"
+            
+            region = self.db.query(RegionModel).filter(RegionModel.region == form_data.region_id).first()
 
-        existing_branch_office_data = branch_office.dict(exclude_unset=True)
-        for key, value in existing_branch_office_data.items():
-            setattr(existing_branch_office, key, value)
+            zone = self.db.query(ZoneModel).filter(ZoneModel.zone == form_data.zone_id).first()
 
-        self.db.commit()
+            existing_branch_office.branch_office = form_data.branch_office
+            existing_branch_office.address = form_data.address
+            existing_branch_office.dte_code = form_data.dte_code
+            existing_branch_office.region_id = region.id
+            existing_branch_office.commune_id = form_data.commune_id
+            existing_branch_office.segment_id = form_data.segment_id
+            existing_branch_office.zone_id = zone.id
+            existing_branch_office.principal_id = form_data.principal_id
+            existing_branch_office.principal_supervisor = form_data.principal_supervisor
+            existing_branch_office.getaway_machine_id = form_data.getaway_machine_id
+            existing_branch_office.basement_id = form_data.basement_id
+            existing_branch_office.status_id = form_data.status_id
+            existing_branch_office.visibility_id = form_data.visibility_id
+            existing_branch_office.opening_date = form_data.opening_date
 
-        return 1
+            self.db.commit()
+            return 1
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"

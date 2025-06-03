@@ -46,8 +46,8 @@ def delete(id:int, session_user: UserLogin = Depends(get_current_active_user), d
 
     return {"message": data}
 
-@branch_offices.patch("/update/{id}")
-def update(id: int, branch_office: UpdateBranchOffice, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = BranchOfficeClass(db).update(id, branch_office)
+@branch_offices.post("/update/")
+def update(form_data: UpdateBranchOffice = Depends(UpdateBranchOffice.as_form), db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).update(form_data)
 
     return {"message": data}
