@@ -16,6 +16,12 @@ def index(session_user: UserLogin = Depends(get_current_active_user), db: Sessio
 
     return {"message": data}
 
+@branch_offices.get("/get_all_basement/")
+def get_all_basement(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).get_all_basement(session_user.rol_id, session_user.rut, session_user.branch_office_id)
+
+    return {"message": data}
+
 @branch_offices.post("/get_full_data/")
 def get_full_data(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = BranchOfficeClass(db).get_full_data()
