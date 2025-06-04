@@ -26,7 +26,6 @@ class HonoraryClass:
                 data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
-                    outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
                     filter(
                         *filters
                     ).order_by(HonoraryModel.added_date.desc())
