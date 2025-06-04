@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.backend.schemas import GenerateCustomerTicket, GeneratedCustomerTicketList, CustomerTicketList, GenerateCustomerCreditNoteTicket, CustomerTicketSearch, ToBeAcceptedCustomerTicket, ChangeStatusInCustomerTicket
 from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.customer_class import CustomerClass
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 customer_tickets = APIRouter(
     prefix="/customer_tickets",
@@ -23,7 +25,7 @@ def search(customer_ticket_inputs:CustomerTicketSearch, db: Session = Depends(ge
     return {"message": data}
 
 @customer_tickets.post("/generate_ticket")
-def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, db: Session = Depends(get_db)):
+def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
     if customer_ticket_inputs.will_save == 1:
@@ -32,7 +34,7 @@ def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, db: Session =
         else:
             CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
-    data = CustomerTicketClass(db).store(customer_ticket_inputs)
+    data = CustomerTicketClass(db).store(customer_ticket_inputs, session_user.rol_id)
 
     return {"message": data}
 

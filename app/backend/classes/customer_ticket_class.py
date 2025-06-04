@@ -393,7 +393,7 @@ class CustomerTicketClass:
                 f.write(response.content)
             print(f'PDF guardado como {folio}.pdf')
 
-    def store(self, form_data):
+    def store(self, form_data, rol_id):
         customer = CustomerClass(self.db).get_by_rut(form_data.rut)
         customer_data = json.loads(customer)
 
@@ -412,13 +412,18 @@ class CustomerTicketClass:
                 dte = DteModel()
 
                 period = datetime.now().strftime('%m-%Y')
+
+                if rol_id == 1 or rol_id == 2:
+                    status_id = 4
+                else:
+                    status_id = 1
                 
                 # Asignar los valores del formulario a la instancia del modelo
                 dte.branch_office_id = form_data.branch_office_id
                 dte.cashier_id = 0
                 dte.dte_type_id = 39
                 dte.dte_version_id = 1
-                dte.status_id = 4
+                dte.status_id = status_id
                 dte.chip_id = form_data.chip_id
                 dte.rut = form_data.rut
                 dte.folio = folio
