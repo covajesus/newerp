@@ -10,7 +10,6 @@ class BranchOfficeClass:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.principal_supervisor == rut). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             elif rol_id == 4:
