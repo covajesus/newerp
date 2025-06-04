@@ -19,7 +19,8 @@ class WhatsappClass:
         token = os.getenv('LIBREDTE_TOKEN')
         print(token)
 
-        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+        url = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
+        
         headers = {
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json"
@@ -47,7 +48,6 @@ class WhatsappClass:
         else:
             dte_type = "factura"
 
-        # Asegurar que el teléfono comience con '56'
         phone_str = str(customer.phone).strip()
         if not phone_str.startswith("56"):
             customer_phone = "56" + phone_str
