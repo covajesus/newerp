@@ -385,6 +385,8 @@ class CapitulationClass:
                     },
                 }
 
+                print(data)
+
                 url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
 
                 response = requests.post(
@@ -395,6 +397,8 @@ class CapitulationClass:
                         "Content-Type": "application/json",
                     },
                 )
+
+                print(response.text)
 
                 if response.status_code == 200:
                     return {"status": "success", "message": "Capitulation imputed successfully"}
