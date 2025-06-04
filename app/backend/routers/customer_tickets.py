@@ -26,7 +26,6 @@ def search(customer_ticket_inputs:CustomerTicketSearch, db: Session = Depends(ge
 
 @customer_tickets.post("/generate_ticket")
 def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    print(2232323232323)
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
     if customer_ticket_inputs.will_save == 1:

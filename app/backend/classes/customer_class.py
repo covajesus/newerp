@@ -168,6 +168,7 @@ class CustomerClass:
     
     def check_existence(self, rut):
         try:
+            print(rut)
             data_query = self.db.query(CustomerModel.rut, RegionModel.region, CommuneModel.commune, CustomerModel.customer, CustomerModel.phone, CustomerModel.email, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.address). \
                         outerjoin(RegionModel, RegionModel.id == CustomerModel.region_id). \
                         outerjoin(CommuneModel, CommuneModel.id == CustomerModel.commune_id). \
@@ -243,12 +244,12 @@ class CustomerClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
-    def update(self, id, form_data):
+    def update(self, rut, form_data):
         """
         Actualiza los datos de la patente en la base de datos.
         """
         print(id)
-        customer = self.db.query(CustomerModel).filter(CustomerModel.id == id).first()
+        customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
