@@ -6,17 +6,31 @@ class BranchOfficeClass:
 
     def get_all(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            if rol_id == 3:
+            if rol_id == 1 or rol_id == 2 or rol_id == 3:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
                     filter(BranchOfficeModel.principal_supervisor == rut). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
-            else:
+            elif rol_id == 4:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.principal_supervisor == rut). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            elif rol_id == 5:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            elif rol_id == 6:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.id == branch_office_id). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             
@@ -27,7 +41,14 @@ class BranchOfficeClass:
     
     def get_all_basement(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            if rol_id == 3:
+            if rol_id == 1 or rol_id == 2 or rol_id == 3:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.basement_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            elif rol_id == 4:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
@@ -35,11 +56,19 @@ class BranchOfficeClass:
                     filter(BranchOfficeModel.principal_supervisor == rut). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
-            else:
+            elif rol_id == 5:
+                data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.basement_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
+            elif rol_id == 6:
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.basement_id == 1). \
                     filter(BranchOfficeModel.visibility_id == 1). \
+                    filter(BranchOfficeModel.id == branch_office_id). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             

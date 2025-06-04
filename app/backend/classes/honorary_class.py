@@ -77,8 +77,8 @@ class HonoraryClass:
                     "id": honorary.id,
                     "requested_by": honorary.full_name,
                     "honorary_reason": honorary.honorary_reason,
-                    "rut": honorary.replacement_employee_rut,
-                    "full_name": honorary.replacement_employee_full_name,
+                    "replacement_employee_rut": honorary.replacement_employee_rut,
+                    "replacement_employee_full_name": honorary.replacement_employee_full_name,
                     "added_date": honorary.added_date
                 } for honorary in data]
 
