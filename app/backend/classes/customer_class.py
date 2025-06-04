@@ -243,11 +243,12 @@ class CustomerClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
-    def update(self, rut, form_data):
+    def update(self, id, form_data):
         """
         Actualiza los datos de la patente en la base de datos.
         """
-        customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
+        print(id)
+        customer = self.db.query(CustomerModel).filter(CustomerModel.id == id).first()
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
 

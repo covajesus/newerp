@@ -398,6 +398,7 @@ class Honorary(BaseModel):
     replacement_employee_rut: Union[str, None]
     replacement_employee_full_name: str
     address: str
+    account_type_id: int
     account_number: str
     start_date: Union[str, None]
     end_date: Union[str, None]
@@ -418,6 +419,7 @@ class Honorary(BaseModel):
                 replacement_employee_rut: str = Form(None),
                 replacement_employee_full_name: str = Form(),
                 address: str = Form(),
+                account_type_id: int = Form(),
                 account_number: str = Form(),
                 start_date: str = Form(None),
                 end_date: str = Form(None),
@@ -425,7 +427,7 @@ class Honorary(BaseModel):
                 observation: str = Form()
                 ):
         
-        return cls(honorary_reason_id=honorary_reason_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
+        return cls(honorary_reason_id=honorary_reason_id, account_type_id=account_type_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
 
 class ValidateHonoraryRut(BaseModel):
     replacement_employee_rut: str
@@ -487,6 +489,7 @@ class UpdateHonorary(BaseModel):
     schedule_id: int = None
     region_id: int = None
     commune_id: int = None
+    account_type_id: int = None
     requested_by: int = None
     status_id: int = None
     accountability_status_id: int = None

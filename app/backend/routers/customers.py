@@ -35,8 +35,8 @@ def delete(id:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
-@customers.patch("/update/{id}")
-def update(id: int, customer: UpdateCustomer, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+@customers.post("/update/{id}")
+def update(id: int, customer: UpdateCustomer, db: Session = Depends(get_db)):
     data = CustomerClass(db).update(id, customer)
 
     return {"message": data}

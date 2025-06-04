@@ -104,6 +104,7 @@ class HonoraryClass:
                 "branch_office_id": data.branch_office_id,
                 "foreigner_id": data.foreigner_id,
                 "bank_id": data.bank_id,
+                "account_type_id": data.account_type_id,
                 "schedule_id": data.schedule_id,
                 "region_id": data.region_id,
                 "commune_id": data.commune_id,
@@ -136,6 +137,7 @@ class HonoraryClass:
             honorary.schedule_id = honorary_inputs.schedule_id
             honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
+            honorary.account_type_id = honorary_inputs.account_type_id
             honorary.requested_by = requested_by
             honorary.status_id = 14
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
@@ -169,6 +171,7 @@ class HonoraryClass:
             honorary.schedule_id = honorary_inputs.schedule_id
             honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
+            honorary.account_type_id = honorary_inputs.account_type_id
             honorary.status_id = 2
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
