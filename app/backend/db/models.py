@@ -1099,6 +1099,7 @@ class HonoraryModel(Base):
     branch_office_id = Column(Integer)
     foreigner_id = Column(Integer)
     bank_id = Column(Integer)
+    account_type_id = Column(Integer)
     schedule_id = Column(Integer)
     region_id = Column(Integer)
     commune_id = Column(Integer)

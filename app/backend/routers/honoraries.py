@@ -29,7 +29,7 @@ def generate(id: int, form_data: Honorary = Depends(Honorary.as_form), session_u
     return {"message": data}
 
 @honoraries.post("/validate")
-def generate(form_data: ValidateHonoraryRut = Depends(ValidateHonoraryRut.as_form), db: Session = Depends(get_db)):
+def validate(form_data: ValidateHonoraryRut = Depends(ValidateHonoraryRut.as_form), db: Session = Depends(get_db)):
     data = HonoraryClass(db).validate(form_data)
 
     return {"message": data} 
