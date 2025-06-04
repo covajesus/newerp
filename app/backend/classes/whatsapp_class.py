@@ -17,10 +17,11 @@ class WhatsappClass:
         image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
-        print(token)
 
-        url = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
-        
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
+
+        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
         headers = {
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json"
@@ -92,7 +93,7 @@ class WhatsappClass:
                                 "index": "0",
                                 "sub_type": "url",
                                 "parameters": [
-                                    {"type": "text", "text": url}
+                                    {"type": "text", "text": url_data}
                                 ]
                             }
                         ]
