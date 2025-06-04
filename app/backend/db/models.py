@@ -56,6 +56,7 @@ class ExpenseTypeModel(Base):
     __tablename__ = 'expense_types'
 
     id = Column(Integer, primary_key=True)
+    capitulation_visible_id = Column(Integer)
     expense_type = Column(String(255))
     accounting_account = Column(String(255))
 
