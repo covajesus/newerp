@@ -22,6 +22,8 @@ class HonoraryClass:
             if search_rut is not None and search_rut != '':
                 filters.append(HonoraryModel.replacement_employee_rut == search_rut)
 
+            print(rol_id)
+
             if rol_id == '1' or rol_id == '2' or rol_id == '5':
                 data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
