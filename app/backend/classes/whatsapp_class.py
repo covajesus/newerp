@@ -47,9 +47,16 @@ class WhatsappClass:
         else:
             dte_type = "factura"
 
+        # Asegurar que el teléfono comience con '56'
+        phone_str = str(customer.phone).strip()
+        if not phone_str.startswith("56"):
+            customer_phone = "56" + phone_str
+        else:
+            customer_phone = phone_str
+
         payload = {
                     "messaging_product": "whatsapp",
-                    "to": f"{customer.phone}",
+                    "to": f"{customer_phone}",
                     "type": "template",
                     "template": {
                         "name": whatsapp_template.title,
