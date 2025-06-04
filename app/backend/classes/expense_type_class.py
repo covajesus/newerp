@@ -18,7 +18,7 @@ class ExpenseTypeClass:
     def get_all_capitulation_visibles(self):
         try:
             data = self.db.query(ExpenseTypeModel). \
-                    filter(ExpenseTypeModel.capitulation_visible_id == 1). \
+                    filter(ExpenseTypeModel.capitulation_visibility_id == 1). \
                     order_by(ExpenseTypeModel.expense_type). \
                     all()
             
