@@ -371,7 +371,7 @@ class CapitulationClass:
                            str(expense_type.accounting_account): capitulation.amount,
                         },
                         'haber': {
-                            '11101001': capitulation.amount,
+                            '111000101': capitulation.amount,
                         }
                     },
                     "operacion": "I",
