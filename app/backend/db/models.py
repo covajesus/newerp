@@ -57,6 +57,9 @@ class ExpenseTypeModel(Base):
 
     id = Column(Integer, primary_key=True)
     capitulation_visibility_id = Column(Integer)
+    accounting_account = Column(String(255))
+    eerr_visibility_id = Column(Integer)
+    track_visibility_id = Column(Integer)
     expense_type = Column(String(255))
     accounting_account = Column(String(255))
 
@@ -1486,6 +1489,7 @@ class ComparationPendingDepositsBankStatementModel(Base):
     branch_office_id = Column(Integer)
     payment_type_id = Column(Integer)
     collection_id = Column(Integer)
+    deposit_id = Column(Integer)
     branch_office = Column(String(255))
     status_id = Column(Integer)
     payment_number = Column(Integer)

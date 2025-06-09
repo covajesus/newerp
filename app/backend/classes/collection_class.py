@@ -1,17 +1,51 @@
-from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel
+from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
 from datetime import datetime
-from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.dte_class import DteClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
 import pytz
 from app.backend.classes.authentication_class import AuthenticationClass
+import json
 
 class CollectionClass:
     def __init__(self, db):
         self.db = db
 
+    def get(self, id):
+        try:
+            data_query = self.db.query(CashierModel.cashier, CollectionModel.id, CollectionModel.branch_office_id, CollectionModel.cashier_id, CollectionModel.added_date, CollectionModel.total_tickets, CollectionModel.cash_gross_amount, CollectionModel.cash_gross_amount, CollectionModel.cash_net_amount, CollectionModel.card_gross_amount, CollectionModel.card_net_amount).outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id).filter(CollectionModel.id == id).first()
+
+            if data_query:
+                # Serializar los datos del empleado
+                collection_data = {
+                    "id": data_query.id,
+                    "branch_office_id": data_query.branch_office_id,
+                    "cashier": data_query.cashier,
+                    "cashier_id": data_query.cashier_id,
+                    "added_date": data_query.added_date.strftime('%Y-%m-%d'),
+                    "total_tickets": data_query.total_tickets,
+                    "cash_gross_amount": data_query.cash_gross_amount,
+                    "cash_net_amount": data_query.cash_net_amount,
+                    "card_gross_amount": data_query.card_gross_amount,
+                    "card_net_amount": data_query.card_net_amount
+                }
+
+                result = {
+                    "collection_data": collection_data
+                }
+
+                # Convierte el resultado a una cadena JSON
+                serialized_result = json.dumps(result)
+
+                return serialized_result
+            else:
+                return "No se encontraron datos para el campo especificado."
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
     def get_all(self, branch_office_id = None, cashier_id = None, added_date = None, page = 1, items_per_page = 10):
         filters = []
         if branch_office_id is not None:
@@ -99,7 +133,6 @@ class CollectionClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
-    
 
     def get_all_with_detail(self, branch_office_id = None, cashier_id = None, added_date = None, page = 1, items_per_page = 10):
         filters = []
@@ -227,14 +260,6 @@ class CollectionClass:
         except Exception as e:
             error_message = str(e)
             return {'error': error_message}
-
-    def get(self, field, value):
-        try:
-            data = self.db.query(CollectionModel).filter(getattr(CollectionModel, field) == value).first()
-            return data
-        except Exception as e:
-            error_message = str(e)
-            return f"Error: {error_message}"
         
     def existence(self, branch_office_id, cashier_id, added_date):
         try:
@@ -264,6 +289,32 @@ class CollectionClass:
         self.db.add(collection)
 
         self.db.commit()
+
+    def update(self, update_collection_inputs):
+        tz = pytz.timezone('America/Santiago')
+        current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            collection = self.db.query(CollectionModel).filter(
+                CollectionModel.id == update_collection_inputs.id
+            ).first()
+
+            if collection:
+                collection.cash_gross_amount = update_collection_inputs.cash_gross_amount
+                collection.cash_net_amount = update_collection_inputs.cash_net_amount
+                collection.card_gross_amount = update_collection_inputs.card_gross_amount
+                collection.card_net_amount = update_collection_inputs.card_net_amount
+                collection.total_tickets = update_collection_inputs.total_tickets
+                collection.updated_date = current_date
+
+                self.db.commit()
+                return "Collection updated successfully"
+            else:
+                return "Collection not found"
+
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
 
     def update_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = self.db.query(CollectionModel).filter(
@@ -345,3 +396,39 @@ class CollectionClass:
                 self.db.commit()
             
             return "Collection updated successfully"
+        
+    def manual_store(self, collection_inputs):
+        tz = pytz.timezone('America/Santiago')
+        current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+        collection = CollectionModel(
+                branch_office_id=collection_inputs['branch_office_id'],
+                cashier_id=collection_inputs['cashier_id'],
+                cash_gross_amount=collection_inputs['cash_gross_amount'],
+                cash_net_amount=collection_inputs['cash_net_amount'],
+                card_gross_amount=collection_inputs['card_gross_amount'],
+                card_net_amount=collection_inputs['card_net_amount'],
+                total_tickets=collection_inputs['total_tickets'],
+                added_date=collection_inputs['added_date'],
+                updated_date=current_date
+            )
+
+        self.db.add(collection)
+
+        try:
+            self.db.commit()
+            return "Collection stored successfully"
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+    def delete(self, id):
+        try:
+            self.db.query(CollectionModel).filter(CollectionModel.id == id).delete()
+            self.db.commit()
+
+            return {"status": "success", "message": "Collection deleted successfully"}
+
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}

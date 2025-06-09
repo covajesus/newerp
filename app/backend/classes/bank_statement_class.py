@@ -22,6 +22,7 @@ class BankStatementClass:
                                            ComparationPendingDepositsBankStatementModel.collection_id, 
                                            ComparationPendingDepositsBankStatementModel.branch_office, 
                                            ComparationPendingDepositsBankStatementModel.status_id, 
+                                           ComparationPendingDepositsBankStatementModel.deposit_id, 
                                            ComparationPendingDepositsBankStatementModel.payment_number, 
                                            ComparationPendingDepositsBankStatementModel.collection_amount, 
                                            ComparationPendingDepositsBankStatementModel.collection_date, 
@@ -50,6 +51,7 @@ class BankStatementClass:
                         "collection_id": bank_statement.collection_id,
                         "branch_office": bank_statement.branch_office,
                         "status_id": bank_statement.status_id,
+                        "deposit_id": bank_statement.deposit_id,
                         "payment_number": bank_statement.payment_number,
                         "collection_amount": bank_statement.collection_amount,
                         "collection_date": bank_statement.collection_date,
@@ -242,6 +244,7 @@ class BankStatementClass:
         self.db.commit()
 
     def deposit_accept(self, id):
+        print(id)
         dte = self.db.query(DepositModel).filter(DepositModel.id == id).first()
         dte.status_id = 6
 

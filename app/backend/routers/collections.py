@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.collection_class import CollectionClass
-from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch
+from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch, ManualStoreCollection, UpdateCollection
 
 collections = APIRouter(
     prefix="/collections",
@@ -44,5 +44,30 @@ def search(collection_inputs:CollectionSearch, db: Session = Depends(get_db)):
 @collections.get("/total_collection/{branch_office_id}/{collection_date}")
 def total_collection(branch_office_id:int, collection_date: str, db: Session = Depends(get_db)):
     data = CollectionClass(db).total_collection(branch_office_id, collection_date)
+
+    return {"message": data}
+
+@collections.post("/manual_store")
+def manual_store(manual_store_collection: ManualStoreCollection, db: Session = Depends(get_db)):
+    collection_inputs = manual_store_collection.dict()
+
+    data = CollectionClass(db).manual_store(collection_inputs)
+    return {"message": data}
+
+@collections.delete("/delete/{id}")
+def delete(id: int, db: Session = Depends(get_db)):
+    CollectionClass(db).delete(id)
+
+    return {"message": "success"}
+
+@collections.get("/edit/{id}")
+def edit(id: int, db: Session = Depends(get_db)):
+    data = CollectionClass(db).get(id)
+
+    return {"message": data}
+
+@collections.post("/update")
+def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
+    data = CollectionClass(db).update(update_collection)
 
     return {"message": data}
