@@ -13,6 +13,14 @@ bank_statements = APIRouter(
     tags=["BankStatement"]
 )
 
+@bank_statements.post("/compare_update_deposits")
+def compare_update_deposits(
+    db: Session = Depends(get_db)
+):
+    BankStatementClass(db).compare_update_deposits()
+
+    return {"message": 'Uploaded successfully'}
+
 @bank_statements.post("/get_comparation_pending_dtes_bank_statements")
 def get_comparation_pending_dtes_bank_statements(
     db: Session = Depends(get_db)
