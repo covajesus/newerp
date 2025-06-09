@@ -62,6 +62,14 @@ class ExpenseTypeModel(Base):
     track_visibility_id = Column(Integer)
     expense_type = Column(String(255))
     accounting_account = Column(String(255))
+    type = Column(Integer)
+    group_detail = Column(String(255))
+
+class GroupDetailModel(Base):
+    __tablename__ = 'group_details'
+
+    id = Column(Integer, primary_key=True)
+    group_detail = Column(String(255))
 
 class ZoneModel(Base):
     __tablename__ = 'zones'

@@ -67,6 +67,7 @@ from app.backend.routers.transbank_statements import transbank_statements
 from app.backend.routers.segments import segments
 from app.backend.routers.zones import zones
 from app.backend.routers.principals import principals
+from app.backend.routers.group_details import group_details
 
 app = FastAPI(root_path="/api")
 application = app
@@ -157,6 +158,7 @@ app.include_router(transbank_statements)
 app.include_router(segments)
 app.include_router(zones)
 app.include_router(principals)
+app.include_router(group_details)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
