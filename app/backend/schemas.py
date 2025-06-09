@@ -1670,6 +1670,8 @@ class StoreExpenseType(BaseModel):
     capitulation_visibility_id: int
     eerr_visibility_id: int
     track_visibility_id: int
+    type: int
+    group_detail: str
 
 class UpdateExpenseType(BaseModel):
     id: int
@@ -1678,6 +1680,18 @@ class UpdateExpenseType(BaseModel):
     capitulation_visibility_id: int
     eerr_visibility_id: int
     track_visibility_id: int
+    type: int
+    group_detail: str
+
+class GroupDetail(BaseModel):
+    page: int
+
+class StoreGroupDetail(BaseModel):
+    group_detail: str
+
+class UpdateGroupDetail(BaseModel):
+    id: int
+    group_detail: str
 
 class UpdateCollection(BaseModel):
     id: int

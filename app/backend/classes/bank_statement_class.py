@@ -13,6 +13,39 @@ class BankStatementClass:
     def __init__(self, db: Session):
         self.db = db
 
+    def compare_update_deposits(self):
+        try:
+            data = self.db.query(
+                ComparationPendingDepositsBankStatementModel.id, 
+                ComparationPendingDepositsBankStatementModel.branch_office_id, 
+                ComparationPendingDepositsBankStatementModel.payment_type_id, 
+                ComparationPendingDepositsBankStatementModel.collection_id, 
+                ComparationPendingDepositsBankStatementModel.branch_office, 
+                ComparationPendingDepositsBankStatementModel.status_id, 
+                ComparationPendingDepositsBankStatementModel.deposit_id, 
+                ComparationPendingDepositsBankStatementModel.payment_number, 
+                ComparationPendingDepositsBankStatementModel.collection_amount, 
+                ComparationPendingDepositsBankStatementModel.collection_date, 
+                ComparationPendingDepositsBankStatementModel.deposited_amount, 
+                ComparationPendingDepositsBankStatementModel.bank_statement_type_id,
+                ComparationPendingDepositsBankStatementModel.bank_statement_amount, 
+                ComparationPendingDepositsBankStatementModel.bank_statement_rut, 
+                ComparationPendingDepositsBankStatementModel.deposit_number
+            ).order_by(ComparationPendingDepositsBankStatementModel.id).all()
+
+            i = 0
+            while i < len(data):
+                bank_statement = data[i]
+
+                if bank_statement.deposit_id:
+                    self.deposit_accept(bank_statement.deposit_id)
+
+                i += 1
+
+        except Exception as e:
+            print(f"Error: {str(e)}")
+
+
     def get_comparation_pending_deposits_bank_statements(self, page=1, items_per_page=99999999):
         try:
             if page != 0:

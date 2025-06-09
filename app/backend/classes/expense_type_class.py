@@ -8,7 +8,7 @@ class ExpenseTypeClass:
 
     def get(self, id):
         try:
-            data_query = self.db.query(ExpenseTypeModel.expense_type, ExpenseTypeModel.accounting_account, ExpenseTypeModel.capitulation_visibility_id, ExpenseTypeModel.eerr_visibility_id, ExpenseTypeModel.track_visibility_id).filter(ExpenseTypeModel.id == id).first()
+            data_query = self.db.query(ExpenseTypeModel.type, ExpenseTypeModel.group_detail, ExpenseTypeModel.expense_type, ExpenseTypeModel.accounting_account, ExpenseTypeModel.capitulation_visibility_id, ExpenseTypeModel.eerr_visibility_id, ExpenseTypeModel.track_visibility_id).filter(ExpenseTypeModel.id == id).first()
 
             if data_query:
                 # Serializar los datos del empleado
@@ -18,7 +18,9 @@ class ExpenseTypeClass:
                     "accounting_account": data_query.accounting_account,
                     "capitulation_visibility_id": data_query.capitulation_visibility_id,
                     "eerr_visibility_id": data_query.eerr_visibility_id,
-                    "track_visibility_id": data_query.track_visibility_id
+                    "track_visibility_id": data_query.track_visibility_id,
+                    "type": data_query.type,
+                    "group_detail": data_query.group_detail
                 }
 
                 result = {
@@ -131,7 +133,9 @@ class ExpenseTypeClass:
                 accounting_account=expense_type_inputs.accounting_account,
                 capitulation_visibility_id=expense_type_inputs.capitulation_visibility_id,
                 eerr_visibility_id=expense_type_inputs.eerr_visibility_id,
-                track_visibility_id=expense_type_inputs.track_visibility_id
+                track_visibility_id=expense_type_inputs.track_visibility_id,
+                type=expense_type_inputs.type,
+                group_detail=expense_type_inputs.group_detail
             )
 
         self.db.add(expense_type)
@@ -166,6 +170,8 @@ class ExpenseTypeClass:
                 expense_type.capitulation_visibility_id = update_expense_type_inputs.capitulation_visibility_id
                 expense_type.eerr_visibility_id = update_expense_type_inputs.eerr_visibility_id
                 expense_type.track_visibility_id = update_expense_type_inputs.track_visibility_id
+                expense_type.type = update_expense_type_inputs.type
+                expense_type.group_detail = update_expense_type_inputs.group_detail
 
                 self.db.commit()
                 return "Expense type updated successfully"
