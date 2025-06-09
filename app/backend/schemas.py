@@ -1651,6 +1651,43 @@ class StoreCollection(BaseModel):
     total_tickets: int
     added_date: str
 
+class ManualStoreCollection(BaseModel):
+    branch_office_id: int
+    cashier_id: int
+    cash_gross_amount: int
+    cash_net_amount: int
+    card_gross_amount: int
+    card_net_amount: int
+    total_tickets: int
+    added_date: str
+
+class ExpenseType(BaseModel):
+    page: int
+
+class StoreExpenseType(BaseModel):
+    expense_type: str
+    accounting_account: str
+    capitulation_visibility_id: int
+    eerr_visibility_id: int
+    track_visibility_id: int
+
+class UpdateExpenseType(BaseModel):
+    id: int
+    expense_type: str
+    accounting_account: str
+    capitulation_visibility_id: int
+    eerr_visibility_id: int
+    track_visibility_id: int
+
+class UpdateCollection(BaseModel):
+    id: int
+    cash_gross_amount: int
+    cash_net_amount: int
+    card_gross_amount: int
+    card_net_amount: int
+    total_tickets: int
+    added_date: str
+
 class ChangeStatusReceivedTributaryDocument(BaseModel):
     id: int
     branch_office_id: int
