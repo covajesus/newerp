@@ -224,3 +224,13 @@ class DepositClass:
         self.db.commit()
         self.db.refresh(patent)
 
+    def delete(self, id):
+        try:
+            self.db.query(DepositModel).filter(DepositModel.id == id).delete()
+            self.db.commit()
+
+            return {"status": "success", "message": "Deposit deleted successfully"}
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}
+        
