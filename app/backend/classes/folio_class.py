@@ -3,6 +3,7 @@ from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.alert_class import AlertClass
 import json
 import requests
+import pytz
 import datetime
 
 class FolioClass:
@@ -124,7 +125,11 @@ class FolioClass:
                 folio.branch_office_id = branch_office_id
                 folio.cashier_id = cashier_id
                 folio.requested_status_id = 1
-                folio.updated_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                tz = pytz.timezone('America/Santiago')
+                current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+                folio.updated_date = current_date
 
                 # Confirmar los cambios en la base de datos
                 self.db.commit()
