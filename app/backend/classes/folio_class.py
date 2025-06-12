@@ -124,6 +124,7 @@ class FolioClass:
                 folio.branch_office_id = branch_office_id
                 folio.cashier_id = cashier_id
                 folio.requested_status_id = 1
+                folio.updated_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
                 # Confirmar los cambios en la base de datos
                 self.db.commit()
