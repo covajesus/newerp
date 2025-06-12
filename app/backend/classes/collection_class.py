@@ -240,20 +240,19 @@ class CollectionClass:
     def total_collection(self, branch_office_id, collection_date):
         try:
             result = self.db.query(
-                func.sum(TotalGeneralCollectionModel.total).label('total'),
-                TotalGeneralCollectionModel.id.label('collection_id')
+                func.sum(TotalGeneralCollectionModel.total).label('total')
             ).filter(
-                TotalGeneralCollectionModel.branch_office_id == branch_office_id
-            ).filter(
+                TotalGeneralCollectionModel.branch_office_id == branch_office_id,
                 TotalGeneralCollectionModel.added_date == collection_date
-            ).group_by(TotalGeneralCollectionModel.branch_office_id).all()
+            ).group_by(
+                TotalGeneralCollectionModel.branch_office_id
+            ).first()
 
+ 
             if result:
-                total_sum = result[0][0]
-                collection_id = result[0][1]
                 return {
-                    'total': total_sum if total_sum else 0,
-                    'collection_id': collection_id
+                    'total': result.total if result and result.total else 0,
+                    'collection_id': None
                 }
             else:
                 return {'total': 0, 'collection_id': None}
