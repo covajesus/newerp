@@ -111,116 +111,116 @@ class TransbankStatementClass:
             return f"Error: {error_message}"
 
     def read_store_bank_statement(self, file_url, period):
-    try:
-        fixed_period = HelperClass.fix_current_dte_period(period)
-        date = fixed_period + "-01"
+        try:
+            fixed_period = HelperClass.fix_current_dte_period(period)
+            date = fixed_period + "-01"
 
-        self.db.execute(text("TRUNCATE TABLE transbank_statements"))
-        self.db.commit()
-
-        response = requests.get(file_url)
-        response.raise_for_status()
-
-        content = response.content.decode('latin1')
-        lines = content.splitlines()
-        start_index = None
-
-        for i, line in enumerate(lines):
-            if line.startswith("Fecha Venta"):
-                start_index = i
-                break
-
-        if start_index is None:
-            raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
-
-        data_lines = "\n".join(lines[start_index:])
-        df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str)
-        df = df.fillna("")
-
-        for index, row in df.iterrows():
-            raw_code = row.get("Fecha Venta", "").strip()
-            raw_date = raw_code.lstrip("*")  # Elimina asterisco si lo hay
-
-            # Validar si el valor tiene formato de fecha
-            if not re.match(r"\d{2}/\d{2}/\d{4}", raw_date):
-                continue  # Ignorar filas sin fechas válidas
-
-            parsed_date = None
-            for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
-                try:
-                    parsed_date = datetime.strptime(raw_date, fmt)
-                    break
-                except ValueError:
-                    continue
-
-            if not parsed_date:
-                continue  # Ignorar si no se pudo parsear la fecha
-
-            formatted_date = parsed_date.strftime("%Y-%m-%d")
-
-            branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                filter(BranchOfficesTransbankStatementsModel.transbank_code == raw_code).first()
-
-            if branch_office_transbank_statement:
-                transbank_statement = TransbankStatementModel()
-                transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id
-                transbank_statement.original_date = formatted_date
-                transbank_statement.code = raw_code
-                transbank_statement.branch_office_name = row.get("Local", "")
-                transbank_statement.sale_type = row.get("Identificación Local", "")
-                transbank_statement.payment_type = row.get("Tipo Movimiento", "")
-                transbank_statement.card_number = row.get("Tipo Tarjeta", "")
-                transbank_statement.sale_description = row.get("Identificador", "")
-                transbank_statement.amount = int(row.get("Tipo Cuota", "0").replace(".", ""))
-                transbank_statement.value_1 = row.get("Monto Afecto", "")
-                transbank_statement.value_2 = row.get("Monto Exento", "")
-                transbank_statement.value_3 = row.get("Código Autorización", "")
-                transbank_statement.value_4 = row.get("N° Cuotas", "")
-                transbank_statement.added_date = formatted_date
-
-                self.db.add(transbank_statement)
-                self.db.commit()
-
-        transbank_total = self.db.query(TransbankTotalModel).all()
-
-        for item in transbank_total:
-            cashier = self.db.query(CashierModel). \
-                filter(CashierModel.branch_office_id == item.branch_office_id). \
-                filter(CashierModel.transbank_status_id == 1).first()
-
-            if not cashier:
-                continue
-
-            card_net_amount = round(item.total / 1.19)
-
-            check_collection = self.db.query(CollectionModel). \
-                filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                filter(CollectionModel.cashier_id == cashier.id). \
-                filter(CollectionModel.added_date == item.added_date).count()
-
-            if check_collection > 0:
-                self.db.query(CollectionModel). \
-                    filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                    filter(CollectionModel.cashier_id == cashier.id). \
-                    filter(CollectionModel.added_date == item.added_date).delete()
-                self.db.commit()
-
-            collection = CollectionModel(
-                branch_office_id=item.branch_office_id,
-                cashier_id=cashier.id,
-                cash_gross_amount=0,
-                cash_net_amount=0,
-                card_gross_amount=item.total,
-                card_net_amount=card_net_amount,
-                total_tickets=item.total_tickets,
-                added_date=item.added_date,
-                updated_date=item.added_date,
-            )
-
-            self.db.add(collection)
+            self.db.execute(text("TRUNCATE TABLE transbank_statements"))
             self.db.commit()
 
-        return 1
+            response = requests.get(file_url)
+            response.raise_for_status()
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al leer el Transbank: {str(e)}")
+            content = response.content.decode('latin1')
+            lines = content.splitlines()
+            start_index = None
+
+            for i, line in enumerate(lines):
+                if line.startswith("Fecha Venta"):
+                    start_index = i
+                    break
+
+            if start_index is None:
+                raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
+
+            data_lines = "\n".join(lines[start_index:])
+            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str)
+            df = df.fillna("")
+
+            for index, row in df.iterrows():
+                raw_code = row.get("Fecha Venta", "").strip()
+                raw_date = raw_code.lstrip("*")  # Elimina asterisco si lo hay
+
+                # Validar si el valor tiene formato de fecha
+                if not re.match(r"\d{2}/\d{2}/\d{4}", raw_date):
+                    continue  # Ignorar filas sin fechas válidas
+
+                parsed_date = None
+                for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
+                    try:
+                        parsed_date = datetime.strptime(raw_date, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                if not parsed_date:
+                    continue  # Ignorar si no se pudo parsear la fecha
+
+                formatted_date = parsed_date.strftime("%Y-%m-%d")
+
+                branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
+                    filter(BranchOfficesTransbankStatementsModel.transbank_code == raw_code).first()
+
+                if branch_office_transbank_statement:
+                    transbank_statement = TransbankStatementModel()
+                    transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id
+                    transbank_statement.original_date = formatted_date
+                    transbank_statement.code = raw_code
+                    transbank_statement.branch_office_name = row.get("Local", "")
+                    transbank_statement.sale_type = row.get("Identificación Local", "")
+                    transbank_statement.payment_type = row.get("Tipo Movimiento", "")
+                    transbank_statement.card_number = row.get("Tipo Tarjeta", "")
+                    transbank_statement.sale_description = row.get("Identificador", "")
+                    transbank_statement.amount = int(row.get("Tipo Cuota", "0").replace(".", ""))
+                    transbank_statement.value_1 = row.get("Monto Afecto", "")
+                    transbank_statement.value_2 = row.get("Monto Exento", "")
+                    transbank_statement.value_3 = row.get("Código Autorización", "")
+                    transbank_statement.value_4 = row.get("N° Cuotas", "")
+                    transbank_statement.added_date = formatted_date
+
+                    self.db.add(transbank_statement)
+                    self.db.commit()
+
+            transbank_total = self.db.query(TransbankTotalModel).all()
+
+            for item in transbank_total:
+                cashier = self.db.query(CashierModel). \
+                    filter(CashierModel.branch_office_id == item.branch_office_id). \
+                    filter(CashierModel.transbank_status_id == 1).first()
+
+                if not cashier:
+                    continue
+
+                card_net_amount = round(item.total / 1.19)
+
+                check_collection = self.db.query(CollectionModel). \
+                    filter(CollectionModel.branch_office_id == item.branch_office_id). \
+                    filter(CollectionModel.cashier_id == cashier.id). \
+                    filter(CollectionModel.added_date == item.added_date).count()
+
+                if check_collection > 0:
+                    self.db.query(CollectionModel). \
+                        filter(CollectionModel.branch_office_id == item.branch_office_id). \
+                        filter(CollectionModel.cashier_id == cashier.id). \
+                        filter(CollectionModel.added_date == item.added_date).delete()
+                    self.db.commit()
+
+                collection = CollectionModel(
+                    branch_office_id=item.branch_office_id,
+                    cashier_id=cashier.id,
+                    cash_gross_amount=0,
+                    cash_net_amount=0,
+                    card_gross_amount=item.total,
+                    card_net_amount=card_net_amount,
+                    total_tickets=item.total_tickets,
+                    added_date=item.added_date,
+                    updated_date=item.added_date,
+                )
+
+                self.db.add(collection)
+                self.db.commit()
+
+            return 1
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al leer el Transbank: {str(e)}")
