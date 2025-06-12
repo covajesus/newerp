@@ -127,13 +127,6 @@ class FolioClass:
                 folio.cashier_id = cashier_id
                 folio.requested_status_id = 1
 
-                tz = pytz.timezone('America/Santiago')
-                current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-
-                print('******************************** Solicitaron folio ********************************')
-
-                folio.updated_date = current_date
-
                 # Confirmar los cambios en la base de datos
                 self.db.commit()
 
@@ -191,6 +184,9 @@ class FolioClass:
                     folio.branch_office_id = branch_office_id
                     folio.cashier_id = cashier_id
                     folio.requested_status_id = 1
+                    tz = pytz.timezone('America/Santiago')
+                    current_date = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+                    folio.updated_date = current_date
                     self.db.add(folio)
                 
                 # Confirma todos los cambios después de procesar los folios
