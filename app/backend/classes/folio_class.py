@@ -129,6 +129,8 @@ class FolioClass:
                 tz = pytz.timezone('America/Santiago')
                 current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
+                print('******************************** Solicitaron folio ********************************')
+
                 folio.updated_date = current_date
 
                 # Confirmar los cambios en la base de datos
