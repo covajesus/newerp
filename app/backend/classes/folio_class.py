@@ -100,6 +100,7 @@ class FolioClass:
         
     def get_folio(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
+            print(2222222222222222222222222)
             if requested_quantity > 0:
                 # Consulta de cajero para obtener el folio_segment_id
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
