@@ -13,7 +13,7 @@ bank_statements = APIRouter(
     tags=["BankStatement"]
 )
 
-@bank_statements.post("/compare_update_deposits")
+@bank_statements.get("/compare_update_deposits")
 def compare_update_deposits(
     db: Session = Depends(get_db)
 ):

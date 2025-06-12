@@ -81,3 +81,9 @@ def accept(id:int, db: Session = Depends(get_db)):
     data = DepositClass(db).reject(id)
 
     return {"message": data}
+
+@deposits.delete("/delete/{id}")
+def accept(id:int, db: Session = Depends(get_db)):
+    data = DepositClass(db).delete(id)
+
+    return {"message": data}
