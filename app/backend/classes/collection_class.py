@@ -246,7 +246,7 @@ class CollectionClass:
                 TotalGeneralCollectionModel.branch_office_id == branch_office_id
             ).filter(
                 TotalGeneralCollectionModel.added_date == collection_date
-            ).group_by(TotalGeneralCollectionModel.id).all()
+            ).group_by(TotalGeneralCollectionModel.branch_office_id).all()
 
             if result:
                 total_sum = result[0][0]
