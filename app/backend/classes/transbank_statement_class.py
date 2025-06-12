@@ -145,10 +145,8 @@ class TransbankStatementClass:
                         count()
 
                 if check_branch_office_transbank_statement > 0:
-                    string_date = index
-                    raw_date = string_date.strip()
+                    raw_date = row.get("Fecha Venta", "").strip().lstrip("*")  # Elimina espacios y asterisco inicial
 
-                    # Try parsing the date with possible formats
                     parsed_date = None
                     for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
                         try:
