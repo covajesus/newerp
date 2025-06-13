@@ -104,7 +104,6 @@ class WhatsappClass:
 
         print(response.text)
         
-
     def resend(self, dte_id, phone):
         dte_data = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
