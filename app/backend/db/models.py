@@ -312,6 +312,8 @@ class FolioReportModel(Base):
     __tablename__ = 'folio_report'
     id = Column(Integer, primary_key=True, autoincrement=True)
     cashier = Column(String(255))
+    rustdesk = Column(String(255))
+    anydesk = Column(String(255))
 
 class CashierModel(Base):
     __tablename__ = 'cashiers'
