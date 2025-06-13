@@ -3,6 +3,7 @@ from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.collection_class import CollectionClass
 from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch, ManualStoreCollection, UpdateCollection
+from app.backend.classes.whatsapp_class import WhatsappClass
 
 collections = APIRouter(
     prefix="/collections",

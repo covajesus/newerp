@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
+from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 
@@ -84,4 +85,10 @@ def existence(folio:int, db: Session = Depends(get_db)):
 def existence(period:str, db: Session = Depends(get_db)):
     data = DteClass(db).open_customer_billing_period(period)
     
+    return {"message": data}
+
+@dtes.get("/whatsapp/resend/{dte_id}/{phone}")
+def resend(dte_id: int, phone: int, db: Session = Depends(get_db)):
+    data = WhatsappClass(db).resend(dte_id, phone)
+
     return {"message": data}

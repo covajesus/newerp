@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel
+from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel
 import os
 from dotenv import load_dotenv
 load_dotenv() 
@@ -103,4 +103,90 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
-   
+        
+
+    def resend(self, dte_id, phone):
+        dte_data = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
+        user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
+
+        image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
+
+        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+            
+        added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
+
+        required_fields = {
+                "Tipo DTE": dte_data.dte_type_id,
+                "Folio": dte_data.folio,
+                "Fecha": added_date_str,
+                "Total": dte_data.total,
+                "Sucursal": branch_office.branch_office,
+                "Supervisor": user.full_name,
+                "Teléfono": user.phone,
+                "Email": user.email
+        }
+                
+        if dte_data.dte_type_id == 39:
+            dte_type = "boleta"
+        else:
+            dte_type = "factura"
+
+        payload = {
+                        "messaging_product": "whatsapp",
+                        "to": f"{phone}",
+                        "type": "template",
+                        "template": {
+                            "name": whatsapp_template.title,
+                            "language": {"code": "es"},
+                            "components": [
+                                {
+                                    "type": "header",
+                                    "parameters": [
+                                        {
+                                            "type": "document",
+                                            "document": {
+                                                "link": image,
+                                                "filename": f"{dte_data.folio}.pdf"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "body",
+                                    "parameters": [
+                                        {"type": "text", "text": str(dte_type)},
+                                        {"type": "text", "text": str(dte_data.folio)},
+                                        {"type": "text", "text": added_date_str},
+                                        {"type": "text", "text": str(dte_data.total)},
+                                        {"type": "text", "text": branch_office.branch_office},
+                                        {"type": "text", "text": user.full_name},
+                                        {"type": "text", "text": user.phone},
+                                        {"type": "text", "text": user.email},
+                                    ]
+                                },
+                                {
+                                    "type": "button",
+                                    "index": "0",
+                                    "sub_type": "url",
+                                    "parameters": [
+                                        {"type": "text", "text": url_data}
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+        print(payload)
+        response = requests.post(url, json=payload, headers=headers)
+
+        print(response.text)
