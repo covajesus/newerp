@@ -22,6 +22,7 @@ class AccountabilityClass:
         url = "https://libredte.cl/api/lce/lce_asientos/buscar/76063822"
 
         since_date = f"{period}-01"
+        period_year = period.split("-")[0]
         # Obtener último día del mes
         year, month = map(int, period.split("-"))
         last_day = monthrange(year, month)[1]
@@ -41,6 +42,7 @@ class AccountabilityClass:
             "haber_desde": None,
             "haber_hasta": None
         }
+        print(payload)
 
         headers = {
             "Content-Type": "application/json",
@@ -49,5 +51,35 @@ class AccountabilityClass:
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
 
-        print(response.status_code)
-        print(response.text)
+        try:
+            assets = response.json()
+        except json.JSONDecodeError:
+            print("⚠ Error al decodificar JSON de la respuesta:")
+            print(response.text)
+            return
+
+        for asset in assets:
+            asset_id = asset.get("id")
+            fecha = asset.get("fecha")
+            glosa = asset.get("glosa")
+
+            documentos = asset.get("documentos", {}).get("emitidos", [])
+            dte = documentos[0].get("dte") if documentos else None
+            folio = documentos[0].get("folio") if documentos else None
+
+            detalle = asset.get("detalle", [])
+            for item in detalle:
+                asset_id
+
+                url = "https://libredte.cl/api/lce/lce_asientos/eliminar/" + str(period_year) +"/" + str(asset_id) + "/76063822"
+
+                payload={}
+                headers = {
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {TOKEN}'
+                }
+
+
+                response = requests.request("GET", url, headers=headers, data=payload)
+
+                print(response.text)
