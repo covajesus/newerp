@@ -1,4 +1,4 @@
-from app.backend.db.models import FolioModel, CashierModel
+from app.backend.db.models import FolioModel, CashierModel, FolioReportModel
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.alert_class import AlertClass
 import json
@@ -68,6 +68,22 @@ class FolioClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
+    def report(self):
+        folio_reports = self.db.query(FolioReportModel).all()
+
+        if not folio_reports:
+            return "No hay folios en el informe."
+        
+        serialized_data = []
+        for folio_report in folio_reports:
+            folio_report_dict = {
+                "id": folio_report.id,
+                "cashier": folio_report.cashier
+            }
+            serialized_data.append(folio_report_dict)
+
+        return json.dumps(serialized_data)
+    
     def validate(self):
         try:
             folio_count = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).count()
@@ -100,7 +116,6 @@ class FolioClass:
         
     def get_folio(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
-            print(2222222222222222222222222)
             if requested_quantity > 0:
                 # Consulta de cajero para obtener el folio_segment_id
                 cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()

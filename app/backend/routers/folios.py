@@ -88,3 +88,9 @@ def get_from_caf(db: Session = Depends(get_db)):
         db.commit()
 
     return {"message": f"Inserted folios from {folio_start} to {folio_end}"}
+
+@folios.get("/report")
+def report(db: Session = Depends(get_db)):
+    data = FolioClass(db).report()
+    
+    return {"message": data}
