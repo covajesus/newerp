@@ -79,6 +79,8 @@ class FolioClass:
             folio_report_dict = {
                 "id": folio_report.id,
                 "cashier": folio_report.cashier,
+                "branch_office": folio_report.branch_office,
+                "available_folios": folio_report.available_folios,
                 "rustdesk": folio_report.rustdesk,
                 "anydesk": folio_report.anydesk
             }
