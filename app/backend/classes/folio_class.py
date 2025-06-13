@@ -78,7 +78,9 @@ class FolioClass:
         for folio_report in folio_reports:
             folio_report_dict = {
                 "id": folio_report.id,
-                "cashier": folio_report.cashier
+                "cashier": folio_report.cashier,
+                "rustdesk": folio_report.rustdesk,
+                "anydesk": folio_report.anydesk
             }
             serialized_data.append(folio_report_dict)
 
