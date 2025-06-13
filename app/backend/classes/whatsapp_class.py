@@ -125,67 +125,62 @@ class WhatsappClass:
                 }
             
         added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
-
-        required_fields = {
-                "Tipo DTE": dte_data.dte_type_id,
-                "Folio": dte_data.folio,
-                "Fecha": added_date_str,
-                "Total": dte_data.total,
-                "Sucursal": branch_office.branch_office,
-                "Supervisor": user.full_name,
-                "Teléfono": user.phone,
-                "Email": user.email
-        }
                 
         if dte_data.dte_type_id == 39:
             dte_type = "boleta"
         else:
             dte_type = "factura"
 
+        phone_str = str(phone).strip()
+        if not phone_str.startswith("56"):
+            customer_phone = "56" + phone_str
+        else:
+            customer_phone = phone_str
+
         payload = {
-                        "messaging_product": "whatsapp",
-                        "to": f"{phone}",
-                        "type": "template",
-                        "template": {
-                            "name": whatsapp_template.title,
-                            "language": {"code": "es"},
-                            "components": [
-                                {
-                                    "type": "header",
-                                    "parameters": [
-                                        {
-                                            "type": "document",
-                                            "document": {
-                                                "link": image,
-                                                "filename": f"{dte_data.folio}.pdf"
-                                            }
+                    "messaging_product": "whatsapp",
+                    "to": f"{customer_phone}",
+                    "type": "template",
+                    "template": {
+                        "name": whatsapp_template.title,
+                        "language": {"code": "es"},
+                        "components": [
+                            {
+                                "type": "header",
+                                "parameters": [
+                                    {
+                                        "type": "document",
+                                        "document": {
+                                            "link": image,
+                                            "filename": f"{dte_data.folio}.pdf"
                                         }
-                                    ]
-                                },
-                                {
-                                    "type": "body",
-                                    "parameters": [
-                                        {"type": "text", "text": str(dte_type)},
-                                        {"type": "text", "text": str(dte_data.folio)},
-                                        {"type": "text", "text": added_date_str},
-                                        {"type": "text", "text": str(dte_data.total)},
-                                        {"type": "text", "text": branch_office.branch_office},
-                                        {"type": "text", "text": user.full_name},
-                                        {"type": "text", "text": user.phone},
-                                        {"type": "text", "text": user.email},
-                                    ]
-                                },
-                                {
-                                    "type": "button",
-                                    "index": "0",
-                                    "sub_type": "url",
-                                    "parameters": [
-                                        {"type": "text", "text": url_data}
-                                    ]
-                                }
-                            ]
-                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "body",
+                                "parameters": [
+                                    {"type": "text", "text": str(dte_type)},
+                                    {"type": "text", "text": str(dte_data.folio)},
+                                    {"type": "text", "text": added_date_str},
+                                    {"type": "text", "text": str(dte_data.total)},
+                                    {"type": "text", "text": branch_office.branch_office},
+                                    {"type": "text", "text": user.full_name},
+                                    {"type": "text", "text": user.phone},
+                                    {"type": "text", "text": user.email},
+                                ]
+                            },
+                            {
+                                "type": "button",
+                                "index": "0",
+                                "sub_type": "url",
+                                "parameters": [
+                                    {"type": "text", "text": url_data}
+                                ]
+                            }
+                        ]
                     }
+                }
         print(payload)
         response = requests.post(url, json=payload, headers=headers)
 
