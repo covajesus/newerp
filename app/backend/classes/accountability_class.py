@@ -84,6 +84,7 @@ class AccountabilityClass:
             for item in details:
                 # Optional: use 'item' data if needed
                 delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{period_year}/{entry_id}/76063822"
+                print(delete_url)
 
                 delete_headers = {
                     'Accept': 'application/json',
