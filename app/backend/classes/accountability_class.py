@@ -34,7 +34,7 @@ class AccountabilityClass:
         until_date = f"{period}-{last_day:02d}"
 
         payload = {
-            "periodo": period,
+            "periodo": period_year,
             "fecha_desde": since_date,
             "fecha_hasta": until_date,
             "glosa": gloss,
@@ -60,6 +60,7 @@ class AccountabilityClass:
 
 
         print(response.text)
+        exit()
 
         try:
             assets = response.json()
