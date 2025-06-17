@@ -7,17 +7,20 @@ class AccountabilityClass:
     def __init__(self, db):
         self.db = db
 
-    def delete(self, branch_office_id, period):
+    def delete(self, branch_office_id, period, expense_type_id):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        branch_office_qty = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).count()
+        if branch_office_id != None and branch_office_id != '' and branch_office_id != 0:
+            branch_office_qty = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).count()
+        else:
+            branch_office_qty = 0
 
         if branch_office_qty == 0:
-            gloss = "441000102"
+            gloss = expense_type_id
         else:
             branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
 
-            gloss = str(branch_office.branch_office) + "_441000102"
+            gloss = str(branch_office.branch_office) + "_" + str(expense_type_id)
 
         url = "https://libredte.cl/api/lce/lce_asientos/buscar/76063822"
 
@@ -34,7 +37,7 @@ class AccountabilityClass:
             "fecha_hasta": until_date,
             "glosa": gloss,
             "operacion": None,
-            "cuenta": '441000102',
+            "cuenta": expense_type_id,
             "debe": None,
             "debe_desde": None,
             "debe_hasta": None,

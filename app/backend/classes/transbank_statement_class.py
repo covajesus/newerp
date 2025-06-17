@@ -35,7 +35,7 @@ class TransbankStatementClass:
                         BranchOfficeModel.branch_office.label("branch_office")
                     )
                     .outerjoin(BranchOfficeModel, BranchOfficeModel.id == TransbankStatementModel.branch_office_id)
-                    .order_by(TransbankStatementModel.id)
+                    .order_by(TransbankStatementModel.id.desc())
                 )
 
                 total_items = data_query.count()
