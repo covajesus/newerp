@@ -65,6 +65,7 @@ class AccountabilityClass:
         
         for entry in entries:
             entry_id = entry.get("id")
+            asset_number = entry_id.split("-")[1]
             date = entry.get("fecha")
             description = entry.get("glosa")
 
@@ -83,7 +84,7 @@ class AccountabilityClass:
             details = entry.get("detalle", [])
             for item in details:
                 # Optional: use 'item' data if needed
-                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{period_year}/{entry_id}/76063822"
+                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{period_year}/{asset_number}/76063822"
                 print(delete_url)
 
                 delete_headers = {
