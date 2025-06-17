@@ -54,7 +54,12 @@ class AccountabilityClass:
             'Authorization': f'Bearer {TOKEN}'
         }
 
+        print(payload)
+
         response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+
+        print(response)
 
         try:
             assets = response.json()
