@@ -58,11 +58,12 @@ class AccountabilityClass:
 
         try:
             assets = response.json()
+            print(assets)
         except json.JSONDecodeError:
             print("⚠ Error al decodificar JSON de la respuesta:")
             print(response.text)
             return
-
+        
         for asset in assets:
             asset_id = asset.get("id")
             fecha = asset.get("fecha")
