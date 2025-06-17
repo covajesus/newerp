@@ -82,7 +82,6 @@ class AccountabilityClass:
 
             details = entry.get("detalle", [])
             for item in details:
-                print(222222222222222222222222)
                 # Optional: use 'item' data if needed
                 delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{period_year}/{entry_id}/76063822"
 
