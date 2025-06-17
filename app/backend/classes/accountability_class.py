@@ -69,23 +69,28 @@ class AccountabilityClass:
             fecha = asset.get("fecha")
             glosa = asset.get("glosa")
 
-            documentos = asset.get("documentos", {}).get("emitidos", [])
+            # Manejar documentos que pueden ser dict o list
+            documentos_data = asset.get("documentos", {})
+            if isinstance(documentos_data, dict):
+                documentos = documentos_data.get("emitidos", [])
+            elif isinstance(documentos_data, list):
+                documentos = documentos_data
+            else:
+                documentos = []
+
             dte = documentos[0].get("dte") if documentos else None
             folio = documentos[0].get("folio") if documentos else None
 
             detalle = asset.get("detalle", [])
             for item in detalle:
-                asset_id
+                # Puedes usar 'item' para más datos si lo necesitas
+                url_eliminar = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asset.get('periodo')}/{asset_id}/76063822"
 
-                url = "https://libredte.cl/api/lce/lce_asientos/eliminar/" + str(period_year) +"/" + str(asset_id) + "/76063822"
-
-                payload={}
-                headers = {
+                headers_eliminar = {
                     'Accept': 'application/json',
                     'Authorization': f'Bearer {TOKEN}'
                 }
 
+                response_eliminar = requests.get(url_eliminar, headers=headers_eliminar)
 
-                response = requests.request("GET", url, headers=headers, data=payload)
-
-                print(response.text)
+                print(response_eliminar.text)
