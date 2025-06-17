@@ -57,40 +57,40 @@ class AccountabilityClass:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
 
         try:
-            assets = response.json()
-            print(assets)
+            entries = response.json()
         except json.JSONDecodeError:
             print("⚠ Error al decodificar JSON de la respuesta:")
             print(response.text)
             return
         
-        for asset in assets:
-            asset_id = asset.get("id")
-            fecha = asset.get("fecha")
-            glosa = asset.get("glosa")
+        for entry in entries:
+            entry_id = entry.get("id")
+            date = entry.get("fecha")
+            description = entry.get("glosa")
 
-            # Manejar documentos que pueden ser dict o list
-            documentos_data = asset.get("documentos", {})
-            if isinstance(documentos_data, dict):
-                documentos = documentos_data.get("emitidos", [])
-            elif isinstance(documentos_data, list):
-                documentos = documentos_data
+            # Handle "documentos" which can be a dict or a list
+            documents_data = entry.get("documentos", {})
+            if isinstance(documents_data, dict):
+                documents = documents_data.get("emitidos", [])
+            elif isinstance(documents_data, list):
+                documents = documents_data
             else:
-                documentos = []
+                documents = []
 
-            dte = documentos[0].get("dte") if documentos else None
-            folio = documentos[0].get("folio") if documentos else None
+            dte = documents[0].get("dte") if documents else None
+            folio = documents[0].get("folio") if documents else None
 
-            detalle = asset.get("detalle", [])
-            for item in detalle:
-                # Puedes usar 'item' para más datos si lo necesitas
-                url_eliminar = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asset.get('periodo')}/{asset_id}/76063822"
+            details = entry.get("detalle", [])
+            for item in details:
+                print(222222222222222222222222)
+                # Optional: use 'item' data if needed
+                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{entry.get('periodo')}/{entry_id}/76063822"
 
-                headers_eliminar = {
+                delete_headers = {
                     'Accept': 'application/json',
                     'Authorization': f'Bearer {TOKEN}'
                 }
 
-                response_eliminar = requests.get(url_eliminar, headers=headers_eliminar)
+                delete_response = requests.get(delete_url, headers=delete_headers)
 
-                print(response_eliminar.text)
+                print(delete_response.text)
