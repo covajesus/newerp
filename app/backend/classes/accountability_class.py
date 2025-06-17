@@ -59,7 +59,7 @@ class AccountabilityClass:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
 
 
-        print(response)
+        print(response.text)
 
         try:
             assets = response.json()
