@@ -63,7 +63,7 @@ class ExpenseTypeModel(Base):
     expense_type = Column(String(255))
     accounting_account = Column(String(255))
     type = Column(Integer)
-    group_detail = Column(String(255))
+    group_detail = Column(Integer)
 
 class GroupDetailModel(Base):
     __tablename__ = 'group_details'

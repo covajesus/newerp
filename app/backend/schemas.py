@@ -1688,7 +1688,7 @@ class UpdateExpenseType(BaseModel):
     eerr_visibility_id: int
     track_visibility_id: int
     type: int
-    group_detail: str
+    group_detail: int
 
 class GroupDetail(BaseModel):
     page: int
