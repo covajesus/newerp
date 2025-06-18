@@ -27,6 +27,12 @@ def capitulation_visibles(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@expense_types.get("/eerr_visibles")
+def eerr_visibles(db: Session = Depends(get_db)):
+    data = ExpenseTypeClass(db).get_all_eerr_visibles()
+
+    return {"message": data}
+
 @expense_types.post("/store")
 def store(expense_type_inputs: StoreExpenseType, db: Session = Depends(get_db)):
     data = ExpenseTypeClass(db).store(expense_type_inputs)
