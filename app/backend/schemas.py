@@ -1664,6 +1664,13 @@ class ManualStoreCollection(BaseModel):
 class ExpenseType(BaseModel):
     page: int
 
+class StoreManualSeat(BaseModel):
+    branch_office_id: int
+    expense_type_id: int
+    tax_status_id: int
+    period: str
+    amount: int
+
 class StoreExpenseType(BaseModel):
     expense_type: str
     accounting_account: str
