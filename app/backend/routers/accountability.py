@@ -16,8 +16,8 @@ def store(manual_seat:StoreManualSeat, session_user: UserLogin = Depends(get_cur
 
     return {"message": data}
 
-@accountability.get("/delete/{branch_office_id}/{period}")
-def delete(branch_office_id: int, period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = AccountabilityClass(db).delete(branch_office_id, period)
+@accountability.get("/delete/{branch_office_id}/{period}/{expense_type_id}")
+def delete(branch_office_id: int, period: str, expense_type_id: int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = AccountabilityClass(db).delete(branch_office_id, period, expense_type_id)
 
     return {"message": data}
