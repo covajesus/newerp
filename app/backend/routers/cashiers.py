@@ -22,3 +22,10 @@ def all(db: Session = Depends(get_db)):
     data = CashierClass(db).get_all()
 
     return {"message": data}
+
+@cashiers.post("/latest_update")
+def latest_update(db: Session = Depends(get_db)):
+    data = CashierClass(db).latest_update()
+
+    return {"message": data}
+

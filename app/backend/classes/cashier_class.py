@@ -1,4 +1,6 @@
 from app.backend.db.models import CashierModel
+from app.backend.db.models import LatestUpdateCashierModel
+import json
 
 class CashierClass:
     def __init__(self, db):
@@ -41,3 +43,22 @@ class CashierClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
+
+    def latest_update(self):
+        cashier_reports = self.db.query(LatestUpdateCashierModel).all()
+
+        if not cashier_reports:
+            return "No hay cajaas en el informe."
+        
+        serialized_data = []
+        for cashier_report in cashier_reports:
+            cashier_report_dict = {
+                "id": cashier_report.id,
+                "cashier": cashier_report.cashier,
+                "last_updated_date": cashier_report.last_updated_date.isoformat() if cashier_report.last_updated_date else None,
+                "rustdesk": cashier_report.rustdesk,
+                "anydesk": cashier_report.anydesk
+            }
+            serialized_data.append(cashier_report_dict)
+
+        return json.dumps(serialized_data)

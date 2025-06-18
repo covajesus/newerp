@@ -329,6 +329,14 @@ class CashierModel(Base):
     transbank_status_id = Column(Integer)
     available_folios = Column(Integer)
 
+class LatestUpdateCashierModel(Base):
+    __tablename__ = 'latest_update_cashiers'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cashier = Column(String(255))
+    anydesk = Column(String(255))
+    rustdesk = Column(String(255))
+    last_updated_date = Column(String(255))
+
 class TransbankTotalModel(Base):
     __tablename__ = 'transbank_total'
     id = Column(Integer, primary_key=True, autoincrement=True)
