@@ -7,8 +7,109 @@ class AccountabilityClass:
     def __init__(self, db):
         self.db = db
 
+    def store(self, branch_office_id, expense_type_id, tax_status_id, period, amount):
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+        expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == expense_type_id).first()
+        splitted_period = period.split('-')
+        utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
+
+        gloss = (
+                branch_office.branch_office
+                + "_"
+                + expense_type.accounting_account
+                + "_"
+                + utf8_date
+                + "_AsientoLibre"
+            )
+
+        if  expense_type.accounting_account != 443000344:
+            if tax_status_id == 0:
+                data = {
+                        "fecha": period + "-01",
+                        "glosa": gloss,
+                        "detalle": {
+                            'debe': {
+                                str(expense_type.accounting_account): amount,
+                            },
+                            'haber': {
+                                '111000101': amount,
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": '',
+                                    "folio": 0,
+                                }
+                            ]
+                        },
+                    }
+            else:
+                data = {
+                    "fecha": period + "-01",
+                    "glosa": gloss,
+                    "detalle": {
+                        'debe': {
+                            '111000102': amount,
+                        },
+                        'haber': {
+                            str(expense_type.accounting_account): round(amount/1.19),
+                            '221000226': round(amount - (amount/1.19)),
+                        }
+                    },
+                    "operacion": "I",
+                    "documentos": {
+                        "emitidos": [
+                            {
+                                "dte": '',
+                                "folio": 0,
+                            }
+                        ]
+                    },
+                }
+        else:
+            data = {
+                "fecha": period + "-01",
+                "glosa": gloss,
+                "detalle": {
+                    'debe': {
+                        str(expense_type.accounting_account): amount,
+                        '221000223': round((amount/0.8700) - amount),
+                    },
+                    'haber': {
+                        '111000102': round(amount/0.8700),
+                    }
+                },
+                "operacion": "I",
+                "documentos": {
+                    "emitidos": [
+                        {
+                            "dte": '',
+                            "folio": 0,
+                        }
+                    ]
+                },
+            }
+        
+        print(data)
+
+        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+        response = requests.post(
+            url,
+            json=data,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        print(response.text)
+
     def delete(self, branch_office_id, period, expense_type_id):
-        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == expense_type_id).first()
 
@@ -51,7 +152,7 @@ class AccountabilityClass:
 
         headers = {
             "Content-Type": "application/json",
-            'Authorization': f'Bearer {TOKEN}'
+            'Authorization': f'Bearer {token}'
         }
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
@@ -89,7 +190,7 @@ class AccountabilityClass:
 
                 delete_headers = {
                     'Accept': 'application/json',
-                    'Authorization': f'Bearer {TOKEN}'
+                    'Authorization': f'Bearer {token}'
                 }
 
                 delete_response = requests.get(delete_url, headers=delete_headers)
