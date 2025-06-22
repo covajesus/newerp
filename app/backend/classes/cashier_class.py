@@ -48,7 +48,7 @@ class CashierClass:
         cashier_reports = self.db.query(LatestUpdateCashierModel).all()
 
         if not cashier_reports:
-            return "No hay cajaas en el informe."
+            return "No hay cajas en el informe."
         
         serialized_data = []
         for cashier_report in cashier_reports:

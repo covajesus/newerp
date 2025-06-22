@@ -167,17 +167,21 @@ class FolioClass:
     
     def validate_caf_limit(self, folio_segment_id):
         try:
-            settings = SettingClass(self.db).get()
-            if settings:
-                folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == folio_segment_id).count()
-                caf_limit = settings['setting_data']['caf_limit']
 
-                if folios < caf_limit:
-                    return 1
+            if folio_segment_id != 9:
+                settings = SettingClass(self.db).get()
+                if settings:
+                    folios = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).filter(FolioModel.folio_segment_id == folio_segment_id).count()
+                    caf_limit = settings['setting_data']['caf_limit']
+
+                    if folios < caf_limit:
+                        return 1
+                    else:
+                        return 0
                 else:
-                    return 0
+                    return 3
             else:
-                return 3
+                return 0
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
@@ -189,8 +193,7 @@ class FolioClass:
                 cashier.available_folios = quantity_in_cashier
                 self.db.add(cashier)
                 self.db.commit()
-                
-
+            
                 response_validate_caf_limit = self.validate_caf_limit(cashier.folio_segment_id)
 
                 if response_validate_caf_limit == 1:
