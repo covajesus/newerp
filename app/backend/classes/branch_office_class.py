@@ -33,7 +33,7 @@ class BranchOfficeClass:
                     filter(BranchOfficeModel.id == branch_office_id). \
                     order_by(BranchOfficeModel.branch_office). \
                     all()
-            
+            print(data)
             return data
         except Exception as e:
             error_message = str(e)
