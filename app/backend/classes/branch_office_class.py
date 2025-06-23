@@ -7,6 +7,11 @@ class BranchOfficeClass:
     def get_all(self, rol_id = None, rut = None, branch_office_id = None):
         try:
             print(rol_id)
+            data = self.db.query(BranchOfficeModel). \
+                    filter(BranchOfficeModel.status_id == 7). \
+                    filter(BranchOfficeModel.visibility_id == 1). \
+                    order_by(BranchOfficeModel.branch_office). \
+                    all()
             if rol_id == 1 or rol_id == 2 or rol_id == 3:
                 print(22222222222223)
                 data = self.db.query(BranchOfficeModel). \
