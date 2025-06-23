@@ -8,6 +8,7 @@ class BranchOfficeClass:
         try:
             print(rol_id)
             if rol_id == 1 or rol_id == 2 or rol_id == 3:
+                print(22222222222223)
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
