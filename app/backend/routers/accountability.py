@@ -29,7 +29,6 @@ def delete(branch_office_id: int, period: str, expense_type_id: int, session_use
 
 @accountability.post("/massive_store")
 def store(
-    form_data: StoreAccountability = Depends(StoreAccountability.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -47,7 +46,7 @@ def store(
         file_url = FileClass(db).get(remote_path)
 
         if file_extension == "xlsx":
-            excel_data = AccountabilityClass(db).read_store_massive_accountability(file_url, form_data.period)
+            excel_data = AccountabilityClass(db).read_store_massive_accountability(file_url)
         else:
             raise HTTPException(status_code=400, detail="Formato no compatible")
 

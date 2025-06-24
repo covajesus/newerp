@@ -200,7 +200,7 @@ class AccountabilityClass:
 
                 print(delete_response.text)
 
-    def read_store_massive_accountability(self, file_url, period):
+    def read_store_massive_accountability(self, file_url):
         try:
             token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
             response = requests.get(file_url)
