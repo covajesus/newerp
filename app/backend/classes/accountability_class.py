@@ -234,7 +234,8 @@ class AccountabilityClass:
                     if not expense_type:
                         print(f"[Fila {index + 2}] Tipo de gasto no encontrado")
                         continue
-
+                    
+                    print(period)
                     splitted_period = period.split('-')
                     utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
 
