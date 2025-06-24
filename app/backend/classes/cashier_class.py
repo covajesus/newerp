@@ -154,10 +154,12 @@ class CashierClass:
             # Inicialización de filtros dinámicos
             filters = []
             if cashier_inputs.branch_office_id is not None:
+                print(222)
+                print(cashier_inputs.branch_office_id)
                 filters.append(CashierModel.branch_office_id == cashier_inputs.branch_office_id)
             if cashier_inputs.cashier_id is not None:
                 filters.append(CashierModel.id == cashier_inputs.cashier_id)
-            print(filters)
+           
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
                 CashierModel.id,
