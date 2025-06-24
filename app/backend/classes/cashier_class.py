@@ -153,9 +153,9 @@ class CashierClass:
         try:
             # Inicialización de filtros dinámicos
             filters = []
-            if cashier_inputs.branch_office_id is not None:
+            if cashier_inputs.branch_office_id is not None and cashier_inputs.branch_office_id != '':
                 filters.append(CashierModel.branch_office_id == cashier_inputs.branch_office_id)
-            if cashier_inputs.cashier_id is not None:
+            if cashier_inputs.cashier_id is not None and cashier_inputs.cashier_id != '':
                 filters.append(CashierModel.id == cashier_inputs.cashier_id)
            
             # Construir la consulta base con los filtros aplicados
