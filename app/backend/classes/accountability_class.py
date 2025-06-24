@@ -221,8 +221,8 @@ class AccountabilityClass:
 
                     branch_office_id = row["branch_office_id"]
                     accounting_account = row["accounting_account"]
-                    amount = float(row["amount"])
-                    period = float(row["period"])
+                    amount = row["amount"]
+                    period = row["period"]
                     tax_status_id = 0
 
                     branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id==branch_office_id).first()
@@ -235,7 +235,6 @@ class AccountabilityClass:
                         print(f"[Fila {index + 2}] Tipo de gasto no encontrado")
                         continue
                     
-                    print(period)
                     splitted_period = period.split('-')
                     utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
 
