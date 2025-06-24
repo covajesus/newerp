@@ -200,7 +200,7 @@ class AccountabilityClass:
 
                 print(delete_response.text)
 
-    def read_store_massive_accountability(self, file_url):
+    def read_store_massive_accountability(self, file_url, period):
         try:
             token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
             response = requests.get(file_url)
@@ -221,7 +221,7 @@ class AccountabilityClass:
                     branch_office_id = row["SUCURSAL"]
                     expense_type_id = row["TIPO DE GASTO"]
                     amount = float(row["MONTO"])
-                    period = row["PERIODO"]
+                    period = period
                     tax_status_id = int(row["IVA"])
 
                     branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id==branch_office_id).first()
