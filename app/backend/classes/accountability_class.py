@@ -218,6 +218,7 @@ class AccountabilityClass:
 
             for index, row in df.iterrows():
                 try:
+
                     branch_office_id = row["branch_office_id"]
                     accounting_account = row["accounting_account"]
                     amount = float(row["amount"])
