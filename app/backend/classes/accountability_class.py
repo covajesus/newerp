@@ -215,6 +215,8 @@ class AccountabilityClass:
 
             df = pd.read_excel(xls, sheet_name=sheet_names[0], engine="openpyxl")
             df = df.fillna("")
+            print(period)
+            exit()
 
             for index, row in df.iterrows():
                 try:
