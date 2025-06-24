@@ -2,6 +2,11 @@ import requests
 from app.backend.db.models import BranchOfficeModel, ExpenseTypeModel
 import json
 from calendar import monthrange
+from app.backend.classes.helper_class import HelperClass
+from fastapi import HTTPException
+from io import BytesIO
+import pandas as pd
+from sqlalchemy import text
 
 class AccountabilityClass:
     def __init__(self, db):
@@ -92,8 +97,6 @@ class AccountabilityClass:
                     ]
                 },
             }
-        
-        print(data)
 
         url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
 
@@ -196,3 +199,111 @@ class AccountabilityClass:
                 delete_response = requests.get(delete_url, headers=delete_headers)
 
                 print(delete_response.text)
+
+    def read_store_massive_accountability(self, file_url):
+        try:
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            response = requests.get(file_url)
+            response.raise_for_status()
+
+            excel_file = BytesIO(response.content)
+            xls = pd.ExcelFile(excel_file, engine="openpyxl")
+            sheet_names = xls.sheet_names
+
+            if not sheet_names:
+                raise HTTPException(status_code=500, detail="El archivo Excel no tiene hojas.")
+
+            df = pd.read_excel(xls, sheet_name=sheet_names[0], engine="openpyxl")
+            df = df.fillna("")
+
+            for index, row in df.iterrows():
+                try:
+                    branch_office_id = row["SUCURSAL"]
+                    expense_type_id = row["TIPO DE GASTO"]
+                    amount = float(row["MONTO"])
+                    period = row["PERIODO"]
+                    tax_status_id = int(row["IVA"])
+
+                    branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id==branch_office_id).first()
+                    if not branch_office:
+                        print(f"[Fila {index + 2}] Sucursal no encontrada")
+                        continue
+
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id==expense_type_id).first()
+                    if not expense_type:
+                        print(f"[Fila {index + 2}] Tipo de gasto no encontrado")
+                        continue
+
+                    splitted_period = period.split('-')
+                    utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
+
+                    gloss = (
+                        branch_office.branch_office + "_" +
+                        expense_type.accounting_account + "_" +
+                        utf8_date + "_AsientoLibre"
+                    )
+
+                    if expense_type.accounting_account != 443000344:
+                        if tax_status_id == 0:
+                            data = {
+                                "fecha": period + "-01",
+                                "glosa": gloss,
+                                "detalle": {
+                                    "debe": {str(expense_type.accounting_account): amount},
+                                    "haber": {"111000101": amount},
+                                },
+                                "operacion": "I",
+                                "documentos": {"emitidos": [{"dte": '', "folio": 0}]},
+                            }
+                        else:
+                            neto = round(amount / 1.19)
+                            iva = round(amount - neto)
+                            data = {
+                                "fecha": period + "-01",
+                                "glosa": gloss,
+                                "detalle": {
+                                    "debe": {"111000102": amount},
+                                    "haber": {
+                                        str(expense_type.accounting_account): neto,
+                                        "221000226": iva,
+                                    },
+                                },
+                                "operacion": "I",
+                                "documentos": {"emitidos": [{"dte": '', "folio": 0}]},
+                            }
+                    else:
+                        base = round(amount / 0.87)
+                        iva = base - amount
+                        data = {
+                            "fecha": period + "-01",
+                            "glosa": gloss,
+                            "detalle": {
+                                "debe": {
+                                    str(expense_type.accounting_account): amount,
+                                    "221000223": iva,
+                                },
+                                "haber": {"111000102": base},
+                            },
+                            "operacion": "I",
+                            "documentos": {"emitidos": [{"dte": '', "folio": 0}]},
+                        }
+
+                    url = "https://libredte.cl/api/lce/lce_asientos/crear/76063822"
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+
+                    print(f"[Fila {index + 2}] Enviado ({response.status_code}): {response.text}")
+
+                except Exception as row_error:
+                    print(f"[Fila {index + 2}] Error procesando fila: {row_error}")
+
+            return {"status": "success", "message": "Proceso completado"}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")

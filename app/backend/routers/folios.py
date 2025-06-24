@@ -94,3 +94,9 @@ def report(db: Session = Depends(get_db)):
     data = FolioClass(db).report()
     
     return {"message": data}
+
+@folios.get("/get_quantity_per_cashier")
+def report(db: Session = Depends(get_db)):
+    data = FolioClass(db).get_quantity_per_cashier()
+    
+    return {"message": data}

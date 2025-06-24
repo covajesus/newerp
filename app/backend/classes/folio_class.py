@@ -1,4 +1,4 @@
-from app.backend.db.models import FolioModel, CashierModel, FolioReportModel
+from app.backend.db.models import FolioModel, CashierModel, FolioReportModel, FolioQuantityPerCashierModel
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.alert_class import AlertClass
 import json
@@ -70,6 +70,26 @@ class FolioClass:
         
     def report(self):
         folio_reports = self.db.query(FolioReportModel).all()
+
+        if not folio_reports:
+            return "No hay folios en el informe."
+        
+        serialized_data = []
+        for folio_report in folio_reports:
+            folio_report_dict = {
+                "id": folio_report.id,
+                "cashier": folio_report.cashier,
+                "branch_office": folio_report.branch_office,
+                "available_folios": folio_report.available_folios,
+                "rustdesk": folio_report.rustdesk,
+                "anydesk": folio_report.anydesk
+            }
+            serialized_data.append(folio_report_dict)
+
+        return json.dumps(serialized_data)
+    
+    def get_quantity_per_cashier(self):
+        folio_reports = self.db.query(FolioQuantityPerCashierModel).all()
 
         if not folio_reports:
             return "No hay folios en el informe."

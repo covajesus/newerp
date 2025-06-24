@@ -1052,6 +1052,15 @@ class BankStatement(BaseModel):
             ):
         return cls(period=period)
 
+class StoreAccountability(BaseModel):
+    period: str
+
+    @classmethod
+    def as_form(cls, 
+                period: str = Form()
+            ):
+        return cls(period=period)
+    
 class TransbankStatement(BaseModel):
     period: str
 
@@ -1620,6 +1629,9 @@ class PatentList(BaseModel):
 class CapitulationList(BaseModel):
     page: int
 
+class CashierList(BaseModel):
+    page: int
+
 class IntershipList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
     intern: Optional[str] = None  # Ahora es opcional
@@ -1633,6 +1645,26 @@ class MaintenanceList(BaseModel):
 class UserList(BaseModel):
     rut: Optional[str] = None  # Ahora es opcional
     page: int
+
+class StoreCashier(BaseModel):
+    cashier: str
+    branch_office_id: int
+    getaway_machine_id: Optional[int] = None
+    transbank_status_id: Optional[int] = None
+    visibility_status_id: Optional[int] = None
+    folio_segment_id: Optional[int] = None
+    anydesk: Optional[str] = None
+    rustdesk: Optional[str] = None
+
+class UpdateCashier(BaseModel):
+    cashier: str
+    branch_office_id: int
+    getaway_machine_id: Optional[int] = None
+    transbank_status_id: Optional[int] = None
+    visibility_status_id: Optional[int] = None
+    folio_segment_id: Optional[int] = None
+    anydesk: Optional[str] = None
+    rustdesk: Optional[str] = None
 
 class DepositList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional

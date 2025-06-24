@@ -317,6 +317,15 @@ class FolioReportModel(Base):
     anydesk = Column(String(255))
     available_folios = Column(Integer)
 
+class FolioQuantityPerCashierModel(Base):
+    __tablename__ = 'total_folios_per_cashier'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cashier = Column(String(255))
+    branch_office = Column(String(255))
+    rustdesk = Column(String(255))
+    anydesk = Column(String(255))
+    available_folios = Column(Integer)
+
 class CashierModel(Base):
     __tablename__ = 'cashiers'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -327,7 +336,10 @@ class CashierModel(Base):
     anydesk = Column(String(255))
     rustdesk = Column(String(255))
     transbank_status_id = Column(Integer)
+    visibility_status_id = Column(Integer)
     available_folios = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
 
 class LatestUpdateCashierModel(Base):
     __tablename__ = 'latest_update_cashiers'

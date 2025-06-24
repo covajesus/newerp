@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.cashier_class import CashierClass
+from app.backend.schemas import CashierList, StoreCashier
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 cashiers = APIRouter(
     prefix="/cashiers",
@@ -29,3 +32,32 @@ def latest_update(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@cashiers.post("/get_list")
+def get_list(cashier: CashierList, db: Session = Depends(get_db)):
+    data = CashierClass(db).get_list(cashier.page)
+
+    return {"message": data}
+
+@cashiers.post("/store")
+def store(cashier_inputs: StoreCashier, db: Session = Depends(get_db)):
+    data = CashierClass(db).store(cashier_inputs)
+
+    return {"message": data}
+
+@cashiers.get("/edit/{id}")
+def edit(id:int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CashierClass(db).get("id", id)
+
+    return {"message": data}
+
+@cashiers.post("/update/{id}")
+def update(id:int, cashier_inputs: StoreCashier, db: Session = Depends(get_db)):
+    data = CashierClass(db).update(id, cashier_inputs)
+
+    return {"message": data}
+
+@cashiers.delete("/delete/{id}")
+def delete(id:int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CashierClass(db).delete(id)
+
+    return {"message": data}
