@@ -84,7 +84,8 @@ class CashierClass:
                 BranchOfficeModel, BranchOfficeModel.id == CashierModel.branch_office_id
             ).filter(
                 CashierModel.folio_segment_id != 9,
-                CashierModel.folio_segment_id == 8
+                CashierModel.folio_segment_id != 8,
+                CashierModel.folio_segment_id != 0
             ).filter(
                 *filters
             ).order_by(
