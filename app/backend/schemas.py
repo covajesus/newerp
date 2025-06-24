@@ -1643,7 +1643,7 @@ class MaintenanceList(BaseModel):
 
 class SearchCashier(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
-    cashier_id: Optional[int] = None  # Ahora es opcional
+    cashier_id: Optional[str] = None  # Ahora es opcional
     page: int
 
 class UserList(BaseModel):
