@@ -149,7 +149,97 @@ class CashierClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
         
+    def search(self, cashier_inputs, page=0, items_per_page=10):
+        try:
+            # Inicialización de filtros dinámicos
+            filters = []
+            if cashier_inputs.branch_office_id is not None:
+                filters.append(CashierModel.branch_office_id == cashier_inputs.branch_office_id)
+            if cashier_inputs.cashier_id is not None:
+                filters.append(CashierModel.id == cashier_inputs.cashier_id)
 
+            # Construir la consulta base con los filtros aplicados
+            query = self.db.query(
+                CashierModel.id,
+                CashierModel.cashier,
+                CashierModel.branch_office_id,
+                CashierModel.folio_segment_id,
+                CashierModel.getaway_machine_id,
+                CashierModel.added_date,
+                CashierModel.updated_date,
+                CashierModel.anydesk,
+                CashierModel.rustdesk,
+                CashierModel.available_folios,
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == CashierModel.branch_office_id
+            ).filter(
+                CashierModel.folio_segment_id != 9,
+                CashierModel.folio_segment_id != 8,
+                CashierModel.folio_segment_id != 0
+            ).filter(
+                *filters
+            ).order_by(
+                CashierModel.id
+            )
+
+            if page > 0:
+                total_items = query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+
+                if page < 1 or page > total_pages:
+                    return {"status": "error", "message": "Invalid page number"}
+
+                data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+                if not data:
+                    return {"status": "error", "message": "No data found"}
+
+                serialized_data = [{
+                    "id": cashier.id,
+                    "cashier": cashier.cashier,
+                    "branch_office_id": cashier.branch_office_id,
+                    "folio_segment_id": cashier.folio_segment_id,
+                    "getaway_machine_id": cashier.getaway_machine_id,
+                    "added_date": cashier.added_date.isoformat() if cashier.added_date else None,
+                    "updated_date": cashier.updated_date.isoformat() if cashier.updated_date else None,
+                    "anydesk": cashier.anydesk,
+                    "rustdesk": cashier.rustdesk,
+                    "available_folios": cashier.available_folios,
+                    "branch_office": cashier.branch_office
+                } for cashier in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+
+            else:
+                data = query.all()
+
+                serialized_data = [{
+                    "id": cashier.id,
+                    "cashier": cashier.cashier,
+                    "branch_office_id": cashier.branch_office_id,
+                    "folio_segment_id": cashier.folio_segment_id,
+                    "getaway_machine_id": cashier.getaway_machine_id,
+                    "added_date": cashier.added_date.isoformat() if cashier.added_date else None,
+                    "updated_date": cashier.updated_date.isoformat() if cashier.updated_date else None,
+                    "anydesk": cashier.anydesk,
+                    "rustdesk": cashier.rustdesk,
+                    "available_folios": cashier.available_folios,
+                    "branch_office": cashier.branch_office
+                } for cashier in data]
+
+                return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
+        
     def store(self, form_data):
         cashier = CashierModel()
         cashier.cashier = form_data.cashier

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.cashier_class import CashierClass
-from app.backend.schemas import CashierList, StoreCashier
+from app.backend.schemas import CashierList, StoreCashier, SearchCashier
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.schemas import UserLogin
 
@@ -59,5 +59,11 @@ def update(id:int, cashier_inputs: StoreCashier, db: Session = Depends(get_db)):
 @cashiers.delete("/delete/{id}")
 def delete(id:int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = CashierClass(db).delete(id)
+
+    return {"message": data}
+
+@cashiers.post("/search")
+def edit(cashier_inputs:SearchCashier, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CashierClass(db).get_list(cashier_inputs, cashier_inputs.page)
 
     return {"message": data}

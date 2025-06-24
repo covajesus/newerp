@@ -1641,6 +1641,10 @@ class MaintenanceList(BaseModel):
     branch_office_id: Optional[int] = None  # Ahora es opcional
     page: int
 
+class SearchCashier(BaseModel):
+    branch_office_id: Optional[int] = None  # Ahora es opcional
+    cashier_id: Optional[int] = None  # Ahora es opcional
+    page: int
 
 class UserList(BaseModel):
     rut: Optional[str] = None  # Ahora es opcional
