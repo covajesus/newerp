@@ -64,6 +64,6 @@ def delete(id:int, session_user: UserLogin = Depends(get_current_active_user), d
 
 @cashiers.post("/search")
 def edit(cashier_inputs:SearchCashier, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = CashierClass(db).get_list(cashier_inputs, cashier_inputs.page)
+    data = CashierClass(db).search(cashier_inputs, cashier_inputs.page)
 
     return {"message": data}
