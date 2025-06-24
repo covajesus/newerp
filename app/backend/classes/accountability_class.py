@@ -297,7 +297,7 @@ class AccountabilityClass:
                         },
                     )
 
-                    print(f"[Fila {index + 2}] Enviado ({response.status_code}): {response.text}")
+                    print(response.text)
 
                 except Exception as row_error:
                     print(f"[Fila {index + 2}] Error procesando fila: {row_error}")
