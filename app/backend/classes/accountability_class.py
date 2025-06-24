@@ -215,15 +215,12 @@ class AccountabilityClass:
 
             df = pd.read_excel(xls, sheet_name=sheet_names[0], engine="openpyxl")
             df = df.fillna("")
-            print(period)
-            exit()
 
             for index, row in df.iterrows():
                 try:
                     branch_office_id = row["SUCURSAL"]
                     expense_type_id = row["TIPO DE GASTO"]
                     amount = float(row["MONTO"])
-                    period = period
                     tax_status_id = int(row["IVA"])
 
                     branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id==branch_office_id).first()
