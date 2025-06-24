@@ -218,17 +218,18 @@ class AccountabilityClass:
 
             for index, row in df.iterrows():
                 try:
-                    branch_office_id = row["SUCURSAL"]
-                    expense_type_id = row["TIPO DE GASTO"]
-                    amount = float(row["MONTO"])
-                    tax_status_id = int(row["IVA"])
+                    branch_office_id = row["branch_office_id"]
+                    accounting_account = row["accounting_account"]
+                    amount = float(row["amount"])
+                    period = float(row["period"])
+                    tax_status_id = 0
 
                     branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id==branch_office_id).first()
                     if not branch_office:
                         print(f"[Fila {index + 2}] Sucursal no encontrada")
                         continue
 
-                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.accounting_account==expense_type_id).first()
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.accounting_account==accounting_account).first()
                     if not expense_type:
                         print(f"[Fila {index + 2}] Tipo de gasto no encontrado")
                         continue
