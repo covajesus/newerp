@@ -269,7 +269,7 @@ class AccountabilityClass:
                                         "221000226": iva,
                                     },
                                 },
-                                "operacion": "I",
+                                "operacion": "E",
                                 "documentos": {"emitidos": [{"dte": '', "folio": 0}]},
                             }
                     else:
