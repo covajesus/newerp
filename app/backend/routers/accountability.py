@@ -27,7 +27,7 @@ def delete(branch_office_id: int, period: str, expense_type_id: int, session_use
 
     return {"message": data}
 
-@accountability.post("/store")
+@accountability.post("/massive_store")
 def store(
     form_data: StoreAccountability = Depends(StoreAccountability.as_form),
     support: UploadFile = File(None),
