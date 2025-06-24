@@ -37,7 +37,7 @@ def store(
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
-        file_category_name = 'accountaability'
+        file_category_name = 'accountability'
         unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
 
         remote_path = f"{file_category_name}_{unique_filename}"
