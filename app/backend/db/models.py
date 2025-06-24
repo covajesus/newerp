@@ -326,6 +326,15 @@ class FolioQuantityPerCashierModel(Base):
     anydesk = Column(String(255))
     available_folios = Column(Integer)
 
+class RemunerationModel(Base):
+    __tablename__ = 'remunerations'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer)
+    accounting_account = Column(Integer)
+    amount = Column(String(255))
+    period = Column(String(255))
+    added_date = Column(DateTime())
+
 class CashierModel(Base):
     __tablename__ = 'cashiers'
     id = Column(Integer, primary_key=True, autoincrement=True)
