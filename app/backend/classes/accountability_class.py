@@ -228,7 +228,7 @@ class AccountabilityClass:
                         print(f"[Fila {index + 2}] Sucursal no encontrada")
                         continue
 
-                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id==expense_type_id).first()
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.accounting_account==expense_type_id).first()
                     if not expense_type:
                         print(f"[Fila {index + 2}] Tipo de gasto no encontrado")
                         continue
