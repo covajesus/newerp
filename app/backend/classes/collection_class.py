@@ -31,9 +31,6 @@ class CollectionClass:
                 record.cash_gross_amount = data.get('cash_gross_amount', record.cash_gross_amount)
                 record.card_gross_amount = data.get('card_gross_amount', record.card_gross_amount)
                 record.card_net_amount = data.get('card_net_amount', record.card_net_amount)
-                record.tax = data.get('tax', record.tax)
-                record.total = data.get('total', record.total)
-                record.subtotal = data.get('subtotal', record.subtotal)
                 record.total_tickets = data.get('total_tickets', record.total_tickets)
                 record.updated_date = datetime.now()
             else:
@@ -45,9 +42,6 @@ class CollectionClass:
                     'cash_gross_amount': data.get('cash_gross_amount', 0),
                     'card_gross_amount': data.get('card_gross_amount', 0),
                     'card_net_amount': data.get('card_net_amount', 0),
-                    'tax': data.get('tax', 0),
-                    'total': data.get('total', 0),
-                    'subtotal': data.get('subtotal', 0),
                     'total_tickets': data.get('total_tickets', 0),
                     'updated_date': datetime.now()
                 }
