@@ -14,6 +14,49 @@ class CollectionClass:
     def __init__(self, db):
         self.db = db
 
+    def update_all_collections(self, collections_data: list[dict]):
+        for data in collections_data:
+            cashier_id = data['cashier_id']
+            branch_office_id = data['branch_office_id']
+            added_date = data['added_date']  # debe venir en formato compatible datetime.date o str
+
+            record = self.db.query(CollectionModel).filter_by(
+                cashier_id=cashier_id,
+                branch_office_id=branch_office_id,
+                added_date=added_date
+            ).first()
+
+            if record:
+                # Actualizar solo campos específicos
+                record.cash_gross_amount = data.get('cash_gross_amount', record.cash_gross_amount)
+                record.card_gross_amount = data.get('card_gross_amount', record.card_gross_amount)
+                record.card_net_amount = data.get('card_net_amount', record.card_net_amount)
+                record.tax = data.get('tax', record.tax)
+                record.total = data.get('total', record.total)
+                record.subtotal = data.get('subtotal', record.subtotal)
+                record.total_tickets = data.get('total_tickets', record.total_tickets)
+                record.updated_date = datetime.now()
+            else:
+                # Insertar nuevo registro con todos los campos obligatorios
+                new_data = {
+                    'cashier_id': cashier_id,
+                    'branch_office_id': branch_office_id,
+                    'added_date': added_date,
+                    'cash_gross_amount': data.get('cash_gross_amount', 0),
+                    'card_gross_amount': data.get('card_gross_amount', 0),
+                    'card_net_amount': data.get('card_net_amount', 0),
+                    'tax': data.get('tax', 0),
+                    'total': data.get('total', 0),
+                    'subtotal': data.get('subtotal', 0),
+                    'total_tickets': data.get('total_tickets', 0),
+                    'updated_date': datetime.now()
+                }
+
+                new_record = CollectionModel(**new_data)
+                self.db.add(new_record)
+                
+            self.db.commit()
+
     def get_all_collections(self):
         limit_date = date.today() - timedelta(days=10)
 
