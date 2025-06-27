@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.db.database import get_db
+from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.classes.collection_class import CollectionClass
 from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch, ManualStoreCollection, UpdateCollection
@@ -70,5 +70,13 @@ def edit(id: int, db: Session = Depends(get_db)):
 @collections.post("/update")
 def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
     data = CollectionClass(db).update(update_collection)
+
+    return {"message": data}
+
+@collections.get("/cron")
+def cron(update_collection: UpdateCollection, db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
+    data = CollectionClass(db).get_all_collections()
+
+    print(data)
 
     return {"message": data}

@@ -7,11 +7,36 @@ from sqlalchemy import func
 import pytz
 from app.backend.classes.authentication_class import AuthenticationClass
 import json
+from datetime import date, timedelta
+from sqlalchemy import and_
 
 class CollectionClass:
     def __init__(self, db):
         self.db = db
 
+    def get_all_collections(self):
+        limit_date = date.today() - timedelta(days=10)
+
+        data = (
+            self.db.query(
+                CashierModel.cashier,
+                CollectionModel.id,
+                CollectionModel.branch_office_id,
+                CollectionModel.cashier_id,
+                CollectionModel.added_date,
+                CollectionModel.total_tickets,
+                CollectionModel.cash_gross_amount,
+                CollectionModel.cash_net_amount,
+                CollectionModel.card_gross_amount,
+                CollectionModel.card_net_amount
+            )
+            .outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id)
+            .filter(CollectionModel.added_date >= limit_date)
+            .all()
+        )
+
+        return data
+    
     def get(self, id):
         try:
             data_query = self.db.query(CashierModel.cashier, CollectionModel.id, CollectionModel.branch_office_id, CollectionModel.cashier_id, CollectionModel.added_date, CollectionModel.total_tickets, CollectionModel.cash_gross_amount, CollectionModel.cash_gross_amount, CollectionModel.cash_net_amount, CollectionModel.card_gross_amount, CollectionModel.card_net_amount).outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id).filter(CollectionModel.id == id).first()
