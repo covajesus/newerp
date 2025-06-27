@@ -21,13 +21,13 @@ class CollectionClass:
             # (cashier_id, branch_office_id, added_date, cash_gross_amount, card_gross_amount, card_net_amount, total_tickets)
 
             # Ejemplo de asignación por posición (ajusta el orden según tu query)
-            cashier_id = data[0]
-            branch_office_id = data[1]
-            added_date = data[2]
-            cash_gross_amount = data[3]
-            card_gross_amount = data[4]
-            card_net_amount = data[5]
-            total_tickets = data[6]
+            cashier_id = data[3]
+            branch_office_id = data[2]
+            added_date = data[4]
+            cash_gross_amount = data[6]
+            card_gross_amount = data[7]
+            card_net_amount = data[8]
+            total_tickets = data[9]
 
             # Buscar registro existente
             record = self.db.query(CollectionModel).filter_by(
