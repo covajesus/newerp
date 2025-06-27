@@ -51,62 +51,50 @@ class CollectionClass:
                 
             self.db.commit()
 
-    def get_all_collections(self):
-        limit_date = date.today() - timedelta(days=10)
+    def update_all_collections(self, collections_data: list):
+        for data in collections_data:
+            # si data es tupla, conviértelo a dict con índices o nombres
+            # suponiendo que sabes el orden de campos, por ejemplo:
+            # (cashier_id, branch_office_id, added_date, cash_gross_amount, card_gross_amount, card_net_amount, total_tickets)
 
-        data = (
-            self.db.query(
-                CashierModel.cashier,
-                CollectionModel.id,
-                CollectionModel.branch_office_id,
-                CollectionModel.cashier_id,
-                CollectionModel.added_date,
-                CollectionModel.total_tickets,
-                CollectionModel.cash_gross_amount,
-                CollectionModel.cash_net_amount,
-                CollectionModel.card_gross_amount,
-                CollectionModel.card_net_amount
-            )
-            .outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id)
-            .filter(CollectionModel.added_date >= limit_date)
-            .all()
-        )
+            # Ejemplo de asignación por posición (ajusta el orden según tu query)
+            cashier_id = data[0]
+            branch_office_id = data[1]
+            added_date = data[2]
+            cash_gross_amount = data[3]
+            card_gross_amount = data[4]
+            card_net_amount = data[5]
+            total_tickets = data[6]
 
-        return data
-    
-    def get(self, id):
-        try:
-            data_query = self.db.query(CashierModel.cashier, CollectionModel.id, CollectionModel.branch_office_id, CollectionModel.cashier_id, CollectionModel.added_date, CollectionModel.total_tickets, CollectionModel.cash_gross_amount, CollectionModel.cash_gross_amount, CollectionModel.cash_net_amount, CollectionModel.card_gross_amount, CollectionModel.card_net_amount).outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id).filter(CollectionModel.id == id).first()
+            # Buscar registro existente
+            record = self.db.query(CollectionModel).filter_by(
+                cashier_id=cashier_id,
+                branch_office_id=branch_office_id,
+                added_date=added_date
+            ).first()
 
-            if data_query:
-                # Serializar los datos del empleado
-                collection_data = {
-                    "id": data_query.id,
-                    "branch_office_id": data_query.branch_office_id,
-                    "cashier": data_query.cashier,
-                    "cashier_id": data_query.cashier_id,
-                    "added_date": data_query.added_date.strftime('%Y-%m-%d'),
-                    "total_tickets": data_query.total_tickets,
-                    "cash_gross_amount": data_query.cash_gross_amount,
-                    "cash_net_amount": data_query.cash_net_amount,
-                    "card_gross_amount": data_query.card_gross_amount,
-                    "card_net_amount": data_query.card_net_amount
-                }
-
-                result = {
-                    "collection_data": collection_data
-                }
-
-                # Convierte el resultado a una cadena JSON
-                serialized_result = json.dumps(result)
-
-                return serialized_result
+            if record:
+                record.cash_gross_amount = cash_gross_amount
+                record.card_gross_amount = card_gross_amount
+                record.card_net_amount = card_net_amount
+                record.total_tickets = total_tickets
+                record.updated_date = datetime.now()
             else:
-                return "No se encontraron datos para el campo especificado."
+                new_data = {
+                    'cashier_id': cashier_id,
+                    'branch_office_id': branch_office_id,
+                    'added_date': added_date,
+                    'cash_gross_amount': cash_gross_amount,
+                    'card_gross_amount': card_gross_amount,
+                    'card_net_amount': card_net_amount,
+                    'total_tickets': total_tickets,
+                    'updated_date': datetime.now()
+                }
+                new_record = CollectionModel(**new_data)
+                self.db.add(new_record)
 
-        except Exception as e:
-            error_message = str(e)
-            return f"Error: {error_message}"
+            self.db.commit()
+
         
     def get_all(self, branch_office_id = None, cashier_id = None, added_date = None, page = 1, items_per_page = 10):
         filters = []
