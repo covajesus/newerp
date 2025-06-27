@@ -40,11 +40,14 @@ class CollectionClass:
             ).first()
 
             if record:
-                record.cash_gross_amount = cash_gross_amount
-                record.card_gross_amount = card_gross_amount
-                record.card_net_amount = card_net_amount
-                record.total_tickets = total_tickets
-                record.updated_date = current_date
+                if record.cash_gross_amount != cash_gross_amount or record.card_gross_amount != card_gross_amount:
+                    record.cash_gross_amount = cash_gross_amount
+                    record.card_gross_amount = card_gross_amount
+                    record.card_net_amount = card_net_amount
+                    record.total_tickets = total_tickets
+                    record.updated_date = current_date
+
+                    self.db.commit()
             else:
                 new_data = {
                     'cashier_id': cashier_id,
@@ -59,7 +62,7 @@ class CollectionClass:
                 new_record = CollectionModel(**new_data)
                 self.db.add(new_record)
 
-            self.db.commit()
+                self.db.commit()
 
 
     def get_all_collections(self):
