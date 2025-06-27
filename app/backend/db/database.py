@@ -17,7 +17,7 @@ def get_db():
 
 
 # 🟢 Conexión a otra base de datos (ej: jisparking)
-SQLALCHEMY_DB2_URI = "mysql+pymysql://admin:Chile2025!@69.48.183.220:3306/jisparking"
+SQLALCHEMY_DB2_URI = "mysql+pymysql://admin:Chile2025!@jisbackend.com:3306/jisparking"
 engine_db2 = create_engine(SQLALCHEMY_DB2_URI, pool_size=10, max_overflow=0, echo=False)
 SessionLocalDB2 = sessionmaker(bind=engine_db2, autocommit=False, autoflush=False)
 BaseDB2 = declarative_base()
