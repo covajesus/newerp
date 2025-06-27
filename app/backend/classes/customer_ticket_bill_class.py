@@ -79,11 +79,7 @@ class CustomerTicketBillClass:
                     "folio": dte.folio,
                     "total": dte.total,
                     "status_id": dte.status_id,
-                   "added_date": (
-                        datetime.strptime(dte.added_date, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
-                        if isinstance(dte.added_date, str)
-                        else dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None
-                    ),
+                    "added_date": dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None,
                     "branch_office": dte.branch_office
                 } for dte in data]
 
