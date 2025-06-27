@@ -16,6 +16,9 @@ class CollectionClass:
 
     def update_all_collections(self, collections_data: list):
         for data in collections_data:
+            tz = pytz.timezone('America/Santiago')
+            current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
             # si data es tupla, conviértelo a dict con índices o nombres
             # suponiendo que sabes el orden de campos, por ejemplo:
             # (cashier_id, branch_office_id, added_date, cash_gross_amount, card_gross_amount, card_net_amount, total_tickets)
@@ -41,7 +44,7 @@ class CollectionClass:
                 record.card_gross_amount = card_gross_amount
                 record.card_net_amount = card_net_amount
                 record.total_tickets = total_tickets
-                record.updated_date = datetime.now()
+                record.updated_date = current_date
             else:
                 new_data = {
                     'cashier_id': cashier_id,
@@ -51,7 +54,7 @@ class CollectionClass:
                     'card_gross_amount': card_gross_amount,
                     'card_net_amount': card_net_amount,
                     'total_tickets': total_tickets,
-                    'updated_date': datetime.now()
+                    'updated_date': current_date
                 }
                 new_record = CollectionModel(**new_data)
                 self.db.add(new_record)
