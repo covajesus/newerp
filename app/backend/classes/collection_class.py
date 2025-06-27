@@ -28,9 +28,10 @@ class CollectionClass:
             branch_office_id = data[2]
             added_date = data[4]
             cash_gross_amount = data[6]
-            card_gross_amount = data[7]
-            card_net_amount = data[8]
-            total_tickets = data[9]
+            cash_net_amount = data[7]  # Asumiendo que este es el campo correcto
+            card_gross_amount = data[8]
+            card_net_amount = data[9]
+            total_tickets = data[10]
 
             # Buscar registro existente
             record = self.db.query(CollectionModel).filter_by(
@@ -42,6 +43,7 @@ class CollectionClass:
             if record:
                 if record.cash_gross_amount != cash_gross_amount or record.card_gross_amount != card_gross_amount:
                     record.cash_gross_amount = cash_gross_amount
+                    record.cash_net_amount = cash_net_amount
                     record.card_gross_amount = card_gross_amount
                     record.card_net_amount = card_net_amount
                     record.total_tickets = total_tickets
@@ -54,6 +56,7 @@ class CollectionClass:
                     'branch_office_id': branch_office_id,
                     'added_date': added_date,
                     'cash_gross_amount': cash_gross_amount,
+                    'cash_net_amount': cash_net_amount,
                     'card_gross_amount': card_gross_amount,
                     'card_net_amount': card_net_amount,
                     'total_tickets': total_tickets,
@@ -79,7 +82,8 @@ class CollectionClass:
                 CollectionModel.cash_gross_amount,
                 CollectionModel.cash_net_amount,
                 CollectionModel.card_gross_amount,
-                CollectionModel.card_net_amount
+                CollectionModel.card_net_amount,
+                CollectionModel.total_tickets
             )
             .outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id)
             .filter(CollectionModel.added_date >= limit_date)
