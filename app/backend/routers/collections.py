@@ -74,7 +74,7 @@ def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
     return {"message": data}
 
 @collections.get("/cron")
-def cron(update_collection: UpdateCollection, db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
+def cron(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
     data = CollectionClass(db).get_all_collections()
 
     print(data)
