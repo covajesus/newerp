@@ -160,7 +160,7 @@ class CashierClass:
             available_folios = data[1]
 
             record = self.db.query(CashierModel).filter_by(
-                cashier_id=cashier_id
+                id=cashier_id
             ).first()
 
             if record:
