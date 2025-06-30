@@ -74,4 +74,4 @@ def available_folios_cron(db: Session = Depends(get_db), db2: Session = Depends(
 
     CashierClass(db).update_all_cashiers(data)
 
-    return {"message": 'Updated o inserted collections in the second database.'}
+    return {"message": 'Updated o inserted cashiers in the second database.'}
