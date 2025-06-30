@@ -186,8 +186,8 @@ class CashierClass:
                 CashierModel.id,
                 CashierModel.available_folios
             )
-            .outerjoin(CashierModel, CashierModel.folio_segment_id != 9)
-            .outerjoin(CashierModel, CashierModel.folio_segment_id != 8)
+            .filter(CashierModel, CashierModel.folio_segment_id != 9)
+            .filter(CashierModel, CashierModel.folio_segment_id != 8)
             .all()
         )
 
