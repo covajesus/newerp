@@ -77,8 +77,6 @@ def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
 def cron(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
     data = CollectionClass(db2).get_all_collections()
 
-    print(data)
-
     CollectionClass(db).update_all_collections(data)
 
     return {"message": 'Updated o inserted collections in the second database.'}

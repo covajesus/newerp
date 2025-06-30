@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.db.database import get_db
+from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.classes.cashier_class import CashierClass
 from app.backend.schemas import CashierList, StoreCashier, SearchCashier
@@ -67,3 +67,11 @@ def edit(cashier_inputs:SearchCashier, session_user: UserLogin = Depends(get_cur
     data = CashierClass(db).search(cashier_inputs, cashier_inputs.page)
 
     return {"message": data}
+
+@cashiers.post("/update_available_folios")
+def update_available_folios(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
+    data = CashierClass(db2).get_all_cashiers()
+
+    CashierClass(db).update_all_cashiers(data)
+
+    return {"message": 'Updated o inserted collections in the second database.'}

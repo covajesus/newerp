@@ -1,5 +1,7 @@
 from app.backend.db.models import CashierModel, LatestUpdateCashierModel, BranchOfficeModel
 import json
+from datetime import datetime
+import pytz
 
 class CashierClass:
     def __init__(self, db):
@@ -148,6 +150,48 @@ class CashierClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
+    
+    def update_all_cashiers(self, cashiers_data: list):
+        tz = pytz.timezone('America/Santiago')
+        current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+        for data in cashiers_data:
+            cashier_id = data[0]
+            available_folios = data[1]
+
+            record = self.db.query(CashierModel).filter_by(
+                cashier_id=cashier_id
+            ).first()
+
+            if record:
+                if record.available_folios != available_folios:
+                    record.available_folios = available_folios
+                    record.updated_date = current_date
+
+                    self.db.commit()
+            else:
+                new_data = {
+                    'cashier_id': cashier_id,
+                    'available_folios': available_folios,
+                    'updated_date': current_date
+                }
+                new_record = CashierModel(**new_data)
+                self.db.add(new_record)
+
+                self.db.commit()
+
+    def get_all_cashiers(self):
+        data = (
+            self.db.query(
+                CashierModel.id,
+                CashierModel.available_folios
+            )
+            .outerjoin(CashierModel, CashierModel.folio_segment_id != 9)
+            .outerjoin(CashierModel, CashierModel.folio_segment_id != 8)
+            .all()
+        )
+
+        return data
         
     def search(self, cashier_inputs, page=0, items_per_page=10):
         try:
