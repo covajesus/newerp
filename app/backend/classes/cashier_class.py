@@ -186,10 +186,11 @@ class CashierClass:
                 CashierModel.id,
                 CashierModel.available_folios
             )
-            .filter(CashierModel, CashierModel.folio_segment_id != 9)
-            .filter(CashierModel, CashierModel.folio_segment_id != 8)
+            .filter(CashierModel.folio_segment_id != 9)
+            .filter(CashierModel.folio_segment_id != 8)
             .all()
         )
+        return data
 
         return data
         
