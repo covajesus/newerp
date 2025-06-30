@@ -14,7 +14,7 @@ class WhatsappClass:
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
+        image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
 
@@ -110,7 +110,7 @@ class WhatsappClass:
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://jisbackend.com/files/" + str(dte_data.folio) + ".pdf"
+        image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
 
