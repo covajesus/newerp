@@ -68,8 +68,8 @@ def edit(cashier_inputs:SearchCashier, session_user: UserLogin = Depends(get_cur
 
     return {"message": data}
 
-@cashiers.post("/update_available_folios")
-def update_available_folios(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
+@cashiers.post("/cron")
+def cron(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
     data = CashierClass(db2).get_all_cashiers()
 
     CashierClass(db).update_all_cashiers(data)
