@@ -972,32 +972,22 @@ class CustomerTicketClass:
                 "folio": dte.folio
             }
 
-            try:
-                url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
+ 
+            url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
                 
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                )
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
                 
-                print(response.text)
+            print(response.text)
 
-                if response.status_code == 200:
-                    data = json.loads(response.text)
+            if response.status_code == 200:
+                data = json.loads(response.text)
 
-                    for item in data:
-                        print(item)
-
-                    return 0
-                else:
-                    print("Error al listar los DTE:")
-                    print(response.status_code, response.json())
-                    return None
-
-            except Exception as e:
-                print("Error al conectarse a la API:", e)
-                return None
+                for item in data:
+                    print(item)
