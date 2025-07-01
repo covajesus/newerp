@@ -479,30 +479,33 @@ class DteClass:
         
         if dte_data:
             for dte_datum in dte_data:
-                added_date = HelperClass.create_period_date(period)
+                valid_branch_ids = [8, 10, 13, 15, 16, 18, 20, 33, 34, 39, 41, 45, 48, 50, 52, 57, 60, 61, 71, 76, 78, 81, 90, 102, 106, 112]
 
-                dte = DteModel(
-                    rut=dte_datum.rut,
-                    branch_office_id=dte_datum.branch_office_id,
-                    cashier_id=0,
-                    dte_type_id=dte_datum.dte_type_id,
-                    dte_version_id=1,
-                    chip_id=0,
-                    status_id=1,
-                    cash_amount=dte_datum.cash_amount,
-                    card_amount=0,
-                    subtotal=dte_datum.subtotal,
-                    tax=dte_datum.tax,
-                    discount=0,
-                    total=dte_datum.total,
-                    period=current_period,
-                    added_date=added_date
-                )
-            
-                # Agregar el objeto a la sesión
-                self.db.add(dte)
+                if dte_datum.branch_office_id in valid_branch_ids:
+                    added_date = HelperClass.create_period_date(period)
 
-                self.db.commit()
+                    dte = DteModel(
+                        rut=dte_datum.rut,
+                        branch_office_id=dte_datum.branch_office_id,
+                        cashier_id=0,
+                        dte_type_id=dte_datum.dte_type_id,
+                        dte_version_id=1,
+                        chip_id=0,
+                        status_id=1,
+                        cash_amount=dte_datum.cash_amount,
+                        card_amount=0,
+                        subtotal=dte_datum.subtotal,
+                        tax=dte_datum.tax,
+                        discount=0,
+                        total=dte_datum.total,
+                        period=current_period,
+                        added_date=added_date
+                    )
+                
+                    # Agregar el objeto a la sesión
+                    self.db.add(dte)
+
+                    self.db.commit()
 
             try:
                 return 'Opened period successfully'
