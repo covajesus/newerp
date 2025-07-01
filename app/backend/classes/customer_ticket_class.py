@@ -971,6 +971,7 @@ class CustomerTicketClass:
         since = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
 
         data = {
+            "folio": "15780920",
             "fecha_desde": since,
             "fecha_hasta": until,
         }
