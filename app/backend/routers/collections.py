@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.backend.classes.collection_class import CollectionClass
 from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch, ManualStoreCollection, UpdateCollection
 from app.backend.classes.whatsapp_class import WhatsappClass
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 collections = APIRouter(
     prefix="/collections",
@@ -11,8 +13,8 @@ collections = APIRouter(
 )
 
 @collections.post("/")
-def index(collection: CollectionList, db: Session = Depends(get_db)):
-    data = CollectionClass(db).get_all(collection.branch_office_id, collection.cashier_id, collection.added_date, collection.page)
+def index(collection: CollectionList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CollectionClass(db).get_all(session_user.rol_id, session_user.rut, collection.branch_office_id, collection.cashier_id, collection.added_date, collection.page)
 
     return {"message": data}
 
