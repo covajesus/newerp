@@ -13,8 +13,8 @@ customer_tickets = APIRouter(
 )
 
 @customer_tickets.post("/")
-def index(customer_ticket_inputs:CustomerTicketList, db: Session = Depends(get_db)):
-    data = CustomerTicketClass(db).get_all(1, customer_ticket_inputs.page)
+def index(customer_ticket_inputs:CustomerTicketList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).get_all(session_user.rol_id, session_user.rut, 1, customer_ticket_inputs.page)
 
     return {"message": data}
 
