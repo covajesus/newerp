@@ -14,6 +14,7 @@ class BranchOfficeClass:
                     order_by(BranchOfficeModel.branch_office). \
                     all()
             elif rol_id == 4:
+                print(12222)
                 data = self.db.query(BranchOfficeModel). \
                     filter(BranchOfficeModel.status_id == 7). \
                     filter(BranchOfficeModel.visibility_id == 1). \
