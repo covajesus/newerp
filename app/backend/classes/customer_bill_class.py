@@ -1221,3 +1221,13 @@ class CustomerBillClass:
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
+
+    def pre_accept(self, id):
+        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        # Actualizar campos
+        dte.status_id = 2
+        self.db.commit()
+        self.db.refresh(dte)

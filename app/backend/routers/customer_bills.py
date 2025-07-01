@@ -88,6 +88,12 @@ def delete(id:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@customer_bills.get("/pre_accept/{id}")
+def pre_accept(id:int, db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).pre_accept(id)
+
+    return {"message": data}
+
 @customer_bills.get("/reject/{id}")
 def reject(id:int, db: Session = Depends(get_db)):
     data = CustomerBillClass(db).reject(id)
