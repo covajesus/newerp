@@ -966,18 +966,10 @@ class CustomerTicketClass:
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        # Obtener la fecha actual
-        until = datetime.now().strftime('%Y-%m-%d')
-
-        # Restar 60 días a la fecha actual
-        since = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-
         for dte in dtes:
             print(dte.folio)
             data = {
-                "folio": dte.folio,
-                "fecha_desde": since,
-                "fecha_hasta": until,
+                "folio": dte.folio
             }
 
             try:
