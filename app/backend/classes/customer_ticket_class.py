@@ -273,7 +273,7 @@ class CustomerTicketClass:
                     ).filter(
                         *filters
                     ).order_by(
-                        desc(DteModel.folio)
+                        DteModel.folio.desc()
                     )
 
                 # Si se solicita paginación
