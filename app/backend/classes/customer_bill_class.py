@@ -20,6 +20,7 @@ class CustomerBillClass:
 
     def get_all(self, rol_id = None, rut = None, group = 1, page=0, items_per_page=10):
         try:
+            print(rol_id)
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
                 filters = []
