@@ -968,7 +968,7 @@ class CustomerTicketClass:
         until = datetime.now().strftime('%Y-%m-%d')
 
         # Restar 60 días a la fecha actual
-        since = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+        since = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
 
         data = {
             "fecha_desde": since,
@@ -976,7 +976,7 @@ class CustomerTicketClass:
         }
 
         try:
-            url = f"https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
+            url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
             
             response = requests.post(
                 url,
@@ -987,7 +987,7 @@ class CustomerTicketClass:
                 },
             )
             
-            print(response)
+            print(response.text)
 
             if response.status_code == 200:
                 data = json.loads(response.text)
