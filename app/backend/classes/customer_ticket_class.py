@@ -353,6 +353,7 @@ class CustomerTicketClass:
                 filters.append(DteModel.status_id < 4)
                 filters.append(DteModel.dte_type_id == 39)
                 filters.append(DteModel.rut != None)
+                filters.append(DteModel.period == datetime.now().strftime('%Y-%m'))
                 
                 if supervisor_id != None:
                     # Construir la consulta base con los filtros aplicados
@@ -378,7 +379,7 @@ class CustomerTicketClass:
                     ).filter(
                         *filters
                     ).order_by(
-                        desc(DteModel.folio)
+                        DteModel.folio.desc()
                     )
                 else:
                     # Construir la consulta base con los filtros aplicados
@@ -402,7 +403,7 @@ class CustomerTicketClass:
                     ).filter(
                         *filters
                     ).order_by(
-                        desc(DteModel.folio)
+                        DteModel.folio.desc()
                     )
 
                 # Si se solicita paginación
