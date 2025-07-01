@@ -19,41 +19,76 @@ class CustomerTicketBillClass:
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
 
-    def get_all(self, page=1, items_per_page=10):
+    def get_all(self, rol_id = None, rut = None, page=1, items_per_page=10):
         try:
 
-            # Inicialización de filtros dinámicos
-            filters = []
+            if rol_id == 1 or rol_id == 2:
+                # Inicialización de filtros dinámicos
+                filters = []
 
-            filters.append(DteModel.dte_version_id == 1)
-            filters.append(DteModel.status_id > 3)
-            filters.append(DteModel.rut != None)
-            filters.append(DteModel.rut != '66666666-6')
-            filters.append(or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39))
+                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.status_id > 3)
+                filters.append(DteModel.rut != None)
+                filters.append(DteModel.rut != '66666666-6')
+                filters.append(or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39))
 
-            # Construir la consulta base con los filtros aplicados
-            query = self.db.query(
-                    DteModel.id, 
-                    DteModel.branch_office_id, 
-                    DteModel.dte_type_id, 
-                    DteModel.folio, 
-                    DteModel.total,
-                    DteModel.added_date,
-                    DteModel.rut,
-                    DteModel.status_id,
-                    DteModel.chip_id,
-                    BranchOfficeModel.branch_office,
-                    CustomerModel.customer.label('customer')
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-            ).outerjoin(
-                CustomerModel, CustomerModel.rut == DteModel.rut
-            ).filter(
-                *filters
-            ).order_by(
-                DteModel.added_date.desc()
-            )
-            
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                        DteModel.id, 
+                        DteModel.branch_office_id, 
+                        DteModel.dte_type_id, 
+                        DteModel.folio, 
+                        DteModel.total,
+                        DteModel.added_date,
+                        DteModel.rut,
+                        DteModel.status_id,
+                        DteModel.chip_id,
+                        BranchOfficeModel.branch_office,
+                        CustomerModel.customer.label('customer')
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    DteModel.added_date.desc()
+                )
+            elif rol_id == 4:
+                                # Inicialización de filtros dinámicos
+                filters = []
+
+                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.status_id > 3)
+                filters.append(DteModel.rut != None)
+                filters.append(DteModel.rut != '66666666-6')
+                filters.append(or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39))
+
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                        DteModel.id, 
+                        DteModel.branch_office_id, 
+                        DteModel.dte_type_id, 
+                        DteModel.folio, 
+                        DteModel.total,
+                        DteModel.added_date,
+                        DteModel.rut,
+                        DteModel.status_id,
+                        DteModel.chip_id,
+                        BranchOfficeModel.branch_office,
+                        CustomerModel.customer.label('customer')
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    BranchOfficeModel.principal_supervisor == rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    DteModel.added_date.desc()
+                )
+
             # Si se solicita paginación
             if page > 0:
                 # Calcular el total de registros
