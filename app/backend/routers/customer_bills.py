@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.backend.schemas import GenerateCustomerBill, GeneratedCustomerBillList, CustomerBillList, GenerateCustomerCreditNoteBill, CustomerBillSearch, ToBeAcceptedCustomerBill, ChangeStatusInCustomerBill
 from app.backend.classes.customer_bill_class import CustomerBillClass
 from app.backend.classes.customer_class import CustomerClass
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 customer_bills = APIRouter(
     prefix="/customer_bills",
@@ -11,8 +13,8 @@ customer_bills = APIRouter(
 )
 
 @customer_bills.post("/")
-def index(customer_bill_inputs:CustomerBillList, db: Session = Depends(get_db)):
-    data = CustomerBillClass(db).get_all(1, customer_bill_inputs.page)
+def index(customer_bill_inputs:CustomerBillList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).get_all(session_user.rol_id, session_user.rut, 1, customer_bill_inputs.page)
 
     return {"message": data}
 
