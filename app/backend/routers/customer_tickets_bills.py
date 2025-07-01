@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.backend.schemas import GeneratedCustomerTicketBillList, CustomerTicketBillList, GenerateCustomerCreditNoteTicketBill, CustomerTicketBillSearch, ToBeAcceptedCustomerTicketBill, ChangeStatusInCustomerTicketBill
 from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillClass
 from app.backend.classes.customer_class import CustomerClass
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 customer_tickets_bills = APIRouter(
     prefix="/customer_tickets_bills",
