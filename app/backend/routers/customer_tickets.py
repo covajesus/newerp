@@ -38,6 +38,12 @@ def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, session_user:
 
     return {"message": data}
 
+@customer_tickets.get("/pre_accept/{id}")
+def pre_accept(id:int, db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).pre_accept(id)
+
+    return {"message": data}
+
 @customer_tickets.post("/generate_credit_note")
 def generate_credit_note(customer_credit_note_ticket_inputs:GenerateCustomerCreditNoteTicket, db: Session = Depends(get_db)):
     data = CustomerTicketClass(db).store_credit_note(customer_credit_note_ticket_inputs)
