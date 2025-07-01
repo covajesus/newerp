@@ -973,6 +973,7 @@ class CustomerTicketClass:
         since = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
 
         for dte in dtes:
+            print(dte)
             data = {
                 "folio": dte.folio,
                 "fecha_desde": since,
