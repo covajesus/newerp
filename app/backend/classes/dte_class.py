@@ -471,6 +471,7 @@ class DteClass:
         dte_data = self.db.query(DteModel)\
                             .filter(DteModel.period == last_period)\
                             .filter(DteModel.status_id == 5)\
+                            .filter(DteModel.dte_version_id == 1)\
                             .all()
         
         if dte_data:
