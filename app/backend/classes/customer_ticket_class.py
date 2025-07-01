@@ -340,13 +340,13 @@ class CustomerTicketClass:
                 # Inicialización de filtros dinámicos
                 filters = []
 
-                if branch_office_id != None:
+                if branch_office_id != None and branch_office_id != "":
                     filters.append(DteModel.branch_office_id == branch_office_id)
-                if rut != None and rut != "":
+                if rut != None and rut != "" and rut != "":
                     filters.append(DteModel.rut == rut)
-                if customer is not None:
+                if customer is not None and customer != "":
                     filters.append(CustomerModel.customer.like(f"%{customer}%"))
-                if status_id != None:
+                if status_id != None and status_id != "":
                     filters.append(DteModel.status_id == status_id)
 
                 filters.append(DteModel.dte_version_id == 1)
