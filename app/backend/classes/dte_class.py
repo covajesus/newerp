@@ -116,23 +116,23 @@ class DteClass:
         try:
             # Inicialización de filtros dinámicos
             filters = []
-            if folio is not None:
+            if folio is not None and folio != "":
                 filters.append(DteModel.folio == folio) 
-            if branch_office_id is not None:
+            if branch_office_id is not None and branch_office_id != "":
                 filters.append(DteModel.branch_office_id == branch_office_id)
-            if rut is not None:
+            if rut is not None and rut != "":
                 filters.append(DteModel.rut == rut)
-            if customer is not None:
+            if customer is not None and customer != "":
                 filters.append(CustomerModel.customer.like(f"%{customer}%"))
-            if until is not None:
+            if until is not None and until != "":
                 filters.append(DteModel.added_date <= until)  # Fecha desde
-            if since is not None:
+            if since is not None and since != "":
                 filters.append(DteModel.added_date >= since)  # Fecha hasta
-            if amount is not None:
+            if amount is not None and amount != "":
                 filters.append(DteModel.total == amount)
-            if supervisor_id is not None:
+            if supervisor_id is not None and supervisor_id != "":
                 filters.append(DteModel.supervisor_id == supervisor_id)
-            if status_id is not None:
+            if status_id is not None and status_id != "":
                 filters.append(DteModel.status_id == status_id)
 
             filters.append(DteModel.rut != None)
