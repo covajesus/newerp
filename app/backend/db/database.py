@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 # 🔵 Conexión a la base principal
 SQLALCHEMY_DATABASE_URI = "mysql+pymysql://admin:Chile2025!@intrajisbackend.com:3306/jisparking"
-engine = create_engine(SQLALCHEMY_DATABASE_URI, pool_size=20, max_overflow=0, echo=False)
+engine = create_engine(SQLALCHEMY_DATABASE_URI, pool_size=20, max_overflow=0, echo=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 
