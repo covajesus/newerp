@@ -10,6 +10,8 @@ from datetime import datetime
 import uuid
 import json
 import base64
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 
 patents = APIRouter(
     prefix="/patents",
@@ -17,8 +19,8 @@ patents = APIRouter(
 )
 
 @patents.post("/")
-def index(patent: PatentList, db: Session = Depends(get_db)):
-    data = PatentClass(db).get_all(patent.branch_office_id, patent.semester, patent.year, patent.page)
+def index(patent: PatentList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = PatentClass(db).get_all(session_user.rol_id, session_user.rut, patent.branch_office_id, patent.semester, patent.year, patent.page)
 
     return {"message": data}
 
