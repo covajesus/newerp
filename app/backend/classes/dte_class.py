@@ -160,7 +160,7 @@ class DteClass:
             ).filter(
                 *filters
             ).order_by(
-                desc(DteModel.folio)
+                DteModel.added_date.desc()
             )
 
             # Obtener la consulta SQL generada con literal_binds=True
