@@ -466,9 +466,7 @@ class DteClass:
     def open_customer_billing_period(self, period):
         current_period = HelperClass.fix_current_dte_period(period)
 
-        print(current_period)
         last_period = HelperClass.fix_last_dte_period(period)
-        print(last_period)
 
         dte_data = self.db.query(DteModel)\
                             .filter(DteModel.period == last_period)\

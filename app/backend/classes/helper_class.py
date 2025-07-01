@@ -669,7 +669,7 @@ class HelperClass:
         else:
             month = str(month)
 
-        return str(month) + "-" + str(year)
+        return str(year) + "-" + str(month)
     
     def create_period_date(period):
         period = period.split('-')
