@@ -139,7 +139,7 @@ class CustomerBillClass:
                     } for dte in data]
 
                     return serialized_data
-            elif rol_id == 3:
+            elif rol_id == 4:
                 # Inicialización de filtros dinámicos
                 filters = []
 

@@ -82,7 +82,7 @@ class CustomerTicketClass:
                         desc(DteModel.folio)
                     )
             elif rol_id == 4:
-                                # Inicialización de filtros dinámicos
+                # Inicialización de filtros dinámicos
                 filters = []
 
                 filters.append(DteModel.dte_version_id == 1)
