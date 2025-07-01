@@ -962,6 +962,8 @@ class CustomerTicketClass:
         self.db.refresh(dte)
 
     def check_payments(self):
+        dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id  == 39).filter(DteModel.dte_version_id == 1).all()
+
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         # Obtener la fecha actual
@@ -970,38 +972,39 @@ class CustomerTicketClass:
         # Restar 60 días a la fecha actual
         since = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
 
-        data = {
-            "folio": "15780920",
-            "fecha_desde": since,
-            "fecha_hasta": until,
-        }
+        for dte in dtes:
+            data = {
+                "folio": dte.folio,
+                "fecha_desde": since,
+                "fecha_hasta": until,
+            }
 
-        try:
-            url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
-            
-            response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-            
-            print(response.text)
+            try:
+                url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
+                
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                print(response.text)
 
-            if response.status_code == 200:
-                data = json.loads(response.text)
+                if response.status_code == 200:
+                    data = json.loads(response.text)
 
-                for item in data:
-                    print(item)
+                    for item in data:
+                        print(item)
 
-                return 0
-            else:
-                print("Error al listar los DTE:")
-                print(response.status_code, response.json())
+                    return 0
+                else:
+                    print("Error al listar los DTE:")
+                    print(response.status_code, response.json())
+                    return None
+
+            except Exception as e:
+                print("Error al conectarse a la API:", e)
                 return None
-
-        except Exception as e:
-            print("Error al conectarse a la API:", e)
-            return None
