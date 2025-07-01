@@ -50,7 +50,7 @@ class DepositClass:
                 *filters
             ).order_by(
                 status_order,  # Primero ordenamos por prioridad de status_id
-                DepositModel.id  # Luego, ordenamos por ID dentro de cada grupo
+                DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
             )
 
             # Si se solicita paginación
