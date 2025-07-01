@@ -33,7 +33,7 @@ class CustomerTicketClass:
                 if group == 1:
                     filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
 
-                    current_period = datetime.now().strftime('%m-%Y')
+                    current_period = datetime.now().strftime('%Y-%m')
                     filters.append(DteModel.period == current_period)
 
                     # Construir la consulta base con los filtros aplicados
@@ -92,7 +92,7 @@ class CustomerTicketClass:
                 if group == 1:
                     filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
 
-                    current_period = datetime.now().strftime('%m-%Y')
+                    current_period = datetime.now().strftime('%Y-%m')
                     filters.append(DteModel.period == current_period)
 
                     # Construir la consulta base con los filtros aplicados
