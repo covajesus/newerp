@@ -472,9 +472,7 @@ class DteClass:
                             .filter(DteModel.period == last_period)\
                             .filter(DteModel.status_id == 5)\
                             .all()
-
-        print(dte_data)
-        print(3333333333)
+        
         if dte_data:
             for dte_datum in dte_data:
                 valid_branch_ids = [8, 10, 13, 15, 16, 18, 20, 33, 34, 39, 41, 45, 48, 50, 52, 57, 60, 61, 71, 76, 78, 81, 90, 102, 106, 112]
