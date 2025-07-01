@@ -99,3 +99,9 @@ def change_status(customer_ticket_inputs:ChangeStatusInCustomerTicket, db: Sessi
     data = CustomerTicketClass(db).change_status(customer_ticket_inputs)
 
     return {"message": data}
+
+@customer_tickets.get("/check_payments")
+def check_payments(db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).check_payments()
+
+    return {"message": data}

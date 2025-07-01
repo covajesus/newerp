@@ -7,7 +7,7 @@ from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import or_
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import HTTPException
 import requests
 import json
@@ -952,9 +952,6 @@ class CustomerTicketClass:
                 return None
             
     def verify(self, id):
-        """
-        Actualiza los datos de la patente en la base de datos.
-        """
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
         if not dte:
             raise HTTPException(status_code=404, detail="Dte no encontrado")
@@ -963,3 +960,47 @@ class CustomerTicketClass:
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
+
+    def check_payments(self):
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        # Obtener la fecha actual
+        until = datetime.now().strftime('%Y-%m-%d')
+
+        # Restar 60 días a la fecha actual
+        since = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+
+        data = {
+            "fecha_desde": since,
+            "fecha_hasta": until,
+        }
+
+        try:
+            url = f"https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
+            
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+            
+            print(response)
+
+            if response.status_code == 200:
+                data = json.loads(response.text)
+
+                for item in data:
+                    print(item)
+
+                return 0
+            else:
+                print("Error al listar los DTE:")
+                print(response.status_code, response.json())
+                return None
+
+        except Exception as e:
+            print("Error al conectarse a la API:", e)
+            return None
