@@ -2,6 +2,7 @@ import requests
 from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 load_dotenv() 
 
 class WhatsappClass:
@@ -227,7 +228,7 @@ class WhatsappClass:
                                     {"type": "text", "text": customer.customer},
                                     {"type": "text", "text": branch_office.branch_office},
                                     {"type": "text", "text": str(dte.total)},
-                                    {"type": "text", "text": dte.payment_date.strftime('%d-%m-%Y')},
+                                    {"type": "text", "text": datetime.strptime(dte.payment_date, '%Y-%m-%d').strftime('%d-%m-%Y')},
                                 ]
                             }
                         ]
