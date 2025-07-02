@@ -437,6 +437,7 @@ class DteModel(Base):
     comment = Column(String)
     payment_comment = Column(String)
     added_date = Column(DateTime())
+    updated_date = Column(DateTime())
 
 class UserModel(Base):
     __tablename__ = 'users'

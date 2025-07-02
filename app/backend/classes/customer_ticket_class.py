@@ -1209,6 +1209,7 @@ class CustomerTicketClass:
                             dte.payment_type_id = 2
                             dte.payment_date = payment_date
                             dte.status_id = 5
+                            dte.updated_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
                             self.db.commit()
                             self.db.refresh(dte)
