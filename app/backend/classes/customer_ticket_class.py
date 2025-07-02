@@ -1188,8 +1188,6 @@ class CustomerTicketClass:
                     "Content-Type": "application/json",
                 },
             )
-                
-            print(response.text)
 
             if response.status_code == 200:
                 data = json.loads(response.text)
