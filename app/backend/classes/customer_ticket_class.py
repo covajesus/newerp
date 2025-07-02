@@ -1198,11 +1198,13 @@ class CustomerTicketClass:
                     payment_status = item.get("pagado")
 
                     if payment_status != None:
+                        print(1111111111111)
                         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
                         if not dte:
                             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
                         if dte.status_id == 4:
+                            print(22222222222)
                             dte.expense_type_id = 25
                             dte.payment_type_id = 2
                             dte.payment_date = payment_date
