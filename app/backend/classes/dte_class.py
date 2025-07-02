@@ -173,6 +173,8 @@ class DteClass:
             print("Consulta SQL corregida:", query_sql)
 
             # Calcular el offset para la paginación
+            print(page)
+            print(items_per_page)
             offset = (page - 1) * items_per_page
             print(offset)
 
