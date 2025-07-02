@@ -469,10 +469,11 @@ class DteClass:
         last_period = HelperClass.fix_last_dte_period(period)
 
         dte_data = self.db.query(DteModel)\
-                            .filter(DteModel.period == last_period)\
-                            .filter(DteModel.status_id == 5)\
-                            .filter(DteModel.dte_version_id == 1)\
-                            .all()
+                                .filter(DteModel.period == last_period)\
+                                .filter(DteModel.status_id == 5)\
+                                .filter(DteModel.dte_version_id == 1)\
+                                .filter(DteModel.dte_type_id.in_([33, 39]))\
+                                .all()
         
         if dte_data:
             for dte_datum in dte_data:

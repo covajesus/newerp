@@ -1195,9 +1195,24 @@ class CustomerTicketClass:
                 data = json.loads(response.text)
 
                 for item in data:
+                    folio = item.get("folio")
                     payment_date = item.get("fecha")
                     payment_status = item.get("pagado")
 
-                    print(f"Folio: {dte.folio}, Fecha de pago: {payment_date}, Estado de pago: {payment_status}")
+                    if payment_status != None:
+                        dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
+                        if not dte:
+                            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+                        if dte.status_id == 4:
+                            dte.expense_type_id = 25
+                            dte.payment_type_id = 2
+                            dte.payment_date = payment_date
+                            dte.status_id = 5
+
+                            self.db.commit()
+                            self.db.refresh(dte)
+
+                            print("Dte actualizado correctamente: " + str(dte.folio))
 
 
