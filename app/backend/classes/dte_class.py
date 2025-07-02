@@ -174,10 +174,11 @@ class DteClass:
 
             # Calcular el offset para la paginación
             offset = (page - 1) * items_per_page
+            print(offset)
 
             # Ejecutar la consulta con paginación
             data = self.db.execute(query.statement.offset(offset).limit(items_per_page)).fetchall()
-
+            print(len(data))
             # Procesar los resultados
             total_items = len(data)  # Total de elementos
             total_pages = (total_items + items_per_page - 1) // items_per_page  # Calcular total de páginas
