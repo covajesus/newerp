@@ -1195,4 +1195,9 @@ class CustomerTicketClass:
                 data = json.loads(response.text)
 
                 for item in data:
-                    print(item)
+                    payment_date = item.get("fecha")
+                    payment_status = item.get("pagado")
+
+                    print(f"Folio: {dte.folio}, Fecha de pago: {payment_date}, Estado de pago: {payment_status}")
+
+
