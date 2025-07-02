@@ -605,7 +605,7 @@ class CustomerTicketClass:
             if folio != None:
                 dte = DteModel()
 
-                period = datetime.now().strftime('%m-%Y')
+                period = datetime.now().strftime('%Y-%m')
 
                 if rol_id == 1 or rol_id == 2:
                     status_id = 4
