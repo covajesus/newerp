@@ -1196,17 +1196,19 @@ class CustomerTicketClass:
                     folio = item.get("folio")
                     payment_date = item.get("fecha")
                     payment_status = item.get("pagado")
+                    amount = item.get("monto")
 
                     if payment_status != None:
-                        print(1111111111111)
+                        print('Ejecutando paso 1.')
                         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
                         if not dte:
                             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
                         if dte.status_id == 4:
-                            print(22222222222)
+                            print('Ejecutando paso 2.')
                             dte.expense_type_id = 25
                             dte.payment_type_id = 2
+                            dte.card_amount = amount
                             dte.payment_date = payment_date
                             dte.status_id = 5
                             dte.updated_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
