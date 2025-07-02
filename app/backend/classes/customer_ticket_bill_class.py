@@ -218,6 +218,7 @@ class CustomerTicketBillClass:
 
             # Si se solicita paginación
             if page > 0:
+                print(333333333)
                 # Calcular el total de registros
                 total_items = query.count()
                 print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
