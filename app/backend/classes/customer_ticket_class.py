@@ -1174,7 +1174,7 @@ class CustomerTicketClass:
         for dte in dtes:
             print(dte.folio)
             data = {
-                "folio": dte.folio
+                "folio": dte.folio,
             }
 
  
@@ -1188,6 +1188,7 @@ class CustomerTicketClass:
                     "Content-Type": "application/json",
                 },
             )
+            print(response.text)
 
             if response.status_code == 200:
                 data = json.loads(response.text)
