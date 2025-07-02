@@ -213,7 +213,7 @@ class WhatsappClass:
                     "to": f"{customer_phone}",
                     "type": "template",
                     "template": {
-                        "name": whatsapp_template.whatsapp_template,
+                        "name": whatsapp_template.title,
                         "language": {
                             "code": "es"
                         },
