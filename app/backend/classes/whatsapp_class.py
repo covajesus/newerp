@@ -224,7 +224,7 @@ class WhatsappClass:
                                     {"type": "text", "text": user.full_name},
                                     {"type": "text", "text": str(folio)},
                                     {"type": "text", "text": str(dte.rut)},
-                                    {"type": "text", "text": customer.names},
+                                    {"type": "text", "text": customer.customer},
                                     {"type": "text", "text": branch_office.branch_office},
                                     {"type": "text", "text": str(dte.total)},
                                     {"type": "text", "text": dte.payment_date.strftime('%d-%m-%Y')},
