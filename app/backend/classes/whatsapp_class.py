@@ -184,3 +184,57 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
+
+    def notify_paymeent(self, folio):
+        dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
+        customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte.branch_office_id).first()
+        user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
+        phone = user.phone
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 2).first()
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+        
+        phone_str = str(phone).strip()
+        if not phone_str.startswith("56"):
+            customer_phone = "56" + phone_str
+        else:
+            customer_phone = phone_str
+
+        payload = {
+                    "messaging_product": "whatsapp",
+                    "to": f"{customer_phone}",
+                    "type": "template",
+                    "template": {
+                        "name": whatsapp_template.whatsapp_template,
+                        "language": {
+                            "code": "es"
+                        },
+                        "components": [
+                            {
+                                "type": "body",
+                                "parameters": [
+                                    {"type": "text", "text": user.full_name},
+                                    {"type": "text", "text": str(folio)},
+                                    {"type": "text", "text": str(dte.rut)},
+                                    {"type": "text", "text": customer.names},
+                                    {"type": "text", "text": branch_office.branch_office},
+                                    {"type": "text", "text": str(dte.total)},
+                                    {"type": "text", "text": dte.payment_date.strftime('%d-%m-%Y')},
+                                ]
+                            }
+                        ]
+                    }
+                }
+
+        print(payload)
+        response = requests.post(url, json=payload, headers=headers)
+
+        print(response.text)
