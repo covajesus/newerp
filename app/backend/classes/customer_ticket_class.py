@@ -1207,7 +1207,7 @@ class CustomerTicketClass:
 
                         if dte.status_id == 4:
                             print('Ejecutando paso 2.')
-                            dte.expense_type_id = 25
+                            dte.expense_type_id = 23
                             dte.payment_type_id = 2
                             dte.card_amount = amount
                             dte.payment_date = payment_date
