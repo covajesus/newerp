@@ -894,7 +894,7 @@ class CustomerTicketClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": "Venta",
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
                         "QtyItem": 1,
                         "PrcItem": amount,
                     },
@@ -927,7 +927,7 @@ class CustomerTicketClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": "Venta",
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
                         "QtyItem": 1,
                         "PrcItem": form_data.amount,
                     }
