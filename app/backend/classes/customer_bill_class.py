@@ -774,6 +774,7 @@ class CustomerBillClass:
         check_dte_existence = self.db.query(DteModel).filter(
             DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
+            DteModel.total == form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount,
             DteModel.dte_type_id == 33,
             DteModel.dte_version_id == 1,
             DteModel.period == datetime.now().strftime('%Y-%m')
@@ -797,13 +798,15 @@ class CustomerBillClass:
                     dte = DteModel()
 
                     period = datetime.now().strftime('%Y-%m')
+
+                    status_id = 1
                     
                     # Asignar los valores del formulario a la instancia del modelo
                     dte.branch_office_id = form_data.branch_office_id
                     dte.cashier_id = 0
                     dte.dte_type_id = 33
                     dte.dte_version_id = 1
-                    dte.status_id = 4
+                    dte.status_id = status_id
                     dte.chip_id = form_data.chip_id
                     dte.rut = form_data.rut
                     dte.folio = folio
