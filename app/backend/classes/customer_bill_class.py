@@ -795,7 +795,6 @@ class CustomerBillClass:
 
                 self.save_pdf_ticket(folio)
 
-
             if folio != None:
                 dte = self.db.query(DteModel).filter(
                             DteModel.branch_office_id == form_data.branch_office_id,
