@@ -589,6 +589,7 @@ class CustomerTicketClass:
 
     def store(self, form_data, rol_id):
         check_dte_existence = self.db.query(DteModel).filter(
+            DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
             DteModel.dte_type_id == 39,
             DteModel.dte_version_id == 1,

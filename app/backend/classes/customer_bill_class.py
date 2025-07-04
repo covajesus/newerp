@@ -772,8 +772,9 @@ class CustomerBillClass:
 
     def store(self, form_data):
         check_dte_existence = self.db.query(DteModel).filter(
+            DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
-            DteModel.dte_type_id == 39,
+            DteModel.dte_type_id == 33,
             DteModel.dte_version_id == 1,
             DteModel.period == datetime.now().strftime('%Y-%m')
         ).count()
