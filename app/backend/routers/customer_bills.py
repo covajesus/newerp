@@ -24,6 +24,20 @@ def search(customer_bills:CustomerBillSearch, session_user: UserLogin = Depends(
 
     return {"message": data}
 
+@customer_bills.post("/store")
+def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+
+    data = CustomerBillClass(db).store(customer_ticket_inputs, session_user.rol_id)
+
+    return {"message": data}
+
 @customer_bills.post("/generate_bill")
 def store(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
@@ -34,7 +48,7 @@ def store(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_d
         else:
             CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
 
-    data = CustomerBillClass(db).store(customer_bill_inputs)
+    data = CustomerBillClass(db).generate(customer_bill_inputs)
 
     return {"message": data}
 
