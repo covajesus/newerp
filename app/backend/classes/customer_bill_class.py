@@ -800,7 +800,7 @@ class CustomerBillClass:
                     
                     # Asignar los valores del formulario a la instancia del modelo
                     dte.branch_office_id = form_data.branch_office_id
-                    dte.cashier_id = form_data.cashier_id
+                    dte.cashier_id = 0
                     dte.dte_type_id = 33
                     dte.dte_version_id = 1
                     dte.status_id = 4
