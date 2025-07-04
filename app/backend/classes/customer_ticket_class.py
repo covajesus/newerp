@@ -624,21 +624,24 @@ class CustomerTicketClass:
                             DteModel.period == datetime.now().strftime('%Y-%m')
                     ).first()
 
-                dte.folio = folio
-                dte.status_id = 4
+                if dte:
+                    dte.folio = folio
+                    dte.status_id = 4
 
-                try:
-                    self.db.commit()
-                    self.db.refresh(dte)
+                    try:
+                        self.db.commit()
+                        self.db.refresh(dte)
 
-                    print("Empieza envio de whatsapp")
+                        print("Empieza envio de whatsapp")
 
-                    WhatsappClass(self.db).send(dte, form_data.rut)
+                        WhatsappClass(self.db).send(dte, form_data.rut)
 
-                    return {"status": "success", "message": "Dte saved successfully"}
-                except Exception as e:
-                    self.db.rollback()
-                    return {"status": "error", "message": f"Error: {str(e)}"}
+                        return {"status": "success", "message": "Dte saved successfully"}
+                    except Exception as e:
+                        self.db.rollback()
+                        return {"status": "error", "message": f"Error: {str(e)}"}
+                else:
+                    return {"status": "error", "message": "Dte not found after generation"}
             else:
                 return 'error'
             
