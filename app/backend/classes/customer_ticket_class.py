@@ -622,6 +622,7 @@ class CustomerTicketClass:
                             DteModel.period == datetime.now().strftime('%Y-%m')
                     ).first()
 
+                dte.folio = folio
                 dte.status_id = 4
 
                 try:

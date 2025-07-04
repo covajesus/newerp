@@ -770,7 +770,7 @@ class CustomerBillClass:
                 f.write(response.content)
             print(f'PDF guardado como {folio}.pdf')
 
-    def store(self, form_data):
+    def store(self, form_data, rol_id):
         check_dte_existence = self.db.query(DteModel).filter(
             DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
