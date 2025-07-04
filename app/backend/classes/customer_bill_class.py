@@ -771,67 +771,77 @@ class CustomerBillClass:
             print(f'PDF guardado como {folio}.pdf')
 
     def store(self, form_data):
-        customer = CustomerClass(self.db).get_by_rut(form_data.rut)
-        customer_data = json.loads(customer)
-        code = self.pre_generate_bill(customer_data, form_data)
+        check_dte_existence = self.db.query(DteModel).filter(
+            DteModel.rut == form_data.rut,
+            DteModel.dte_type_id == 39,
+            DteModel.dte_version_id == 1,
+            DteModel.period == datetime.now().strftime('%Y-%m')
+        ).count()
 
-        if code is not None:
-            if code == 402:
-                return "LibreDTE payment required"
-            
-            folio = self.generate_bill(customer_data['customer_data']['rut'], code)
+        if check_dte_existence == 0:
+            customer = CustomerClass(self.db).get_by_rut(form_data.rut)
+            customer_data = json.loads(customer)
+            code = self.pre_generate_bill(customer_data, form_data)
 
-            self.save_pdf_bill(folio)
-
-        if form_data.will_save == 1:
-            if folio != None:
-                dte = DteModel()
-
-                period = datetime.now().strftime('%Y-%m')
+            if code is not None:
+                if code == 402:
+                    return "LibreDTE payment required"
                 
-                # Asignar los valores del formulario a la instancia del modelo
-                dte.branch_office_id = form_data.branch_office_id
-                dte.cashier_id = form_data.cashier_id
-                dte.dte_type_id = 33
-                dte.dte_version_id = 1
-                dte.status_id = 4
-                dte.chip_id = form_data.chip_id
-                dte.rut = form_data.rut
-                dte.folio = folio
-                dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-                dte.card_amount = 0
-                dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
-                dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
-                dte.discount = 0
-                dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-                dte.period = period
-                dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                folio = self.generate_bill(customer_data['customer_data']['rut'], code)
 
-                self.db.add(dte)
+                self.save_pdf_bill(folio)
 
-                try:
-                    self.db.commit()
-                    return {"status": "success", "message": "Dte saved successfully"}
-                except Exception as e:
-                    self.db.rollback()
-                    return {"status": "error", "message": f"Error: {str(e)}"}
+            if form_data.will_save == 1:
+                if folio != None:
+                    dte = DteModel()
+
+                    period = datetime.now().strftime('%Y-%m')
+                    
+                    # Asignar los valores del formulario a la instancia del modelo
+                    dte.branch_office_id = form_data.branch_office_id
+                    dte.cashier_id = form_data.cashier_id
+                    dte.dte_type_id = 33
+                    dte.dte_version_id = 1
+                    dte.status_id = 4
+                    dte.chip_id = form_data.chip_id
+                    dte.rut = form_data.rut
+                    dte.folio = folio
+                    dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+                    dte.card_amount = 0
+                    dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
+                    dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
+                    dte.discount = 0
+                    dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+                    dte.period = period
+                    dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                    self.db.add(dte)
+
+                    try:
+                        self.db.commit()
+                        return {"status": "success", "message": "Dte saved successfully"}
+                    except Exception as e:
+                        self.db.rollback()
+                        return {"status": "error", "message": f"Error: {str(e)}"}
+                else:
+                    return 'error'
             else:
-                return 'error'
+                if folio != None:
+                    dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+                    dte.folio = folio
+                    dte.status_id = 4
+                    self.db.add(dte)
+
+                    try:
+                        self.db.commit()
+                        return {"status": "success", "message": "Dte saved successfully"}
+                    except Exception as e:
+                        self.db.rollback()
+                        return {"status": "error", "message": f"Error: {str(e)}"}
+                else:
+                    return 'error'
         else:
-            if folio != None:
-                dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
-                dte.folio = folio
-                dte.status_id = 4
-                self.db.add(dte)
-
-                try:
-                    self.db.commit()
-                    return {"status": "success", "message": "Dte saved successfully"}
-                except Exception as e:
-                    self.db.rollback()
-                    return {"status": "error", "message": f"Error: {str(e)}"}
-            else:
-                return 'error'
+            return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
     
     def store_credit_note(self, form_data):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
