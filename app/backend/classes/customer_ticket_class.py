@@ -644,7 +644,6 @@ class CustomerTicketClass:
                     return {"status": "error", "message": "Dte not found after generation"}
             else:
                 return 'error'
-            
         else:
             return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
         
