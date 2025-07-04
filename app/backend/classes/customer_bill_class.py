@@ -799,7 +799,10 @@ class CustomerBillClass:
 
                     period = datetime.now().strftime('%Y-%m')
 
-                    status_id = 1
+                    if rol_id == 1 or rol_id == 2:
+                        status_id = 2
+                    elif rol_id == 4:
+                        status_id = 1
                     
                     # Asignar los valores del formulario a la instancia del modelo
                     dte.branch_office_id = form_data.branch_office_id

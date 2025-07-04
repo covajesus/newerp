@@ -34,6 +34,20 @@ def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, session_user:
         else:
             CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
+    data = CustomerTicketClass(db).generate(customer_ticket_inputs)
+
+    return {"message": data}
+
+@customer_tickets.post("/store")
+def store(customer_ticket_inputs:GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+
     data = CustomerTicketClass(db).store(customer_ticket_inputs, session_user.rol_id)
 
     return {"message": data}
