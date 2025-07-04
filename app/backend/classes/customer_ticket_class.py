@@ -640,7 +640,7 @@ class CustomerTicketClass:
                 return 'error'
             
         else:
-            return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
+            return {"status": "error", "message": "Dte does not exist"}
         
     def store(self, form_data, rol_id):
         check_dte_existence = self.db.query(DteModel).filter(
