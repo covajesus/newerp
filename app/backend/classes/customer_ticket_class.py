@@ -594,10 +594,11 @@ class CustomerTicketClass:
             DteModel.total == (form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount),
             DteModel.dte_type_id == 39,
             DteModel.dte_version_id == 1,
+            DteModel.status_id == 4,
             DteModel.period == datetime.now().strftime('%Y-%m')
         ).count()
 
-        if check_dte_existence == 1:
+        if check_dte_existence == 0:
             customer = CustomerClass(self.db).get_by_rut(form_data.rut)
             customer_data = json.loads(customer)
 
@@ -641,60 +642,48 @@ class CustomerTicketClass:
                 return 'error'
             
         else:
-            return {"status": "error", "message": "Dte does not exist"}
+            return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
         
     def store(self, form_data, rol_id):
-        check_dte_existence = self.db.query(DteModel).filter(
-            DteModel.branch_office_id == form_data.branch_office_id,
-            DteModel.rut == form_data.rut,
-            DteModel.total == (form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount),
-            DteModel.dte_type_id == 39,
-            DteModel.dte_version_id == 1,
-            DteModel.period == datetime.now().strftime('%Y-%m')
-        ).count()
+        if form_data.will_save == 1:
+            dte = DteModel()
 
-        if check_dte_existence == 0:
-            if form_data.will_save == 1:
-                dte = DteModel()
+            period = datetime.now().strftime('%Y-%m')
 
-                period = datetime.now().strftime('%Y-%m')
-
-                if rol_id == 1 or rol_id == 2:
-                    status_id = 2
-                elif rol_id == 4:
-                    status_id = 1
+            if rol_id == 1 or rol_id == 2:
+                status_id = 2
+            elif rol_id == 4:
+                status_id = 1
                     
-                # Asignar los valores del formulario a la instancia del modelo
-                dte.branch_office_id = form_data.branch_office_id
-                dte.cashier_id = 0
-                dte.dte_type_id = 39
-                dte.dte_version_id = 1
-                dte.status_id = status_id
-                dte.chip_id = form_data.chip_id
-                dte.rut = form_data.rut
-                dte.folio = 0
-                dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-                dte.card_amount = 0
-                dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
-                dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
-                dte.discount = 0
-                dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-                dte.period = period
-                dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            # Asignar los valores del formulario a la instancia del modelo
+            dte.branch_office_id = form_data.branch_office_id
+            dte.cashier_id = 0
+            dte.dte_type_id = 39
+            dte.dte_version_id = 1
+            dte.status_id = status_id
+            dte.chip_id = form_data.chip_id
+            dte.rut = form_data.rut
+            dte.folio = 0
+            dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+            dte.card_amount = 0
+            dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
+            dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
+            dte.discount = 0
+            dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+            dte.period = period
+            dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                self.db.add(dte)
+            self.db.add(dte)
 
-                try:
-                    self.db.commit()
+            try:
+                self.db.commit()
 
-                    return {"status": "success", "message": "Dte saved successfully"}
-                except Exception as e:
-                    self.db.rollback()
-                    return {"status": "error", "message": f"Error: {str(e)}"}
-            else:
-                return 'error'
+                return {"status": "success", "message": "Dte saved successfully"}
+            except Exception as e:
+                self.db.rollback()
+                return {"status": "error", "message": f"Error: {str(e)}"}
         else:
-            return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
+            return 'error'
             
     def create_account_asset(self, form_data):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"

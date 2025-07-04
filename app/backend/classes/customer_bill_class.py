@@ -785,13 +785,13 @@ class CustomerBillClass:
             customer = CustomerClass(self.db).get_by_rut(form_data.rut)
             customer_data = json.loads(customer)
 
-            code = self.pre_generate_ticket(customer_data, form_data)
+            code = self.pre_generate_bill(customer_data, form_data)
 
             if code is not None:
                 if code == 402:
                     return "LibreDTE payment required"
                 
-                folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
+                folio = self.generate_bill(customer_data['customer_data']['rut'], code)
 
                 self.save_pdf_ticket(folio)
 
