@@ -13,45 +13,86 @@ class CapitulationClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, page=0, items_per_page=10):
+    def get_all(self, rol_id=None, rut=None, page=0, items_per_page=10):
         try:
-            # Inicialización de filtros dinámicos
-            filters = []
+            if rol_id == 1 or rol_id == 2:
+                # Inicialización de filtros dinámicos
+                filters = []
 
-            # Construir la consulta base con los filtros aplicados
-            query = self.db.query(
-                CapitulationModel.id,
-                CapitulationModel.document_date,
-                CapitulationModel.supplier_rut,
-                CapitulationModel.document_number,
-                CapitulationModel.document_type_id,
-                CapitulationModel.capitulation_type_id,
-                CapitulationModel.branch_office_id,
-                CapitulationModel.expense_type_id,
-                CapitulationModel.description,
-                CapitulationModel.amount,
-                CapitulationModel.support,
-                CapitulationModel.status_id,
-                BranchOfficeModel.id.label("branch_office_id"), 
-                BranchOfficeModel.branch_office,
-                ExpenseTypeModel.id.label("expense_type_id"),
-                ExpenseTypeModel.expense_type,
-                UserModel.full_name,
-                CapitulationModel.payment_date,
-                CapitulationModel.payment_number,
-                CapitulationModel.period,
-                CapitulationModel.payment_support
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == CapitulationModel.branch_office_id
-            ).outerjoin(
-                ExpenseTypeModel, ExpenseTypeModel.id == CapitulationModel.expense_type_id
-            ).outerjoin(
-                UserModel, UserModel.rut == CapitulationModel.user_rut
-            ).filter(
-                *filters
-            ).order_by(
-                CapitulationModel.id
-            )
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    CapitulationModel.id,
+                    CapitulationModel.document_date,
+                    CapitulationModel.supplier_rut,
+                    CapitulationModel.document_number,
+                    CapitulationModel.document_type_id,
+                    CapitulationModel.capitulation_type_id,
+                    CapitulationModel.branch_office_id,
+                    CapitulationModel.expense_type_id,
+                    CapitulationModel.description,
+                    CapitulationModel.amount,
+                    CapitulationModel.support,
+                    CapitulationModel.status_id,
+                    BranchOfficeModel.id.label("branch_office_id"), 
+                    BranchOfficeModel.branch_office,
+                    ExpenseTypeModel.id.label("expense_type_id"),
+                    ExpenseTypeModel.expense_type,
+                    UserModel.full_name,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                    CapitulationModel.period,
+                    CapitulationModel.payment_support
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == CapitulationModel.branch_office_id
+                ).outerjoin(
+                    ExpenseTypeModel, ExpenseTypeModel.id == CapitulationModel.expense_type_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == CapitulationModel.user_rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    CapitulationModel.id
+                )
+            else:
+                # Inicialización de filtros dinámicos
+                filters = []
+
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    CapitulationModel.id,
+                    CapitulationModel.document_date,
+                    CapitulationModel.supplier_rut,
+                    CapitulationModel.document_number,
+                    CapitulationModel.document_type_id,
+                    CapitulationModel.capitulation_type_id,
+                    CapitulationModel.branch_office_id,
+                    CapitulationModel.expense_type_id,
+                    CapitulationModel.description,
+                    CapitulationModel.amount,
+                    CapitulationModel.support,
+                    CapitulationModel.status_id,
+                    BranchOfficeModel.id.label("branch_office_id"), 
+                    BranchOfficeModel.branch_office,
+                    ExpenseTypeModel.id.label("expense_type_id"),
+                    ExpenseTypeModel.expense_type,
+                    UserModel.full_name,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                    CapitulationModel.period,
+                    CapitulationModel.payment_support
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == CapitulationModel.branch_office_id
+                ).outerjoin(
+                    ExpenseTypeModel, ExpenseTypeModel.id == CapitulationModel.expense_type_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == CapitulationModel.user_rut
+                ).filter(
+                    BranchOfficeModel.principal_supervisor == rut,
+                ).filter(
+                    *filters
+                ).order_by(
+                    CapitulationModel.id
+                )
 
             if page > 0:
                 total_items = query.count()

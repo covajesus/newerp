@@ -803,8 +803,6 @@ class CustomerBillClass:
                             DteModel.total == (form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount),
                             DteModel.dte_type_id == 33,
                             DteModel.dte_version_id == 1,
-                            DteModel.gloss == form_data.gloss,
-                            DteModel.chip_id == form_data.chip_id,
                             DteModel.status_id == 2,
                             DteModel.period == datetime.now().strftime('%Y-%m')
                     ).first()
