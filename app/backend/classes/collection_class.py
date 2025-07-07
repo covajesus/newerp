@@ -151,7 +151,7 @@ class CollectionClass:
                     TotalGeneralCollectionModel.added_date,
                     TotalGeneralCollectionModel.updated_date,
                 ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == TotalGeneralCollectionModel.branch_office_id).outerjoin(CashierModel, CashierModel.id == TotalGeneralCollectionModel.cashier_id).filter(*filters).order_by(desc(TotalGeneralCollectionModel.added_date))
-
+                print(query)
                 # Si se solicita paginación
                 if page > 0:
                     # Calcular el total de registros
