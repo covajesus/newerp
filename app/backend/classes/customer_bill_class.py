@@ -933,6 +933,8 @@ class CustomerBillClass:
     def pre_generate_bill(self, customer_data, form_data):  # Added self as the first argument
         branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
 
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         if form_data.chip_id == 1:
@@ -963,7 +965,7 @@ class CustomerBillClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "NmbItem": dte.gloss,
                         "QtyItem": 1,
                         "PrcItem": amount,
                     },
@@ -997,7 +999,7 @@ class CustomerBillClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "NmbItem": dte.gloss,
                         "QtyItem": 1,
                         "PrcItem": form_data.amount,
                     }
