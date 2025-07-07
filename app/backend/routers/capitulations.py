@@ -20,7 +20,7 @@ capitulations = APIRouter(
 
 @capitulations.post("/")
 def index(capitulation: CapitulationList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = CapitulationClass(db).get_all(session_user.rold_id, session_user.rut, capitulation.page)
+    data = CapitulationClass(db).get_all(session_user.rol_id, session_user.rut, capitulation.page)
 
     return {"message": data}
 
