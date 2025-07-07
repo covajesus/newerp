@@ -794,7 +794,7 @@ class CustomerBillClass:
                 
                 folio = self.generate_bill(customer_data['customer_data']['rut'], code)
 
-                self.save_pdf_ticket(folio)
+                self.save_pdf_bill(folio)
 
             if folio != None:
                 dte = self.db.query(DteModel).filter(
