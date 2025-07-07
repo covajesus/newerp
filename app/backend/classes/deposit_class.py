@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import json
 from sqlalchemy import case
+from app.backend.db.models import DepositModel, BranchOfficeModel
+from sqlalchemy import func
 
 class DepositClass:
     def __init__(self, db: Session):
@@ -42,7 +44,7 @@ class DepositClass:
                 DepositModel.deposited_amount,   
                 DepositModel.payment_number, 
                 DepositModel.collection_amount,
-                DepositModel.collection_date, 
+                func.to_char(DepositModel.collection_date, 'DD-MM-YYYY').label('collection_date'),
                 BranchOfficeModel.branch_office
             ).outerjoin(
                 BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id
