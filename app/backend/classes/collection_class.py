@@ -179,7 +179,7 @@ class CollectionClass:
                         "cash_gross_amount": collection.total,
                         "card_gross_amount": collection.card_total_collections,
                         "total_tickets": collection.total_tickets,
-                        "added_date": collection.added_date,
+                        "added_date": collection.added_date.strftime('%d-%m-%Y') if collection.added_date else None,
                         "updated_date": collection.updated_date
                     } for collection in data]
 
@@ -202,10 +202,10 @@ class CollectionClass:
                         "branch_office": collection.branch_office,
                         "cashier_id": collection.cashier_id,
                         "cashier": collection.cashier,
-                        "cash_gross_amount": collection.cash_gross_amount,
-                        "card_gross_amount": collection.card_gross_amount,
+                        "cash_gross_amount": collection.total,
+                        "card_gross_amount": collection.card_total_collections,
                         "total_tickets": collection.total_tickets,
-                        "added_date": collection.added_date,
+                        "added_date": collection.added_date.strftime('%d-%m-%Y') if collection.added_date else None,
                         "updated_date": collection.updated_date
                     } for collection in data]
 
