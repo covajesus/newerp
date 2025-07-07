@@ -7,6 +7,8 @@ from app.backend.schemas import Deposit, DepositList
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
 import uuid
+from app.backend.auth.auth_user import get_current_active_user
+from app.backend.schemas import UserLogin
 import json
 
 deposits = APIRouter(
@@ -15,8 +17,8 @@ deposits = APIRouter(
 )
 
 @deposits.post("/")
-def index(deposit: DepositList, db: Session = Depends(get_db)):
-    data = DepositClass(db).get_all(deposit.branch_office_id, deposit.since, deposit.until, deposit.status_id, deposit.page)
+def index(deposit: DepositList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = DepositClass(db).get_all(session_user.rol_id, session_user.rut, deposit.branch_office_id, deposit.since, deposit.until, deposit.status_id, deposit.page)
 
     return {"message": data}
 

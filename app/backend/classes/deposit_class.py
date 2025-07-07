@@ -13,48 +13,91 @@ class DepositClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, branch_office_id=None, status_id=None, since=None, until=None, page=0, items_per_page=10):
+    def get_all(self, rol_id=None, rut=None, branch_office_id=None, status_id=None, since=None, until=None, page=0, items_per_page=10):
         try:
-            # Inicialización de filtros dinámicos
-            filters = []
-            if branch_office_id is not None:
-                filters.append(DepositModel.branch_office_id == branch_office_id)
-            if status_id is not None:
-                filters.append(DepositModel.status_id == status_id)
-            if since is not None:
-                filters.append(DepositModel.added_date >= since)
-            if until is not None:
-                filters.append(DepositModel.added_date <= until)
+            if rol_id == 1 or rol_id == 2:
+                # Inicialización de filtros dinámicos
+                filters = []
+                if branch_office_id is not None:
+                    filters.append(DepositModel.branch_office_id == branch_office_id)
+                if status_id is not None:
+                    filters.append(DepositModel.status_id == status_id)
+                if since is not None:
+                    filters.append(DepositModel.added_date >= since)
+                if until is not None:
+                    filters.append(DepositModel.added_date <= until)
 
-            # Definir la prioridad de orden para status_id
-            status_order = case(
-                (DepositModel.status_id == 1, 1),
-                (DepositModel.status_id == 3, 2),
-                (DepositModel.status_id == 6, 3),
-                else_=4  # Otros valores de status_id van al final
-            )
+                # Definir la prioridad de orden para status_id
+                status_order = case(
+                    (DepositModel.status_id == 1, 1),
+                    (DepositModel.status_id == 3, 2),
+                    (DepositModel.status_id == 6, 3),
+                    else_=4  # Otros valores de status_id van al final
+                )
 
-            # Construir la consulta base con los filtros aplicados
-            query = self.db.query(
-                DepositModel.id, 
-                DepositModel.branch_office_id, 
-                DepositModel.payment_type_id, 
-                DepositModel.collection_id,
-                DepositModel.status_id,
-                DepositModel.deposited_amount,   
-                DepositModel.payment_number, 
-                DepositModel.collection_amount,
-                func.date_format(DepositModel.collection_date, '%d-%m-%Y').label('collection_date'),
-                BranchOfficeModel.branch_office
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id
-            ).filter(
-                *filters
-            ).order_by(
-                status_order,  # Primero ordenamos por prioridad de status_id
-                DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
-            )
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DepositModel.id, 
+                    DepositModel.branch_office_id, 
+                    DepositModel.payment_type_id, 
+                    DepositModel.collection_id,
+                    DepositModel.status_id,
+                    DepositModel.deposited_amount,   
+                    DepositModel.payment_number, 
+                    DepositModel.collection_amount,
+                    func.date_format(DepositModel.collection_date, '%d-%m-%Y').label('collection_date'),
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id
+                ).filter(
+                    *filters
+                ).order_by(
+                    status_order,  # Primero ordenamos por prioridad de status_id
+                    DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
+                )
+            else:
+                # Inicialización de filtros dinámicos
+                filters = []
+                if branch_office_id is not None:
+                    filters.append(DepositModel.branch_office_id == branch_office_id)
+                if status_id is not None:
+                    filters.append(DepositModel.status_id == status_id)
+                if since is not None:
+                    filters.append(DepositModel.added_date >= since)
+                if until is not None:
+                    filters.append(DepositModel.added_date <= until)
 
+                # Definir la prioridad de orden para status_id
+                status_order = case(
+                    (DepositModel.status_id == 1, 1),
+                    (DepositModel.status_id == 3, 2),
+                    (DepositModel.status_id == 6, 3),
+                    else_=4  # Otros valores de status_id van al final
+                )
+
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DepositModel.id, 
+                    DepositModel.branch_office_id, 
+                    DepositModel.payment_type_id, 
+                    DepositModel.collection_id,
+                    DepositModel.status_id,
+                    DepositModel.deposited_amount,   
+                    DepositModel.payment_number, 
+                    DepositModel.collection_amount,
+                    func.date_format(DepositModel.collection_date, '%d-%m-%Y').label('collection_date'),
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id
+                ).filter(
+                    BranchOfficeModel.principal_supervisor == rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    status_order,  # Primero ordenamos por prioridad de status_id
+                    DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
+                )
+                
             # Si se solicita paginación
             if page > 0:
                 total_items = query.count()
