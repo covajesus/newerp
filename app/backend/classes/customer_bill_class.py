@@ -850,6 +850,7 @@ class CustomerBillClass:
             dte.dte_version_id = 1
             dte.status_id = status_id
             dte.chip_id = form_data.chip_id
+            dte.gloss = form_data.gloss
             dte.rut = form_data.rut
             dte.folio = 0
             dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount

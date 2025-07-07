@@ -39,7 +39,7 @@ def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin =
     return {"message": data}
 
 @customer_bills.post("/generate_bill")
-def store(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
+def generate_bill(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
 
     if customer_bill_inputs.will_save == 1:
