@@ -44,7 +44,7 @@ class DepositClass:
                 DepositModel.deposited_amount,   
                 DepositModel.payment_number, 
                 DepositModel.collection_amount,
-                func.to_char(DepositModel.collection_date, 'DD-MM-YYYY').label('collection_date'),
+                func.date_format(DepositModel.collection_date, '%d-%m-%Y').label('collection_date'),
                 BranchOfficeModel.branch_office
             ).outerjoin(
                 BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id
