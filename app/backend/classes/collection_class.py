@@ -409,7 +409,8 @@ class CollectionClass:
     def total_collection(self, branch_office_id, collection_date):
         try:
             result = self.db.query(
-                func.sum(TotalGeneralCollectionModel.total).label('total')
+                func.sum(TotalGeneralCollectionModel.total).label('total'), 
+                func.max(TotalGeneralCollectionModel.id).label('collection_id')
             ).filter(
                 TotalGeneralCollectionModel.branch_office_id == branch_office_id,
                 TotalGeneralCollectionModel.added_date == collection_date
@@ -421,7 +422,7 @@ class CollectionClass:
             if result:
                 return {
                     'total': result.total if result and result.total else 0,
-                    'collection_id': None
+                    'collection_id': result.collection_id
                 }
             else:
                 return {'total': 0, 'collection_id': None}
