@@ -127,7 +127,6 @@ class CollectionClass:
             return f"Error: {error_message}"
         
     def get_all(self, rol_id = None, rut = None, branch_office_id = None, cashier_id = None, added_date = None, page = 1, items_per_page = 10):
-        print(rol_id)
         if rol_id == 1 or rol_id == 2:
             filters = []
             if branch_office_id is not None:
