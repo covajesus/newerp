@@ -1951,6 +1951,7 @@ class GenerateCustomerBill(BaseModel):
     phone: Optional[str] = None
     activity: Optional[str] = None
     address: Optional[str] = None
+    gloss: Optional[str] = None
 
 class FolioList(BaseModel):
     page: int
