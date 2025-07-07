@@ -40,8 +40,7 @@ def store(store_collection: StoreCollection, db: Session = Depends(get_db)):
 
 @collections.post("/search")
 def search(collection_inputs:CollectionSearch, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
-    print(collection_inputs)
-    data = CollectionClass(db).get_all(session_user.rol_id, collection_inputs.branch_office_id, collection_inputs.cashier_id, collection_inputs.added_date, collection_inputs.page)
+    data = CollectionClass(db).get_all(session_user.rol_id, session_user.rut, collection_inputs.branch_office_id, collection_inputs.cashier_id, collection_inputs.added_date, collection_inputs.page)
 
     return {"message": data}
 
