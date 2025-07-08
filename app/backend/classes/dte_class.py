@@ -672,3 +672,28 @@ class DteClass:
                 
         else:
             return "No data found"
+
+    def resend(self, dte_id, email):
+        dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+
+        url = "https://libredte.cl/api/dte/dte_emitidos/enviar_email/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822"
+
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        payload = json.dumps({
+            "emails": email,
+            "asunto": None,
+            "mensaje": None,
+            "pdf": False,
+            "cedible": False,
+            "papelContinuo": 0
+        })
+
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        print(response.text)

@@ -93,8 +93,12 @@ def existence(period:str, db: Session = Depends(get_db)):
     
     return {"message": data}
 
-@dtes.get("/whatsapp/resend/{dte_id}/{phone}")
-def resend(dte_id: int, phone: int, db: Session = Depends(get_db)):
-    data = WhatsappClass(db).resend(dte_id, phone)
+@dtes.get("/resend/{dte_id}/{phone}/{email}")
+def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
+    if phone != 0 and phone is not None and phone != "":
+        data = WhatsappClass(db).resend(dte_id, phone)
+
+    if email != "" and email is not None:
+        data = DteClass(db).resend(dte_id, email)
 
     return {"message": data}
