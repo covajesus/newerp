@@ -417,10 +417,17 @@ class DteClass:
                 dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
 
                 if dte_qty == 0:
+                    if dte.get('tipo') == 'Factura electrónica':
+                        dte_type_id = 33
+                    elif dte.get('tipo') == 'Boleta electrónica':
+                        dte_type_id = 39
+                    elif dte.get('tipo') == 'Nota de crédito electrónica':
+                        dte_type_id = 61
+
                     store_dte = DteModel(
                         branch_office_id=80,
                         cashier_id=0,
-                        dte_type_id=dte.get('tipo'),
+                        dte_type_id=dte_type_id,
                         dte_version_id=1,
                         status_id=4,
                         folio=dte.get('folio'),
