@@ -27,6 +27,12 @@ def delete(branch_office_id: int, period: str, expense_type_id: int, session_use
 
     return {"message": data}
 
+@accountability.get("/subscriber_assets/store/{branch_office_id}/{period}")
+def store_subscriber_assets(branch_office_id: int, period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = AccountabilityClass(db).store_subscriber_assets(branch_office_id, period)
+
+    return {"message": data}
+
 @accountability.get("/subscriber_assets/delete/{branch_office_id}/{period}")
 def delete_subscriber_assets(branch_office_id: int, period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = AccountabilityClass(db).delete_subscriber_assets(branch_office_id, period)
