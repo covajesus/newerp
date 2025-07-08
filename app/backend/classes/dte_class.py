@@ -372,14 +372,14 @@ class DteClass:
                     )
 
                     self.db.add(store_customer)
-            exit()
+                    exit()
                     try:
                         self.db.commit()
                         print(f"Cliente {dte.get('razon_social', 'Cliente Desconocido')} guardado correctamente.")
                     except Exception as e:
                         error_message = str(e)
                         print(f"Error al guardar el cliente {dte.get('razon_social', 'Cliente Desconocido')}: {error_message}")
-
+                exit()
                 print(f"""
                     Tipo: {dte.get('tipo')}
                     Folio: {dte.get('folio')}
