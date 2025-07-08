@@ -306,13 +306,22 @@ class DteClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
+import json
+import requests
+from datetime import datetime
+
+class DteClass:
+
+    def __init__(self, db):
+        self.db = db  # si no usas db, puedes quitar esto
+
     def import_by_rut(self, rut):
         url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         payload = json.dumps({
             "receptor": rut,
-            "fecha_desde": datetime.now().strftime("%Y-%m-01"),
+            "fecha_desde": datetime.now().strftime("%Y-%m-01")
         })
 
         headers = {
@@ -322,25 +331,43 @@ class DteClass:
 
         response = requests.post(url, headers=headers, data=payload)
 
-        print(response.text)
-
         try:
             data = response.json()
+            print("Respuesta recibida:", data)
 
-            # Si la respuesta contiene la lista de DTEs
-            dtes = data.get("dtes", [])
+            # Si la respuesta es una lista directamente
+            if isinstance(data, list):
+                dtes = data
+            # Si la respuesta es un dict con clave "dtes"
+            elif isinstance(data, dict) and "dtes" in data:
+                dtes = data["dtes"]
+            else:
+                print("No se encontraron documentos o formato inesperado.")
+                return
+
             if not dtes:
                 print("No se encontraron documentos para ese RUT.")
                 return
 
             print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
             for dte in dtes:
-                dte_type_id = dte.get('tipo')
-                folio = dte.get('folio')
-                    
+                print(f"""
+Tipo: {dte.get('tipo')}
+Folio: {dte.get('folio')}
+Razón Social: {dte.get('razon_social')}
+Fecha: {dte.get('fecha')}
+Total: {dte.get('total')}
+Estado: {dte.get('estado')}
+Track ID: {dte.get('track_id')}
+Usuario: {dte.get('usuario')}
+¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
+-----------------------------
+                """)
+
         except json.JSONDecodeError:
             print("La respuesta no es un JSON válido:")
             print(response.text)
+
     
     def get_total_quantity(user_inputs):
 
