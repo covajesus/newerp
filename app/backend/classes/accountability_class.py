@@ -203,7 +203,7 @@ class AccountabilityClass:
     def store_subscriber_assets(self, branch_office_id, period):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        if branch_office_id == None:
+        if branch_office_id == 0:
             branch_offices = self.db.query(BranchOfficeModel).all()
 
             for branch_office in branch_offices:
