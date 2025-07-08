@@ -5,6 +5,7 @@ from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
 from sqlalchemy import cast, Date, func
 from datetime import datetime, timedelta
+import json
 
 class DteClass:
     def __init__(self, db):
@@ -304,7 +305,24 @@ class DteClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
-        
+    
+    def import_by_rut(rut):
+        url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        payload = json.dumps({
+            "receptor": rut
+        })
+
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        print(response.text)
+    
     def get_total_quantity(user_inputs):
 
         if user_inputs['rol_id'] == 4 or user_inputs['rol_id'] == 5:

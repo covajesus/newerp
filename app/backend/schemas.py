@@ -1238,6 +1238,9 @@ class ReceivedDteList(BaseModel):
     dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0
 
+class ImportDte(BaseModel):
+    rut: str
+
 class CustomerList(BaseModel):
     rut: Optional[str] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0

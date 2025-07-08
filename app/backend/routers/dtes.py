@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
@@ -20,6 +20,12 @@ def index(dte: DteList, db: Session = Depends(get_db)):
 @dtes.post("/all_with_customer")
 def all_with_customer(dte: DteList, db: Session = Depends(get_db)):
     data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_version_id, dte.page)
+
+    return {"message": data}
+
+@dtes.post("/import_by_rut")
+def import_by_rut(dte: ImportDte, db: Session = Depends(get_db)):
+    data = DteClass(db).import_by_rut(dte.rut)
 
     return {"message": data}
 
