@@ -45,7 +45,7 @@ class CustomerCollectionClass:
                     CollectionModel.added_date == date
                 ).first()
 
-                collection.subscriber_amount = total_amount
+                collection.subscriber = total_amount
                 collection.total_tickets = result.total_tickets
                 collection.updated_date = date
                 self.db.commit()
@@ -54,7 +54,7 @@ class CustomerCollectionClass:
                 collection = CollectionModel()
                 collection.branch_office_id = branch_office_id
                 collection.cashier_id = subscriber_cashier.id
-                collection.subscriber_amount = total_amount
+                collection.subscriber = total_amount
                 collection.total_tickets = result.total_tickets
                 collection.added_date = date
                 collection.updated_date = date

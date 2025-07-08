@@ -1008,7 +1008,7 @@ class CollectionModel(Base):
     cash_net_amount = Column(Integer)
     card_gross_amount = Column(Integer)
     card_net_amount = Column(Integer)
-    subscriber_amount = Column(Integer)
+    subscriber = Column(Integer)
     total_tickets = Column(Integer)
     added_date = Column(Date())
     updated_date = Column(DateTime())
