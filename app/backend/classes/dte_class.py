@@ -379,8 +379,8 @@ class DteClass:
 
                     commune_data = self.db.query(CommuneModel).filter(
                                 func.lower(CommuneModel.commune).like(f"%{data.get('comuna').lower()}%")
-                            ).all()
-
+                            ).first()
+                    print(commune_data)
                     store_customer = CustomerModel(
                         rut=rut,
                         region_id=commune_data.region_id,
