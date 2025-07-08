@@ -207,7 +207,9 @@ class AccountabilityClass:
             branch_offices = self.db.query(BranchOfficeModel).all()
 
             for branch_office in branch_offices:
-                collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).first()
+                collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
+
+                amount = collection.subscribers if collection else 0
 
                 expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                 splitted_period = period.split('-')
@@ -230,7 +232,8 @@ class AccountabilityClass:
                                 '111000102': amount,
                             },
                             'haber': {
-                                '111000101': amount,
+                                '441000102': round(amount/1.19),
+                                '221000226': round(amount - (amount/1.19)),
                             }
                         },
                         "operacion": "I",
@@ -259,6 +262,7 @@ class AccountabilityClass:
                 print(response.text)
         else:
             branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").first()
             expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
             splitted_period = period.split('-')
             utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
@@ -277,10 +281,11 @@ class AccountabilityClass:
                     "glosa": gloss,
                     "detalle": {
                         'debe': {
-                            '111000101': amount,
+                            '111000102': amount,
                         },
                         'haber': {
-                                '111000101': amount,
+                            '441000102': round(amount/1.19),
+                            '221000226': round(amount - (amount/1.19)),
                         }
                     },
                     "operacion": "I",
