@@ -11,9 +11,9 @@ class CustomerCollectionClass:
         period = form_data.period.split("-")
         year = int(period[0])
         month = int(period[1])
-        period = f"{month:02d}-{year:04d}"
+        period = f"{year:04d}-{month:02d}"
         date = form_data.period + "-01"
-        print(period)
+
         results = (
             self.db.query(
                 DteModel.branch_office_id,
@@ -37,7 +37,7 @@ class CustomerCollectionClass:
                 CollectionModel.cashier_id == subscriber_cashier.id,
                 CollectionModel.added_date == date
             ).count()
-            print(11111)
+   
             if check_existence > 0:
                 collection = self.db.query(CollectionModel).filter(
                     CollectionModel.branch_office_id == branch_office_id,
