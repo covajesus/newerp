@@ -37,7 +37,7 @@ class CustomerCollectionClass:
                 CollectionModel.cashier_id == subscriber_cashier.id,
                 CollectionModel.added_date == date
             ).count()
- 
+            print(11111)
             if check_existence > 0:
                 collection = self.db.query(CollectionModel).filter(
                     CollectionModel.branch_office_id == branch_office_id,
