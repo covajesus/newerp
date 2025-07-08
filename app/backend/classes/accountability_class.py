@@ -386,9 +386,17 @@ class AccountabilityClass:
             details = entry.get("detalle", [])
             for item in details:
                 # Optional: use 'item' data if needed
-                print(period_year)
-                print(asset_number)
+                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{period_year}/{asset_number}/76063822"
+                print(delete_url)
 
+                delete_headers = {
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {token}'
+                }
+
+                delete_response = requests.get(delete_url, headers=delete_headers)
+
+                print(delete_response.text)
 
     def read_store_massive_accountability(self, file_url):
         try:
