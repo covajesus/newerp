@@ -311,7 +311,8 @@ class DteClass:
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         payload = json.dumps({
-            "receptor": rut
+            "receptor": rut,
+            "fecha_desde": datetime.now().strftime("%Y-%m-01"),
         })
 
         headers = {
@@ -319,9 +320,25 @@ class DteClass:
             'Authorization': f'Bearer {token}'
         }
 
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, data=payload)
 
-        print(response.text)
+        try:
+            data = response.json()
+
+            # Si la respuesta contiene la lista de DTEs
+            dtes = data.get("dtes", [])
+            if not dtes:
+                print("No se encontraron documentos para ese RUT.")
+                return
+
+            print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
+            for dte in dtes:
+                dte_type_id = dte.get('tipo')
+                folio = dte.get('folio')
+                    
+        except json.JSONDecodeError:
+            print("La respuesta no es un JSON válido:")
+            print(response.text)
     
     def get_total_quantity(user_inputs):
 
