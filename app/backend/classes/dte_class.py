@@ -380,7 +380,7 @@ class DteClass:
                     commune_data = self.db.query(CommuneModel).filter(
                                     func.lower(CommuneModel.commune).like(f"%{data.get('comuna_glosa', '').lower()}%")
                                 ).first()
-                    print(commune_data)
+            
                     store_customer = CustomerModel(
                         rut=rut,
                         region_id=commune_data.region_id,
@@ -401,7 +401,7 @@ class DteClass:
                     except Exception as e:
                         error_message = str(e)
                         print(f"Error al guardar el cliente {dte.get('razon_social', 'Cliente Desconocido')}: {error_message}")
-                exit()
+
                 print(f"""
                     Tipo: {dte.get('tipo')}
                     Folio: {dte.get('folio')}
