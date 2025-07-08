@@ -414,6 +414,12 @@ class DteClass:
                         dte_type_id = 39
                     elif dte.get('tipo') == 'Nota de crédito electrónica':
                         dte_type_id = 61
+                    
+                    dte_data = self.db.query(DteModel).filter(
+                        DteModel.rut == rut,
+                        DteModel.dte_type_id == dte_type_id,
+                        DteModel.dte_version_id == 1
+                    ).first()
 
                     store_dte = DteModel(
                         branch_office_id=80,

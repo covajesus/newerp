@@ -965,7 +965,7 @@ class CustomerBillClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
                         "QtyItem": 1,
                         "PrcItem": amount,
                     },
@@ -999,7 +999,7 @@ class CustomerBillClass:
                 },
                 "Detalle": [
                     {
-                        "NmbItem": "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
                         "QtyItem": 1,
                         "PrcItem": form_data.amount,
                     }
