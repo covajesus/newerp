@@ -13,7 +13,7 @@ class CustomerCollectionClass:
         month = int(period[1])
         period = f"{month:02d}-{year:04d}"
         date = form_data.period + "-01"
-
+        print(period)
         results = (
             self.db.query(
                 DteModel.branch_office_id,
@@ -25,7 +25,7 @@ class CustomerCollectionClass:
             .group_by(DteModel.branch_office_id)
             .all()
         )
-        print(334343)
+
         for result in results:
             branch_office_id = result.branch_office_id
             total_amount = int(result.total_amount)
