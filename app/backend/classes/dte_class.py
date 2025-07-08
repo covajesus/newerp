@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel
+from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
@@ -362,12 +362,34 @@ class DteClass:
 
                     print(response.text)
 
+                    data = response.json()
+                    print("Información del contribuyente:")
+                    print(f"RUT: {data.get('rut')}-{data.get('dv')}")
+                    print(f"Razón Social: {data.get('razon_social')}")
+                    print(f"Giro: {data.get('giro')}")
+                    print(f"Actividad Económica: {data.get('actividad_economica')}")
+                    print(f"Teléfono: {data.get('telefono')}")
+                    print(f"Email: {data.get('email')}")
+                    print(f"Dirección: {data.get('direccion')}")
+                    print(f"Comuna: {data.get('comuna')} ({data.get('comuna_glosa')})")
+                    print(f"Última Modificación: {data.get('modificado')}")
+
+                    raw_phone = data.get("telefono", "")
+                    cleaned_phone = raw_phone.replace("+56", "").replace(" ", "").strip()
+
+                    commune_data = self.db.query(CommuneModel).filter(
+                                func.lower(CommuneModel.commune).like(f"%{data.get('comuna').lower()}%")
+                            ).all()
+
                     store_customer = CustomerModel(
                         rut=rut,
-                        customer=dte.get('razon_social', 'Cliente Desconocido'),
-                        address='',
-                        phone='',
-                        email='',
+                        region_id=commune_data.region_id,
+                        commune_id=commune_data.id,
+                        customer=data.get('razon_social'),
+                        address=data.get('direccion'),
+                        activity=data.get('giro', ''),
+                        phone=cleaned_phone,
+                        email=data.get('email'),
                         added_date=datetime.now()
                     )
 
