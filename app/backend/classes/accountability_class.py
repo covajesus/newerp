@@ -207,10 +207,68 @@ class AccountabilityClass:
             branch_offices = self.db.query(BranchOfficeModel).all()
 
             for branch_office in branch_offices:
-                collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
+                collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").count()
 
-                amount = collection.subscribers if collection else 0
+                if collection_qty > 0:
+                    collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
 
+                    amount = collection.subscribers if collection else 0
+
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
+                    splitted_period = period.split('-')
+                    utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
+
+                    gloss = (
+                            branch_office.branch_office
+                            + "_"
+                            + expense_type.accounting_account
+                            + "_"
+                            + utf8_date
+                            + "_Abonados"
+                        )
+
+                    data = {
+                            "fecha": period + "-01",
+                            "glosa": gloss,
+                            "detalle": {
+                                'debe': {
+                                    '111000102': amount,
+                                },
+                                'haber': {
+                                    '441000102': round(amount/1.19),
+                                    '221000226': round(amount - (amount/1.19)),
+                                }
+                            },
+                            "operacion": "I",
+                            "documentos": {
+                                "emitidos": [
+                                    {
+                                        "dte": '',
+                                        "folio": 0,
+                                    }
+                                ]
+                            },
+                        }
+
+
+                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+
+                    print(response.text)
+        else:
+            branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").first()
+            collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").count()
+            
+            if collection_qty > 0:
                 expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                 splitted_period = period.split('-')
                 utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
@@ -260,58 +318,6 @@ class AccountabilityClass:
                 )
 
                 print(response.text)
-        else:
-            branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
-            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").first()
-            expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
-            splitted_period = period.split('-')
-            utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
-
-            gloss = (
-                    branch_office.branch_office
-                    + "_"
-                    + expense_type.accounting_account
-                    + "_"
-                    + utf8_date
-                    + "_Abonados"
-                )
-
-            data = {
-                    "fecha": period + "-01",
-                    "glosa": gloss,
-                    "detalle": {
-                        'debe': {
-                            '111000102': amount,
-                        },
-                        'haber': {
-                            '441000102': round(amount/1.19),
-                            '221000226': round(amount - (amount/1.19)),
-                        }
-                    },
-                    "operacion": "I",
-                    "documentos": {
-                        "emitidos": [
-                            {
-                                "dte": '',
-                                "folio": 0,
-                            }
-                        ]
-                    },
-                }
-
-
-            url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-
-            response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            print(response.text)
 
     def delete_subscriber_assets(self, branch_office_id, period):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
