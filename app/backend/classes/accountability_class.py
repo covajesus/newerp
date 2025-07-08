@@ -207,15 +207,12 @@ class AccountabilityClass:
             branch_offices = self.db.query(BranchOfficeModel).all()
 
             for branch_office in branch_offices:
-                collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").count()
+                collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).count()
 
                 if collection_qty > 0:
-                    print(period + "-01")
-                    print(branch_office.id)
-                    collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
+                    collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).first()
               
                     amount = collection.subscribers if collection else 0
-                    print(amount)
 
                     expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                     splitted_period = period.split('-')
@@ -268,8 +265,8 @@ class AccountabilityClass:
                     print(response.text)
         else:
             branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
-            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").first()
-            collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").count()
+            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).first()
+            collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).count()
             
             if collection_qty > 0:
                 expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
