@@ -394,7 +394,7 @@ class DteClass:
                     )
 
                     self.db.add(store_customer)
-                    exit()
+
                     try:
                         self.db.commit()
                         print(f"Cliente {dte.get('razon_social', 'Cliente Desconocido')} guardado correctamente.")
