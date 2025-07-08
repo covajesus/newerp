@@ -351,6 +351,35 @@ class DteClass:
 
             print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
             for dte in dtes:
+                customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
+
+                if not customer:
+                    url = "https://libredte.cl/api/dte/contribuyentes/info/" + str(rut)
+
+                    payload={}
+
+                    response = requests.request("GET", url, headers=headers, data=payload)
+
+                    print(response.text)
+
+                    store_customer = CustomerModel(
+                        rut=rut,
+                        customer=dte.get('razon_social', 'Cliente Desconocido'),
+                        address='',
+                        phone='',
+                        email='',
+                        added_date=datetime.now()
+                    )
+
+                    self.db.add(store_customer)
+            exit()
+                    try:
+                        self.db.commit()
+                        print(f"Cliente {dte.get('razon_social', 'Cliente Desconocido')} guardado correctamente.")
+                    except Exception as e:
+                        error_message = str(e)
+                        print(f"Error al guardar el cliente {dte.get('razon_social', 'Cliente Desconocido')}: {error_message}")
+
                 print(f"""
                     Tipo: {dte.get('tipo')}
                     Folio: {dte.get('folio')}
@@ -365,10 +394,44 @@ class DteClass:
                                     """)
                 dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
 
-                if dte_qty > 0:
-                    print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
+                if dte_qty == 0:
+                    store_dte = DteModel(
+                        branch_office_id=80,
+                        cashier_id=0,
+                        dte_type_id=dte.get('tipo'),
+                        dte_version_id=1,
+                        status_id=4,
+                        folio=dte.get('folio'),
+                        rut=rut,
+                        cash_amount=dte.get('total'),
+                        card_amount=0,
+                        subtotal=round(dte.get('total')/1.19),
+                        tax=dte.get('total') - round(dte.get('total')/1.19),
+                        discount=0,
+                        total=dte.get('total'),
+                        ticket_serial_number=0,
+                        ticket_hour=0,
+                        ticket_transaction_number=0,
+                        ticket_dispenser_number=0,
+                        ticket_number=0,
+                        ticket_station_number=0,
+                        ticket_sa=0,
+                        ticket_correlative=0,
+                        entrance_hour='',
+                        exit_hour='',
+                        added_date=dte.get('fecha')
+                    )
+
+                    self.db.add(store_dte)
+
+                    try:
+                        self.db.commit()
+                        print(f"DTE con folio {dte.get('folio')} guardado correctamente.")
+                    except Exception as e:
+                        error_message = str(e)
+                        print(f"Error al guardar el DTE con folio {dte.get('folio')}: {error_message}")
                 else:
-                    print(f"El DTE con folio {dte.get('folio')} no existe en la base de datos. Puedes proceder a almacenarlo.")
+                    print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
 
         except json.JSONDecodeError:
             print("La respuesta no es un JSON válido:")
