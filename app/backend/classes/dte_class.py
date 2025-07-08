@@ -377,9 +377,7 @@ class DteClass:
                     raw_phone = data.get("telefono", "")
                     cleaned_phone = raw_phone.replace("+56", "").replace(" ", "").strip()
 
-                    commune_data = self.db.query(CommuneModel).filter(
-                                func.lower(CommuneModel.commune).like(f"%{data.get('comuna').lower()}%")
-                            ).first()
+                    commune_data = self.db.query(CommuneModel).filter(CommuneModel.commune).like(f"%{data.get('comuna_glosa').lower()}%").first()
                     print(commune_data)
                     store_customer = CustomerModel(
                         rut=rut,
