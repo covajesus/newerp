@@ -211,8 +211,9 @@ class AccountabilityClass:
 
                 if collection_qty > 0:
                     collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
-
+                    print(222222)
                     amount = collection.subscribers if collection else 0
+                    print(amount)
 
                     expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                     splitted_period = period.split('-')
