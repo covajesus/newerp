@@ -25,7 +25,7 @@ def all_with_customer(dte: DteList, db: Session = Depends(get_db)):
 
 @dtes.post("/import_by_rut")
 def import_by_rut(dte: ImportDte, db: Session = Depends(get_db)):
-    data = DteClass().import_by_rut(dte.rut)
+    data = DteClass(db).import_by_rut(dte.rut)
 
     return {"message": data}
 

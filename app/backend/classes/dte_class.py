@@ -306,7 +306,7 @@ class DteClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
-    def import_by_rut(rut):
+    def import_by_rut(self, rut):
         url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
