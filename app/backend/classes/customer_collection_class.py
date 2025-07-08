@@ -31,35 +31,36 @@ class CustomerCollectionClass:
             total_amount = int(result.total_amount)
 
             subscriber_cashier = CashierClass(self.db).get_subscriber_cashier(branch_office_id)
-            
-            check_existence = self.db.query(CollectionModel).filter(
-                CollectionModel.branch_office_id == branch_office_id,
-                CollectionModel.cashier_id == subscriber_cashier.id,
-                CollectionModel.added_date == date
-            ).count()
-   
-            if check_existence > 0:
-                collection = self.db.query(CollectionModel).filter(
+            if not subscriber_cashier:
+                check_existence = self.db.query(CollectionModel).filter(
                     CollectionModel.branch_office_id == branch_office_id,
                     CollectionModel.cashier_id == subscriber_cashier.id,
                     CollectionModel.added_date == date
-                ).first()
+                ).count()
+    
+                if check_existence > 0:
+                    collection = self.db.query(CollectionModel).filter(
+                        CollectionModel.branch_office_id == branch_office_id,
+                        CollectionModel.cashier_id == subscriber_cashier.id,
+                        CollectionModel.added_date == date
+                    ).first()
 
-                collection.subscribers = total_amount
-                collection.total_tickets = result.total_tickets
-                collection.updated_date = date
-                self.db.commit()
-                self.db.refresh(collection)
+                    collection.subscribers = total_amount
+                    collection.total_tickets = result.total_tickets
+                    collection.updated_date = date
+                    self.db.commit()
+                    self.db.refresh(collection)
+                else:
+                    collection = CollectionModel()
+                    collection.branch_office_id = branch_office_id
+                    collection.cashier_id = subscriber_cashier.id
+                    collection.subscribers = total_amount
+                    collection.total_tickets = result.total_tickets
+                    collection.added_date = date
+                    collection.updated_date = date
+                    self.db.add(collection)
+                    self.db.commit()
+                    self.db.refresh(collection)
             else:
-                collection = CollectionModel()
-                collection.branch_office_id = branch_office_id
-                collection.cashier_id = subscriber_cashier.id
-                collection.subscribers = total_amount
-                collection.total_tickets = result.total_tickets
-                collection.added_date = date
-                collection.updated_date = date
-                self.db.add(collection)
-                self.db.commit()
-                self.db.refresh(collection)
-
+                print(f"Subscriber cashier not found for branch office {branch_office_id}. Skipping collection creation.")
 
