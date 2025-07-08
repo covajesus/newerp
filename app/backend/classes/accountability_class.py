@@ -210,12 +210,10 @@ class AccountabilityClass:
                 collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").count()
 
                 if collection_qty > 0:
-                    query = self.db.query(CollectionModel).filter(
-                                    CollectionModel.branch_office_id == branch_office.id
-                                ).filter(
-                                    CollectionModel.added_date == period + "-01"
-                                )
-                    print(str(query.statement))
+                    print(period + "-01")
+                    print(branch_office.id)
+                    collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").first()
+              
                     amount = collection.subscribers if collection else 0
                     print(amount)
 
