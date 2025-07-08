@@ -352,17 +352,23 @@ class DteClass:
             print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
             for dte in dtes:
                 print(f"""
-Tipo: {dte.get('tipo')}
-Folio: {dte.get('folio')}
-Razón Social: {dte.get('razon_social')}
-Fecha: {dte.get('fecha')}
-Total: {dte.get('total')}
-Estado: {dte.get('estado')}
-Track ID: {dte.get('track_id')}
-Usuario: {dte.get('usuario')}
-¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
------------------------------
-                """)
+                    Tipo: {dte.get('tipo')}
+                    Folio: {dte.get('folio')}
+                    Razón Social: {dte.get('razon_social')}
+                    Fecha: {dte.get('fecha')}
+                    Total: {dte.get('total')}
+                    Estado: {dte.get('estado')}
+                    Track ID: {dte.get('track_id')}
+                    Usuario: {dte.get('usuario')}
+                    ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
+                    -----------------------------
+                                    """)
+                dte_qty = self.db.query(DteModel).filter(DteModel.id == dte.get('folio')).count()
+
+                if dte_qty > 0:
+                    print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
+                else:
+                    print(f"El DTE con folio {dte.get('folio')} no existe en la base de datos. Puedes proceder a almacenarlo.")
 
         except json.JSONDecodeError:
             print("La respuesta no es un JSON válido:")
