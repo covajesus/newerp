@@ -363,7 +363,7 @@ class DteClass:
                     ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
                     -----------------------------
                                     """)
-                dte_qty = self.db.query(DteModel).filter(DteModel.id == dte.get('folio')).count()
+                dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
 
                 if dte_qty > 0:
                     print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
