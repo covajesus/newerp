@@ -31,7 +31,7 @@ class CustomerCollectionClass:
             total_amount = int(result.total_amount)
 
             subscriber_cashier = CashierClass(self.db).get_subscriber_cashier(branch_office_id)
-            if not subscriber_cashier:
+            if subscriber_cashier != None:
                 check_existence = self.db.query(CollectionModel).filter(
                     CollectionModel.branch_office_id == branch_office_id,
                     CollectionModel.cashier_id == subscriber_cashier.id,
