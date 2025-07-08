@@ -305,15 +305,6 @@ class DteClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
-    
-import json
-import requests
-from datetime import datetime
-
-class DteClass:
-
-    def __init__(self, db):
-        self.db = db  # si no usas db, puedes quitar esto
 
     def import_by_rut(self, rut):
         url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
@@ -466,7 +457,6 @@ class DteClass:
             print("La respuesta no es un JSON válido:")
             print(response.text)
 
-    
     def get_total_quantity(user_inputs):
 
         if user_inputs['rol_id'] == 4 or user_inputs['rol_id'] == 5:
