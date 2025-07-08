@@ -322,6 +322,8 @@ class DteClass:
 
         response = requests.post(url, headers=headers, data=payload)
 
+        print(response.text)
+
         try:
             data = response.json()
 
