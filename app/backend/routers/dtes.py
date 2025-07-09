@@ -112,6 +112,7 @@ def massive_resend(db: Session = Depends(get_db)):
         customer = db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
 
         if customer:
-            print(dte.id, customer.phone)
+            if customer.phone != None and customer.phone != "":
+                WhatsappClass(db).resend(dte.id, customer.phone)
 
     return {"message": "Listo"}
