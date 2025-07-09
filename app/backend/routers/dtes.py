@@ -109,9 +109,9 @@ def massive_resend(db: Session = Depends(get_db)):
     dte_data = db.query(DteModel).filter(DteModel.status_id == 4).all()
 
     for dte in dte_data:
-        customer = db.query(CustomerModel).filter(CustomerModel.rut == dte_data.rut).first()
+        customer = db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
 
         if customer:
-            print(dte_data.id, customer.phone)
+            print(dte.id, customer.phone)
 
-    return {"message": 'Listo'}
+    return {"message": "Listo"}
