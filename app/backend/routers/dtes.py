@@ -106,7 +106,7 @@ def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
 
 @dtes.get("/massive_resend")
 def massive_resend(db: Session = Depends(get_db)):
-    dte_data = db.query(DteModel).filter(DteModel.status_id == 4).all()
+    dte_data = db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.branch_office_id == 78).filter(DteModel.dte_version_id == 1).all()
 
     for dte in dte_data:
         customer = db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
