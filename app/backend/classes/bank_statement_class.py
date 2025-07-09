@@ -246,8 +246,10 @@ class BankStatementClass:
                             bank_statement_type_id = 1
                             rut = "76063822-6"
                         else:
-                            raw = row[col]
+                            bank_statement_type_id = 2
                             
+                            raw = row[col]
+
                             cleaned = re.sub(r'[^\dkK]', '', raw)  # Elimina puntos y guión: "198998880"
 
                             match = re.fullmatch(r'\d{9}[\dkK]', cleaned)
