@@ -246,11 +246,14 @@ class BankStatementClass:
                             bank_statement_type_id = 1
                             rut = "76063822-6"
                         else:
-                            bank_statement_type_id = 2
-                            match = re.search(r'\d{10}', row[col])
+                            cleaned = re.sub(r'[^\dkK]', '', raw)  # Elimina puntos y guión: "198998880"
+
+                            match = re.fullmatch(r'\d{9}[\dkK]', cleaned)
                             if match:
-                                number = match.group(0)
-                                rut = f"{number[1:9]}-{number[9]}"
+                                rut = f"{cleaned[0:8]}-{cleaned[9]}"
+                                print("Match:", rut)
+                            else:
+                                print("No es un RUT válido en formato")
 
                 fixed_period = HelperClass.fix_current_dte_period(period)
 
