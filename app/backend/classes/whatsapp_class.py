@@ -137,50 +137,51 @@ class WhatsappClass:
         else:
             customer_phone = phone_str
 
-        payload = {
-                    "messaging_product": "whatsapp",
-                    "to": f"{customer_phone}",
-                    "type": "template",
-                    "template": {
-                        "name": whatsapp_template.title,
-                        "language": {"code": "es"},
-                        "components": [
-                            {
-                                "type": "header",
-                                "parameters": [
-                                    {
-                                        "type": "document",
-                                        "document": {
-                                            "link": image,
-                                            "filename": f"{dte_data.folio}.pdf"
+        if user.name != None:
+            payload = {
+                        "messaging_product": "whatsapp",
+                        "to": f"{customer_phone}",
+                        "type": "template",
+                        "template": {
+                            "name": whatsapp_template.title,
+                            "language": {"code": "es"},
+                            "components": [
+                                {
+                                    "type": "header",
+                                    "parameters": [
+                                        {
+                                            "type": "document",
+                                            "document": {
+                                                "link": image,
+                                                "filename": f"{dte_data.folio}.pdf"
+                                            }
                                         }
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "body",
-                                "parameters": [
-                                    {"type": "text", "text": str(dte_type)},
-                                    {"type": "text", "text": str(dte_data.folio)},
-                                    {"type": "text", "text": added_date_str},
-                                    {"type": "text", "text": str(dte_data.total)},
-                                    {"type": "text", "text": branch_office.branch_office},
-                                    {"type": "text", "text": user.full_name},
-                                    {"type": "text", "text": user.phone},
-                                    {"type": "text", "text": user.email},
-                                ]
-                            },
-                            {
-                                "type": "button",
-                                "index": "0",
-                                "sub_type": "url",
-                                "parameters": [
-                                    {"type": "text", "text": url_data}
-                                ]
-                            }
-                        ]
+                                    ]
+                                },
+                                {
+                                    "type": "body",
+                                    "parameters": [
+                                        {"type": "text", "text": str(dte_type)},
+                                        {"type": "text", "text": str(dte_data.folio)},
+                                        {"type": "text", "text": added_date_str},
+                                        {"type": "text", "text": str(dte_data.total)},
+                                        {"type": "text", "text": branch_office.branch_office},
+                                        {"type": "text", "text": user.full_name},
+                                        {"type": "text", "text": user.phone},
+                                        {"type": "text", "text": user.email},
+                                    ]
+                                },
+                                {
+                                    "type": "button",
+                                    "index": "0",
+                                    "sub_type": "url",
+                                    "parameters": [
+                                        {"type": "text", "text": url_data}
+                                    ]
+                                }
+                            ]
+                        }
                     }
-                }
         print(payload)
         response = requests.post(url, json=payload, headers=headers)
 
