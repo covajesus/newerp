@@ -3,6 +3,7 @@ from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
+from app.backend.db.models import DteModel, CustomerModel
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 
@@ -102,3 +103,12 @@ def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
         data = DteClass(db).resend(dte_id, email)
 
     return {"message": data}
+
+@dtes.get("/massive_resend")
+def massive_resend(db: Session = Depends(get_db)):
+    dte_data = db.query(DteModel).filter(DteModel.stataus_id == 4).first()
+
+    customer = db.query(CustomerModel).filter(CustomerModel.rut == dte_data.rut).first()
+    print(dte_data.id, customer.phone)
+
+    return {"message": 'Listo'}
