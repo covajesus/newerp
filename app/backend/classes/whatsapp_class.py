@@ -137,7 +137,7 @@ class WhatsappClass:
         else:
             customer_phone = phone_str
 
-        if user.full_name != None:
+        if user:
             payload = {
                         "messaging_product": "whatsapp",
                         "to": f"{customer_phone}",
