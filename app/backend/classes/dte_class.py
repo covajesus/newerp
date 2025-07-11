@@ -5,6 +5,7 @@ from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
 from sqlalchemy import cast, Date, func
 from datetime import datetime, timedelta
+from sqlalchemy import or_
 import json
 
 class DteClass:
@@ -704,6 +705,7 @@ class DteClass:
             .filter(DteModel.payment_type_id == 2)
             .filter(DteModel.dte_version_id == 1)
             .filter(DteModel.period == period)
+            .filter(or_(DteModel.comment.is_(None), DteModel.comment == ""))
             .all()
         )
 
@@ -793,3 +795,90 @@ class DteClass:
                 print(f"Error al procesar folio {dte.folio}: {str(e)}")
 
         return "Listo"
+
+    def get_dte_authorization_code(self, folio: int):
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        search_url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
+        base_info_url = "https://libredte.cl/api/pagos/cobros/info"
+        
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+
+        dte = (
+            self.db.query(DteModel)
+            .filter(DteModel.folio == folio)
+            .filter(DteModel.dte_version_id == 1)
+            .first()
+        )
+
+        if not dte:
+            print(f"No se encontró el DTE con folio {folio}")
+            return 2
+
+        print("Folio:", dte.folio)
+
+        payload = {
+            "codigo": None,
+            "vencidos": None,
+            "vencen_hoy": None,
+            "vigentes": None,
+            "sin_vencimiento": None,
+            "dte_emitidos": None,
+            "receptor": None,
+            "dte": None,
+            "folio": dte.folio,
+            "fecha_desde": None,
+            "fecha_hasta": None,
+            "pagado": None,
+            "pagado_desde": None,
+            "pagado_hasta": None,
+            "total": None,
+            "total_desde": None,
+            "total_hasta": None,
+            "medio": None,
+            "sucursal": None
+        }
+
+        try:
+            # 1. Obtener código
+            response = requests.post(search_url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            if data:
+                codigo = data[0].get("codigo")
+                print("Código extraído:", codigo)
+
+                # 2. Obtener info detallada
+                rut_emisor = "76063822-6"
+                info_url = f"{base_info_url}/{codigo}/{rut_emisor}?getDocumento=0&getDetalle=0&getLinks=0"
+
+                info_response = requests.get(info_url, headers=headers)
+                info_response.raise_for_status()
+                info_data = info_response.json()
+
+                # 3. Extraer authorizationCode
+                authorization_code = (
+                    info_data
+                    .get("datos", {})
+                    .get("detailOutput", {})
+                    .get("authorizationCode")
+                )
+
+                print("Authorization Code:", authorization_code)
+
+                if authorization_code:
+                    # 4. Guardar en la BD
+                    dte.comment = f"Código de autorización: {authorization_code}"
+                    self.db.commit()
+                    self.db.refresh(dte)
+                    return 1
+
+            print("No se obtuvo código o authorizationCode")
+            return 2
+
+        except Exception as e:
+            print(f"Error al procesar folio {dte.folio}: {str(e)}")
+            return 2

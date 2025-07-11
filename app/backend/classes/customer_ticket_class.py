@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
+from app.backend.classes.dte_class import DteClass
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
@@ -1204,7 +1205,6 @@ class CustomerTicketClass:
                 "folio": dte.folio,
             }
 
- 
             url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
                 
             response = requests.post(
@@ -1243,6 +1243,8 @@ class CustomerTicketClass:
 
                             self.db.commit()
                             self.db.refresh(dte)
+
+                            authorization_code_response = DteClass(self.db).get_dte_authorization_code(dte.folio)
 
                             print("Dte actualizado correctamente: " + str(dte.folio))
 
