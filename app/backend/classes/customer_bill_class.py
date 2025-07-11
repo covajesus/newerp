@@ -4,6 +4,7 @@ from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
+from app.backend.classes.dte_class import DteClass
 import requests
 from datetime import datetime
 import json
@@ -1273,3 +1274,61 @@ class CustomerBillClass:
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
+
+    def check_payments(self):
+        dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id  == 33).filter(DteModel.dte_version_id == 1).all()
+
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        for dte in dtes:
+            print(dte.folio)
+            data = {
+                "folio": dte.folio,
+            }
+
+            url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
+                
+            response = requests.post(
+                url,
+                json=data,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+            print(response.text)
+
+            if response.status_code == 200:
+                data = json.loads(response.text)
+
+                for item in data:
+                    folio = item.get("folio")
+                    payment_date = item.get("fecha")
+                    payment_status = item.get("pagado")
+                    amount = item.get("monto")
+
+                    if payment_status != None:
+                        print('Ejecutando paso 1.')
+                        dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
+                        if not dte:
+                            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+                        if dte.status_id == 4:
+                            print('Ejecutando paso 2.')
+                            dte.expense_type_id = 23
+                            dte.payment_type_id = 2
+                            dte.card_amount = amount
+                            dte.payment_date = payment_date
+                            dte.status_id = 5
+                            dte.updated_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                            self.db.commit()
+                            self.db.refresh(dte)
+
+                            authorization_code_response = DteClass(self.db).get_dte_authorization_code(dte.folio)
+
+                            print("Dte actualizado correctamente: " + str(dte.folio))
+
+                            WhatsappClass(self.db).notify_paymeent(dte.folio)
+
+
