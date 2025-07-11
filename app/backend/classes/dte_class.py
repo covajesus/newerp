@@ -638,7 +638,7 @@ class DteClass:
                                 added_date=dte.get('fecha')
                             )
 
-                        self.db.add(store_dte)
+                            self.db.add(store_dte)
                         try:
                             self.db.commit()
                             print(f"DTE con folio {dte.get('folio')} guardado correctamente.")
