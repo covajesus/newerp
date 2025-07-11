@@ -490,7 +490,6 @@ class DteClass:
 
     def refresh_import_by_rut(self):
         customers = self.db.query(CustomerModel).filter(CustomerModel.rut != '66666666-6').all()
-
         for customer in customers:
             print(customer.rut)
             rut = customer.rut
@@ -595,52 +594,45 @@ class DteClass:
                         else:
                             continue  # Tipo desconocido
 
-                        old_period = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m")
-                        old_dte = self.db.query(DteModel).filter(
-                            DteModel.folio == dte.get('folio'),
-                            DteModel.rut == rut,
-                            DteModel.dte_type_id == dte_type_id,
-                            DteModel.dte_version_id == 1,
-                            DteModel.period == old_period
+                        branch_office = self.db.query(BranchOfficeModel).filter(
+                            BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).first()
 
-                        old_dte_qty = self.db.query(DteModel).filter(
-                            DteModel.folio == dte.get('folio'),
+                        validate_dte_existence = self.db.query(DteModel).filter(
                             DteModel.rut == rut,
                             DteModel.dte_type_id == dte_type_id,
                             DteModel.dte_version_id == 1,
-                            DteModel.period == old_period
+                            DteModel.period == datetime.now().strftime('%Y-%m')
                         ).count()
 
-                        branch_office_id = old_dte.branch_office_id if old_dte_qty > 0 else 80
-
-                        store_dte = DteModel(
-                            branch_office_id=branch_office_id,
-                            cashier_id=0,
-                            dte_type_id=dte_type_id,
-                            dte_version_id=1,
-                            status_id=4,
-                            folio=dte.get('folio'),
-                            rut=rut,
-                            cash_amount=dte.get('total'),
-                            card_amount=0,
-                            subtotal=round(dte.get('total') / 1.19),
-                            tax=dte.get('total') - round(dte.get('total') / 1.19),
-                            discount=0,
-                            total=dte.get('total'),
-                            ticket_serial_number=0,
-                            ticket_hour=0,
-                            ticket_transaction_number=0,
-                            ticket_dispenser_number=0,
-                            ticket_number=0,
-                            ticket_station_number=0,
-                            ticket_sa=0,
-                            ticket_correlative=0,
-                            period = datetime.now().strftime('%Y-%m'),
-                            entrance_hour='',
-                            exit_hour='',
-                            added_date=dte.get('fecha')
-                        )
+                        if validate_dte_existence == 0:
+                            store_dte = DteModel(
+                                branch_office_id=branch_office.id,
+                                cashier_id=0,
+                                dte_type_id=dte_type_id,
+                                dte_version_id=1,
+                                status_id=4,
+                                folio=dte.get('folio'),
+                                rut=rut,
+                                cash_amount=dte.get('total'),
+                                card_amount=0,
+                                subtotal=round(dte.get('total') / 1.19),
+                                tax=dte.get('total') - round(dte.get('total') / 1.19),
+                                discount=0,
+                                total=dte.get('total'),
+                                ticket_serial_number=0,
+                                ticket_hour=0,
+                                ticket_transaction_number=0,
+                                ticket_dispenser_number=0,
+                                ticket_number=0,
+                                ticket_station_number=0,
+                                ticket_sa=0,
+                                ticket_correlative=0,
+                                period = datetime.now().strftime('%Y-%m'),
+                                entrance_hour='',
+                                exit_hour='',
+                                added_date=dte.get('fecha')
+                            )
 
                         self.db.add(store_dte)
                         try:
