@@ -119,3 +119,9 @@ def change_status(customer_bill_inputs:ChangeStatusInCustomerBill, db: Session =
     data = CustomerBillClass(db).change_status(customer_bill_inputs)
 
     return {"message": data}
+
+@customer_bills.get("/check_payments")
+def check_payments(db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).check_payments()
+
+    return {"message": data}

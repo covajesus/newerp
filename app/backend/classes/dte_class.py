@@ -696,14 +696,16 @@ class DteClass:
 
     
     def check_dte_payment(self):
-        dte_data = self.db.query(DteModel).filter(DteModel.status_id == 5).filter(DteModel.payment_type_id == 2).all()
+        period = datetime.now().strftime('%Y-%m')
+
+        dte_data = self.db.query(DteModel).filter(DteModel.status_id == 5).filter(DteModel.payment_type_id == 2).filter(DteModel.dte_version_id == 1).filter(DteModel.period == period).all()
 
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         for dte in dte_data:
             url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
             
-            print(dte.folio)
+            print("Folio:" str(dte.folio))
 
             payload = json.dumps({
                 "codigo": None,
