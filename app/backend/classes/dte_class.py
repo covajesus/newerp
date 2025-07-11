@@ -521,11 +521,9 @@ class DteClass:
                     dtes = data["dtes"]
                 else:
                     print("No se encontraron documentos o formato inesperado.")
-                    return
 
                 if not dtes:
                     print("No se encontraron documentos para ese RUT.")
-                    return
 
                 print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
                 for dte in dtes:
