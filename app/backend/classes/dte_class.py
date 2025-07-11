@@ -705,7 +705,7 @@ class DteClass:
             .filter(DteModel.payment_type_id == 2)
             .filter(DteModel.dte_version_id == 1)
             .filter(DteModel.period == period)
-            .filter(or_(DteModel.comment.is_(None), DteModel.comment == ""))
+            .filter(DteModel.comment.is_(None))
             .all()
         )
 
