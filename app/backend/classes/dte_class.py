@@ -488,171 +488,170 @@ class DteClass:
             print("La respuesta no es un JSON válido:")
             print(response.text)
 
+    def refresh_import_by_rut(self):
+        customers = self.db.query(CustomerModel).all()
 
-        def refresh_import_by_rut(self):
-            customers = self.db.query(CustomerModel).all()
+        for customer in customers:
+            print(customer.rut)
+            rut = customer.rut
+            url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-            for customer in customers:
-                print(customer.rut)
-                rut = customer.rut
-                url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
-                token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            payload = json.dumps({
+                "receptor": rut,
+                "fecha_desde": datetime.now().strftime("%Y-%m-01")
+            })
 
-                payload = json.dumps({
-                    "receptor": rut,
-                    "fecha_desde": datetime.now().strftime("%Y-%m-01")
-                })
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {token}'
+            }
 
-                headers = {
-                    'Accept': 'application/json',
-                    'Authorization': f'Bearer {token}'
-                }
+            response = requests.post(url, headers=headers, data=payload)
 
-                response = requests.post(url, headers=headers, data=payload)
+            try:
+                data = response.json()
+                print("Respuesta recibida:", data)
 
-                try:
-                    data = response.json()
-                    print("Respuesta recibida:", data)
+                dtes = None  # Evita error de variable no definida
 
-                    dtes = None  # Evita error de variable no definida
+                if isinstance(data, list):
+                    dtes = data
+                elif isinstance(data, dict) and "dtes" in data:
+                    dtes = data["dtes"]
+                else:
+                    print("No se encontraron documentos o formato inesperado.")
 
-                    if isinstance(data, list):
-                        dtes = data
-                    elif isinstance(data, dict) and "dtes" in data:
-                        dtes = data["dtes"]
-                    else:
-                        print("No se encontraron documentos o formato inesperado.")
+                if not dtes:
+                    print("No se encontraron documentos para ese RUT.")
+                    continue  # Salta al siguiente cliente
 
-                    if not dtes:
-                        print("No se encontraron documentos para ese RUT.")
-                        continue  # Salta al siguiente cliente
+                print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
+                for dte in dtes:
+                    customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
 
-                    print(f"Se encontraron {len(dtes)} documentos para el RUT {rut}:\n")
-                    for dte in dtes:
-                        customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
+                    if not customer:
+                        info_url = "https://libredte.cl/api/dte/contribuyentes/info/" + str(rut)
+                        response = requests.get(info_url, headers=headers)
+                        data = response.json()
 
-                        if not customer:
-                            info_url = "https://libredte.cl/api/dte/contribuyentes/info/" + str(rut)
-                            response = requests.get(info_url, headers=headers)
-                            data = response.json()
+                        print("Información del contribuyente:")
+                        print(f"RUT: {data.get('rut')}-{data.get('dv')}")
+                        print(f"Razón Social: {data.get('razon_social')}")
+                        print(f"Giro: {data.get('giro')}")
+                        print(f"Actividad Económica: {data.get('actividad_economica')}")
+                        print(f"Teléfono: {data.get('telefono')}")
+                        print(f"Email: {data.get('email')}")
+                        print(f"Dirección: {data.get('direccion')}")
+                        print(f"Comuna: {data.get('comuna')} ({data.get('comuna_glosa')})")
 
-                            print("Información del contribuyente:")
-                            print(f"RUT: {data.get('rut')}-{data.get('dv')}")
-                            print(f"Razón Social: {data.get('razon_social')}")
-                            print(f"Giro: {data.get('giro')}")
-                            print(f"Actividad Económica: {data.get('actividad_economica')}")
-                            print(f"Teléfono: {data.get('telefono')}")
-                            print(f"Email: {data.get('email')}")
-                            print(f"Dirección: {data.get('direccion')}")
-                            print(f"Comuna: {data.get('comuna')} ({data.get('comuna_glosa')})")
+                        raw_phone = data.get("telefono", "")
+                        cleaned_phone = raw_phone.replace("+56", "").replace(" ", "").strip()
 
-                            raw_phone = data.get("telefono", "")
-                            cleaned_phone = raw_phone.replace("+56", "").replace(" ", "").strip()
+                        commune_data = self.db.query(CommuneModel).filter(
+                            func.lower(CommuneModel.commune).like(f"%{data.get('comuna_glosa', '').lower()}%")
+                        ).first()
 
-                            commune_data = self.db.query(CommuneModel).filter(
-                                func.lower(CommuneModel.commune).like(f"%{data.get('comuna_glosa', '').lower()}%")
-                            ).first()
+                        store_customer = CustomerModel(
+                            rut=rut,
+                            region_id=commune_data.region_id if commune_data else None,
+                            commune_id=commune_data.id if commune_data else None,
+                            customer=data.get('razon_social'),
+                            address=data.get('direccion'),
+                            activity=data.get('giro', ''),
+                            phone=cleaned_phone,
+                            email=data.get('email'),
+                            added_date=datetime.now()
+                        )
 
-                            store_customer = CustomerModel(
-                                rut=rut,
-                                region_id=commune_data.region_id if commune_data else None,
-                                commune_id=commune_data.id if commune_data else None,
-                                customer=data.get('razon_social'),
-                                address=data.get('direccion'),
-                                activity=data.get('giro', ''),
-                                phone=cleaned_phone,
-                                email=data.get('email'),
-                                added_date=datetime.now()
-                            )
+                        self.db.add(store_customer)
+                        try:
+                            self.db.commit()
+                            print(f"Cliente {dte.get('razon_social', 'Cliente Desconocido')} guardado correctamente.")
+                        except Exception as e:
+                            print(f"Error al guardar el cliente: {str(e)}")
 
-                            self.db.add(store_customer)
-                            try:
-                                self.db.commit()
-                                print(f"Cliente {dte.get('razon_social', 'Cliente Desconocido')} guardado correctamente.")
-                            except Exception as e:
-                                print(f"Error al guardar el cliente: {str(e)}")
+                    print(f"""
+    Tipo: {dte.get('tipo')}
+    Folio: {dte.get('folio')}
+    Razón Social: {dte.get('razon_social')}
+    Fecha: {dte.get('fecha')}
+    Total: {dte.get('total')}
+    Estado: {dte.get('estado')}
+    Track ID: {dte.get('track_id')}
+    Usuario: {dte.get('usuario')}
+    ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
+    -----------------------------
+    """)
 
-                        print(f"""
-        Tipo: {dte.get('tipo')}
-        Folio: {dte.get('folio')}
-        Razón Social: {dte.get('razon_social')}
-        Fecha: {dte.get('fecha')}
-        Total: {dte.get('total')}
-        Estado: {dte.get('estado')}
-        Track ID: {dte.get('track_id')}
-        Usuario: {dte.get('usuario')}
-        ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
-        -----------------------------
-        """)
-
-                        dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
-                        if dte_qty == 0:
-                            if dte.get('tipo') == 'Factura electrónica':
-                                dte_type_id = 33
-                            elif dte.get('tipo') == 'Boleta electrónica':
-                                dte_type_id = 39
-                            elif dte.get('tipo') == 'Nota de crédito electrónica':
-                                dte_type_id = 61
-                            else:
-                                continue  # Tipo desconocido
-
-                            old_period = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m")
-                            old_dte = self.db.query(DteModel).filter(
-                                DteModel.folio == dte.get('folio'),
-                                DteModel.rut == rut,
-                                DteModel.dte_type_id == dte_type_id,
-                                DteModel.dte_version_id == 1,
-                                DteModel.period == old_period
-                            ).first()
-
-                            old_dte_qty = self.db.query(DteModel).filter(
-                                DteModel.folio == dte.get('folio'),
-                                DteModel.rut == rut,
-                                DteModel.dte_type_id == dte_type_id,
-                                DteModel.dte_version_id == 1,
-                                DteModel.period == old_period
-                            ).count()
-
-                            branch_office_id = old_dte.branch_office_id if old_dte_qty > 0 else 80
-
-                            store_dte = DteModel(
-                                branch_office_id=branch_office_id,
-                                cashier_id=0,
-                                dte_type_id=dte_type_id,
-                                dte_version_id=1,
-                                status_id=4,
-                                folio=dte.get('folio'),
-                                rut=rut,
-                                cash_amount=dte.get('total'),
-                                card_amount=0,
-                                subtotal=round(dte.get('total') / 1.19),
-                                tax=dte.get('total') - round(dte.get('total') / 1.19),
-                                discount=0,
-                                total=dte.get('total'),
-                                ticket_serial_number=0,
-                                ticket_hour=0,
-                                ticket_transaction_number=0,
-                                ticket_dispenser_number=0,
-                                ticket_number=0,
-                                ticket_station_number=0,
-                                ticket_sa=0,
-                                ticket_correlative=0,
-                                entrance_hour='',
-                                exit_hour='',
-                                added_date=dte.get('fecha')
-                            )
-
-                            self.db.add(store_dte)
-                            try:
-                                self.db.commit()
-                                print(f"DTE con folio {dte.get('folio')} guardado correctamente.")
-                            except Exception as e:
-                                print(f"Error al guardar el DTE con folio {dte.get('folio')}: {str(e)}")
+                    dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
+                    if dte_qty == 0:
+                        if dte.get('tipo') == 'Factura electrónica':
+                            dte_type_id = 33
+                        elif dte.get('tipo') == 'Boleta electrónica':
+                            dte_type_id = 39
+                        elif dte.get('tipo') == 'Nota de crédito electrónica':
+                            dte_type_id = 61
                         else:
-                            print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
-                except json.JSONDecodeError:
-                    print("La respuesta no es un JSON válido:")
-                    print(response.text)
+                            continue  # Tipo desconocido
+
+                        old_period = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m")
+                        old_dte = self.db.query(DteModel).filter(
+                            DteModel.folio == dte.get('folio'),
+                            DteModel.rut == rut,
+                            DteModel.dte_type_id == dte_type_id,
+                            DteModel.dte_version_id == 1,
+                            DteModel.period == old_period
+                        ).first()
+
+                        old_dte_qty = self.db.query(DteModel).filter(
+                            DteModel.folio == dte.get('folio'),
+                            DteModel.rut == rut,
+                            DteModel.dte_type_id == dte_type_id,
+                            DteModel.dte_version_id == 1,
+                            DteModel.period == old_period
+                        ).count()
+
+                        branch_office_id = old_dte.branch_office_id if old_dte_qty > 0 else 80
+
+                        store_dte = DteModel(
+                            branch_office_id=branch_office_id,
+                            cashier_id=0,
+                            dte_type_id=dte_type_id,
+                            dte_version_id=1,
+                            status_id=4,
+                            folio=dte.get('folio'),
+                            rut=rut,
+                            cash_amount=dte.get('total'),
+                            card_amount=0,
+                            subtotal=round(dte.get('total') / 1.19),
+                            tax=dte.get('total') - round(dte.get('total') / 1.19),
+                            discount=0,
+                            total=dte.get('total'),
+                            ticket_serial_number=0,
+                            ticket_hour=0,
+                            ticket_transaction_number=0,
+                            ticket_dispenser_number=0,
+                            ticket_number=0,
+                            ticket_station_number=0,
+                            ticket_sa=0,
+                            ticket_correlative=0,
+                            entrance_hour='',
+                            exit_hour='',
+                            added_date=dte.get('fecha')
+                        )
+
+                        self.db.add(store_dte)
+                        try:
+                            self.db.commit()
+                            print(f"DTE con folio {dte.get('folio')} guardado correctamente.")
+                        except Exception as e:
+                            print(f"Error al guardar el DTE con folio {dte.get('folio')}: {str(e)}")
+                    else:
+                        print(f"El DTE con folio {dte.get('folio')} ya existe en la base de datos.")
+            except json.JSONDecodeError:
+                print("La respuesta no es un JSON válido:")
+                print(response.text)
 
     def get_total_quantity(user_inputs):
 
