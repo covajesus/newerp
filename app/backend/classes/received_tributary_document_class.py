@@ -241,7 +241,7 @@ class ReceivedTributaryDocumentClass:
             for item in data:
                 # 👉 Validar que el emisor exista
                 if not item.get('emisor'):
-                    
+                    return 1
                 else:
                     verificator_digit = HelperClass.verificator_digit(item['emisor'])
                     rut = str(item['emisor']) + '-' + str(verificator_digit)
