@@ -742,7 +742,7 @@ class DteClass:
             }
 
             try:
-                # Primera llamada: Buscar el cobro y obtener el código
+                # 1. Obtener código
                 response = requests.post(search_url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -751,7 +751,7 @@ class DteClass:
                     codigo = data[0].get("codigo")
                     print("Código extraído:", codigo)
 
-                    # Segunda llamada: Obtener más información del cobro usando el código
+                    # 2. Obtener info detallada
                     rut_emisor = "76063822-6"
                     info_url = f"{base_info_url}/{codigo}/{rut_emisor}?getDocumento=0&getDetalle=0&getLinks=0"
 
@@ -764,8 +764,27 @@ class DteClass:
                     info_response.raise_for_status()
                     info_data = info_response.json()
 
-                    print("Info adicional:", info_data)
+                    # 3. Extraer authorizationCode
+                    authorization_code = (
+                        info_data
+                        .get("datos", {})
+                        .get("detailOutput", {})
+                        .get("authorizationCode")
+                    )
 
+                    print("Authorization Code:", authorization_code)
+
+                    # 4. Guardar en la BD
+                    dte_record = (
+                        self.db.query(DteModel)
+                        .filter(DteModel.folio == dte.folio)
+                        .filter(DteModel.dte_version_id == 1)
+                        .first()
+                    )
+
+                    dte_record.comment = f"Código: {codigo} | Authorization Code: {authorization_code}"
+                    self.db.commit()
+                    self.db.refresh(dte_record)
 
                 else:
                     print("No hay resultados para este folio")
