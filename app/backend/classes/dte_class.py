@@ -705,7 +705,7 @@ class DteClass:
         for dte in dte_data:
             url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
             
-            print("Folio:" str(dte.folio))
+            print("Folio:" + str(dte.folio))
 
             payload = json.dumps({
                 "codigo": None,
