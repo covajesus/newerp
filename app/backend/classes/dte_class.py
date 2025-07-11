@@ -605,7 +605,11 @@ class DteClass:
                             DteModel.period == datetime.now().strftime('%Y-%m')
                         ).count()
 
-                        if validate_dte_existence == 0:
+                        branch_office_qty = self.db.query(BranchOfficeModel).filter(
+                            BranchOfficeModel.dte_code == dte.get('sucursal_sii')
+                        ).count()
+
+                        if validate_dte_existence == 0 and branch_office_qty > 0:
                             store_dte = DteModel(
                                 branch_office_id=branch_office.id,
                                 cashier_id=0,
