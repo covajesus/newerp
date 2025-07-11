@@ -693,3 +693,45 @@ class DteClass:
         response = requests.request("POST", url, headers=headers, data=payload)
 
         print(response.text)
+
+    
+    def check_dte_payment(self):
+        dte_data = self.db.query(DteModel).filter(DteModel.status_id == 5).all()
+
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        for dte in dte_data:
+            url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
+
+            payload = json.dumps({
+                "codigo": None,
+                "vencidos": None,
+                "vencen_hoy": None,
+                "vigentes": None,
+                "sin_vencimiento": None,
+                "dte_emitidos": None,
+                "receptor": None,
+                "dte": None,
+                "folio": dte.folio,
+                "fecha_desde": None,
+                "fecha_hasta": None,
+                "pagado": None,
+                "pagado_desde": None,
+                "pagado_hasta": None,
+                "total": None,
+                "total_desde": None,
+                "total_hasta": None,
+                "medio": None,
+                "sucursal": None
+            })
+
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {token}'
+            }
+
+            response = requests.request("POST", url, headers=headers, data=payload)
+
+            print(response.text)
+
+        return "Listo"

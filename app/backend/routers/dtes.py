@@ -116,3 +116,9 @@ def massive_resend(db: Session = Depends(get_db)):
                 WhatsappClass(db).resend(dte.id, customer.phone)
 
     return {"message": "Listo"}
+
+@dtes.get("/check_dte_payment")
+def massive_resend(db: Session = Depends(get_db)):
+    DteClass(db).check_dte_payment()
+
+    return {"message": "Listo"}
