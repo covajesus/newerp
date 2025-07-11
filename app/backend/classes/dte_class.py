@@ -6,6 +6,7 @@ from app.backend.classes.helper_class import HelperClass
 from sqlalchemy import cast, Date, func
 from datetime import datetime, timedelta
 from sqlalchemy import or_
+from dateutil.relativedelta import relativedelta
 import json
 
 class DteClass:
@@ -422,8 +423,31 @@ class DteClass:
                         DteModel.dte_version_id == 1
                     ).first()
 
+                    old_period = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m")
+
+                    old_dte = self.db.query(DteModel).filter(
+                        DteModel.folio == dte.get('folio'),
+                        DteModel.rut == rut,
+                        DteModel.dte_type_id == dte_type_id,
+                        DteModel.dte_version_id == 1,
+                        DteModel.period == old_period
+                    ).first()
+
+                    old_dte_qty = self.db.query(DteModel).filter(
+                        DteModel.folio == dte.get('folio'),
+                        DteModel.rut == rut,
+                        DteModel.dte_type_id == dte_type_id,
+                        DteModel.dte_version_id == 1,
+                        DteModel.period == old_period
+                    ).count()
+
+                    if old_dte_qty > 0:
+                        branch_office_id = old_dte.branch_office_id
+                    else:
+                        branch_office_id = 80
+
                     store_dte = DteModel(
-                        branch_office_id=80,
+                        branch_office_id=branch_office_id,
                         cashier_id=0,
                         dte_type_id=dte_type_id,
                         dte_version_id=1,
