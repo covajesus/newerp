@@ -117,8 +117,8 @@ def massive_resend(db: Session = Depends(get_db)):
 
     return {"message": "Listo"}
 
-@dtes.get("/check_dte_payment")
-def massive_resend(db: Session = Depends(get_db)):
-    DteClass(db).check_dte_payment()
+@dtes.get("/get_massive_codes")
+def get_massive_codes(db: Session = Depends(get_db)):
+    DteClass(db).get_massive_codes()
 
     return {"message": "Listo"}

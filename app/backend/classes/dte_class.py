@@ -695,19 +695,29 @@ class DteClass:
         print(response.text)
 
     
-    def check_dte_payment(self):
+    def get_massive_codes(self):
         period = datetime.now().strftime('%Y-%m')
 
-        dte_data = self.db.query(DteModel).filter(DteModel.status_id == 5).filter(DteModel.payment_type_id == 2).filter(DteModel.dte_version_id == 1).filter(DteModel.period == period).all()
+        dte_data = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.period == period)
+            .all()
+        )
 
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
 
         for dte in dte_data:
-            url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
-            
-            print("Folio:" + str(dte.folio))
+            print("Folio:", dte.folio)
 
-            payload = json.dumps({
+            payload = {
                 "codigo": None,
                 "vencidos": None,
                 "vencen_hoy": None,
@@ -727,15 +737,26 @@ class DteClass:
                 "total_hasta": None,
                 "medio": None,
                 "sucursal": None
-            })
-
-            headers = {
-                'Accept': 'application/json',
-                'Authorization': f'Bearer {token}'
             }
 
-            response = requests.request("POST", url, headers=headers, data=payload)
+            try:
+                response = requests.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
 
-            print(response.text)
+                if data:
+                    codigo = data[0].get("codigo")
+                    print("Código extraído:", codigo)
+                    
+                    dte = self.db.query(DteModel).filter(DteModel.folio == dte.folio).filter(DteModel.dte_version_id == 1).first()
+                    dte.comment = "El código de autorización es: " + str(codigo)
+                    self.db.commit()
+                    self.db.refresh(dte)
+
+                else:
+                    print("No hay resultados para este folio")
+
+            except Exception as e:
+                print(f"Error al consultar folio {dte.folio}: {str(e)}")
 
         return "Listo"
