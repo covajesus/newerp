@@ -492,6 +492,7 @@ class DteClass:
         customers = self.db.query(CustomerModel).all()
 
         for customer in customers:
+            print(customer.rut)
             rut = customer.rut
             url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
             token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
