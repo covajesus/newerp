@@ -41,8 +41,6 @@ class CustomerCollectionClass:
                 ).count()
     
                 if check_existence > 0:
-                    print(branch_office_id, total_amount, subscriber_cashier.id)
-
                     delete_collection = self.db.query(CollectionModel).filter(
                         CollectionModel.branch_office_id == branch_office_id,
                         CollectionModel.cashier_id == subscriber_cashier.id,
