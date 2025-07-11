@@ -17,7 +17,7 @@ class CustomerCollectionClass:
         results = (
             self.db.query(
                 DteModel.branch_office_id,
-                func.sum(DteModel.total).label("total_amount"),
+                func.sum(DteModel.subtotal).label("total_amount"),
                 func.count(DteModel.id).label("total_tickets")
             )
             .filter(DteModel.period == period)

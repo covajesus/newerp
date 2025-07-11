@@ -47,7 +47,7 @@ class ReceivedTributaryDocumentClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.status_id
+                DteModel.added_date.desc()
             )
 
             # Si se solicita paginación
@@ -145,7 +145,7 @@ class ReceivedTributaryDocumentClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.status_id
+                DteModel.added_date.desc()
             )
 
             data = query.all()
@@ -215,11 +215,7 @@ class ReceivedTributaryDocumentClass:
     
     def refresh(self):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-        # Obtener la fecha actual
         until = datetime.now().strftime('%Y-%m-%d')
-
-        # Restar 60 días a la fecha actual
         since = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
         
         data = {
@@ -228,12 +224,9 @@ class ReceivedTributaryDocumentClass:
             "fecha_hasta": until,
             "emisor": '76063822-6'
         }
-                
+
         try:
-            # Endpoint para generar un DTE temporal
-            url = f"https://libredte.cl/api/dte/dte_recibidos/buscar/" + '76063822'
-            
-            # Enviar solicitud a la API
+            url = f"https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
             response = requests.get(
                 url,
                 json=data,
@@ -244,50 +237,50 @@ class ReceivedTributaryDocumentClass:
             )
             
             data = json.loads(response.text)
+
             for item in data:
-                verificator_digit = HelperClass.verificator_digit(item['emisor'])
-
-                rut = str(item['emisor']) + '-' + str(verificator_digit)
-                
-                if item['total'] != None:
-                    total = item['total']
+                # 👉 Validar que el emisor exista
+                if not item.get('emisor'):
+                    
                 else:
-                    total = 0
+                    verificator_digit = HelperClass.verificator_digit(item['emisor'])
+                    rut = str(item['emisor']) + '-' + str(verificator_digit)
 
-                net = HelperClass.get_net(total)
+                    total = item['total'] if item['total'] is not None else 0
+                    net = HelperClass.get_net(total)
 
-                dte = DteModel()
-                # Asignar los valores del formulario a la instancia del modelo
-                dte.branch_office_id = 0
-                dte.cashier_id = 0
-                dte.dte_type_id = item['dte']
-                dte.dte_version_id = 2
-                dte.status_id = 1
-                dte.chip_id = 0
-                dte.rut = rut
-                dte.folio = item['folio']
-                dte.cash_amount = total
-                dte.card_amount = 0
-                dte.subtotal = net
-                dte.tax = int(total) - int(net)
-                dte.discount = 0
-                dte.total = total
-                dte.added_date = str(item['fecha']) + ' 00:00:00'
+                    validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
+                    if validate_supplier_existence == 0:
+                        supplier = SupplierModel()
+                        supplier.rut = rut
+                        supplier.supplier = item['razon_social'].upper()
+                        self.db.add(supplier)
+                        self.db.commit()
 
-                self.db.add(dte)
-                self.db.commit()
+                    dte = DteModel()
+                    dte.branch_office_id = 0
+                    dte.cashier_id = 0
+                    dte.dte_type_id = item['dte']
+                    dte.dte_version_id = 2
+                    dte.status_id = 1
+                    dte.chip_id = 0
+                    dte.rut = rut
+                    dte.folio = item['folio']
+                    dte.cash_amount = total
+                    dte.card_amount = 0
+                    dte.subtotal = net
+                    dte.tax = int(total) - int(net)
+                    dte.discount = 0
+                    dte.total = total
+                    dte.added_date = str(item['fecha']) + ' 00:00:00'
 
-                validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
-
-                if validate_supplier_existence == 0:
-                    supplier = SupplierModel()
-                    supplier.rut = rut
-                    supplier.supplier = item['razon_social'].upper()
-                    self.db.add(supplier)
+                    self.db.add(dte)
                     self.db.commit()
+
         except Exception as e:
             print("Error al conectarse a la API:", e)
-            return None 
+            return None
+
     
     def pay(self, form_data):
         selected_bills = form_data.selected_bills
