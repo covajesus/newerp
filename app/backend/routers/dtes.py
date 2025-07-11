@@ -122,3 +122,9 @@ def get_massive_codes(db: Session = Depends(get_db)):
     DteClass(db).get_massive_codes()
 
     return {"message": "Listo"}
+
+@dtes.get("/refresh_import_by_rut")
+def refresh_import_by_rut(db: Session = Depends(get_db)):
+    DteClass(db).refresh_import_by_rut()
+
+    return {"message": "Listo"}
