@@ -489,7 +489,7 @@ class DteClass:
             print(response.text)
 
     def refresh_import_by_rut(self):
-        customers = self.db.query(CustomerModel).all()
+        customers = self.db.query(CustomerModel).filter(CustomerModel.rut != '66666666-6').all()
 
         for customer in customers:
             print(customer.rut)
@@ -636,6 +636,7 @@ class DteClass:
                             ticket_station_number=0,
                             ticket_sa=0,
                             ticket_correlative=0,
+                            period = datetime.now().strftime('%Y-%m'),
                             entrance_hour='',
                             exit_hour='',
                             added_date=dte.get('fecha')
