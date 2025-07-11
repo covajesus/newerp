@@ -782,7 +782,7 @@ class DteClass:
                         .first()
                     )
 
-                    dte_record.comment = f"Código: {codigo} | Authorization Code: {authorization_code}"
+                    dte_record.comment = f"Código de autorización: {authorization_code}"
                     self.db.commit()
                     self.db.refresh(dte_record)
 
