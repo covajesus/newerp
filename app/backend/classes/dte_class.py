@@ -708,7 +708,9 @@ class DteClass:
         )
 
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-        url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
+        search_url = "https://libredte.cl/api/pagos/cobros/buscar/76063822"
+        base_info_url = "https://libredte.cl/api/pagos/cobros/info"
+        
         headers = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {token}'
@@ -740,23 +742,34 @@ class DteClass:
             }
 
             try:
-                response = requests.post(url, headers=headers, json=payload)
+                # Primera llamada: Buscar el cobro y obtener el código
+                response = requests.post(search_url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
 
                 if data:
                     codigo = data[0].get("codigo")
                     print("Código extraído:", codigo)
-                    
-                    dte = self.db.query(DteModel).filter(DteModel.folio == dte.folio).filter(DteModel.dte_version_id == 1).first()
-                    dte.comment = "El código de autorización es: " + str(codigo)
-                    self.db.commit()
-                    self.db.refresh(dte)
+
+                    # Segunda llamada: Obtener más información del cobro usando el código
+                    rut_emisor = "76063822-6"
+                    info_url = f"{base_info_url}/{codigo}/{rut_emisor}?getDocumento=0&getDetalle=0&getLinks=0"
+
+                    info_headers = {
+                        'Accept': 'application/json'
+                    }
+
+                    info_response = requests.get(info_url, headers=info_headers)
+                    info_response.raise_for_status()
+                    info_data = info_response.json()
+
+                    print("Info adicional:", info_data)
+
 
                 else:
                     print("No hay resultados para este folio")
 
             except Exception as e:
-                print(f"Error al consultar folio {dte.folio}: {str(e)}")
+                print(f"Error al procesar folio {dte.folio}: {str(e)}")
 
         return "Listo"
