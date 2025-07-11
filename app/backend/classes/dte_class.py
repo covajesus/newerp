@@ -756,7 +756,8 @@ class DteClass:
                     info_url = f"{base_info_url}/{codigo}/{rut_emisor}?getDocumento=0&getDetalle=0&getLinks=0"
 
                     info_headers = {
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'Authorization': f'Bearer {token}'
                     }
 
                     info_response = requests.get(info_url, headers=info_headers)
