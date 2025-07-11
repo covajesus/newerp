@@ -42,7 +42,7 @@ class CustomerCollectionClass:
     
                 if check_existence > 0:
                     print(branch_office_id, total_amount, subscriber_cashier.id)
-                    
+
                     delete_collection = self.db.query(CollectionModel).filter(
                         CollectionModel.branch_office_id == branch_office_id,
                         CollectionModel.cashier_id == subscriber_cashier.id,
@@ -53,6 +53,17 @@ class CustomerCollectionClass:
                         self.db.delete(delete_collection)
                         self.db.commit()
 
+                    collection = CollectionModel()
+                    collection.branch_office_id = branch_office_id
+                    collection.cashier_id = subscriber_cashier.id
+                    collection.subscribers = total_amount
+                    collection.total_tickets = result.total_tickets
+                    collection.added_date = date
+                    collection.updated_date = date
+                    self.db.add(collection)
+                    self.db.commit()
+                    self.db.refresh(collection)
+                else:
                     collection = CollectionModel()
                     collection.branch_office_id = branch_office_id
                     collection.cashier_id = subscriber_cashier.id
