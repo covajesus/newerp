@@ -259,6 +259,7 @@ class BankStatementClass:
                                 rut = f"{cuerpo}-{dv}"
                                 print("Match:", rut)
                             else:
+                                rut = 0
                                 print("No es un RUT válido en formato")
 
                 fixed_period = HelperClass.fix_current_dte_period(period)
