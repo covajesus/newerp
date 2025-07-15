@@ -250,11 +250,13 @@ class BankStatementClass:
                             
                             raw = row[col]
 
-                            cleaned = re.sub(r'[^\dkK]', '', raw)  # Elimina puntos y guión: "198998880"
+                            cleaned = re.sub(r'[^\dkK]', '', raw)  # Elimina puntos y guiones
 
-                            match = re.fullmatch(r'\d{9}[\dkK]', cleaned)
+                            match = re.fullmatch(r'\d{8,9}[\dkK]', cleaned)
                             if match:
-                                rut = f"{cleaned[0:8]}-{cleaned[9]}"
+                                cuerpo = cleaned[:-1].lstrip("0")  # Elimina ceros a la izquierda del cuerpo
+                                dv = cleaned[-1].upper()  # Dígito verificador
+                                rut = f"{cuerpo}-{dv}"
                                 print("Match:", rut)
                             else:
                                 print("No es un RUT válido en formato")

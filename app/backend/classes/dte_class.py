@@ -417,63 +417,51 @@ class DteClass:
                     elif dte.get('tipo') == 'Nota de crédito electrónica':
                         dte_type_id = 61
                     
-                    dte_data = self.db.query(DteModel).filter(
-                        DteModel.rut == rut,
-                        DteModel.dte_type_id == dte_type_id,
-                        DteModel.dte_version_id == 1
-                    ).first()
+                    branch_office = self.db.query(BranchOfficeModel).filter(
+                            BranchOfficeModel.dte_code == dte.get('sucursal_sii')
+                        ).first()
 
-                    old_period = (datetime.now() - relativedelta(months=1)).strftime("%Y-%m")
+                    validate_dte_existence = self.db.query(DteModel).filter(
+                            DteModel.rut == rut,
+                            DteModel.dte_type_id == dte_type_id,
+                            DteModel.dte_version_id == 1,
+                            DteModel.period == datetime.now().strftime('%Y-%m')
+                        ).count()
 
-                    old_dte = self.db.query(DteModel).filter(
-                        DteModel.folio == dte.get('folio'),
-                        DteModel.rut == rut,
-                        DteModel.dte_type_id == dte_type_id,
-                        DteModel.dte_version_id == 1,
-                        DteModel.period == old_period
-                    ).first()
+                    branch_office_qty = self.db.query(BranchOfficeModel).filter(
+                            BranchOfficeModel.dte_code == dte.get('sucursal_sii')
+                        ).count()
 
-                    old_dte_qty = self.db.query(DteModel).filter(
-                        DteModel.folio == dte.get('folio'),
-                        DteModel.rut == rut,
-                        DteModel.dte_type_id == dte_type_id,
-                        DteModel.dte_version_id == 1,
-                        DteModel.period == old_period
-                    ).count()
+                    if validate_dte_existence == 0 and branch_office_qty > 0:
+                        store_dte = DteModel(
+                            branch_office_id=branch_office.id,
+                            cashier_id=0,
+                            dte_type_id=dte_type_id,
+                            dte_version_id=1,
+                            status_id=4,
+                            folio=dte.get('folio'),
+                            rut=rut,
+                            cash_amount=dte.get('total'),
+                            card_amount=0,
+                            subtotal=round(dte.get('total')/1.19),
+                            tax=dte.get('total') - round(dte.get('total')/1.19),
+                            discount=0,
+                            total=dte.get('total'),
+                            ticket_serial_number=0,
+                            ticket_hour=0,
+                            ticket_transaction_number=0,
+                            ticket_dispenser_number=0,
+                            ticket_number=0,
+                            ticket_station_number=0,
+                            ticket_sa=0,
+                            ticket_correlative=0,
+                            entrance_hour='',
+                            exit_hour='',
+                            period=datetime.now().strftime('%Y-%m'),
+                            added_date=dte.get('fecha')
+                        )
 
-                    if old_dte_qty > 0:
-                        branch_office_id = old_dte.branch_office_id
-                    else:
-                        branch_office_id = 80
-
-                    store_dte = DteModel(
-                        branch_office_id=branch_office_id,
-                        cashier_id=0,
-                        dte_type_id=dte_type_id,
-                        dte_version_id=1,
-                        status_id=4,
-                        folio=dte.get('folio'),
-                        rut=rut,
-                        cash_amount=dte.get('total'),
-                        card_amount=0,
-                        subtotal=round(dte.get('total')/1.19),
-                        tax=dte.get('total') - round(dte.get('total')/1.19),
-                        discount=0,
-                        total=dte.get('total'),
-                        ticket_serial_number=0,
-                        ticket_hour=0,
-                        ticket_transaction_number=0,
-                        ticket_dispenser_number=0,
-                        ticket_number=0,
-                        ticket_station_number=0,
-                        ticket_sa=0,
-                        ticket_correlative=0,
-                        entrance_hour='',
-                        exit_hour='',
-                        added_date=dte.get('fecha')
-                    )
-
-                    self.db.add(store_dte)
+                        self.db.add(store_dte)
 
                     try:
                         self.db.commit()

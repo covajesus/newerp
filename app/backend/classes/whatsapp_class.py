@@ -30,6 +30,9 @@ class WhatsappClass:
         
         added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
 
+        if dte_data.chip_id == 1:
+            total = dte_data.total + 5000
+
         required_fields = {
             "Tipo DTE": dte_data.dte_type_id,
             "Folio": dte_data.folio,
