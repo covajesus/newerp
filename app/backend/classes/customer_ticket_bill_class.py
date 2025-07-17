@@ -143,7 +143,7 @@ class CustomerTicketBillClass:
                     "folio": dte.folio,
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "payment_date": dte.payment_date.strftime('%d-%m-%Y') if dte.payment_date else None,
+                    "payment_date": dte.payment_date if dte.payment_date else None,
                     "branch_office": dte.branch_office,
                     "status_id": dte.status_id
                 } for dte in data]
