@@ -43,6 +43,7 @@ class CustomerTicketBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.payment_date,
                         BranchOfficeModel.branch_office,
                         CustomerModel.customer.label('customer')
                 ).outerjoin(
@@ -74,6 +75,7 @@ class CustomerTicketBillClass:
                         DteModel.added_date,
                         DteModel.rut,
                         DteModel.status_id,
+                        DteModel.payment_date,
                         DteModel.chip_id,
                         BranchOfficeModel.branch_office,
                         CustomerModel.customer.label('customer')
@@ -113,8 +115,9 @@ class CustomerTicketBillClass:
                     "chip_id": dte.chip_id,
                     "folio": dte.folio,
                     "total": dte.total,
+                    "payment_date": dte.payment_date.strftime('%d-%m-%Y') if dte.payment_date else None,
                     "status_id": dte.status_id,
-                    "added_date": dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office
                 } for dte in data]
 
@@ -139,7 +142,8 @@ class CustomerTicketBillClass:
                     "chip_id": dte.chip_id,
                     "folio": dte.folio,
                     "total": dte.total,
-                    "added_date": dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                    "payment_date": dte.payment_date.strftime('%d-%m-%Y') if dte.payment_date else None,
                     "branch_office": dte.branch_office,
                     "status_id": dte.status_id
                 } for dte in data]
