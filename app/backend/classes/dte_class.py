@@ -181,7 +181,7 @@ class DteClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.added_date.desc()
+                DteModel.id.desc()
             )
 
             # Paginación
