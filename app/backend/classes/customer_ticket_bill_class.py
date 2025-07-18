@@ -172,8 +172,6 @@ class CustomerTicketBillClass:
             filters.append(DteModel.status_id > 3)
             filters.append(DteModel.rut != None)
             filters.append(DteModel.rut != '66666666-6')
-
-            print()
             
             if supervisor_id != None:
                 # Construir la consulta base con los filtros aplicados
@@ -186,6 +184,7 @@ class CustomerTicketBillClass:
                     DteModel.rut,
                     DteModel.status_id,
                     DteModel.chip_id,
+                    DteModel.payment_date,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
                 ).outerjoin(
@@ -209,6 +208,7 @@ class CustomerTicketBillClass:
                     DteModel.added_date,
                     DteModel.rut,
                     DteModel.status_id,
+                    DteModel.payment_date,
                     DteModel.chip_id,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
@@ -244,6 +244,7 @@ class CustomerTicketBillClass:
                     "id": dte.id,
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
+                    "payment_date": dte.payment_date,
                     "customer": dte.customer,
                     "chip_id": dte.chip_id,
                     "folio": dte.folio,
@@ -271,6 +272,7 @@ class CustomerTicketBillClass:
                     "rut": dte.rut,
                     "branch_office_id": dte.branch_office_id,
                     "customer": dte.customer,
+                    "payment_date": dte.payment_date,
                     "folio": dte.folio,
                     "chip_id": dte.chip_id,
                     "total": dte.total,

@@ -54,15 +54,7 @@ def get_support(support: str, db: Session = Depends(get_db)):
 def delete(id: int, db: Session = Depends(get_db)):
     EmployeeIntershipClass(db).delete(id)
 
-    for question_id in range(1, 28):
-        intership_data = EmployeeIntershipClass(db).get_answers(id, question_id)
-    
-        if intership_data["image"]:
-            remote_path = intership_data["image"]
-            message = FileClass(db).delete(remote_path)
-
-            if message == "success":
-                print(f"Archivo asociado a la pregunta {question_id} eliminado correctamente.")
+    EmployeeIntershipClass(db).delete_employee_intership_answers(id)
 
     return {"message": "success"}
 

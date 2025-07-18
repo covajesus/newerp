@@ -12,7 +12,7 @@ class EmployeeIntershipClass:
     def get_all(self, branch_office_id=None, intern=None, rol_id=None, rut=None, page=0, items_per_page=10):
         try:
             filters = []
-            print(branch_office_id)
+
             if branch_office_id is not None:
                 filters.append(EmployeeIntershipModel.branch_office_id == branch_office_id)
             if intern is not None:
@@ -111,6 +111,20 @@ class EmployeeIntershipClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
+
+    def delete_employee_intership_answers(self, intership_id):
+        intership_answer = self.db.query(EmployeeIntershipAnswerModel).filter(
+            EmployeeIntershipAnswerModel.intership_id == intership_id
+        ).all()
+
+        for answer in intership_answer:
+            intership_answer_detail = self.db.query(EmployeeIntershipAnswerModel).filter(
+                EmployeeIntershipAnswerModel.id == answer.id,
+            ).first()
+
+            self.db.delete(intership_answer_detail)
+            self.db.commit()
+            
         
     def get_answers(self, intership_id, question):
         intership_answer = self.db.query(EmployeeIntershipAnswerModel).filter(
@@ -128,7 +142,6 @@ class EmployeeIntershipClass:
             }
         
     def get(self, id):
-        print(2)
         try:
             data_query = self.db.query(
                             EmployeeIntershipModel.id, 
