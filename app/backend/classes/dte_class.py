@@ -225,7 +225,7 @@ class DteClass:
                 "customer": dte.customer,
                 "rut": dte.rut,
                 "entrance_hour": dte.entrance_hour,
-                "payment_date": dte.payment_date.strftime('%d-%m-%Y') if dte.payment_date else None,
+                "payment_date": dte.payment_date,
                 "status_id": dte.status_id,
                 "exit_hour": dte.exit_hour,
                 "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
