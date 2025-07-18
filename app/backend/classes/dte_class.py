@@ -140,7 +140,7 @@ class DteClass:
 
             filters.append(DteModel.rut != None)
             filters.append(DteModel.dte_version_id == dte_version_id)
-            filters.append(DteModel.status_id > 3)
+            filters.append(DteModel.status_id > '3')
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(

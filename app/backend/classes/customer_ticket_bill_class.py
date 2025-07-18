@@ -173,7 +173,7 @@ class CustomerTicketBillClass:
             filters.append(DteModel.rut != None)
             filters.append(DteModel.rut != '66666666-6')
 
-            print(filters)
+            print()
             
             if supervisor_id != None:
                 # Construir la consulta base con los filtros aplicados
