@@ -182,7 +182,7 @@ class DteClass:
 
                 if not data:
                     return {"status": "error", "message": "No data found"}
-
+                print(data)
                 # Serializar los resultados
                 serialized_data = [{
                     "id": dte.id,
