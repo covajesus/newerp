@@ -52,7 +52,7 @@ def generated_tickets_bills(customer_ticket_bill_inputs:GeneratedCustomerTicketB
 
 @customer_tickets_bills.post("/dtes_to_review")
 def dtes_to_review(customer_ticket_bill_inputs:GeneratedCustomerTicketBillList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = CustomerTicketBillClass(db).get_all_with_customer_to_review(session_user.rol_id, session_user.rut, customer_ticket_bill_inputs.page)
+    data = CustomerTicketBillClass(db).get_all_to_review(session_user.rol_id, session_user.rut, customer_ticket_bill_inputs.page)
 
     return {"message": data}
 
