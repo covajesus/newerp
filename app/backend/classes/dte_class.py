@@ -251,7 +251,6 @@ class DteClass:
         dte.payment_amount = form_data.deposited_amount
         dte.payment_number = form_data.payment_number
         dte.payment_date = form_data.deposit_date
-        dte.total = form_data.deposited_amount
         dte.support = support
 
         try:
