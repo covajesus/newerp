@@ -479,7 +479,7 @@ class CustomerTicketBillClass:
 
     def get(self, id):
         try:
-            data_query = self.db.query(DteModel.id, DteModel.period, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.address, DteModel.cash_amount, CustomerModel.customer, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
+            data_query = self.db.query(DteModel.id, DteModel.payment_type_id, DteModel.payment_date, DteModel.payment_amount, DteModel.payment_number, DteModel.support, DteModel.period, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.address, DteModel.cash_amount, CustomerModel.customer, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
                         outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id). \
                         outerjoin(CustomerModel, CustomerModel.rut == DteModel.rut). \
                         filter(DteModel.id == id). \
