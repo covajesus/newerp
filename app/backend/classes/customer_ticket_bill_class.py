@@ -504,7 +504,12 @@ class CustomerTicketBillClass:
                     "status_id": data_query.status_id,
                     "period": data_query.period,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
-                    "branch_office": data_query.branch_office
+                    "branch_office": data_query.branch_office,
+                    "payment_type_id": data_query.payment_type_id,
+                    "payment_date": data_query.payment_date,
+                    "payment_amount": data_query.payment_amount,
+                    "payment_number": data_query.payment_number,
+                    "support": data_query.support
                 }
 
                 # Crear el resultado final como un diccionario
