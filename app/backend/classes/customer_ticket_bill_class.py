@@ -62,6 +62,7 @@ class CustomerTicketBillClass:
 
                 filters.append(DteModel.dte_version_id == 1)
                 filters.append(DteModel.status_id > 3)
+                filters.append(DteModel.status_id < 16)
                 filters.append(DteModel.rut != None)
                 filters.append(DteModel.rut != '66666666-6')
                 filters.append(or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39))
