@@ -74,6 +74,18 @@ def edit(id:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@customer_tickets_bills.get("/accept_dte_deposit_transfer/{id}")
+def accept_dte_deposit_transfer(id:int, db: Session = Depends(get_db)):
+    data = CustomerTicketBillClass(db).accept_dte_payment(id)
+
+    return {"message": data}
+
+@customer_tickets_bills.get("/reject_dte_deposit_transfer/{id}")
+def reject_dte_deposit_transfer(id:int, db: Session = Depends(get_db)):
+    data = CustomerTicketBillClass(db).reject_dte_payment(id)
+
+    return {"message": data}
+
 @customer_tickets_bills.get("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
     data = CustomerTicketBillClass(db).delete(id)

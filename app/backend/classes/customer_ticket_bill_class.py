@@ -445,6 +445,39 @@ class CustomerTicketBillClass:
         self.db.commit()
         self.db.refresh(dte)
     
+    def accept_dte_payment(self, id):
+        """
+        Actualiza los datos de la patente en la base de datos.
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        # Actualizar campos
+        dte.status_id = 5
+
+        self.db.commit()
+        self.db.refresh(dte)
+
+    def reject_dte_payment(self, id):
+        """
+        Actualiza los datos de la patente en la base de datos.
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="Dte no encontrado")
+
+        # Actualizar campos
+        dte.payment_type_id = None
+        dte.payment_date = None
+        dte.payment_amount = None
+        dte.payment_number = None
+        dte.support = None
+        dte.status_id = 4
+
+        self.db.commit()
+        self.db.refresh(dte)
+
     def change_status(self, form_data):
         """
         Actualiza los datos de la patente en la base de datos.
