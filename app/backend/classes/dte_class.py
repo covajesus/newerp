@@ -243,6 +243,135 @@ class DteClass:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+
+    def get_all_with_customer_to_review(
+        self,
+        folio=None,
+        branch_office_id=None,
+        rut=None,
+        customer=None,
+        period=None,
+        amount=None,
+        supervisor_id=None,
+        status_id=None,
+        dte_version_id=None,
+        page=0,
+        items_per_page=10
+    ):
+        try:
+            # Filtros dinámicos
+            filters = []
+            if folio:
+                filters.append(DteModel.folio == folio)
+            if branch_office_id:
+                filters.append(DteModel.branch_office_id == branch_office_id)
+            if rut:
+                filters.append(DteModel.rut == rut)
+            if customer:
+                filters.append(CustomerModel.customer.like(f"%{customer}%"))
+            if period:
+                filters.append(DteModel.period == period)
+            if amount:
+                filters.append(DteModel.total == amount)
+            if supervisor_id:
+                filters.append(DteModel.supervisor_id == supervisor_id)
+            if status_id:
+                filters.append(DteModel.status_id == status_id)
+
+            filters.append(DteModel.rut != None)
+
+            if dte_version_id is not None:
+                filters.append(DteModel.dte_version_id == dte_version_id)
+
+            # Condición fija: status_id IN (4, 5)
+            filters.append(DteModel.status_id.in_([16]))
+
+            # Construcción de la consulta
+            query = self.db.query(
+                DteModel.id,
+                DteModel.branch_office_id,
+                DteModel.folio,
+                DteModel.total,
+                DteModel.entrance_hour,
+                DteModel.exit_hour,
+                DteModel.status_id,
+                DteModel.payment_date,
+                CustomerModel.rut,
+                CustomerModel.customer,
+                DteModel.dte_type_id,
+                DteModel.added_date,
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+            ).outerjoin(
+                CustomerModel, CustomerModel.rut == DteModel.rut
+            ).filter(
+                *filters
+            ).order_by(
+                DteModel.id.desc()
+            )
+
+            # Paginación
+            total_items = query.count()
+
+            if total_items == 0:
+                return {
+                    "status": "ok",
+                    "message": "No data found",
+                    "data": [],
+                    "total_items": 0,
+                    "total_pages": 0,
+                    "current_page": page,
+                }
+
+            total_pages = (total_items + items_per_page - 1) // items_per_page
+
+            if page < 1 or page > total_pages:
+                return {"status": "error", "message": "Invalid page number"}
+
+            offset = (page - 1) * items_per_page
+            data = query.offset(offset).limit(items_per_page).all()
+
+            # Mostrar consulta generada
+            from sqlalchemy.dialects import mysql
+            print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+
+            # Mostrar rango de elementos
+            start_item = offset + 1
+            end_item = min(offset + items_per_page, total_items)
+            print(f"Mostrando resultados del {start_item} al {end_item} de {total_items}")
+
+            # Serializar resultados
+            serialized_data = [{
+                "id": dte.id,
+                "branch_office_id": dte.branch_office_id,
+                "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
+                "total": dte.total,
+                "customer": dte.customer,
+                "rut": dte.rut,
+                "entrance_hour": dte.entrance_hour,
+                "payment_date": dte.payment_date,
+                "status_id": dte.status_id,
+                "exit_hour": dte.exit_hour,
+                "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                "branch_office": dte.branch_office
+            } for dte in data]
+
+            return {
+                "status": "ok",
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "from_item": start_item,
+                "to_item": end_item,
+                "data": serialized_data
+            }
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        
     def upload_deposit_transfer(self, form_data, support):
         # Crear una nueva instancia de ContractModel
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.dte_id).first()

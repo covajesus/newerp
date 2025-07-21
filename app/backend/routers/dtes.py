@@ -52,6 +52,12 @@ def all_with_customer(dte: DteList, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@dtes.post("/all_with_customer_to_review")
+def all_with_customer_to_review(dte: DteList, db: Session = Depends(get_db)):
+    data = DteClass(db).get_all_with_customer(dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.period, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_version_id, dte.page)
+
+    return {"message": data}
+
 @dtes.post("/import_by_rut")
 def import_by_rut(dte: ImportDte, db: Session = Depends(get_db)):
     data = DteClass(db).import_by_rut(dte.rut)
