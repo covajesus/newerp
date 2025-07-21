@@ -246,7 +246,26 @@ class DteClass:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+    def upload_deposit_transfer(self, form_data, support):
+        # Crear una nueva instancia de ContractModel
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.dte_id).first()
+        dte.status_id = 16
+        dte.payment_type_id = form_data.payment_type_id
+        dte.cash_gross_amount = form_data.deposited_amount
+        dte.payment_number = form_data.payment_number
+        dte.total = form_data.deposited_amount
+        dte.payment_date = form_data.deposit_date
+        dte.total = form_data.deposited_amount
+        dte.support = support
 
+        try:
+            self.db.commit()
+            self.db.refresh(dte)
+            return {"status": "success", "message": "Dte updated successfully"}
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}
+        
     def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos

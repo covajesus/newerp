@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte, UploadDteDepositTransfer
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.models import DteModel, CustomerModel
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
+from app.backend.classes.file_class import FileClass
+from fastapi import UploadFile, File, HTTPException
+from datetime import datetime
+import uuid
 
 dtes = APIRouter(
     prefix="/dtes",
@@ -17,6 +21,30 @@ def index(dte: DteList, db: Session = Depends(get_db)):
     data = DteClass(db).get_all(dte.branch_office_id, dte.dte_type_id, dte.dte_version_id, dte.since, dte.until, dte.subscriber, dte.page)
 
     return {"message": data}
+
+@dtes.post("/upload_deposit_transfer")
+def upload_deposit_transfer(
+    form_data: UploadDteDepositTransfer = Depends(UploadDteDepositTransfer.as_form),
+    support: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    try:
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        unique_id = uuid.uuid4().hex[:8]
+        file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
+        file_category_name = 'dte_deposit_transfer'
+        unique_filename = f"{timestamp}_{unique_id}.{file_extension}" if file_extension else f"{timestamp}_{unique_id}"
+
+        remote_path = f"{file_category_name}_{unique_filename}"
+
+        message = FileClass(db).upload(support, remote_path)
+
+        DteClass(db).upload_deposit_transfer(form_data, remote_path)
+
+        return {"message": message}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
 @dtes.post("/all_with_customer")
 def all_with_customer(dte: DteList, db: Session = Depends(get_db)):

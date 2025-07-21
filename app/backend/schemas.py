@@ -59,6 +59,29 @@ class OldEmployee(BaseModel):
     born_date: str
     privilege: Union[int, None]
 
+class UploadDteDepositTransfer(BaseModel):
+    dte_id: int
+    payment_type_id: int
+    payment_number: str
+    deposited_amount: int
+    deposit_date: str
+
+    @classmethod
+    def as_form(cls,
+                dte_id: int = Form(...),
+                payment_type_id: int = Form(...),
+                payment_number: str = Form(...),
+                deposited_amount: int = Form(...),
+                deposit_date: str = Form(...)
+            ):
+        return cls(
+            dte_id=dte_id,
+            payment_type_id=payment_type_id,
+            payment_number=payment_number,
+            deposited_amount=deposited_amount,
+            deposit_date=deposit_date
+        )
+        
 class UpdateBranchOffice(BaseModel):
     id: int
     branch_office: str = None

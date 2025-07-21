@@ -436,6 +436,8 @@ class DteModel(Base):
     period = Column(String)
     comment = Column(String)
     payment_comment = Column(String)
+    payment_number = Column(String)
+    support = Column(String)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
