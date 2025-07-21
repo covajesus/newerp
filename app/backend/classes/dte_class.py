@@ -251,9 +251,8 @@ class DteClass:
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.dte_id).first()
         dte.status_id = 16
         dte.payment_type_id = form_data.payment_type_id
-        dte.cash_gross_amount = form_data.deposited_amount
+        dte.payment_amount = form_data.deposited_amount
         dte.payment_number = form_data.payment_number
-        dte.total = form_data.deposited_amount
         dte.payment_date = form_data.deposit_date
         dte.total = form_data.deposited_amount
         dte.support = support

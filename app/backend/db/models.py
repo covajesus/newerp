@@ -422,6 +422,7 @@ class DteModel(Base):
     subtotal = Column(Integer)
     tax = Column(Integer)
     discount = Column(Integer)
+    payment_amount = Column(Integer)
     total = Column(Integer)
     ticket_serial_number = Column(Integer)
     ticket_hour = Column(String)
