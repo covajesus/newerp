@@ -1239,8 +1239,7 @@ class DteList(BaseModel):
     branch_office_id: Optional[int] = None  # Opcional con valor predeterminado None
     rut: Optional[str] = None  # Opcional con valor predeterminado None
     customer: Optional[str] = None  # Opcional con valor predeterminado None
-    since: Optional[str] = None  # Opcional con valor predeterminado None
-    until: Optional[str] = None  # Opcional con valor predeterminado None
+    period: Optional[str] = None  # Opcional con valor predeterminado None
     amount: Optional[str] = None  # Opcional con valor predeterminado None
     supervisor_id: Optional[str] = None  # Opcional con valor predeterminado None
     status_id: Optional[int] = None  # Opcional con valor predeterminado None

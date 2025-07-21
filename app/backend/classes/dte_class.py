@@ -13,7 +13,7 @@ class DteClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, folio=None, branch_office_id=None, rut=None, customer=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, page=0, items_per_page=10):
+    def get_all(self, folio=None, branch_office_id=None, rut=None, customer=None, period=None, amount=None, supervisor_id=None, status_id=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
             filters = []
@@ -25,10 +25,8 @@ class DteClass:
                 filters.append(DteModel.rut == rut)
             if customer is not None:
                 filters.append(DteModel.customer.like(f"%{customer}%"))
-            if until is not None:
-                filters.append(DteModel.added_date >= until)  # Fecha desde
-            if since is not None:
-                filters.append(DteModel.added_date <= since)  # Fecha hasta
+            if period is not None:
+                filters.append(DteModel.period == period)
             if amount is not None:
                 filters.append(DteModel.total == amount)
             if supervisor_id is not None:
