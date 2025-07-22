@@ -613,10 +613,10 @@ class DteClass:
                         ).count()
 
                     if branch_office_qty > 0:
-                        print('Si')
+                        print('Si1')
 
                     if validate_dte_existence == 0:
-                        print('Si')
+                        print('Si2')
         
                     if validate_dte_existence == 0 and branch_office_qty > 0:
                         store_dte = DteModel(
