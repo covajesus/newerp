@@ -738,7 +738,7 @@ class CustomerTicketBillClass:
                     }
                 ],
                 "Referencia": [ {
-                    "TpoDocRef": 39,
+                    "TpoDocRef": dte_type_id,
                     "FolioRef": folio,
                     "FchRef": added_date,
                     "CodRef": 1,

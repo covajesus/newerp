@@ -596,7 +596,7 @@ class DteClass:
                         dte_type_id = 39
                     elif dte.get('tipo') == 'Nota de crédito electrónica':
                         dte_type_id = 61
-
+                    
                     branch_office = self.db.query(BranchOfficeModel).filter(
                             BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).first()
@@ -612,9 +612,9 @@ class DteClass:
                             BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).count()
         
-                    if validate_dte_existence == 0 and branch_office_qty > 0:
+                    if validate_dte_existence == 0:
                         store_dte = DteModel(
-                            branch_office_id=branch_office.id,
+                            branch_office_id=branch_office.id if branch_office else 80,
                             cashier_id=0,
                             dte_type_id=dte_type_id,
                             dte_version_id=1,
