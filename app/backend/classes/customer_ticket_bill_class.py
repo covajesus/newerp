@@ -714,11 +714,7 @@ class CustomerTicketBillClass:
         data = {
                 "Encabezado": {
                     "IdDoc": {
-                        "TipoDTE": 61,
-                        "Folio": 0,
-                        "FchEmis": added_date,
-                        "TpoTranVenta": 1,
-                        "FmaPago": "1",
+                        "TipoDTE": 61
                     },
                     "Emisor": {
                         "RUTEmisor": "76063822-6"
