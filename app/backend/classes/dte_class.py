@@ -587,9 +587,8 @@ class DteClass:
                     -----------------------------
                                     """)
 
-                print(dte.get('folio'))
                 dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).filter(DteModel.dte_version_id == 1).count()
-                print(dte_qty)
+
                 if dte_qty == 0:
                     if dte.get('tipo') == 'Factura electrónica':
                         dte_type_id = 33
@@ -598,6 +597,7 @@ class DteClass:
                     elif dte.get('tipo') == 'Nota de crédito electrónica':
                         dte_type_id = 61
                     
+                    print(dte_type_id)
                     branch_office = self.db.query(BranchOfficeModel).filter(
                             BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).first()
@@ -612,7 +612,9 @@ class DteClass:
                     branch_office_qty = self.db.query(BranchOfficeModel).filter(
                             BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).count()
-
+                    print(branch_office_qty)
+                    print(validate_dte_existence)
+                    print(datetime.now().strftime('%Y-%m'))
                     if validate_dte_existence == 0 and branch_office_qty > 0:
                         store_dte = DteModel(
                             branch_office_id=branch_office.id,
