@@ -745,6 +745,8 @@ class CustomerTicketBillClass:
                     "RazonRef": "Anula factura o boleta"
                 }],
             }
+        
+        print(data)
 
         try:
             # Endpoint para generar un DTE temporal
