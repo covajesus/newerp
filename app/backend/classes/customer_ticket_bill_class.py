@@ -714,7 +714,10 @@ class CustomerTicketBillClass:
         data = {
                 "Encabezado": {
                     "IdDoc": {
-                        "TipoDTE": 61
+                        "TipoDTE": 61,
+                        "FchEmis": added_date,
+                        "TpoTranVenta": 1,
+                        "FmaPago": "1",
                     },
                     "Emisor": {
                         "RUTEmisor": "76063822-6"
@@ -731,8 +734,8 @@ class CustomerTicketBillClass:
                     {
                         "NmbItem": "Nota de Crédito de Venta",
                         "QtyItem": 1,
-                        "PrcItem": amount,
-                        "MontoItem": amount,
+                        "PrcItem": cash_amount,
+                        "MontoItem": cash_amount,
                     }
                 ],
                 "Referencia": [ {
