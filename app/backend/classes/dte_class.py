@@ -616,6 +616,8 @@ class DteClass:
                     print(validate_dte_existence)
                     print(datetime.now().strftime('%Y-%m'))
                     if validate_dte_existence == 0 and branch_office_qty > 0:
+
+                        print(444444444444)
                         store_dte = DteModel(
                             branch_office_id=branch_office.id,
                             cashier_id=0,
