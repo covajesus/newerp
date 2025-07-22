@@ -605,7 +605,7 @@ class DteClass:
                             DteModel.rut == rut,
                             DteModel.dte_type_id == dte_type_id,
                             DteModel.dte_version_id == 1,
-                            DteModel.period == datetime.now().strftime('%Y-%m')
+                            DteModel.period == datetime.now().strftime('%Y-%m'),
                             DteModel.folio == dte.get('folio'),
                         ).count()
 
