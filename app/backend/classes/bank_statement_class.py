@@ -150,7 +150,7 @@ class BankStatementClass:
     def get_comparation_pending_dtes_bank_statements(self, page=1, items_per_page=99999999):
         try:
             if page != 0:
-                data_query = self.db.query(ComparationPendingDtesBankStatementModel.id, ComparationPendingDtesBankStatementModel.rut, ComparationPendingDtesBankStatementModel.customer, ComparationPendingDtesBankStatementModel.folio, ComparationPendingDtesBankStatementModel.branch_office, ComparationPendingDtesBankStatementModel.amount, ComparationPendingDtesBankStatementModel.bank_statement_period, ComparationPendingDtesBankStatementModel.bank_statement_amount, ComparationPendingDtesBankStatementModel.bank_statement_rut, ComparationPendingDtesBankStatementModel.deposit_number). \
+                data_query = self.db.query(ComparationPendingDtesBankStatementModel.id, ComparationPendingDtesBankStatementModel.deposit_date, ComparationPendingDtesBankStatementModel.rut, ComparationPendingDtesBankStatementModel.customer, ComparationPendingDtesBankStatementModel.folio, ComparationPendingDtesBankStatementModel.branch_office, ComparationPendingDtesBankStatementModel.amount, ComparationPendingDtesBankStatementModel.bank_statement_period, ComparationPendingDtesBankStatementModel.bank_statement_amount, ComparationPendingDtesBankStatementModel.bank_statement_rut, ComparationPendingDtesBankStatementModel.deposit_number). \
                         order_by(ComparationPendingDtesBankStatementModel.id)
 
                 total_items = data_query.count()

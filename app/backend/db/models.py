@@ -1533,6 +1533,7 @@ class ComparationPendingDtesBankStatementModel(Base):
     bank_statement_amount = Column(Integer)
     bank_statement_rut = Column(String(255))
     deposit_number = Column(String(255))
+    deposit_date = Column(String(255))
 
 class ComparationPendingDepositsBankStatementModel(Base):
     __tablename__ = 'comparation_pending_deposits_bank_statements'
