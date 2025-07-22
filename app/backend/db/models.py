@@ -1489,6 +1489,7 @@ class BankStatementModel(Base):
     deposit_number = Column(String(255))
     amount = Column(Integer)
     period = Column(String(255))
+    deposit_date = Column(String(255))
 
 class TransbankStatementModel(Base):
     __tablename__ = 'transbank_statements'

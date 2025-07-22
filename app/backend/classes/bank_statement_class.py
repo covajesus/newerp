@@ -237,6 +237,10 @@ class BankStatementClass:
                         deposit_number = row[col]
                     if col == "MONTO":
                         amount = row[col]
+                    if col == "FECHA":
+                        deposit_date = row[col]
+
+                        deposit_date = datetime.strptime(deposit_date, "%d/%m/%Y").strftime("%Y-%m-%d")
                     if col == "DESCRIPCIÓN MOVIMIENTO":
                         words = ["DeposDoctoMBanco", "DeposDoctoOBancos", "Depósito", "Dep", "Pago Remuneraciones", "Trabajo"]
 
@@ -270,6 +274,7 @@ class BankStatementClass:
                 bank_statement.deposit_number = deposit_number
                 bank_statement.amount = amount
                 bank_statement.period = fixed_period
+                bank_statement.deposit_date = deposit_date
 
                 self.db.add(bank_statement)
                 self.db.commit()
