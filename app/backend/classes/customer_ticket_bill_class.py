@@ -634,6 +634,8 @@ class CustomerTicketBillClass:
 
         code = self.pre_generate_credit_note_ticket(customer_data, dte.dte_type_id, dte.folio, dte.cash_amount, dte_date)
 
+        print(code)
+
         folio = None
 
         if code is not None:
