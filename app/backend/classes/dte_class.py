@@ -614,7 +614,7 @@ class DteClass:
                     
                     print(dte.get('sucursal_sii'))
         
-                    if validate_dte_existence == 0 and branch_office_qty > 0:
+                    if 1 == 1:
                         store_dte = DteModel(
                             branch_office_id=branch_office.id,
                             cashier_id=0,
