@@ -280,7 +280,7 @@ class BankStatementClass:
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
             
     def customer_accept(self, id):
-        dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        dte = self.db.query(DteModel).filter(DteModel.folio == id).filter(DteModel.dte_version_id == 1).first()
         dte.status_id = 5
 
         self.db.add(dte)

@@ -734,8 +734,8 @@ class CustomerTicketBillClass:
                     {
                         "NmbItem": "Nota de Crédito de Venta",
                         "QtyItem": 1,
-                        "PrcItem": cash_amount,
-                        "MontoItem": cash_amount,
+                        "PrcItem": amount,
+                        "MontoItem": amount,
                     }
                 ],
                 "Referencia": [ {
