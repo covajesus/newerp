@@ -175,6 +175,7 @@ class BankStatementClass:
                         "bank_statement_amount": bank_statement.bank_statement_amount,
                         "bank_statement_rut": bank_statement.bank_statement_rut,
                         "deposit_number": bank_statement.deposit_number,
+                        "deposit_date": bank_statement.deposit_date,
                     } for bank_statement in data]
 
                 total_available_receipts = self.db.query(ComparationPendingDtesBankStatementModel).filter(ComparationPendingDtesBankStatementModel.bank_statement_type_id == 1).count()
@@ -284,9 +285,10 @@ class BankStatementClass:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
             
-    def customer_accept(self, id):
+    def customer_accept(self, id, payment_date):
         dte = self.db.query(DteModel).filter(DteModel.folio == id).filter(DteModel.dte_version_id == 1).first()
         dte.status_id = 5
+        dte.payment_date = payment_date
 
         self.db.add(dte)
         self.db.commit()

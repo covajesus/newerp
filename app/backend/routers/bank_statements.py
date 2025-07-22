@@ -66,12 +66,13 @@ def store(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
-@bank_statements.get("/customer/accept/{id}")
+@bank_statements.get("/customer/accept/{id}/{payment_date}")
 def customer_accept(
     id: int,
+    payment_date: str,
     db: Session = Depends(get_db)
 ):
-    message = BankStatementClass(db).customer_accept(id)
+    message = BankStatementClass(db).customer_accept(id, payment_date)
 
     return {"message": message}
 
