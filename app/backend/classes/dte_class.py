@@ -611,10 +611,14 @@ class DteClass:
                     branch_office_qty = self.db.query(BranchOfficeModel).filter(
                             BranchOfficeModel.dte_code == dte.get('sucursal_sii')
                         ).count()
-                    
-                    print(dte.get('sucursal_sii'))
+
+                    if branch_office_qty > 0:
+                        print('Si')
+
+                    if validate_dte_existence == 0:
+                        print('Si')
         
-                    if 1 == 1:
+                    if validate_dte_existence == 0 and branch_office_qty > 0:
                         store_dte = DteModel(
                             branch_office_id=branch_office.id,
                             cashier_id=0,
