@@ -617,6 +617,7 @@ class DteClass:
 
                     if validate_dte_existence == 0:
                         print('Si2')
+                    print(validate_dte_existence)
         
                     if validate_dte_existence == 0 and branch_office_qty > 0:
                         store_dte = DteModel(
