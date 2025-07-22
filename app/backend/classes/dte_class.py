@@ -615,7 +615,7 @@ class DteClass:
                     print(branch_office_qty)
                     print(validate_dte_existence)
                     print(datetime.now().strftime('%Y-%m'))
-                    if validate_dte_existence == 0 and branch_office_qty > 0:
+                    if validate_dte_existence == 0 and branch_office_qty != 0:
 
                         print(444444444444)
                         store_dte = DteModel(
