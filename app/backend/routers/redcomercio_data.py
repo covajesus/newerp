@@ -25,8 +25,6 @@ def refresh(db: Session = Depends(get_db)):
 
     until = now.strftime('%Y-%m-%d')
     since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
-    print(until)
-    print(since)
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
@@ -59,8 +57,8 @@ def refresh(db: Session = Depends(get_db)):
                 
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
-                    check_existence =  CollectionClass(db).existence(branch_office.id, cashier_id, added_date)
-                   
+                    check_existence =  CollectionClass(db).delete_redcomercio(branch_office.id, cashier_id, added_date)
+                  
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
@@ -71,10 +69,6 @@ def refresh(db: Session = Depends(get_db)):
                         gross_total = check_existence.cash_gross_amount + dte_datum['total']
                         net_total = round(gross_total/1.19)
                         total_tickets = total_tickets + 1
-                        print(33454545454545454544)
-                        print(gross_total) 
-                        print(net_total)
-                        print(total_tickets)
                         CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
 
     return {"status": "Redcomercio data updated successfully"}
