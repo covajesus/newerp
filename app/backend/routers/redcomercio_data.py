@@ -57,18 +57,12 @@ def refresh(db: Session = Depends(get_db)):
                 
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
-                    check_existence =  CollectionClass(db).delete_redcomercio(branch_office.id, cashier_id, added_date)
-                    print(check_existence)
-                    if check_existence == 0:
-                        gross_total = dte_datum['total']
-                        net_total = round(dte_datum['total']/1.19)
-                        total_tickets = 1
+                    CollectionClass(db).delete_redcomercio(branch_office.id, cashier_id, added_date)
 
-                        CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
-                    else:
-                        gross_total = check_existence.cash_gross_amount + dte_datum['total']
-                        net_total = round(gross_total/1.19)
-                        total_tickets = total_tickets + 1
-                        CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+                    gross_total = dte_datum['total']
+                    net_total = round(dte_datum['total']/1.19)
+                    total_tickets = 1
 
+                    CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+           
     return {"status": "Redcomercio data updated successfully"}
