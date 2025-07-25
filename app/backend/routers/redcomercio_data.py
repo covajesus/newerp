@@ -57,16 +57,16 @@ def refresh(db: Session = Depends(get_db)):
                 
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
-                    check_existence =  CollectionClass(db).verify_red_comercio_collection(branch_office.id, cashier_id, added_date)
+                    cash_gross_amount =  CollectionClass(db).verify_red_comercio_collection(branch_office.id, cashier_id, added_date)
 
-                    if check_existence == 0:
+                    if cash_gross_amount is None || cash_gross_amount == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
                         total_tickets = 1
 
                         CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
                     else:
-                        gross_total = check_existence.cash_gross_amount + dte_datum['total']
+                        gross_total = cash_gross_amount + dte_datum['total']
                         net_total = round(gross_total/1.19)
                         total_tickets = total_tickets + 1
                         CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)

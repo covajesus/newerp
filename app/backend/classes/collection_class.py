@@ -608,9 +608,9 @@ class CollectionClass:
                 CollectionModel.branch_office_id == branch_office_id,
                 CollectionModel.cashier_id == cashier_id,
                 CollectionModel.added_date == added_date
-            ).count()
+            ).first()
 
-            return validate_existence
+            return validate_existence.cash_gross_amount if validate_existence else None
 
         except Exception as e:
             self.db.rollback()
