@@ -221,8 +221,7 @@ class ReceivedTributaryDocumentClass:
         data = {
             "dte": ["33", "34", "39", "56", "61"],
             "fecha_desde": since,
-            "fecha_hasta": until,
-            "emisor": '76063822-6'
+            "fecha_hasta": until
         }
 
         print(data)
