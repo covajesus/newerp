@@ -61,10 +61,7 @@ def refresh(db: Session = Depends(get_db)):
 
                 for dte_datum in dte_data:
                     print(dte_datum["total"])
-                    if (
-                        dte_datum.get("sucursal_sii") == branch_office.dte_code and
-                        isinstance(dte_datum.get("total"), (int, float))
-                    ):
+                    if dte_datum.get("sucursal_sii") == branch_office.dte_code:
                         total_per_branch_office = total_per_branch_office + dte_datum["total"]
                         ticket_numbers = ticket_numbers + 1
 
