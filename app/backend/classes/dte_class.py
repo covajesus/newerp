@@ -415,8 +415,7 @@ class DteClass:
 
             filters.append(DteModel.rut != None)
             filters.append(DteModel.dte_version_id == dte_version_id)
-            filters.append(DteModel.dte_type_id == dte_type_id)
-
+            
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
                 DteModel.id, 
