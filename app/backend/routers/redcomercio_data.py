@@ -24,7 +24,7 @@ def refresh(db: Session = Depends(get_db)):
     now = datetime.now(tz)  # obtienes la fecha y hora actual en la zona horaria
 
     until = now.strftime('%Y-%m-%d')
-    since = (now - timedelta(days=100)).strftime('%Y-%m-%d')
+    since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
@@ -54,20 +54,21 @@ def refresh(db: Session = Depends(get_db)):
                 gross_total = 0
                 total_tickets = 0
                 net_total = 0
-
-                # Totales por sucursal
-                total_per_branch_office = 0
-                ticket_numbers = 0
-
+                
                 for dte_datum in dte_data:
-                    print(dte_datum["total"])
-                    print(dte_datum.get("sucursal_sii"))
-                    print(branch_office.dte_code)
-                    if str(dte_datum.get("sucursal_sii")) == str(branch_office.dte_code):
-                        print(232323232)
-                        total_per_branch_office = total_per_branch_office + dte_datum["total"]
-                        ticket_numbers = ticket_numbers + 1
+                    added_date = dte_datum['fecha']
+                    check_existence =  CollectionClass(db).verify_red_comercio_collection(branch_office.id, cashier_id, added_date)
 
-                print(f"Sucursal {branch_office.dte_code} => Total: {total_per_branch_office}, Boletas: {ticket_numbers}")
+                    if check_existence == 0:
+                        gross_total = dte_datum['total']
+                        net_total = round(dte_datum['total']/1.19)
+                        total_tickets = 1
+
+                        CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+                    else:
+                        gross_total = check_existence.cash_gross_amount + dte_datum['total']
+                        net_total = round(gross_total/1.19)
+                        total_tickets = total_tickets + 1
+                        CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
 
     return {"status": "Redcomercio data updated successfully"}
