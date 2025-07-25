@@ -437,7 +437,7 @@ class DteClass:
             ).filter(
                 *filters
             ).order_by(
-                desc(DteModel.id.desc())
+                DteModel.id.desc()
             )
 
             # Obtener la consulta SQL generada con literal_binds=True
