@@ -284,6 +284,8 @@ class ReceivedTributaryDocumentClass:
                         dte.total = total
                         dte.added_date = str(item['fecha']) + ' 00:00:00'
 
+                        print(item['fecha'])
+
                         self.db.add(dte)
                         self.db.commit()
 
