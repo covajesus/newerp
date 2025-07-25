@@ -4,11 +4,12 @@ from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.models import DteModel, CustomerModel
-from app.backend.db.database import get_db
+from app.backend.db.database import get_db, get_db3
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
+import pymysql
 import uuid
 
 dtes = APIRouter(
@@ -162,3 +163,22 @@ def refresh_import_by_rut(db: Session = Depends(get_db)):
     DteClass(db).refresh_import_by_rut()
 
     return {"message": "Listo"}
+
+
+@dtes.get("/old_dtes")
+def old_dtes(db: Session = Depends(get_db), db3 = Depends(get_db3)):
+    conn = pymysql.connect(
+        host='jisparking.com',
+        user='jysparki_admin',
+        password='Admin2024$',
+        db='jysparki_jis',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM dtes")
+        result = cursor.fetchall()
+
+        print(result)
+    
+    conn.close()
+    return result
