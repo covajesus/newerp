@@ -602,15 +602,17 @@ class CollectionClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def verify_red_comercio_collection(self, branch_office_id, cashier_id, added_date):
+    def delete_red_comercio_collection(self, branch_office_id, cashier_id, added_date):
         try:
             validate_existence = self.db.query(CollectionModel).filter(
                 CollectionModel.branch_office_id == branch_office_id,
                 CollectionModel.cashier_id == cashier_id,
                 CollectionModel.added_date == added_date
-            ).first()
+            ).delete()
 
-            return validate_existence.cash_gross_amount if validate_existence else None
+            self.db.commit()
+
+            return 1
 
         except Exception as e:
             self.db.rollback()
