@@ -58,7 +58,7 @@ def refresh(db: Session = Depends(get_db)):
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
                     check_existence =  CollectionClass(db).delete_redcomercio(branch_office.id, cashier_id, added_date)
-                  
+                    print(check_existence)
                     if check_existence == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
