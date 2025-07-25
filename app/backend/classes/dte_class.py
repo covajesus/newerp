@@ -13,6 +13,20 @@ class DteClass:
     def __init__(self, db):
         self.db = db
 
+    def validate_old_dte(self, folio, rut, dte_version_id):
+        try:
+            folio_count = self.db.query(DteModel).filter(DteModel.folio == folio).filter(DteModel.rut == rut).filter(DteModel.dte_version_id == dte_version_id).count()
+            
+            if folio_count > 1:
+                return 1  # Retorna 1 si hay menos de 100 folios
+            else:
+                return 0  # Retorna 0 si hay 100 o más folios
+        
+        except Exception as e:
+            # Captura cualquier error y retorna el mensaje de error
+            error_message = str(e)
+            return f"Error: {error_message}"
+
     def get_old_dtes(self):
         try:
             # Construir la consulta base con los filtros aplicados

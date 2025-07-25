@@ -164,9 +164,8 @@ def refresh_import_by_rut(db: Session = Depends(get_db)):
 
     return {"message": "Listo"}
 
-
 @dtes.get("/old_dtes")
-def old_dtes(db: Session = Depends(get_db), db3 = Depends(get_db3)):
+def old_dtes(db: Session = Depends(get_db)):
     conn = pymysql.connect(
         host='jisparking.com',
         user='jysparki_admin',
@@ -174,11 +173,40 @@ def old_dtes(db: Session = Depends(get_db), db3 = Depends(get_db3)):
         db='jysparki_jis',
         cursorclass=pymysql.cursors.DictCursor
     )
+
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM dtes")
+        cursor.execute("""
+            SELECT 
+                folio,
+                rut,
+                period,
+                status_id,
+                expense_type_id,
+                payment_type_id,
+                payment_date,
+                payment_comment
+            FROM dtes
+            WHERE dte_version_id = 2 and DATE(created_at) >= '2025-05-01'
+        """)
         result = cursor.fetchall()
 
-        print(result)
-    
+        for row in result:
+            folio = row['folio']
+            rut = row['rut']
+            period = row['period']
+            status_id = row['status_id']
+            expense_type_id = row['expense_type_id']
+            payment_type_id = row['payment_type_id']
+            payment_date = row['payment_date']
+            payment_comment = row['payment_comment']
+
+            print(folio)
+
+            existence = DteClass(db).validate_old_dte(folio, rut, 2)
+
+            if existence == 1:
+                print("Existe DTE:", folio, rut)
+
     conn.close()
-    return result
+
+    return {"data": result}

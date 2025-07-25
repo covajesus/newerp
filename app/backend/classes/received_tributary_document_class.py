@@ -263,7 +263,7 @@ class ReceivedTributaryDocumentClass:
                         DteModel.dte_type_id == item['dte'],
                         DteModel.dte_version_id == 2
                     ).count()
-
+                    print(item['folio'])
                     if dte_validation == 0:
                         dte = DteModel()
                         dte.branch_office_id = 0
