@@ -59,7 +59,7 @@ def refresh(db: Session = Depends(get_db)):
                     added_date = dte_datum['fecha']
                     cash_gross_amount =  CollectionClass(db).verify_red_comercio_collection(branch_office.id, cashier_id, added_date)
 
-                    if cash_gross_amount is None || cash_gross_amount == 0:
+                    if cash_gross_amount is None or cash_gross_amount == 0:
                         gross_total = dte_datum['total']
                         net_total = round(dte_datum['total']/1.19)
                         total_tickets = 1
