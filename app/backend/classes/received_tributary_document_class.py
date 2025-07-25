@@ -219,12 +219,9 @@ class ReceivedTributaryDocumentClass:
         since = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
         
         data = {
-            "dte": ["33", "34", "39", "56", "61"],
             "fecha_desde": since,
             "fecha_hasta": until
         }
-
-        print(data)
 
         try:
             url = f"https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
