@@ -225,6 +225,8 @@ class ReceivedTributaryDocumentClass:
             "emisor": '76063822-6'
         }
 
+        print(data)
+
         try:
             url = f"https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
             response = requests.get(
