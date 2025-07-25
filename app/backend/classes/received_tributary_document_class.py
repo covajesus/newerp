@@ -216,7 +216,7 @@ class ReceivedTributaryDocumentClass:
     def refresh(self):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         until = datetime.now().strftime('%Y-%m-%d')
-        since = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+        since = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
         
         data = {
             "dte": ["33", "34", "39", "56", "61"],
@@ -257,25 +257,33 @@ class ReceivedTributaryDocumentClass:
                         self.db.add(supplier)
                         self.db.commit()
 
-                    dte = DteModel()
-                    dte.branch_office_id = 0
-                    dte.cashier_id = 0
-                    dte.dte_type_id = item['dte']
-                    dte.dte_version_id = 2
-                    dte.status_id = 1
-                    dte.chip_id = 0
-                    dte.rut = rut
-                    dte.folio = item['folio']
-                    dte.cash_amount = total
-                    dte.card_amount = 0
-                    dte.subtotal = net
-                    dte.tax = int(total) - int(net)
-                    dte.discount = 0
-                    dte.total = total
-                    dte.added_date = str(item['fecha']) + ' 00:00:00'
+                    dte_validation = self.db.query(DteModel).filter(
+                        DteModel.folio == item['folio'],
+                        DteModel.rut == rut,
+                        DteModel.dte_type_id == item['dte'],
+                        DteModel.dte_version_id == 2
+                    ).count()
 
-                    self.db.add(dte)
-                    self.db.commit()
+                    if dte_validation == 0:
+                        dte = DteModel()
+                        dte.branch_office_id = 0
+                        dte.cashier_id = 0
+                        dte.dte_type_id = item['dte']
+                        dte.dte_version_id = 2
+                        dte.status_id = 1
+                        dte.chip_id = 0
+                        dte.rut = rut
+                        dte.folio = item['folio']
+                        dte.cash_amount = total
+                        dte.card_amount = 0
+                        dte.subtotal = net
+                        dte.tax = int(total) - int(net)
+                        dte.discount = 0
+                        dte.total = total
+                        dte.added_date = str(item['fecha']) + ' 00:00:00'
+
+                        self.db.add(dte)
+                        self.db.commit()
 
         except Exception as e:
             print("Error al conectarse a la API:", e)

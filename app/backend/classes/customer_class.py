@@ -168,7 +168,6 @@ class CustomerClass:
     
     def check_existence(self, rut):
         try:
-            print(rut)
             data_query = self.db.query(CustomerModel.rut, RegionModel.region, CommuneModel.commune, CustomerModel.customer, CustomerModel.phone, CustomerModel.email, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.address). \
                         outerjoin(RegionModel, RegionModel.id == CustomerModel.region_id). \
                         outerjoin(CommuneModel, CommuneModel.id == CustomerModel.commune_id). \
@@ -213,11 +212,11 @@ class CustomerClass:
         customer.rut = form_data.rut
         customer.region_id = form_data.region_id
         customer.commune_id = form_data.commune_id
-        customer.customer = form_data.customer
+        customer.customer = form_data.customer.upper()
         customer.email = form_data.email
-        customer.activity = form_data.activity
+        customer.activity = form_data.activity.upper()
         customer.phone = form_data.phone
-        customer.address = form_data.address
+        customer.address = form_data.address.upper()
         customer.added_date = datetime.now()
 
         # Añadir la nueva instancia a la base de datos
@@ -255,11 +254,11 @@ class CustomerClass:
 
         customer.region_id = form_data.region_id
         customer.commune_id = form_data.commune_id
-        customer.customer = form_data.customer
+        customer.customer = form_data.customer.upper()
         customer.email = form_data.email
-        customer.activity = form_data.activity
+        customer.activity = form_data.activity.upper()
         customer.phone = form_data.phone
-        customer.address = form_data.address
+        customer.address = form_data.address.upper()
 
         self.db.commit()
         self.db.refresh(customer)

@@ -604,9 +604,6 @@ class CollectionClass:
         
     def delete_redcomercio(self, branch_office_id, cashier_id, added_date):
         try:
-            print(branch_office_id)
-            print(cashier_id)
-            print(added_date)
             self.db.query(CollectionModel).filter(
                 CollectionModel.branch_office_id == branch_office_id,
                 CollectionModel.cashier_id == cashier_id,
