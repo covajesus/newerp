@@ -24,7 +24,7 @@ def refresh(db: Session = Depends(get_db)):
     now = datetime.now(tz)  # obtienes la fecha y hora actual en la zona horaria
 
     until = now.strftime('%Y-%m-%d')
-    since = (now - timedelta(days=31)).strftime('%Y-%m-%d')
+    since = (now - timedelta(days=90)).strftime('%Y-%m-%d')
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
