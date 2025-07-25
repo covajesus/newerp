@@ -47,7 +47,7 @@ class ReceivedTributaryDocumentClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.added_date.desc()
+                DteModel.id.desc()
             )
 
             # Si se solicita paginación
@@ -145,7 +145,7 @@ class ReceivedTributaryDocumentClass:
             ).filter(
                 *filters
             ).order_by(
-                DteModel.added_date.desc()
+                DteModel.id.desc()
             )
 
             data = query.all()
