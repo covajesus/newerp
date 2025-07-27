@@ -4,7 +4,7 @@ from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.models import DteModel, CustomerModel
-from app.backend.db.database import get_db, get_db3
+from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from fastapi import UploadFile, File, HTTPException
