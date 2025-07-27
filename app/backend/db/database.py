@@ -28,16 +28,3 @@ def get_db2():
         yield db
     finally:
         db.close()
-
-# 🟢 Conexión a otra base de datos (ej: jisparking)
-SQLALCHEMY_DB2_URI = "mysql+pymysql://jysparki_admin:Admin2024$@jisparking.com:3306/jysparki_jis"
-engine_db2 = create_engine(SQLALCHEMY_DB2_URI, pool_size=10, max_overflow=0, echo=False)
-SessionLocalDB2 = sessionmaker(bind=engine_db2, autocommit=False, autoflush=False)
-BaseDB2 = declarative_base()
-
-def get_db3():
-    db = SessionLocalDB2()
-    try:
-        yield db
-    finally:
-        db.close()
