@@ -51,7 +51,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.id
+                    CapitulationModel.id.desc()
                 )
             else:
                 # Inicialización de filtros dinámicos
@@ -91,7 +91,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.id
+                    CapitulationModel.id.desc()
                 )
 
             if page > 0:
@@ -207,7 +207,7 @@ class CapitulationClass:
             ).filter(
                 *filters
             ).order_by(
-                CapitulationModel.id
+                CapitulationModel.id.desc()
             )
 
             data = query.all()
