@@ -54,6 +54,9 @@ def refresh(db: Session = Depends(get_db)):
                 gross_total = 0
                 total_tickets = 0
                 net_total = 0
+
+                print(dte_data)
+                exit()
                 
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']

@@ -215,8 +215,8 @@ class ReceivedTributaryDocumentClass:
     
     def refresh(self):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        since = (datetime.now() - timedelta(days=89)).strftime('%Y-%m-%d')
         until = datetime.now().strftime('%Y-%m-%d')
-        since = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
         
         data = {
             "fecha_desde": since,
@@ -224,7 +224,8 @@ class ReceivedTributaryDocumentClass:
         }
 
         try:
-            url = f"https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
+            url = "https://libredte.cl/api/dte/dte_recibidos/buscar/76063822?fecha_desde="+ str(since) +"&fecha_hasta=" + str(until)
+
             response = requests.get(
                 url,
                 json=data,
@@ -236,16 +237,20 @@ class ReceivedTributaryDocumentClass:
             
             data = json.loads(response.text)
 
+
             for item in data:
                 # 👉 Validar que el emisor exista
                 if not item.get('emisor'):
                     return 1
                 else:
+                    if item['emisor'] < 10000000:
+                        item['emisor'] = '0' + str(item['emisor'])
+
                     verificator_digit = HelperClass.verificator_digit(item['emisor'])
                     rut = str(item['emisor']) + '-' + str(verificator_digit)
 
                     total = item['total'] if item['total'] is not None else 0
-                    net = HelperClass.get_net(total)
+                    net = item['neto'] if item['total'] is not None else 0
 
                     validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
                     if validate_supplier_existence == 0:

@@ -179,19 +179,27 @@ def old_dtes(db: Session = Depends(get_db)):
             SELECT 
                 folio,
                 rut,
+                branch_office_id,
                 period,
                 status_id,
                 expense_type_id,
                 payment_type_id,
                 payment_date,
-                payment_comment
+                payment_comment,
+                comment,
+                dte_version_id,
+                deposit_number,
+                dte_type_id,
+                chip_id,
+                amount
             FROM dtes
-            WHERE dte_version_id = 2 and DATE(created_at) >= '2025-05-01'
+            WHERE dte_version_id = 1 and DATE(created_at) >= '2025-07-01'and (status_id = 18 OR status_id = 19)
         """)
         result = cursor.fetchall()
 
         for row in result:
             folio = row['folio']
+            branch_office_id = row['branch_office_id']
             rut = row['rut']
             period = row['period']
             status_id = row['status_id']
@@ -199,13 +207,85 @@ def old_dtes(db: Session = Depends(get_db)):
             payment_type_id = row['payment_type_id']
             payment_date = row['payment_date']
             payment_comment = row['payment_comment']
+            comment = row['comment']
+            dte_version_id = row['dte_version_id']
+            dte_type_id = row['dte_type_id']
+            cash_amount = row['amount']
+            payment_number = row['deposit_number']
+            
+            if status_id == 18:
+                status_id = 4
+            else:
+                status_id = 5
+
+            chip_id = row['chip_id']
 
             print(folio)
 
-            existence = DteClass(db).validate_old_dte(folio, rut, 2)
+            existence = db.query(DteModel).filter(
+                DteModel.folio == folio,
+                DteModel.rut == rut,
+                DteModel.dte_version_id == dte_version_id,
+                DteModel.dte_type_id == dte_type_id
+            ).count()
 
             if existence == 1:
-                print("Existe DTE:", folio, rut)
+                dte_data = db.query(DteModel).filter(
+                    DteModel.folio == folio,
+                    DteModel.rut == rut,
+                    DteModel.dte_version_id == dte_version_id,
+                    DteModel.dte_type_id == dte_type_id
+                ).first()
+
+                if dte_data.status_id != 5:
+                    dte_data.status_id = status_id
+                    dte_data.period = period
+                    dte_data.expense_type_id = expense_type_id
+                    dte_data.payment_type_id = payment_type_id
+                    dte_data.payment_date = payment_date
+                    dte_data.payment_number = payment_number
+                    dte_data.payment_comment = comment
+                    dte_data.comment = comment
+                    dte_data.chip_id = chip_id
+                    dte_data.added_date='2025-07-01 00:00:00',
+                    db.commit()
+                else:
+                    dte_data.expense_type_id = expense_type_id
+                    dte_data.payment_type_id = payment_type_id
+                    dte_data.expense_type_id = expense_type_id
+                    dte_data.period = period
+                    dte_data.payment_date = payment_date
+                    dte_data.payment_number = payment_number
+                    dte_data.payment_comment = comment
+                    dte_data.comment = comment
+                    dte_data.chip_id = chip_id
+                    dte_data.added_date='2025-07-01 00:00:00',
+                    db.commit()
+            else:
+                new_dte = DteModel(
+                    folio=folio,
+                    branch_office_id=branch_office_id,
+                    rut=rut,
+                    period=period,
+                    status_id=status_id,
+                    expense_type_id=expense_type_id,
+                    payment_type_id=payment_type_id,
+                    payment_date=payment_date,
+                    cash_amount=cash_amount,
+                    payment_comment=comment,
+                    subtotal = (cash_amount) - (cash_amount * 0.19),
+                    tax = (cash_amount * 0.19),
+                    total = cash_amount,
+                    dte_version_id=dte_version_id,
+                    payment_number=payment_number,
+                    dte_type_id=dte_type_id,
+                    comment=comment,
+                    chip_id=chip_id,
+                    added_date='2025-07-01 00:00:00',
+                )
+                db.add(new_dte)
+                db.commit()
+                print('DTE guardado:', folio)
 
     conn.close()
 

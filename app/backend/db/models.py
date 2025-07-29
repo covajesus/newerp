@@ -52,6 +52,13 @@ class SupplierModel(Base):
     rut = Column(String(255))
     supplier = Column(String(255))
 
+class Supplier2Model(Base):
+    __tablename__ = 'suppliers2'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    supplier = Column(String(255))
+
 class ExpenseTypeModel(Base):
     __tablename__ = 'expense_types'
 
@@ -589,6 +596,21 @@ class ContractModel(Base):
 
 class CustomerModel(Base):
     __tablename__ = 'customers'
+
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    region_id = Column(Integer)
+    commune_id = Column(Integer)
+    customer = Column(String(255))
+    email = Column(String(255))
+    phone = Column(String(255))
+    activity = Column(String(255))
+    address = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+class Customer2Model(Base):
+    __tablename__ = 'customers2'
 
     id = Column(Integer, primary_key=True)
     rut = Column(String(255))

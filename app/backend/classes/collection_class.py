@@ -521,10 +521,10 @@ class CollectionClass:
 
         if credit_note_amount > 0:
             cash_gross_total = int(collection_inputs['cash_gross_amount']) - int(credit_note_amount)
-            cash_net_total = round(int(cash_net_total)/1.19)
+            cash_net_total = round(int(cash_gross_total)/1.19)
         else:
             cash_gross_total = int(collection_inputs['cash_gross_amount'])
-            cash_net_total = round(int(collection_inputs['cash_net_amount'])/1.19)
+            cash_net_total = round(int(cash_gross_total)/1.19)
 
         if collection_count == 0:
             collection = CollectionModel(
