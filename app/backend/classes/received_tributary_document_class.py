@@ -250,7 +250,7 @@ class ReceivedTributaryDocumentClass:
                     rut = str(item['emisor']) + '-' + str(verificator_digit)
 
                     total = item['total'] if item['total'] is not None else 0
-                    net = item['neto'] if item['total'] is not None else 0
+                    net = item['neto'] if item['neto'] is not None else 0
 
                     validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
                     if validate_supplier_existence == 0:
@@ -266,7 +266,7 @@ class ReceivedTributaryDocumentClass:
                         DteModel.dte_type_id == item['dte'],
                         DteModel.dte_version_id == 2
                     ).count()
-                    print(item['folio'])
+
                     if dte_validation == 0:
                         dte = DteModel()
                         dte.branch_office_id = 0
