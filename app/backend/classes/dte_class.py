@@ -536,25 +536,36 @@ class DteClass:
                 DteModel.id.desc()
             )
 
-            # Obtener la consulta SQL generada con literal_binds=True
-            query_sql = str(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+            # Paginación
+            total_items = query.count()
 
-            # Reemplazar %% por % para corregir el problema de escape
-            query_sql = query_sql.replace('%%', '%')
+            if total_items == 0:
+                return {
+                    "status": "ok",
+                    "message": "No data found",
+                    "data": [],
+                    "total_items": 0,
+                    "total_pages": 0,
+                    "current_page": page,
+                }
 
-            # Mostrar la consulta SQL corregida
-            print("Consulta SQL corregida:", query_sql)
+            total_pages = (total_items + items_per_page - 1) // items_per_page
 
-            # Calcular el offset para la paginación
+            if page < 1 or page > total_pages:
+                return {"status": "error", "message": "Invalid page number"}
+
             offset = (page - 1) * items_per_page
+            data = query.offset(offset).limit(items_per_page).all()
 
-            # Ejecutar la consulta con paginación
-            data = self.db.execute(query.statement.offset(offset).limit(items_per_page)).fetchall()
+            # Mostrar consulta generada
+            from sqlalchemy.dialects import mysql
+            print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
-            # Procesar los resultados
-            total_items = len(data)  # Total de elementos
-            total_pages = (total_items + items_per_page - 1) // items_per_page  # Calcular total de páginas
-            data_paginated = data  # Paginar los resultados según el offset y el límite
+            # Mostrar rango de elementos
+            start_item = offset + 1
+            end_item = min(offset + items_per_page, total_items)
+            print(f"Mostrando resultados del {start_item} al {end_item} de {total_items}")
+
 
             # Serializar los resultados
             serialized_data = [{
@@ -569,7 +580,7 @@ class DteClass:
                 "exit_hour": dte.exit_hour,
                 "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                 "branch_office": dte.branch_office
-            } for dte in data_paginated]
+            } for dte in data]
 
             return {
                 "total_items": total_items,
