@@ -108,7 +108,7 @@ class CapitulationClass:
 
                 serialized_data = [{
                     "id": capitulation.id,
-                    "document_date": capitulation.document_date,
+                    "document_date": capitulation.document_date.strftime("%Y-%m-%d"),
                     "supplier_rut": capitulation.supplier_rut,
                     "document_number": capitulation.document_number,
                     "document_type_id": capitulation.document_type_id,
@@ -141,7 +141,7 @@ class CapitulationClass:
 
                 serialized_data = [{
                     "id": capitulation.id,
-                    "document_date": capitulation.document_date,
+                    "document_date": capitulation.document_date.strftime("%Y-%m-%d"),
                     "supplier_rut": capitulation.supplier_rut,
                     "document_number": capitulation.document_number,
                     "document_type_id": capitulation.document_type_id,
@@ -214,7 +214,7 @@ class CapitulationClass:
 
             serialized_data = [{
                     "id": capitulation.id,
-                    "document_date": capitulation.document_date,
+                    "document_date": capitulation.document_date.strftime("%Y-%m-%d"),
                     "supplier_rut": capitulation.supplier_rut,
                     "document_number": capitulation.document_number,
                     "document_type_id": capitulation.document_type_id,
