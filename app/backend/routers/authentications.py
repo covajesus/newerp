@@ -37,13 +37,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @authentications.post("/recover_password")
 def recover_password(form_data: RecoverPassword, db: Session = Depends(get_db)):
-    user = UserClass(db).get('document_number', form_data.document_number)
+    user = UserClass(db).get('phone', form_data.phone)
 
     if user == 'No se encontraron datos para el campo especificado.':
         return {"status": "error", "message": "Usuario no encontrado."}
     
     try:
-        AuthenticationClass(db).update_password(form_data.document_number, form_data.new_password)
+        AuthenticationClass(db).update_password(form_data.phone, form_data.new_password)
         return {"status": "success", "message": "Contraseña actualizada correctamente."}
     except Exception as e:
         return {"status": "error", "message": str(e)}

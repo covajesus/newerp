@@ -53,9 +53,9 @@ class AuthenticationClass:
             error_message = str(e)
             return f"Error: {error_message}" 
 
-    def update_password(self, document_number: str, new_password: str):
+    def update_password(self, phone: str, new_password: str):
         # Buscar el usuario por su número de documento
-        existing_user = self.db.query(UserModel).filter(UserModel.document_number == document_number).one_or_none()
+        existing_user = self.db.query(UserModel).filter(UserModel.phone == phone).one_or_none()
 
         if not existing_user:
             return "No data found"

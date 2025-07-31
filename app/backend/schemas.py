@@ -246,7 +246,7 @@ class UserLogin(BaseModel):
     hashed_password: Union[str, None]
 
 class RecoverPassword(BaseModel):
-    document_number: Union[int, None]
+    phone: Union[int, None]
     new_password: Union[str, None]
 
 class RecoverUser(BaseModel):
