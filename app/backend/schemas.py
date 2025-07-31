@@ -245,6 +245,10 @@ class UserLogin(BaseModel):
     phone: Union[str, None]
     hashed_password: Union[str, None]
 
+class RecoverPassword(BaseModel):
+    document_number: Union[int, None]
+    new_password: Union[str, None]
+
 class RecoverUser(BaseModel):
     rut: str
     email: str

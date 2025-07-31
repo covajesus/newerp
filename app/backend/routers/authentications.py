@@ -6,7 +6,8 @@ from app.backend.classes.authentication_class import AuthenticationClass
 from app.backend.classes.rol_class import RolClass
 from datetime import timedelta
 from app.backend.auth.auth_user import get_current_active_user
-from app.backend.schemas import UserLogin
+from app.backend.classes.user_class import UserClass
+from app.backend.schemas import UserLogin, RecoverPassword
 import json
 
 authentications = APIRouter(
@@ -34,6 +35,19 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "expires_in": expires_in_seconds
     }
 
+@authentications.post("/recover_password")
+def recover_password(form_data: RecoverPassword, db: Session = Depends(get_db)):
+    user = UserClass(db).get('document_number', form_data.document_number)
+
+    if user == 'No se encontraron datos para el campo especificado.':
+        return {"status": "error", "message": "Usuario no encontrado."}
+    
+    try:
+        AuthenticationClass(db).update_password(form_data.document_number, form_data.new_password)
+        return {"status": "success", "message": "Contraseña actualizada correctamente."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    
 @authentications.post("/logout")
 def logout(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)

@@ -455,6 +455,7 @@ class UserModel(Base):
     id = Column(Integer, primary_key=True)
     rol_id = Column(Integer, ForeignKey('rols.id'))
     rut = Column(Integer)
+    document_number = Column(Integer)
     branch_office_id = Column(Integer)
     full_name = Column(String(255))
     email = Column(String(255))

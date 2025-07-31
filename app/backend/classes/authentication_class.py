@@ -53,24 +53,24 @@ class AuthenticationClass:
             error_message = str(e)
             return f"Error: {error_message}" 
 
-    def update_password(self, user_inputs):
-        existing_user = self.db.query(UserModel).filter(UserModel.visual_rut == user_inputs.visual_rut).one_or_none()
+    def update_password(self, document_number: str, new_password: str):
+        # Buscar el usuario por su número de documento
+        existing_user = self.db.query(UserModel).filter(UserModel.document_number == document_number).one_or_none()
 
         if not existing_user:
             return "No data found"
 
-        existing_user_data = user_inputs.dict(exclude_unset=True)
-        for key, value in existing_user_data.items():
-            print(key, value)
-            if key == 'hashed_password':
-                value = self.generate_bcrypt_hash(value)
-            if hasattr(existing_user, key):
-                setattr(existing_user, key, value)
+        # Hashear la nueva contraseña
+        hashed_password = self.generate_bcrypt_hash(new_password)
 
+        # Actualizar el campo en el modelo
+        existing_user.hashed_password = hashed_password.decode('utf-8')  # Asegurarse de guardar como string
+
+        # Confirmar los cambios
         self.db.commit()
 
         return 1
-        
+
     def generate_bcrypt_hash(self, input_string):
         encoded_string = input_string.encode('utf-8')
 
@@ -131,30 +131,4 @@ class AuthenticationClass:
             print("No se pudo decodificar la respuesta JSON.")
             print(response.text)
             return 3
-
-    # def forgot(self, data):
-    #     # Configurar los detalles del correo
-    #     msg = MIMEMultipart('alternative')
-    #     msg['Subject'] = 'Recupreación de contraseña'
-    #     msg['From'] = 'info@jisparking.com'
-    #     msg['To'] = data.email
-
-    #     # Crear las partes del mensaje (versión de texto plano y versión HTML)
-    #     text = "Este correo requiere un cliente de correo que admita HTML."
-    #     html = "<html><body><h1>¡Hola!</h1><p>Este es un ejemplo de correo con diseño HTML.</p></body></html>"
-
-    #     part1 = MIMEText(text, 'plain')
-    #     part2 = MIMEText(html, 'html')
-
-    #     # Adjuntar las partes al mensaje
-    #     msg.attach(part1)
-    #     msg.attach(part2)
-
-    #     sender_email = 'info@jisparking.com'
-
-    #     # Enviar el correo utilizando el servidor SMTP
-    #     with smtplib.SMTP('mail.jisparking.com', 465) as server:
-    #         server.login(sender_email, 'Macana11!')
-    #         server.sendmail(sender_email, data.email, msg.as_string())
-
 
