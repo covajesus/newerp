@@ -908,7 +908,7 @@ class CustomerBillClass:
             credit_note_dte.chip_id = 0
             credit_note_dte.rut = customer_data['customer_data']['rut']
             credit_note_dte.folio = folio
-            credit_note_dte.cash_amount = -abs(dte.cash_amount9
+            credit_note_dte.cash_amount = -abs(dte.cash_amount)
             credit_note_dte.card_amount = 0
             credit_note_dte.subtotal = -abs(round(dte.cash_amount/1.19))
             credit_note_dte.tax = -abs((dte.cash_amount) - round((dte.cash_amount)/1.19))
