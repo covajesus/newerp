@@ -421,9 +421,9 @@ class Honorary(BaseModel):
     schedule_id: int
     region_id: int
     commune_id: int
-    employee_to_replace: str
+    employee_to_replace: Union[str, None]
     replacement_employee_rut: Union[str, None]
-    replacement_employee_full_name: str
+    replacement_employee_full_name: Union[str, None]
     address: str
     account_type_id: int
     account_number: str
@@ -442,9 +442,9 @@ class Honorary(BaseModel):
                 schedule_id: int = Form(),
                 region_id: int = Form(),
                 commune_id: int = Form(),
-                employee_to_replace: str = Form(),
+                employee_to_replace: str = Form(None),
                 replacement_employee_rut: str = Form(None),
-                replacement_employee_full_name: str = Form(),
+                replacement_employee_full_name: str = Form(None),
                 address: str = Form(),
                 account_type_id: int = Form(),
                 account_number: str = Form(),
