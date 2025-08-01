@@ -22,6 +22,7 @@ class CustomerCollectionClass:
             )
             .filter(DteModel.period == period)
             .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_version_id == 1)
             .group_by(DteModel.branch_office_id)
             .all()
         )
