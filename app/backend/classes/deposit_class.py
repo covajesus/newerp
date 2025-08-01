@@ -13,7 +13,7 @@ class DepositClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, rol_id=None, rut=None, branch_office_id=None, status_id=None, since=None, until=None, page=0, items_per_page=10):
+    def get_all(self, rol_id=None, rut=None, branch_office_id=None, since=None, until=None, status_id=None, page=0, items_per_page=10):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
