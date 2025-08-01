@@ -908,13 +908,14 @@ class CustomerBillClass:
             credit_note_dte.chip_id = 0
             credit_note_dte.rut = customer_data['customer_data']['rut']
             credit_note_dte.folio = folio
-            credit_note_dte.cash_amount = dte.cash_amount
+            credit_note_dte.cash_amount = -abs(dte.cash_amount9
             credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = round(dte.cash_amount/1.19)
-            credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+            credit_note_dte.subtotal = -abs(round(dte.cash_amount/1.19))
+            credit_note_dte.tax = -abs((dte.cash_amount) - round((dte.cash_amount)/1.19))
             credit_note_dte.discount = 0
-            credit_note_dte.total = dte.cash_amount
-            credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            credit_note_dte.total = -abs(dte.cash_amount)
+            credit_note_dte.period = datetime.now().strftime('%Y-%m')
+            credit_note_dte.added_date = dte.added_date
 
             self.db.add(credit_note_dte)
             
