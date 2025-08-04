@@ -241,7 +241,7 @@ class WhatsappClass:
                     f.write(response.content)
                 print(f"✅ Guardado: {file_path}")
             else:
-                print(f"❌ Error al ")
+                print(f"❌ Error al 2")
     
     def notify_paymeent(self, folio):
         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
