@@ -166,6 +166,7 @@ def refresh_import_by_rut(db: Session = Depends(get_db)):
 
 @dtes.get("/cron_send")
 def cron_send(db: Session = Depends(get_db)):
+    print("Enviando DTEs a Whatsapp")
     WhatsappClass(db).cron_to_resend()
 
     return {"message": "Listo"}

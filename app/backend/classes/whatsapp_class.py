@@ -219,10 +219,18 @@ class WhatsappClass:
         print(response.text)
 
     def cron_to_resend(self):
-        customers = self.db.query(CustomerModel).filter(CustomerModel.status_id == 4).filter(CustomerModel.period == '2025-08').all()
+        dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id == 39).filter(DteModel.dte_version_id == 1).filter(DteModel.period == '2025-08').all()
 
-        for customer in customers:
+        for dte in dtes:
+            print(dte.folio)
+            
+            self.resend(dte.id, 979670323)
+            exit()
+            customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+
             print(customer.phone)
+            self.resend(dte.id, customer.phone)
+            print(dte.folio)
 
     def notify_paymeent(self, folio):
         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()

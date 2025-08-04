@@ -747,7 +747,7 @@ class CustomerBillClass:
     
     def save_pdf_bill(self, folio):
         folio = folio
-        tipo_dte = 39
+        tipo_dte = 33
         rut_emisor = '76063822'
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -930,7 +930,7 @@ class CustomerBillClass:
                 return {"status": "error", "message": f"Error: {str(e)}"}
         else:
             return "Creditnote was not created"
-        
+
     def pre_generate_bill(self, customer_data, form_data):  # Added self as the first argument
         branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
 
