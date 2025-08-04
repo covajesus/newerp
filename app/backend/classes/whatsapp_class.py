@@ -119,7 +119,7 @@ class WhatsappClass:
         token = os.getenv('LIBREDTE_TOKEN')
 
         url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
-
+        print(url_data)
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
         headers = {
