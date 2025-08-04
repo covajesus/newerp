@@ -117,6 +117,7 @@ class WhatsappClass:
         image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
+        print(token)
 
         created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
 
