@@ -219,30 +219,18 @@ class WhatsappClass:
         print(response.text)
 
     def cron_to_resend(self):
-        dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id == 33).filter(DteModel.dte_version_id == 1).filter(DteModel.period == '2025-08').all()
-        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-        save_path = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
+        dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id == 39).filter(DteModel.dte_version_id == 1).filter(DteModel.period == '2025-08').all()
 
         for dte in dtes:
-            url = "https://libredte.cl/api/dte/dte_emitidos/pdf/33/"+ str(dte.folio) +"/76063822?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+            print(dte.folio)
+            
 
-            payload={}
-            headers = {
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json"
-                }
+            customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
 
-            response = requests.request("GET", url, headers=headers, data=payload)
+            
+            self.resend(dte.id, customer.phone)
+   
 
-            if response.status_code == 200:
-                file_path = os.path.join(save_path, f"{dte.folio}.pdf")
-                with open(file_path, "wb") as f:
-                    f.write(response.content)
-                print(f"✅ Guardado: {file_path}")
-            else:
-                print(f"❌ Error al 2")
-    
     def notify_paymeent(self, folio):
         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()

@@ -821,7 +821,7 @@ class CustomerTicketBillClass:
             TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
             # Endpoint para generar un DTE temporal
-            url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/39/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+            url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
 
             # Enviar solicitud a la API
             response = requests.post(
