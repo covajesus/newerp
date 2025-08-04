@@ -19,8 +19,22 @@ class WhatsappClass:
 
         token = os.getenv('LIBREDTE_TOKEN')
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
-        print(url_data)
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+        payload={}
+        headers = {
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json"
+                }
+
+        created_dte_response = requests.request("GET", created_dte_url, headers=headers, data=payload)
+
+        print(created_dte_response.text)
+        data = created_dte_response.json()
+
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + data['fecha'] + '/' + str(dte_data.total)
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
         headers = {
@@ -117,22 +131,22 @@ class WhatsappClass:
         image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv('LIBREDTE_TOKEN')
-        print(token)
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
 
         payload={}
         headers = {
-                    "Authorization": f"Bearer {token}",
+                    "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json"
                 }
 
         created_dte_response = requests.request("GET", created_dte_url, headers=headers, data=payload)
 
         print(created_dte_response.text)
-        exit()
+        data = created_dte_response.json()
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + data['fecha'] + '/' + str(dte_data.total)
     
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
