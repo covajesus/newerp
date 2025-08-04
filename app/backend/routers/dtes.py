@@ -164,6 +164,12 @@ def refresh_import_by_rut(db: Session = Depends(get_db)):
 
     return {"message": "Listo"}
 
+@dtes.get("/cron_send")
+def cron_send(db: Session = Depends(get_db)):
+    WhatsappClass(db).cron_to_resend()
+
+    return {"message": "Listo"}
+
 @dtes.get("/old_dtes")
 def old_dtes(db: Session = Depends(get_db)):
     conn = pymysql.connect(
