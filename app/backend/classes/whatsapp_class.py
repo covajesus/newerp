@@ -118,8 +118,21 @@ class WhatsappClass:
 
         token = os.getenv('LIBREDTE_TOKEN')
 
+        created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+        payload={}
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+
+        created_dte_response = requests.request("GET", created_dte_url, headers=headers, data=payload)
+
+        print(created_dte_response.text)
+        exit()
+
         url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + dte_data.added_date.strftime('%Y-%m-%d') + '/' + str(dte_data.total)
-        print(url_data)
+    
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
         headers = {
