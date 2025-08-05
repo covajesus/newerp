@@ -490,7 +490,7 @@ class CollectionClass:
             TotalAllCollectionModel.total
         ).first()
 
-        return total
+        return total[0] if total else 0
         
     def update_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = self.db.query(CollectionModel).filter(
