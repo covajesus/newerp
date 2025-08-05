@@ -53,7 +53,7 @@ class DepositClass:
                     *filters
                 ).order_by(
                     status_order,  # Primero ordenamos por prioridad de status_id
-                    DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
+                    DepositModel.collection_date.desc()  # Luego, ordenamos por ID dentro de cada grupo
                 )
             else:
                 # Inicialización de filtros dinámicos
@@ -95,7 +95,7 @@ class DepositClass:
                     *filters
                 ).order_by(
                     status_order,  # Primero ordenamos por prioridad de status_id
-                    DepositModel.id.desc()  # Luego, ordenamos por ID dentro de cada grupo
+                    DepositModel.collection_date.desc()  # Luego, ordenamos por ID dentro de cada grupo
                 )
                 
             # Si se solicita paginación
