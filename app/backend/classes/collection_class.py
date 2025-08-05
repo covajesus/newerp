@@ -1,4 +1,4 @@
-from app.backend.db.models import CollectionModel, BranchOfficeModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
+from app.backend.db.models import CollectionModel, BranchOfficeModel, TotalAllCollectionModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
 from datetime import datetime
 from app.backend.classes.dte_class import DteClass
 from sqlalchemy import desc
@@ -485,6 +485,13 @@ class CollectionClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
+    def total_collections(self):
+        total = self.db.query(
+            TotalAllCollectionModel.total
+        ).first()
+
+        return total
+        
     def update_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = self.db.query(CollectionModel).filter(
             CollectionModel.cashier_id == cashier_id,

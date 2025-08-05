@@ -23,6 +23,12 @@ class BranchOfficeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class TotalAllCollectionModel(Base):
+    __tablename__ = 'total_all_collections'
+
+    id = Column(Integer, primary_key=True)
+    total = Column(Integer)
+
 class DemarcationModel(Base):
     __tablename__ = 'demarcations'
 
