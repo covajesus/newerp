@@ -209,6 +209,7 @@ class DepositClass:
         deposit.payment_number = form_data.payment_number
         deposit.collection_amount = form_data.collection_amount
         deposit.collection_date = form_data.collection_date
+        deposit.deposit_date = form_data.deposit_date
         deposit.support = support
         deposit.added_date = datetime.now()
 

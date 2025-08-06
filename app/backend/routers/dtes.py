@@ -171,6 +171,34 @@ def cron_send(db: Session = Depends(get_db)):
 
     return {"message": "Listo"}
 
+@dtes.get("/dtes_data")
+def dtes_data(db: Session = Depends(get_db)):
+    print("Enviando DTEs a Whatsapp")
+    WhatsappClass(db).dtes_data()
+
+    return {"message": "Listo"}
+
+@dtes.get("/dtes_data2")
+def dtes_data(db: Session = Depends(get_db)):
+    print("Enviando DTEs a Whatsapp")
+    WhatsappClass(db).dtes_data2()
+
+    return {"message": "Listo"}
+
+@dtes.get("/dtes_data3")
+def dtes_data(db: Session = Depends(get_db)):
+    print("Enviando DTEs a Whatsapp")
+    WhatsappClass(db).dtes_data3()
+
+    return {"message": "Listo"}
+
+@dtes.get("/dtes_data4")
+def dtes_data(db: Session = Depends(get_db)):
+    print("Enviando DTEs a Whatsapp")
+    WhatsappClass(db).dtes_data4()
+
+    return {"message": "Listo"}
+
 @dtes.get("/old_dtes")
 def old_dtes(db: Session = Depends(get_db)):
     conn = pymysql.connect(

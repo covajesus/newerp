@@ -1055,6 +1055,7 @@ class DepositModel(Base):
     payment_number = Column(Integer)
     collection_amount = Column(Integer)
     collection_date = Column(Text)
+    deposit_date = Column(Text)
     support = Column(Text)
     added_date = Column(Date)
     updated_date = Column(Date)

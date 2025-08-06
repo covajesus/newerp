@@ -3,6 +3,7 @@ from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOf
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import json
 load_dotenv() 
 
 class WhatsappClass:
@@ -217,6 +218,235 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
+
+    def dtes_data(self):
+        dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_type_id == 39)
+            .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.period == '2025-05')
+            .all()
+        )
+
+        for dte in dtes:
+            try:
+                print(dte.folio)
+
+                TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+                created_dte_url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/{dte.dte_type_id}/{dte.folio}/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+                headers = {
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json"
+                }
+
+                created_dte_response = requests.get(created_dte_url, headers=headers)
+                print(created_dte_response.text)
+
+                data = created_dte_response.json()
+
+                if isinstance(data, dict):
+                    if data.get("pagado") is not None and data.get("datos") is not None:
+                        datos_dict = json.loads(data["datos"])
+                        authorization_code = datos_dict["detailOutput"]["authorizationCode"]
+
+                        print("Authorization Code:", authorization_code)
+
+                        dte_detail = (
+                            self.db.query(DteModel)
+                            .filter(DteModel.status_id == dte.status_id)
+                            .filter(DteModel.dte_type_id == dte.dte_type_id)
+                            .filter(DteModel.dte_version_id == dte.dte_version_id)
+                            .filter(DteModel.period == dte.period)
+                            .first()
+                        )
+
+                        dte_detail.payment_date = data["pagado"]
+                        dte_detail.comment = f'Código de autorización: {authorization_code}'
+                        dte_detail.payment_comment = f'Código de autorización: {authorization_code}'
+                        self.db.commit()
+                    else:
+                        print("Datos o pagado no disponibles para el DTE con folio", dte.folio)
+                else:
+                    print(f"Respuesta inesperada para DTE folio {dte.folio}: {data}")
+            except Exception as e:
+                print(f"❌ Error procesando DTE folio {dte.folio}: {e}")
+
+
+    def dtes_data2(self):
+        dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_type_id == 39)
+            .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.period == '2025-06')
+            .all()
+        )
+
+        for dte in dtes:
+            try:
+                print(dte.folio)
+
+                TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+                created_dte_url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/{dte.dte_type_id}/{dte.folio}/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+                headers = {
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json"
+                }
+
+                created_dte_response = requests.get(created_dte_url, headers=headers)
+                print(created_dte_response.text)
+
+                data = created_dte_response.json()
+
+                if isinstance(data, dict):
+                    if data.get("pagado") is not None and data.get("datos") is not None:
+                        datos_dict = json.loads(data["datos"])
+                        authorization_code = datos_dict["detailOutput"]["authorizationCode"]
+
+                        print("Authorization Code:", authorization_code)
+
+                        dte_detail = (
+                            self.db.query(DteModel)
+                            .filter(DteModel.status_id == dte.status_id)
+                            .filter(DteModel.dte_type_id == dte.dte_type_id)
+                            .filter(DteModel.dte_version_id == dte.dte_version_id)
+                            .filter(DteModel.period == dte.period)
+                            .first()
+                        )
+
+                        dte_detail.payment_date = data["pagado"]
+                        dte_detail.comment = f'Código de autorización: {authorization_code}'
+                        dte_detail.payment_comment = f'Código de autorización: {authorization_code}'
+                        self.db.commit()
+                    else:
+                        print("Datos o pagado no disponibles para el DTE con folio", dte.folio)
+                else:
+                    print(f"Respuesta inesperada para DTE folio {dte.folio}: {data}")
+            except Exception as e:
+                print(f"❌ Error procesando DTE folio {dte.folio}: {e}")
+
+
+    def dtes_data3(self):
+        dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_type_id == 39)
+            .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.period == '2025-04')
+            .all()
+        )
+
+        for dte in dtes:
+            try:
+                print(dte.folio)
+
+                TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+                created_dte_url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/{dte.dte_type_id}/{dte.folio}/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+                headers = {
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json"
+                }
+
+                created_dte_response = requests.get(created_dte_url, headers=headers)
+                print(created_dte_response.text)
+
+                data = created_dte_response.json()
+
+                if isinstance(data, dict):
+                    if data.get("pagado") is not None and data.get("datos") is not None:
+                        datos_dict = json.loads(data["datos"])
+                        authorization_code = datos_dict["detailOutput"]["authorizationCode"]
+
+                        print("Authorization Code:", authorization_code)
+
+                        dte_detail = (
+                            self.db.query(DteModel)
+                            .filter(DteModel.status_id == dte.status_id)
+                            .filter(DteModel.dte_type_id == dte.dte_type_id)
+                            .filter(DteModel.dte_version_id == dte.dte_version_id)
+                            .filter(DteModel.period == dte.period)
+                            .first()
+                        )
+
+                        dte_detail.payment_date = data["pagado"]
+                        dte_detail.comment = f'Código de autorización: {authorization_code}'
+                        dte_detail.payment_comment = f'Código de autorización: {authorization_code}'
+                        self.db.commit()
+                    else:
+                        print("Datos o pagado no disponibles para el DTE con folio", dte.folio)
+                else:
+                    print(f"Respuesta inesperada para DTE folio {dte.folio}: {data}")
+            except Exception as e:
+                print(f"❌ Error procesando DTE folio {dte.folio}: {e}")
+
+
+    def dtes_data4(self):
+        dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_type_id == 39)
+            .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.period == '2025-03')
+            .all()
+        )
+
+        for dte in dtes:
+            try:
+                print(dte.folio)
+
+                TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+                created_dte_url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/{dte.dte_type_id}/{dte.folio}/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+
+                headers = {
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json"
+                }
+
+                created_dte_response = requests.get(created_dte_url, headers=headers)
+                print(created_dte_response.text)
+
+                data = created_dte_response.json()
+
+                if isinstance(data, dict):
+                    if data.get("pagado") is not None and data.get("datos") is not None:
+                        datos_dict = json.loads(data["datos"])
+                        authorization_code = datos_dict["detailOutput"]["authorizationCode"]
+
+                        print("Authorization Code:", authorization_code)
+
+                        dte_detail = (
+                            self.db.query(DteModel)
+                            .filter(DteModel.status_id == dte.status_id)
+                            .filter(DteModel.dte_type_id == dte.dte_type_id)
+                            .filter(DteModel.dte_version_id == dte.dte_version_id)
+                            .filter(DteModel.period == dte.period)
+                            .first()
+                        )
+
+                        dte_detail.payment_date = data["pagado"]
+                        dte_detail.comment = f'Código de autorización: {authorization_code}'
+                        dte_detail.payment_comment = f'Código de autorización: {authorization_code}'
+                        self.db.commit()
+                    else:
+                        print("Datos o pagado no disponibles para el DTE con folio", dte.folio)
+                else:
+                    print(f"Respuesta inesperada para DTE folio {dte.folio}: {data}")
+            except Exception as e:
+                print(f"❌ Error procesando DTE folio {dte.folio}: {e}")
+
+
 
     def cron_to_resend(self):
         dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id == 39).filter(DteModel.dte_version_id == 1).filter(DteModel.period == '2025-08').all()
