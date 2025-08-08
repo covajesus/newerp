@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import UserLogin, StoreManualSeat, StoreAccountability
+from app.backend.schemas import UserLogin, StoreManualSeat
 from app.backend.classes.accountability_class import AccountabilityClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.file_class import FileClass
-from app.backend.classes.bank_statement_class import BankStatementClass
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
 import uuid

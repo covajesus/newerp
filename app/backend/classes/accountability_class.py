@@ -29,7 +29,7 @@ class AccountabilityClass:
             )
 
         if  expense_type.accounting_account != 443000344:
-            if tax_status_id == 0:
+            if tax_status_id == 2:
                 data = {
                         "fecha": period + "-01",
                         "glosa": gloss,
