@@ -1,4 +1,4 @@
-from app.backend.db.models import CollectionModel, BranchOfficeModel, TotalAllCollectionModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
+from app.backend.db.models import CollectionModel, BranchOfficeModel, DepositModel, TotalAllCollectionModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
 from datetime import datetime
 from app.backend.classes.dte_class import DteClass
 from sqlalchemy import desc
@@ -9,6 +9,7 @@ from app.backend.classes.authentication_class import AuthenticationClass
 import json
 from datetime import date, timedelta
 from sqlalchemy import and_
+from sqlalchemy import func, cast, Date
 
 class CollectionClass:
     def __init__(self, db):
@@ -491,7 +492,42 @@ class CollectionClass:
         ).first()
 
         return total[0] if total else 0
+    
+    def update_deposits(self):
+
+        results = (
+                self.db.query(
+                    func.sum(CollectionModel.cash_gross_amount).label("total_cash"),
+                    cast(CollectionModel.added_date, Date).label("added_day"),
+                    CollectionModel.branch_office_id
+                )
+                .filter(CollectionModel.added_date >= '2024-01-01')
+                .group_by(
+                    CollectionModel.branch_office_id,
+                    cast(CollectionModel.added_date, Date)
+                )
+                .all()
+            )
         
+        for result in results:
+            deposits = self.db.query(DepositModel).filter(DepositModel.branch_office_id == result.branch_office_id).filter(DepositModel.collection_date == result.added_day).all()
+
+            for deposit in deposits:
+                if deposit:
+                    print(result.added_day)
+                    print(result.total_cash)
+
+                    total_cash = result.total_cash if result.total_cash else 0
+        
+                    deposit_detail = self.db.query(DepositModel).filter(DepositModel.id == deposit.id).first()
+
+                    if deposit_detail:
+                        deposit_detail.collection_amount = total_cash
+                        deposit_detail.updated_date = func.now()
+                        self.db.commit()
+                else:
+                    print(f"[✘] No hay datos para sucursal {deposit.branch_office_id} en fecha {deposit.collection_date}")
+    
     def update_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         collection = self.db.query(CollectionModel).filter(
             CollectionModel.cashier_id == cashier_id,

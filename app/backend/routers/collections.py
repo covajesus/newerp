@@ -68,6 +68,12 @@ def delete(id: int, db: Session = Depends(get_db)):
 
     return {"message": "success"}
 
+@collections.get("/update_deposits")
+def update_deposits(db: Session = Depends(get_db)):
+    CollectionClass(db).update_deposits()
+
+    return {"message": '12121'}
+
 @collections.get("/edit/{id}")
 def edit(id: int, db: Session = Depends(get_db)):
     data = CollectionClass(db).get(id)

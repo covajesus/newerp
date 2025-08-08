@@ -34,7 +34,8 @@ class PatentClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    PatentModel.id
+                    PatentModel.year.desc(),
+                    PatentModel.semester.desc()
                 )
 
                 # Si se solicita paginación
