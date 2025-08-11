@@ -443,6 +443,7 @@ class CollectionClass:
             return 0
     
     def store_redcomercio (self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
+        print(cashier_id, branch_office_id, gross_total, net_total, total_tickets, date)
         collection = CollectionModel(
                 branch_office_id=branch_office_id,
                 cashier_id=cashier_id,
