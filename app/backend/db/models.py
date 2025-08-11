@@ -23,6 +23,13 @@ class BranchOfficeModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class TotalAllCollectionPerSupervisorModel(Base):
+    __tablename__ = 'total_all_collection_per_supervisor'
+
+    id = Column(Integer, primary_key=True)
+    principal_supervisor = Column(String(255))
+    total = Column(Integer)
+
 class TotalAllCollectionModel(Base):
     __tablename__ = 'total_all_collections'
 

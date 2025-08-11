@@ -58,8 +58,8 @@ def manual_store(manual_store_collection: ManualStoreCollection, db: Session = D
     return {"message": data}
 
 @collections.get("/total_collections")
-def total_collections(db: Session = Depends(get_db)):
-    data = CollectionClass(db).total_collections()
+def total_collections(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CollectionClass(db).total_collections(session_user.rol_id)
     return {"message": data}
 
 @collections.delete("/delete/{id}")

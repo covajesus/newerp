@@ -1,4 +1,4 @@
-from app.backend.db.models import CollectionModel, BranchOfficeModel, DepositModel, TotalAllCollectionModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
+from app.backend.db.models import CollectionModel, BranchOfficeModel, DepositModel, TotalAllCollectionModel, TotalAllCollectionPerSupervisorModel, CashierModel, TotalGeneralCollectionModel, TotalCollectionModel, TotalDetailCollectionModel, CashierModel
 from datetime import datetime
 from app.backend.classes.dte_class import DteClass
 from sqlalchemy import desc
@@ -486,10 +486,15 @@ class CollectionClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def total_collections(self):
-        total = self.db.query(
-            TotalAllCollectionModel.total
-        ).first()
+    def total_collections(self, rol-id = None):
+        if rol-id == 1 or rol-id == 2:
+            total = self.db.query(
+                TotalAllCollectionModel.total
+            ).first()
+        elif rol-id == 4:
+            total = self.db.query(
+                TotalAllCollectionPerSupervisorModel.total
+            ).first()
 
         return total[0] if total else 0
     
