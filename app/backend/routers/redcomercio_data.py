@@ -73,7 +73,7 @@ def refresh(db: Session = Depends(get_db)):
         total_tickets = values["total_tickets"]
 
         cash_gross_amount = CollectionClass(db).delete_red_comercio_collection(branch_office_id, cashier_id, added_date)
-
+        print(cash_gross_amount)
         if cash_gross_amount is None or cash_gross_amount == 0:
             CollectionClass(db).store_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
         else:
