@@ -486,7 +486,7 @@ class CollectionClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def total_collections(self, rol-id = None):
+    def total_collections(self, rol_id = None):
         if rol-id == 1 or rol-id == 2:
             total = self.db.query(
                 TotalAllCollectionModel.total
