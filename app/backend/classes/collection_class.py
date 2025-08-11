@@ -487,11 +487,11 @@ class CollectionClass:
             return f"Error: {error_message}"
 
     def total_collections(self, rol_id = None):
-        if rol-id == 1 or rol-id == 2:
+        if rol_id == 1 or rol_id == 2:
             total = self.db.query(
                 TotalAllCollectionModel.total
             ).first()
-        elif rol-id == 4:
+        elif rol_id == 4:
             total = self.db.query(
                 TotalAllCollectionPerSupervisorModel.total
             ).first()
