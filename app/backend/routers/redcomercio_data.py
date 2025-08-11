@@ -68,27 +68,30 @@ def refresh(db: Session = Depends(get_db)):
                         }
                     grouped_data[key]["gross_total"] += total
                     grouped_data[key]["total_tickets"] += 1
-    print(grouped_data)
-    exit()
+
     # Ahora recorre el diccionario y haz insert/update
-    for (cashier_id, branch_office_id, added_date), values in grouped_data.items():
+    for key, values in grouped_data.items():
+        # key es una tupla: (cashier_id, sucursal_sii, fecha)
+        cashier_id = key[0]
+        branch_office_id = key[1]
+        added_date = key[2]
+
+        CollectionClass(db).delete_red_comercio_collection(branch_office_id, cashier_id, added_date)
+
+        cashier_id, sucursal_sii, fecha = key
+
         gross_total = values["gross_total"]
-        net_total = round(gross_total / 1.19)
         total_tickets = values["total_tickets"]
 
-        cash_gross_amount = CollectionClass(db).delete_red_comercio_collection(branch_office_id, cashier_id, added_date)
-        print(cashier_id)
-        print(branch_office_id)
-        print(gross_total)
-        print(net_total)
-        print(total_tickets)
-        print(added_date)
-        if cash_gross_amount is None or cash_gross_amount == 0:
-            CollectionClass(db).store_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
-        else:
-            gross_total += cash_gross_amount
-            net_total = round(gross_total / 1.19)
-            CollectionClass(db).update_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
+        print(f"Cajero: {cashier_id}, Sucursal SII: {sucursal_sii}, Fecha: {fecha}")
+        print(f"  Total bruto: {gross_total}")
+        print(f"  Total tickets: {total_tickets}")
+        print("---")
 
+        net_total = round(gross_total/1.19)
+
+        CollectionClass(db).store_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
+
+        
     return {"status": "Redcomercio data updated successfully"}
 
