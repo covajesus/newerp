@@ -21,12 +21,15 @@ def refresh(db: Session = Depends(get_db)):
     url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822-6"
 
     tz = pytz.timezone('America/Santiago')
-    now = datetime.now(tz)  # obtienes la fecha y hora actual en la zona horaria
+    now = datetime.now(tz)
 
     until = now.strftime('%Y-%m-%d')
     since = (now - timedelta(days=90)).strftime('%Y-%m-%d')
 
     branch_offices = BranchOfficeClass(db).get_with_machine()
+
+    # Diccionario para agrupar por (cashier_id, branch_office_id, fecha)
+    grouped_data = {}
 
     if isinstance(branch_offices, list):
         for branch_office in branch_offices:
@@ -39,7 +42,7 @@ def refresh(db: Session = Depends(get_db)):
 
             response = requests.post(
                 url,
-                json=payload,  # ✅ Ahora pasas un dict (se serializa automáticamente)
+                json=payload,
                 headers={
                     "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json",
@@ -48,32 +51,35 @@ def refresh(db: Session = Depends(get_db)):
 
             if response.status_code == 200:
                 dte_data = response.json()
-
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
-                
-                gross_total = 0
-                total_tickets = 0
-                net_total = 0
 
-                print(dte_data)
-                exit()
-                
                 for dte_datum in dte_data:
                     added_date = dte_datum['fecha']
-                    cash_gross_amount =  CollectionClass(db).delete_red_comercio_collection(branch_office.id, cashier_id, added_date)
+                    key = (cashier_id, branch_office.id, added_date)
+                    total = dte_datum['total']
 
-                    
+                    if key not in grouped_data:
+                        grouped_data[key] = {
+                            "gross_total": 0,
+                            "total_tickets": 0
+                        }
+                    grouped_data[key]["gross_total"] += total
+                    grouped_data[key]["total_tickets"] += 1
 
-                    if cash_gross_amount is None or cash_gross_amount == 0:
-                        gross_total = dte_datum['total']
-                        net_total = round(dte_datum['total']/1.19)
-                        total_tickets = 1
+    # Ahora recorre el diccionario y haz insert/update
+    for (cashier_id, branch_office_id, added_date), values in grouped_data.items():
+        gross_total = values["gross_total"]
+        net_total = round(gross_total / 1.19)
+        total_tickets = values["total_tickets"]
 
-                        CollectionClass(db).store_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
-                    else:
-                        gross_total = cash_gross_amount + dte_datum['total']
-                        net_total = round(gross_total/1.19)
-                        total_tickets = total_tickets + 1
-                        CollectionClass(db).update_redcomercio(cashier_id, branch_office.id, gross_total, net_total, total_tickets, added_date)
+        cash_gross_amount = CollectionClass(db).delete_red_comercio_collection(branch_office_id, cashier_id, added_date)
+
+        if cash_gross_amount is None or cash_gross_amount == 0:
+            CollectionClass(db).store_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
+        else:
+            gross_total += cash_gross_amount
+            net_total = round(gross_total / 1.19)
+            CollectionClass(db).update_redcomercio(cashier_id, branch_office_id, gross_total, net_total, total_tickets, added_date)
 
     return {"status": "Redcomercio data updated successfully"}
+
