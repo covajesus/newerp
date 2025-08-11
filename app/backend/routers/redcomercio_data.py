@@ -26,6 +26,9 @@ def refresh(db: Session = Depends(get_db)):
     until = now.strftime('%Y-%m-%d')
     since = (now - timedelta(days=90)).strftime('%Y-%m-%d')
 
+    print(until)
+    print(since)
+
     branch_offices = BranchOfficeClass(db).get_with_machine()
 
     # Diccionario para agrupar por (cashier_id, branch_office_id, fecha)
