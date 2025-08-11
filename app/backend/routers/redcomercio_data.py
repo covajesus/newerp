@@ -49,8 +49,6 @@ def refresh(db: Session = Depends(get_db)):
                 },
             )
 
-            print(response.text)
-
             if response.status_code == 200:
                 dte_data = response.json()
                 cashier_id = CashierClass(db).get_with_machine(branch_office.id)
