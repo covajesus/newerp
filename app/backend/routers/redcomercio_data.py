@@ -68,7 +68,7 @@ def refresh(db: Session = Depends(get_db)):
                         }
                     grouped_data[key]["gross_total"] += total
                     grouped_data[key]["total_tickets"] += 1
-    print(grouped_data.items())
+    print(grouped_data)
     exit()
     # Ahora recorre el diccionario y haz insert/update
     for (cashier_id, branch_office_id, added_date), values in grouped_data.items():
