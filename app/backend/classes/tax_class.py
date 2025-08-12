@@ -20,10 +20,10 @@ class TaxClass:
                     # Incluir la información de la sucursal (BranchOfficeModel)
                     data_query = self.db.query(TaxModel.id, TaxModel.period). \
                         filter(TaxModel.period == period). \
-                        order_by(TaxModel.id)
+                        order_by(TaxModel.period.desc())
                 else:
                     data_query = self.db.query(TaxModel.id, TaxModel.period). \
-                        order_by(TaxModel.id)
+                        order_by(TaxModel.period.desc())
 
                 # Si data_query ha sido definida, realizamos la paginación
                 if data_query:
