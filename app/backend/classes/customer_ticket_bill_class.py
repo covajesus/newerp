@@ -158,6 +158,7 @@ class CustomerTicketBillClass:
 
     def search(self, rol_id, branch_office_id=None, rut=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
         try:
+            print(rol_id)
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
                 filters = []
