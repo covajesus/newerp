@@ -207,7 +207,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
 @dtes.post("/pay")
 async def pay(request: Request, db: Session = Depends(get_db)):
     # 1. Verificar credenciales
-    if not await auth_check(request, USER, PASS):
+    if not await auth_check(request, 'rcabezas', 'Jisparking2022'):
         raise HTTPException(status_code=401, detail="Usuario no autenticado o credenciales incorrectas")
 
     # 2. Recibir datos del cobro
@@ -217,8 +217,8 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Código de cobro inválido o no recibido")
 
     # 3. Consultar cobro en LibreDTE
-    url = f"https://libredte.cl/api/pagos/cobros/info/{codigo}/{EMISOR}"
-    headers = {"Authorization": f"Bearer {HASH}"}
+    url = f"https://libredte.cl/api/pagos/cobros/info/{codigo}/76063822"
+    headers = {"Authorization": f"Bearer JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"}
 
     try:
         resp = requests.get(url, headers=headers, timeout=10)
