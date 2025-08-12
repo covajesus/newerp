@@ -204,9 +204,8 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
 
     return u == user and p == password
 
-@dtes.get("/pay")
+@dtes.post("/pay")
 async def pay(request: Request, db: Session = Depends(get_db)):
-    print(222)
     # Verificar credenciales
     if auth_check('rcabezas', 'Jisparking2022'):
         raise HTTPException(status_code=401, detail="Usuario no autenticado o credenciales incorrectas")
