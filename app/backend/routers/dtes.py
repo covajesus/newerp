@@ -205,7 +205,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
     return u == user and p == password
 
 @dtes.post("/pay")
-async def pay(libre_dte_status_id: int, request: Request):
+async def pay(libre_dte_status_id: int, request: Request, db: Session = Depends(get_db)):
 
     if libre_dte_status_id != 1:
         raise HTTPException(status_code=400, detail="Invalid libre_dte_status_id")
@@ -235,20 +235,23 @@ async def pay(libre_dte_status_id: int, request: Request):
     datos = Cobro["datos"]
     authorization_code = datos["detailOutput"]["authorizationCode"]
 
-    print(datos)
-    exit()
-    dte_qty = count_tp_dte(Cobro["emitido"], 1)
+    dte_qty = db.query(DteModel).filter(
+        DteModel.folio == Cobro["emitido"],
+        DteModel.dte_version_id == 1
+    ).count()
 
     if dte_qty > 0:
-        dte = get_tp_dte(Cobro["emitido"], 1)
+        dte = db.query(DteModel).filter(
+            DteModel.folio == Cobro["emitido"],
+            DteModel.dte_version_id == 1
+        ).first()
         dte.payment_type_id = 2
         dte.payment_date = Cobro["pagado"]
         dte.comment = f"Código de autorización: {authorization_code}"
-        dte.expense_type_id = 25
-        dte.status_id = 19
-        dte.send_libre_dte_id = 1
-        if dte.save():
-            return {"status": "success", "message": "DTE actualizado correctamente"}
+        dte.payment_comment = f"Código de autorización: {authorization_code}"
+        dte.expense_type_id = 23
+        dte.status_id = 5
+        db.commit()
 
     raise HTTPException(status_code=404, detail="DTE no encontrado")
 
