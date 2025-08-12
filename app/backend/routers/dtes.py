@@ -51,7 +51,7 @@ def upload_deposit_transfer(
 
 @dtes.post("/all_with_customer")
 def all_with_customer(dte: DteList, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
-    data = DteClass(db).get_all_with_customer(session_user.rol_id, dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.period, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_version_id, dte.page)
+    data = DteClass(db).get_all_with_customer(session_user.rol_id, session_user.rut, dte.folio, dte.branch_office_id, dte.rut, dte.customer, dte.period, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_version_id, dte.page)
 
     return {"message": data}
 

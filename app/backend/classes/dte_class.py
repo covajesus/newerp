@@ -214,6 +214,7 @@ class DteClass:
     def get_all_with_customer(
         self,
         rol_id,
+        supervisor_rut,
         folio=None,
         branch_office_id=None,
         rut=None,
@@ -227,7 +228,6 @@ class DteClass:
         items_per_page=10
     ):
         try:
-            print(rol_id)
             if rol_id == 1 or rol_id == 2:
                 # Filtros dinámicos
                 filters = []
