@@ -191,7 +191,6 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
     print(user, password)
     # Leer cabeceras HTTP
     auth_header = request.headers.get("Authorization")
-    print(auth_header)
     if not auth_header:
         return False
     
@@ -203,7 +202,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
         u, p = decoded.split(":", 1)
     except Exception:
         return False
-
+    print(u, p)
     return u == user and p == password
 
 @dtes.post("/pay")
