@@ -330,7 +330,7 @@ class DteClass:
                 ).filter(
                     *filters
                 ).filter(
-                    BranchOfficeModel.principal_supervisor == rut
+                    BranchOfficeModel.principal_supervisor == supervisor_rut
                 ).order_by(
                     DteModel.id.desc()
                 )
