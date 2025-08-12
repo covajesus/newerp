@@ -227,6 +227,7 @@ class DteClass:
         items_per_page=10
     ):
         try:
+            print(rol_id)
             if rol_id == 1 or rol_id == 2:
                 # Filtros dinámicos
                 filters = []
