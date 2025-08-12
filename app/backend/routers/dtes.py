@@ -205,10 +205,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
     return u == user and p == password
 
 @dtes.post("/pay")
-async def pay(libre_dte_status_id: int, request: Request, db: Session = Depends(get_db)):
-
-    if libre_dte_status_id != 1:
-        raise HTTPException(status_code=400, detail="Invalid libre_dte_status_id")
+def pay(request: Request, db: Session = Depends(get_db)):
 
     # Verificar credenciales
     if auth_check('rcabezas', 'Jisparking2022'):
