@@ -191,6 +191,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
     print(user, password)
     # Leer cabeceras HTTP
     auth_header = request.headers.get("Authorization")
+    print(auth_header)
     if not auth_header:
         return False
     
