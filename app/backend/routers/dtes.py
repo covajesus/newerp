@@ -206,8 +206,8 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
 
 @dtes.post("/pay")
 async def pay(request: Request, db: Session = Depends(get_db)):
-    # Verificar credenciales
-    if auth_check('rcabezas', 'Jisparking2022'):
+    # Verificar credenciales (usando await y pasando request)
+    if not await auth_check(request, 'rcabezas', 'Jisparking2022'):
         raise HTTPException(status_code=401, detail="Usuario no autenticado o credenciales incorrectas")
 
     # Recibir datos JSON
@@ -248,6 +248,7 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         dte.expense_type_id = 23
         dte.status_id = 5
         db.commit()
+        return {"status": "success", "message": "DTE actualizado correctamente"}
 
     raise HTTPException(status_code=404, detail="DTE no encontrado")
 
