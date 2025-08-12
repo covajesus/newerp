@@ -7,10 +7,12 @@ from app.backend.db.models import DteModel, CustomerModel
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
-from fastapi import UploadFile, File, HTTPException
+from fastapi import UploadFile, File, HTTPException, Request
 from datetime import datetime
 import pymysql
 import uuid
+import base64
+import requests
 
 dtes = APIRouter(
     prefix="/dtes",
@@ -184,6 +186,71 @@ def dtes_data(db: Session = Depends(get_db)):
     WhatsappClass(db).dtes_data2()
 
     return {"message": "Listo"}
+
+async def auth_check(request: Request, user: str, password: str) -> bool:
+    # Leer cabeceras HTTP
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return False
+    
+    try:
+        basic, encoded = auth_header.split(" ")
+        if basic.lower() != "basic":
+            return False
+        decoded = base64.b64decode(encoded).decode("utf-8")
+        u, p = decoded.split(":", 1)
+    except Exception:
+        return False
+
+    return u == user and p == password
+
+@dtes.post("/pay")
+async def pay(libre_dte_status_id: int, request: Request):
+
+    if libre_dte_status_id != 1:
+        raise HTTPException(status_code=400, detail="Invalid libre_dte_status_id")
+
+    # Verificar credenciales
+    if auth_check('rcabezas', 'Jisparking2022'):
+        raise HTTPException(status_code=401, detail="Usuario no autenticado o credenciales incorrectas")
+
+    # Recibir datos JSON
+    cobro_informado = await request.json()
+    if not cobro_informado or "codigo" not in cobro_informado:
+        raise HTTPException(status_code=400, detail="No se recibió datos del cobro")
+
+    # Consultar cobro en LibreDTE
+    url = f"https://libredte.cl/api/pagos/cobros/info/{cobro_informado['codigo']}/76063822"
+    headers = {"Authorization": f"Bearer JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"}
+    resp = requests.get(url, headers=headers)
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error al realizar la consulta del cobro: {resp.text}")
+
+    Cobro = resp.json()
+    if not Cobro.get("pagado"):
+        raise HTTPException(status_code=400, detail="El cobro no está pagado")
+
+    # Procesar datos del cobro
+    datos = Cobro["datos"]
+    authorization_code = datos["detailOutput"]["authorizationCode"]
+
+    print(datos)
+    exit()
+    dte_qty = count_tp_dte(Cobro["emitido"], 1)
+
+    if dte_qty > 0:
+        dte = get_tp_dte(Cobro["emitido"], 1)
+        dte.payment_type_id = 2
+        dte.payment_date = Cobro["pagado"]
+        dte.comment = f"Código de autorización: {authorization_code}"
+        dte.expense_type_id = 25
+        dte.status_id = 19
+        dte.send_libre_dte_id = 1
+        if dte.save():
+            return {"status": "success", "message": "DTE actualizado correctamente"}
+
+    raise HTTPException(status_code=404, detail="DTE no encontrado")
 
 @dtes.get("/dtes_data3")
 def dtes_data(db: Session = Depends(get_db)):
