@@ -206,31 +206,44 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
 
 @dtes.post("/pay")
 async def pay(request: Request, db: Session = Depends(get_db)):
-    # Verificar credenciales (usando await y pasando request)
-    if not await auth_check(request, 'rcabezas', 'Jisparking2022'):
+    # 1. Verificar credenciales
+    if not await auth_check(request, USER, PASS):
         raise HTTPException(status_code=401, detail="Usuario no autenticado o credenciales incorrectas")
 
-    # Recibir datos JSON
+    # 2. Recibir datos del cobro
     cobro_informado = await request.json()
-    if not cobro_informado or "codigo" not in cobro_informado:
-        raise HTTPException(status_code=400, detail="No se recibió datos del cobro")
+    codigo = cobro_informado.get("codigo")
+    if not codigo or not isinstance(codigo, str) or len(codigo.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Código de cobro inválido o no recibido")
 
-    # Consultar cobro en LibreDTE
-    url = f"https://libredte.cl/api/pagos/cobros/info/{cobro_informado['codigo']}/76063822"
-    headers = {"Authorization": f"Bearer JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"}
-    resp = requests.get(url, headers=headers)
+    # 3. Consultar cobro en LibreDTE
+    url = f"https://libredte.cl/api/pagos/cobros/info/{codigo}/{EMISOR}"
+    headers = {"Authorization": f"Bearer {HASH}"}
 
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error al conectar con LibreDTE: {str(e)}")
+
+    # 4. Verificar respuesta
     if resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error al realizar la consulta del cobro: {resp.text}")
+        raise HTTPException(status_code=500, detail=f"Error LibreDTE: {resp.text}")
 
-    Cobro = resp.json()
+    try:
+        Cobro = resp.json()
+    except ValueError:
+        raise HTTPException(status_code=500, detail=f"Respuesta inválida de LibreDTE: {resp.text}")
+
     if not Cobro.get("pagado"):
         raise HTTPException(status_code=400, detail="El cobro no está pagado")
 
-    # Procesar datos del cobro
-    datos = Cobro["datos"]
-    authorization_code = datos["detailOutput"]["authorizationCode"]
+    # 5. Procesar datos del cobro
+    datos = Cobro.get("datos", {})
+    authorization_code = datos.get("detailOutput", {}).get("authorizationCode")
+    if not authorization_code:
+        raise HTTPException(status_code=500, detail="No se encontró código de autorización en la respuesta de LibreDTE")
 
+    # 6. Buscar y actualizar DTE
     dte_qty = db.query(DteModel).filter(
         DteModel.folio == Cobro["emitido"],
         DteModel.dte_version_id == 1
@@ -250,6 +263,7 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "success", "message": "DTE actualizado correctamente"}
 
+    # 7. Si no se encuentra
     raise HTTPException(status_code=404, detail="DTE no encontrado")
 
 @dtes.get("/dtes_data3")
