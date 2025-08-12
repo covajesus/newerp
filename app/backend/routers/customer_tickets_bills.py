@@ -19,8 +19,8 @@ def index(customer_ticket_inputs:CustomerTicketBillList, db: Session = Depends(g
     return {"message": data}
 
 @customer_tickets_bills.post("/search")
-def search(customer_ticket_bill_inputs:CustomerTicketBillSearch, db: Session = Depends(get_db)):
-    data = CustomerTicketBillClass(db).search(customer_ticket_bill_inputs.branch_office_id, customer_ticket_bill_inputs.rut, customer_ticket_bill_inputs.status_id, customer_ticket_bill_inputs.supervisor_id, customer_ticket_bill_inputs.page)
+def search(customer_ticket_bill_inputs:CustomerTicketBillSearch, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
+    data = CustomerTicketBillClass(db).search(session_user.rol_id, customer_ticket_bill_inputs.branch_office_id, customer_ticket_bill_inputs.rut, customer_ticket_bill_inputs.status_id, customer_ticket_bill_inputs.supervisor_id, customer_ticket_bill_inputs.page)
 
     return {"message": data}
 
