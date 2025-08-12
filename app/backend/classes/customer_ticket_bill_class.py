@@ -156,145 +156,73 @@ class CustomerTicketBillClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
-    def search(self, rol_id, branch_office_id=None, rut=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
+    def search(self, branch_office_id=None, rut=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
         try:
-            print(rol_id)
-            if rol_id == 1 or rol_id == 2:
-                # Inicialización de filtros dinámicos
-                filters = []
+            # Inicialización de filtros dinámicos
+            filters = []
 
-                if branch_office_id != None and branch_office_id != "":
-                    filters.append(DteModel.branch_office_id == branch_office_id)
-                if rut != None and rut != "":
-                    filters.append(DteModel.rut == rut)
-                if status_id != None and status_id != "":
-                    filters.append(DteModel.status_id == status_id)
-                if supervisor_id != None and supervisor_id != "":
-                    filters.append(UserModel.supervisor_id == supervisor_id)
+            if branch_office_id != None and branch_office_id != "":
+                filters.append(DteModel.branch_office_id == branch_office_id)
+            if rut != None and rut != "":
+                filters.append(DteModel.rut == rut)
+            if status_id != None and status_id != "":
+                filters.append(DteModel.status_id == status_id)
+            if supervisor_id != None and supervisor_id != "":
+                filters.append(UserModel.supervisor_id == supervisor_id)
 
-                filters.append(DteModel.dte_version_id == 1)
-                filters.append(DteModel.status_id > 3)
-                filters.append(DteModel.rut != None)
-                filters.append(DteModel.rut != '66666666-6')
-                
-                if supervisor_id != None:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        DteModel.payment_date,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        desc(DteModel.folio)
-                    )
-                else:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.payment_date,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        desc(DteModel.folio)
-                    )
-            elif rol_id == 4:
-                # Inicialización de filtros dinámicos
-                filters = []
-
-                if branch_office_id != None and branch_office_id != "":
-                    filters.append(DteModel.branch_office_id == branch_office_id)
-                if rut != None and rut != "":
-                    filters.append(DteModel.rut == rut)
-                if status_id != None and status_id != "":
-                    filters.append(DteModel.status_id == status_id)
-                if supervisor_id != None and supervisor_id != "":
-                    filters.append(UserModel.supervisor_id == supervisor_id)
-
-                filters.append(DteModel.dte_version_id == 1)
-                filters.append(DteModel.status_id > 3)
-                filters.append(DteModel.rut != None)
-                filters.append(DteModel.rut != '66666666-6')
-                
-                if supervisor_id != None:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        DteModel.payment_date,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).filter(
-                        BranchOfficeModel.principal_supervisor == rut
-                    ).order_by(
-                        desc(DteModel.folio)
-                    )
-                else:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.payment_date,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).filter(
-                        BranchOfficeModel.principal_supervisor == rut
-                    ).order_by(
-                        desc(DteModel.folio)
-                    )
+            filters.append(DteModel.dte_version_id == 1)
+            filters.append(DteModel.status_id > 3)
+            filters.append(DteModel.rut != None)
+            filters.append(DteModel.rut != '66666666-6')
+            
+            if supervisor_id != None:
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    DteModel.payment_date,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.folio)
+                )
+            else:
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.payment_date,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    desc(DteModel.folio)
+                )
 
             # Si se solicita paginación
             if page > 0:
