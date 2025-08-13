@@ -29,6 +29,21 @@ class AuthenticationClass:
     def verify_password(self, plain_password, hashed_password):
         return pwd_context.verify(plain_password, hashed_password)
     
+    def create_external_token(self, rut, password):
+        url = "https://api.jisreportes.com/login"
+        data = {
+            "rut": rut,
+            "password": password
+        }
+        print(data)
+
+        response = requests.post(url, json=data)
+
+        json_data = response.json()
+        token = json_data.get("access_token")
+
+        return token
+    
     def create_token(self, data: dict, time_expire: Union[datetime, None] = None):
         data_copy = data.copy()
         if time_expire is None:
