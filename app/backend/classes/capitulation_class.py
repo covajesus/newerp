@@ -281,6 +281,7 @@ class CapitulationClass:
                 CapitulationModel.status_id,
                 BranchOfficeModel.branch_office,
                 ExpenseTypeModel.id.label("expense_type_id"),
+                CapitulationModel.why_was_rejected,
                 ExpenseTypeModel.expense_type,
                 UserModel.full_name,
                 cast(CapitulationModel.payment_date, String).label("payment_date"),
@@ -318,7 +319,8 @@ class CapitulationClass:
                     "payment_date": data_query.payment_date.strftime("%Y-%m-%d") if isinstance(data_query.payment_date, datetime) else data_query.payment_date,
                     "payment_number": data_query.payment_number,
                     "period": f"{data_query.period.split('-')[1]}-{data_query.period.split('-')[0]}" if isinstance(data_query.period, str) and "-" in data_query.period else data_query.period,
-                    "payment_support": data_query.payment_support
+                    "payment_support": data_query.payment_support,
+                    "why_was_rejected": data_query.why_was_rejected
                 }
 
                 result = {
