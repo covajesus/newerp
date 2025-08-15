@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import BranchOfficeModel, CapitulationModel, ExpenseTypeModel, UserModel, TotalAcceptedCapitulations
+from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
 from datetime import datetime
 from fastapi import HTTPException
@@ -352,6 +353,7 @@ class CapitulationClass:
         capitulation.description = form_data.description
         capitulation.amount = form_data.amount
         capitulation.support = support
+        capitulation.added_date = datetime.now()
 
         self.db.add(capitulation)
 
@@ -473,6 +475,8 @@ class CapitulationClass:
         else:
             capitulation.status_id = 3
             capitulation.why_was_rejected = form_data.why_was_rejected
+
+            WhatsappClass(self.db).reject_capitulation(capitulation.id)
 
         capitulation.updated_date = datetime.now()
 

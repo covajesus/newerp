@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel
+from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel, CapitulationModel, ExpenseTypeModel
 import os
 from dotenv import load_dotenv
 from datetime import datetime
@@ -122,7 +122,71 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
-        
+
+    def reject_capitulation(self, capitulation_id):
+        capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.capitulation_id == capitulation_id).first()
+        user = self.db.query(UserModel).filter(UserModel.rut == capitulation.user_rut).first()
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 3).first()
+        expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == capitulation.expense_type_id).first()
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == capitulation.branch_office_id).first()
+
+        phone = user.phone  # Ej: '912345678'
+        full_name = user.full_name
+        capitulation_id = capitulation.id
+        amount_value = capitulation.amount
+        capitulation_date_value = capitulation.added_date.strftime('%d-%m-%Y') if capitulation.added_date else 'N/A'
+        expense_type_name = expense_type.expense_type
+        branch_office_name = branch_office.branch_office
+        rejection_reason = capitulation.why_was_rejected
+
+        # URL de la API
+        url = 'https://graph.facebook.com/v20.0/101066132689690/messages'
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        # Cabeceras
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+
+        phone_str = str(phone).strip()
+        if not phone_str.startswith("56"):
+            phone = "56" + phone_str
+        else:
+            phone = phone_str
+
+        # Payload en formato JSON
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": f"{phone}",
+            "type": "template",
+            "template": {
+                "name": whatsapp_template.title,
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": full_name},
+                            {"type": "text", "text": capitulation_id},
+                            {"type": "text", "text": amount_value},
+                            {"type": "text", "text": capitulation_date_value},
+                            {"type": "text", "text": expense_type_name},
+                            {"type": "text", "text": branch_office_name},
+                            {"type": "text", "text": rejection_reason},
+                        ]
+                    }
+                ]
+            }
+        }
+
+        # Enviar la solicitud POST
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+        # Mostrar la respuesta
+        print(response.text)
+    
     def resend(self, dte_id, phone):
         dte_data = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
