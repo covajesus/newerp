@@ -124,7 +124,7 @@ class WhatsappClass:
         print(response.text)
 
     def reject_capitulation(self, capitulation_id):
-        capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.capitulation_id == capitulation_id).first()
+        capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.id == capitulation_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == capitulation.user_rut).first()
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 3).first()
         expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == capitulation.expense_type_id).first()
