@@ -1736,6 +1736,9 @@ class StoreManualSeat(BaseModel):
     period: str
     amount: int
 
+class ExternalToken(BaseModel):
+    external_token: str
+
 class StoreExpenseType(BaseModel):
     expense_type: str
     accounting_account: str
