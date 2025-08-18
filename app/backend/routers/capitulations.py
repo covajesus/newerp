@@ -4,14 +4,14 @@ from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.capitulation_class import CapitulationClass
 from app.backend.schemas import Capitulation, CapitulationList, UpdateCapitulation, PayCapitulation, ImputeCapitulation
+from app.backend.db.models import CapitulationModel
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
-from typing import List
-from fastapi import Form
 import uuid
 import json
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.schemas import UserLogin
+import pymysql
 
 capitulations = APIRouter(
     prefix="/capitulations",
@@ -176,3 +176,54 @@ def paymenttotal_accepted_capitulations_support(db: Session = Depends(get_db)):
     capitulations = CapitulationClass(db).total_accepted_capitulations()
 
     return {"message": capitulations}
+
+@capitulations.get("/old_capitulations")
+def old_dtes(db: Session = Depends(get_db)):
+    conn = pymysql.connect(
+        host='jisparking.com',
+        user='jysparki_admin',
+        password='Admin2024$',
+        db='jysparki_jis',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                *
+            FROM capitulations
+        """)
+        result = cursor.fetchall()
+
+        for row in result:
+            print(row)
+            if row['status_id'] == 7:
+                status_id = 2
+            
+            if row['status_id'] == 11:
+                status_id = 1
+
+            if row['status_id'] == 17:
+                status_id = 15
+
+            capitulation = CapitulationModel(
+                    document_type_id=row['dte_type_id'],
+                    capitulation_type_id=row['capitulation_type_id'],
+                    branch_office_id=row['branch_office_id'],
+                    expense_type_id=row['expense_type_id'],
+                    status_id=status_id,
+                    document_date=row['document_date'],
+                    document_number=row['document_number'],
+                    user_rut=row['rut'],
+                    supplier_rut=row['supplier_rut'],
+                    description=row['description'],
+                    amount=row['amount'],
+                    support=row['support'],
+                    why_was_rejected=row['why_was_rejected'],
+                    payment_date=row['payment_date'],
+                    payment_number=row['document_number'],
+                    period=row['impute_period'],
+                    added_date=row['created_at'],
+                )
+            db.add(capitulation)
+            db.commit()

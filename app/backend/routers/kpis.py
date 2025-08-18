@@ -13,13 +13,12 @@ def deposits(external_token: ExternalToken):
 
     payload={}
     headers = {
-    'Authorization': 'Bearer ' + str(external_token.external_token)
+        'Authorization': 'Bearer ' + str(external_token.external_token)
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
 
     print(response.text)
-
 
     return {"message": response.text}
 
@@ -36,9 +35,7 @@ def dtes(external_token: ExternalToken):
 
     print(response.text)
 
-
     return {"message": response.text}
-
 
 @kpis.post("/budgets")
 def budgets(external_token: ExternalToken):
@@ -53,7 +50,6 @@ def budgets(external_token: ExternalToken):
 
     print(response.text)
 
-
     return {"message": response.text}
 
 @kpis.post("/sales")
@@ -67,6 +63,5 @@ def sales(external_token: ExternalToken):
     response = requests.request("GET", url, headers=headers, data=payload)
 
     print(response.text)
-
 
     return {"message": response.text}
