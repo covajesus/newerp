@@ -52,7 +52,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.document_date.desc(), CapitulationModel.status_id.asc()
+                    CapitulationModel.status_id.asc()
                 )
             else:
                 # Inicialización de filtros dinámicos
@@ -92,7 +92,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.document_date.desc(), CapitulationModel.status_id.asc()
+                    CapitulationModel.status_id.asc()
                 )
 
             if page > 0:
