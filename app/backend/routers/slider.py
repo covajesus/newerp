@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, Request, Response, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Response, UploadFile, File, Header
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import Employee, UpdateEmployee, SearchEmployee, UserLogin, EmployeeList, UploadSignature, UploadPicture
+from app.backend.schemas import Employee, UpdateEmployee, SearchEmployee, UserLogin, EmployeeList, UploadSignature, UploadPicture, Slider
 from app.backend.classes.employee_class import EmployeeClass
 from app.backend.auth.auth_user import get_current_active_user
 import base64
@@ -52,4 +52,12 @@ def get_images(db: Session = Depends(get_db)):
         link.append(data[i].support)
 
     return link
+
+@slider.post("/get_resources")
+def get_resources(slider_data: Slider, db: Session = Depends(get_db)):
+    """
+    Obtiene recursos desde la API externa usando el token externo
+    """
+    data = SliderClass(db).get_resources(slider_data.external_token)
+    return {"message": data}
 

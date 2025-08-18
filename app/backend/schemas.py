@@ -2001,3 +2001,6 @@ class HonoraryList(BaseModel):
     page: int
     branch_office_id: Optional[int] = None
     rut: Optional[str] = None
+
+class Slider(BaseModel):
+    external_token: str

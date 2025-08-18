@@ -5,6 +5,7 @@ from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.dropbox_class import DropboxClass
 import os
 import json
+import requests
 
 class SliderClass:
     def __init__(self, db):
@@ -33,3 +34,41 @@ class SliderClass:
     def get(self):
         data = self.db.query(SliderModel).all()
         return data
+    
+    def get_resources(self, external_token):
+        """
+        Obtiene recursos desde la API externa de sliders
+        """
+        try:
+            url = "https://api.jisreportes.com/resources/?limit=40"
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {external_token}"
+            }
+            
+            response = requests.get(
+                url,
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Procesar los datos para agregar el prefijo a path_imagen
+                for item in data:
+                    if 'path_imagen' in item and item['path_imagen']:
+                        # Si path_imagen comienza con /static, agregar el prefijo
+                        if item['path_imagen'].startswith('/static'):
+                            item['path_imagen'] = f"https://api.jisreportes.com{item['path_imagen']}"
+                
+                return data
+            else:
+                return {
+                    "error": f"Error en la petición: {response.status_code}",
+                    "message": response.text
+                }
+                
+        except Exception as e:
+            error_message = str(e)
+            return {"error": f"Error: {error_message}"}
