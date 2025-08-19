@@ -132,21 +132,24 @@ class TransbankStatementClass:
                 raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
 
             data_lines = "\n".join(lines[start_index:])
-            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str)
+            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str, index_col=False)
             df = df.fillna("")
             
             for index, row in df.iterrows():
+                # Ahora las columnas están correctamente mapeadas
+                local_id = row.get("Local", "")  # ID del local
+                
                 branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
+                        filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
                         first()
                 
                 check_branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == row.get("Fecha Venta", "")). \
+                        filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
                         count()
 
                 if check_branch_office_transbank_statement > 0:
-                    string_date = index
-                    raw_date = string_date.strip().lstrip("*")
+                    # La fecha está en la columna "Fecha Venta"
+                    raw_date = row.get("Fecha Venta", "").strip().lstrip("*")
 
                     # Try parsing the date with possible formats
                     parsed_date = None
@@ -165,13 +168,17 @@ class TransbankStatementClass:
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.original_date = formatted_date
-                    transbank_statement.code = row.get("Fecha Venta", "")
-                    transbank_statement.branch_office_name = row.get("Local", "")
-                    transbank_statement.sale_type = row.get("Identificación Local", "")
-                    transbank_statement.payment_type = row.get("Tipo Movimiento", "")
-                    transbank_statement.card_number = row.get("Tipo Tarjeta", "")
-                    transbank_statement.sale_description = row.get("Identificador", "")
-                    transbank_statement.amount = int(row.get("Tipo Cuota", "0").replace(".", ""))
+                    transbank_statement.code = local_id  # ID del local
+                    transbank_statement.branch_office_name = row.get("Identificación Local", "")  # Nombre del local
+                    transbank_statement.sale_type = row.get("Tipo Movimiento", "")
+                    transbank_statement.payment_type = row.get("Tipo Tarjeta", "")
+                    transbank_statement.card_number = row.get("Identificador", "")
+                    transbank_statement.sale_description = row.get("Tipo Cuota", "")
+                    # El monto real está en "Monto Afecto"
+                    monto_afecto = row.get("Monto Afecto", "0")
+                    if monto_afecto == "" or monto_afecto == "-":
+                        monto_afecto = "0"
+                    transbank_statement.amount = int(monto_afecto.replace(".", "").replace(",", ""))
                     transbank_statement.value_1 = row.get("Monto Afecto", "")
                     transbank_statement.value_2 = row.get("Monto Exento", "")
                     transbank_statement.value_3 = row.get("Código Autorización", "")
