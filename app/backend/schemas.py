@@ -424,6 +424,7 @@ class Honorary(BaseModel):
     employee_to_replace: Union[str, None]
     replacement_employee_rut: Union[str, None]
     replacement_employee_full_name: Union[str, None]
+    email: str
     address: str
     account_type_id: int
     account_number: str
@@ -445,6 +446,7 @@ class Honorary(BaseModel):
                 employee_to_replace: str = Form(None),
                 replacement_employee_rut: str = Form(None),
                 replacement_employee_full_name: str = Form(None),
+                email: str = Form(),
                 address: str = Form(),
                 account_type_id: int = Form(),
                 account_number: str = Form(),
@@ -454,7 +456,7 @@ class Honorary(BaseModel):
                 observation: str = Form()
                 ):
         
-        return cls(honorary_reason_id=honorary_reason_id, account_type_id=account_type_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
+        return cls(honorary_reason_id=honorary_reason_id, account_type_id=account_type_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, email=email, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
 
 class ValidateHonoraryRut(BaseModel):
     replacement_employee_rut: str

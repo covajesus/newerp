@@ -1212,6 +1212,7 @@ class HonoraryModel(Base):
     employee_to_replace = Column(Integer)
     replacement_employee_rut = Column(Integer)
     replacement_employee_full_name = Column(String(255))
+    email = Column(String(255))
     address = Column(String(255))
     account_number = Column(String(255))
     start_date = Column(Date())

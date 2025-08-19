@@ -145,6 +145,7 @@ class HonoraryClass:
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
             honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
+            honorary.email = honorary_inputs.email
             honorary.address = honorary_inputs.address
             honorary.account_number = honorary_inputs.account_number
             if honorary_inputs.start_date != 'None' and honorary_inputs.start_date != None:
@@ -178,6 +179,7 @@ class HonoraryClass:
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
             honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
+            honorary.email = honorary_inputs.email
             honorary.address = honorary_inputs.address
             honorary.account_number = honorary_inputs.account_number
             if honorary_inputs.start_date != 'None' and honorary_inputs.start_date != None:
