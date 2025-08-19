@@ -220,7 +220,8 @@ class ReceivedTributaryDocumentClass:
         
         data = {
             "fecha_desde": since,
-            "fecha_hasta": until
+            "fecha_hasta": until,
+            "dte": [33, 39]
         }
 
         try:
@@ -239,6 +240,10 @@ class ReceivedTributaryDocumentClass:
 
 
             for item in data:
+                # 👉 Filtrar solo DTEs tipo 33 (Facturas) y 39 (Boletas)
+                if item.get('dte') not in [33, 39]:
+                    continue
+                
                 # 👉 Validar que el emisor exista
                 if not item.get('emisor'):
                     return 1
