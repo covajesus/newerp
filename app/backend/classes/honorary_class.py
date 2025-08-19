@@ -3,6 +3,8 @@ from sqlalchemy import desc
 from datetime import datetime
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.commune_class import CommuneClass
+from app.backend.classes.region_class import RegionClass
+from app.backend.classes.authentication_class import AuthenticationClass
 from app.backend.classes.helper_class import HelperClass
 import requests
 import json
@@ -293,54 +295,70 @@ class HonoraryClass:
         
     def send(self, data):
         settings = SettingClass(self.db).get()
-
         commune = CommuneClass(self.db).get('id', data.commune_id)
-        current_date = HelperClass().get_time_Y_m_d()
+        region = RegionClass(self.db).get('id', data.region_id)
+        
+        # Obtener fecha actual en formato DD-MM-YYYY para Simple Factura
+        current_date_y_m_d = HelperClass().get_time_Y_m_d()  # Formato YYYY-MM-DD
+        # Convertir a DD-MM-YYYY
+        date_parts = current_date_y_m_d.split('-')
+        current_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
         
         amount = HelperClass().remove_from_string('.', str(data.amount))
         amount = round(int(amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
 
-        url = "https://apigateway.cl/api/v1/sii/bte/emitidas/emitir"
+        # Verificar y renovar token si es necesario
+        check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
+        if check_token_status == 0:
+            print('El token de Simple Factura está vencido, renovando...')
+            AuthenticationClass(self.db).create_simplefactura_token()
+        
+        # Obtener token actualizado
+        updated_settings = SettingClass(self.db).get()
+        token = updated_settings["setting_data"]["simplefactura_token"]
 
-        payload = json.dumps({
-                                "auth": {
-                                    "pass": {
-                                    "rut": "76063822-6",
-                                    "clave": "JYM1"
-                                    }
-                                },
-                                "boleta": {
-                                    
-                                    "Encabezado": {
-                                        "IdDoc": {
-                                            "FchEmis": current_date
-                                        },
-                                        "Emisor": {
-                                            "RUTEmisor": '76063822-6'
-                                        },
-                                        "Receptor": {
-                                            "RUTRecep": data.replacement_employee_rut,
-                                            "RznSocRecep": data.replacement_employee_full_name,
-                                            "DirRecep": data.address,
-                                            "CmnaRecep": commune.commune
-                                        }
-                                    },
-                                    "Detalle": [
-                                        {
-                                            "NmbItem": 'Boleta de Honorarios para ' + data.replacement_employee_full_name,
-                                            "MontoItem": amount
-                                        }
-                                    ]
-                                }
-                            })
+        url = "https://api.simplefactura.cl/bhe/emitir"
+
+        payload = {
+            "RutEmisor": "76063822-6",
+            "Retencion": 1,
+            "FechaEmision": current_date,
+            "Emisor": {
+                "Direccion": "Matucana 40"
+            },
+            "Receptor": {
+                "Rut": data.replacement_employee_rut,
+                "Nombre": data.replacement_employee_full_name,
+                "Direccion": data.address,
+                "Region": region.region if region else "No especificada",
+                "Comuna": commune.commune if commune else "No especificada"
+            },
+            "Detalles": [
+                {
+                    "Nombre": f"Boleta de Honorarios para {data.replacement_employee_full_name}",
+                    "Valor": amount
+                }
+            ]
+        }
         
         headers = {
-            'Authorization': 'Bearer ' + str(settings["setting_data"]["apigetaway_token"]),
+            'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
         }
 
-        response = requests.request("POST", url, headers=headers, data=payload)
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            
+            print(f"Status Code: {response.status_code}")
+            print(f"Response: {response.text}")
 
-        print(response.text)
-
-        return 1
+            if response.status_code == 200:
+                print("Boleta de honorarios emitida exitosamente en Simple Factura")
+                return 1
+            else:
+                print(f"Error al emitir boleta de honorarios: {response.status_code} - {response.text}")
+                return 0
+                
+        except Exception as e:
+            print(f"Error de conexión con Simple Factura: {str(e)}")
+            return 0
