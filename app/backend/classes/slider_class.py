@@ -55,8 +55,8 @@ class SliderClass:
                 headers=headers
             )
             
-            # Si el token está vencido (401), crear uno nuevo
-            if response.status_code == 401:
+            # Si el token está vencido (401) o el mensaje contiene "token-invalido", crear uno nuevo
+            if response.status_code == 401 or "token-invalido" in response.text.lower():
                 fresh_token = AuthenticationClass(self.db).create_external_token(rut, password)
                 headers["Authorization"] = f"Bearer {fresh_token}"
                 response = requests.get(url, headers=headers)

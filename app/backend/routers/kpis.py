@@ -11,14 +11,14 @@ kpis = APIRouter(
 )
 
 def make_request_with_fresh_token_if_needed(url: str, credentials: ExternalApiCredentials, db: Session):
-    """Función helper que intenta usar el token actual, y si falla (401) genera uno nuevo"""
+    """Función helper que intenta usar el token actual, y si falla (401 o token-invalido) genera uno nuevo"""
     
     # Primero intentar con el token actual
     headers = {'Authorization': f'Bearer {credentials.external_token}'}
     response = requests.get(url, headers=headers)
     
-    # Si el token está vencido (401), crear uno nuevo
-    if response.status_code == 401:
+    # Si el token está vencido (401) o el mensaje contiene "token-invalido", crear uno nuevo
+    if response.status_code == 401 or "token-invalido" in response.text.lower():
         fresh_token = AuthenticationClass(db).create_external_token(credentials.rut, credentials.password)
         headers = {'Authorization': f'Bearer {fresh_token}'}
         response = requests.get(url, headers=headers)
