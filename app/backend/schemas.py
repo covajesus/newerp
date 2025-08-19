@@ -1736,8 +1736,10 @@ class StoreManualSeat(BaseModel):
     period: str
     amount: int
 
-class ExternalToken(BaseModel):
+class ExternalApiCredentials(BaseModel):
     external_token: str
+    rut: str
+    password: str
 
 class StoreExpenseType(BaseModel):
     expense_type: str
@@ -2001,6 +2003,3 @@ class HonoraryList(BaseModel):
     page: int
     branch_office_id: Optional[int] = None
     rut: Optional[str] = None
-
-class Slider(BaseModel):
-    external_token: str

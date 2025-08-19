@@ -1,67 +1,50 @@
 import requests
-from fastapi import APIRouter
-from app.backend.schemas import ExternalToken
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.backend.db.database import get_db
+from app.backend.classes.authentication_class import AuthenticationClass
+from app.backend.schemas import ExternalApiCredentials
 
 kpis = APIRouter(
     prefix="/kpis",
     tags=["kpis"]
 )
 
+def make_request_with_fresh_token_if_needed(url: str, credentials: ExternalApiCredentials, db: Session):
+    """Función helper que intenta usar el token actual, y si falla (401) genera uno nuevo"""
+    
+    # Primero intentar con el token actual
+    headers = {'Authorization': f'Bearer {credentials.external_token}'}
+    response = requests.get(url, headers=headers)
+    
+    # Si el token está vencido (401), crear uno nuevo
+    if response.status_code == 401:
+        fresh_token = AuthenticationClass(db).create_external_token(credentials.rut, credentials.password)
+        headers = {'Authorization': f'Bearer {fresh_token}'}
+        response = requests.get(url, headers=headers)
+    
+    return response
+
 @kpis.post("/deposits")
-def deposits(external_token: ExternalToken):
+def deposits(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
     url = "https://api.jisreportes.com/dashboard/kpi/depositos"
-
-    payload={}
-    headers = {
-        'Authorization': 'Bearer ' + str(external_token.external_token)
-    }
-
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    print(response.text)
-
+    response = make_request_with_fresh_token_if_needed(url, credentials, db)
     return {"message": response.text}
 
 @kpis.post("/dtes")
-def dtes(external_token: ExternalToken):
+def dtes(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
     url = "https://api.jisreportes.com/dashboard/kpi/dtes"
-
-    payload={}
-    headers = {
-        'Authorization': 'Bearer ' + str(external_token.external_token)
-    }
-
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    print(response.text)
-
+    response = make_request_with_fresh_token_if_needed(url, credentials, db)
     return {"message": response.text}
 
 @kpis.post("/budgets")
-def budgets(external_token: ExternalToken):
+def budgets(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
     url = "https://api.jisreportes.com/dashboard/kpi/presupuesto"
-
-    payload={}
-    headers = {
-        'Authorization': 'Bearer ' + str(external_token.external_token)
-    }
-
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    print(response.text)
-
+    response = make_request_with_fresh_token_if_needed(url, credentials, db)
     return {"message": response.text}
 
 @kpis.post("/sales")
-def sales(external_token: ExternalToken):
+def sales(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
     url = "https://api.jisreportes.com/dashboard/kpi/ventas"
-
-    payload={}
-    headers = {
-        'Authorization': 'Bearer ' + str(external_token.external_token)
-    }
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    print(response.text)
-
+    response = make_request_with_fresh_token_if_needed(url, credentials, db)
     return {"message": response.text}

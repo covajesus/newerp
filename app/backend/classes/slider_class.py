@@ -35,13 +35,16 @@ class SliderClass:
         data = self.db.query(SliderModel).all()
         return data
     
-    def get_resources(self, external_token):
+    def get_resources(self, external_token, rut, password):
         """
         Obtiene recursos desde la API externa de sliders
         """
+        from app.backend.classes.authentication_class import AuthenticationClass
+        
         try:
             url = "https://api.jisreportes.com/resources/?limit=40"
             
+            # Primero intentar con el token actual
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {external_token}"
@@ -51,6 +54,12 @@ class SliderClass:
                 url,
                 headers=headers
             )
+            
+            # Si el token está vencido (401), crear uno nuevo
+            if response.status_code == 401:
+                fresh_token = AuthenticationClass(self.db).create_external_token(rut, password)
+                headers["Authorization"] = f"Bearer {fresh_token}"
+                response = requests.get(url, headers=headers)
             
             if response.status_code == 200:
                 data = response.json()
