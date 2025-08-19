@@ -173,4 +173,12 @@ app.include_router(seats)
 app.include_router(scrappers)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", port=8000, reload=True)
+    uvicorn.run(
+        "main:app", 
+        port=8000, 
+        reload=True,
+        timeout_keep_alive=1800,  # 30 minutos (30 * 60 = 1800 segundos)
+        timeout_graceful_shutdown=60,  # 1 minuto para shutdown
+        limit_max_requests=500000,  # 500,000 requests máximo
+        limit_concurrency=500000,  # 500,000 concurrencia máxima
+    )

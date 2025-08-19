@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
@@ -7,6 +7,7 @@ from fastapi import UploadFile, File, HTTPException
 from app.backend.classes.transbank_statement_class import TransbankStatementClass
 from datetime import datetime
 import uuid
+import asyncio
 
 transbank_statements = APIRouter(
     prefix="/transbank_statements",
@@ -20,7 +21,8 @@ def index(transbank: TransbankStatementList, db: Session = Depends(get_db)):
     return {"message": data}
 
 @transbank_statements.post("/store")
-def store(
+async def store(
+    background_tasks: BackgroundTasks,
     form_data: TransbankStatement = Depends(TransbankStatement.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
@@ -35,12 +37,36 @@ def store(
         remote_path = f"{file_category_name}_{unique_filename}"
 
         message = FileClass(db).upload(support, remote_path)
-
         file_url = FileClass(db).get(remote_path)
 
-        TransbankStatementClass(db).read_store_bank_statement(file_url, form_data.period)
+        # Procesar el archivo en background para evitar timeout
+        background_tasks.add_task(
+            process_transbank_file_background, 
+            file_url, 
+            form_data.period
+        )
 
-        return {"message": "Cartola de transbank cargada exitosamente", "file_url": file_url}
+        return {
+            "message": "Cartola de transbank está siendo procesada en segundo plano", 
+            "file_url": file_url,
+            "status": "processing"
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
+
+def process_transbank_file_background(file_url: str, period: str):
+    """Función para procesar el archivo en background"""
+    try:
+        from app.backend.db.database import SessionLocal
+        db = SessionLocal()
+        
+        # Procesar con timeout extendido
+        TransbankStatementClass(db).read_store_bank_statement(file_url, period)
+        
+        db.close()
+        print(f"✅ Cartola procesada exitosamente: {file_url}")
+        
+    except Exception as e:
+        print(f"❌ Error procesando cartola en background: {str(e)}")
+        raise e
