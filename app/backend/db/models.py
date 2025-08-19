@@ -84,6 +84,19 @@ class ExpenseTypeModel(Base):
     accounting_account = Column(String(255))
     type = Column(Integer)
     group_detail = Column(Integer)
+    positive_negative_id = Column(Integer)
+
+class EerrModel(Base):
+    __tablename__ = 'eerr'
+
+    id = Column(Integer, primary_key=True)
+    seat_id = Column(Integer)
+    branch_office_id = Column(Integer)
+    accounting_account = Column(Integer)
+    amount = Column(Integer)
+    period = Column(String(255))
+    added_date = Column(DateTime)
+    updated_date = Column(DateTime)
 
 class GroupDetailModel(Base):
     __tablename__ = 'group_details'

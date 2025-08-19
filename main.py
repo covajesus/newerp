@@ -72,6 +72,7 @@ from app.backend.routers.accountability import accountability
 from app.backend.routers.remuneration import remuneration
 from app.backend.routers.suppliers import suppliers
 from app.backend.routers.kpis import kpis
+from app.backend.routers.seats import router as seats
 
 app = FastAPI(root_path="/api")
 application = app
@@ -167,6 +168,7 @@ app.include_router(accountability)
 app.include_router(remuneration)
 app.include_router(suppliers)
 app.include_router(kpis)
+app.include_router(seats)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)

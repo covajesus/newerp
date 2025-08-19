@@ -1741,6 +1741,13 @@ class ExternalApiCredentials(BaseModel):
     rut: str
     password: str
 
+class SeatRefresh(BaseModel):
+    external_token: str
+    rut: str
+    password: str
+    month: int
+    year: int
+
 class StoreExpenseType(BaseModel):
     expense_type: str
     accounting_account: str
