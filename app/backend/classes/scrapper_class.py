@@ -4,11 +4,30 @@ import base64
 from lxml import html
 import json
 from rut_chile import rut_chile
+import urllib3
+import ssl
+
+# Deshabilitar warnings de SSL para APIs problemáticas
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class ScrapperClass:
     def __init__(self, db):
         self.db = db
         self.driver = None
+        
+        # Configurar sesión con SSL más flexible
+        self.session = requests.Session()
+        self.session.verify = False  # Deshabilitar verificación SSL estricta
+        
+        # Configurar headers más realistas
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        })
         
     def setup_driver(self):
         """Configurar el driver de Chrome"""
@@ -83,7 +102,7 @@ class ScrapperClass:
     
     def get_customer_data_via_api(self, rut_sin_dv="76063822", dv="6"):
         """
-        Obtener datos del cliente usando API externa (alternativa sin Selenium)
+        Obtener datos del cliente usando APIs externas con múltiples fallbacks
         
         Args:
             rut_sin_dv (str): RUT sin dígito verificador
@@ -94,53 +113,96 @@ class ScrapperClass:
         """
         try:
             rut_completo = f"{rut_sin_dv}-{dv}"
-            url = f"https://siichile.herokuapp.com/consulta?rut={rut_completo}"
             
-            print(f"🌐 Consultando API externa: {url}")
+            # Lista de APIs alternativas para probar
+            apis_to_try = [
+                {
+                    "name": "SIIChile Heroku",
+                    "url": f"https://siichile.herokuapp.com/consulta?rut={rut_completo}",
+                    "timeout": 15
+                },
+                {
+                    "name": "RUT API Alternative", 
+                    "url": f"https://api.libredte.cl/utilidades/contribuyentes/datos/{rut_completo}",
+                    "timeout": 10
+                },
+                {
+                    "name": "SII Mirror",
+                    "url": f"http://siichile.herokuapp.com/consulta?rut={rut_completo}", # HTTP fallback
+                    "timeout": 20
+                }
+            ]
             
-            headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            for api_config in apis_to_try:
+                try:
+                    print(f"🌐 Probando {api_config['name']}: {api_config['url']}")
+                    
+                    response = self.session.get(
+                        api_config['url'], 
+                        timeout=api_config['timeout'],
+                        verify=False,
+                        allow_redirects=True
+                    )
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            
+                            # Verificar que los datos sean válidos
+                            if data and (
+                                data.get("rut") or 
+                                data.get("razon_social") or 
+                                data.get("nombre") or
+                                len(str(data)) > 50  # Respuesta mínima válida
+                            ):
+                                # Estructurar la respuesta según nuestro formato
+                                result = {
+                                    "success": True,
+                                    "method": f"external_api_{api_config['name'].lower().replace(' ', '_')}",
+                                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "rut_consulted": rut_completo,
+                                    "contributor_data": {
+                                        "rut": data.get("rut", rut_completo),
+                                        "business_name": data.get("razon_social", data.get("nombre", "")),
+                                        "small_company": data.get("empresa_menor_tamano", ""),
+                                        "foreign_currency_auth": data.get("aut_moneda_extranjera", ""),
+                                        "activities_start": data.get("inicio_actividades", ""),
+                                        "start_date": data.get("fecha_inicio_actividades", "")
+                                    },
+                                    "economic_activities": data.get("actividades", []),
+                                    "stamped_documents": data.get("documentos_timbrados", []),
+                                    "raw_response": data
+                                }
+                                
+                                print(f"✅ Datos obtenidos exitosamente de {api_config['name']}")
+                                return result
+                            else:
+                                print(f"❌ {api_config['name']}: Datos inválidos o vacíos")
+                                continue
+                                
+                        except json.JSONDecodeError:
+                            print(f"❌ {api_config['name']}: Respuesta no es JSON válido")
+                            continue
+                            
+                    else:
+                        print(f"❌ {api_config['name']}: HTTP {response.status_code}")
+                        continue
+                        
+                except requests.exceptions.Timeout:
+                    print(f"❌ {api_config['name']}: Timeout después de {api_config['timeout']}s")
+                    continue
+                except requests.exceptions.RequestException as e:
+                    print(f"❌ {api_config['name']}: Error de conexión: {e}")
+                    continue
+            
+            # Si llegamos aquí, todas las APIs fallaron
+            return {
+                "success": False,
+                "method": "external_api_failed",
+                "error": "All external APIs failed or returned invalid data",
+                "rut_consulted": rut_completo,
+                "recommendation": "Try again later or use direct SII method"
             }
-            
-            response = requests.get(url, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Estructurar la respuesta según nuestro formato
-                result = {
-                    "success": True,
-                    "method": "api_externa",
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "rut_consultado": rut_completo,
-                    "datos_contribuyente": {
-                        "rut": data.get("rut", ""),
-                        "razon_social": data.get("razon_social", ""),
-                        "empresa_menor_tamano": data.get("empresa_menor_tamano", ""),
-                        "aut_moneda_extranjera": data.get("aut_moneda_extranjera", ""),
-                        "inicio_actividades": data.get("inicio_actividades", ""),
-                        "fecha_inicio_actividades": data.get("fecha_inicio_actividades", "")
-                    },
-                    "actividades_economicas": data.get("actividades", []),
-                    "documentos_timbrados": data.get("documentos_timbrados", []),
-                    "raw_response": data
-                }
-                
-                print(f"✅ Datos obtenidos exitosamente de API externa")
-                print(f"📋 Razón Social: {result['datos_contribuyente']['razon_social']}")
-                print(f"📋 Actividades: {len(result['actividades_economicas'])}")
-                
-                return result
-            else:
-                return {
-                    "success": False,
-                    "method": "api_externa",
-                    "error": f"Error en API externa: {response.status_code}",
-                    "response_text": response.text,
-                    "rut_consultado": rut_completo
-                }
                 
         except Exception as e:
             return {
@@ -235,31 +297,59 @@ class ScrapperClass:
     
     def fetch_captcha(self):
         """
-        Obtener captcha automáticamente desde la API del SII
+        Obtener captcha automáticamente desde la API del SII con manejo robusto de SSL
         
         Returns:
             dict: Datos del captcha con código y token
         """
         try:
-            response = requests.post('https://zeus.sii.cl/cvc_cgi/stc/CViewCaptcha.cgi', 
-                                   data={'oper': 0}, timeout=10)
+            print("🔐 Obteniendo captcha automáticamente...")
             
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Decodificar el captcha desde base64
-                captcha_code = base64.b64decode(data['txtCaptcha'])[36:40].decode()
-                
-                return {
-                    'code': captcha_code,
-                    'captcha': data['txtCaptcha']
-                }
-            else:
-                print(f"Error obteniendo captcha: {response.status_code}")
-                return None
+            # Configurar múltiples intentos con diferentes configuraciones SSL
+            urls_to_try = [
+                'https://zeus.sii.cl/cvc_cgi/stc/CViewCaptcha.cgi',
+                'http://zeus.sii.cl/cvc_cgi/stc/CViewCaptcha.cgi'  # HTTP como fallback
+            ]
+            
+            for url in urls_to_try:
+                try:
+                    # Usar la sesión configurada con SSL flexible
+                    response = self.session.post(
+                        url, 
+                        data={'oper': 0}, 
+                        timeout=15,
+                        verify=False,  # Deshabilitar verificación SSL
+                        allow_redirects=True
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        
+                        # Decodificar el captcha desde base64
+                        captcha_code = base64.b64decode(data['txtCaptcha'])[36:40].decode()
+                        
+                        print(f"✅ Captcha obtenido: {captcha_code}")
+                        return {
+                            'code': captcha_code,
+                            'captcha': data['txtCaptcha']
+                        }
+                    else:
+                        print(f"❌ Error HTTP {response.status_code} en {url}")
+                        continue
+                        
+                except requests.exceptions.SSLError as ssl_err:
+                    print(f"❌ Error SSL en {url}: {ssl_err}")
+                    continue
+                except requests.exceptions.RequestException as req_err:
+                    print(f"❌ Error de conexión en {url}: {req_err}")
+                    continue
+            
+            # Si llegamos aquí, todos los intentos fallaron
+            print("❌ No se pudo obtener captcha de ninguna URL")
+            return None
                 
         except Exception as e:
-            print(f"Error en fetch_captcha: {e}")
+            print(f"❌ Error crítico en fetch_captcha: {e}")
             return None
     
     def extract_sii_direct_data(self, tree, rut_completo):

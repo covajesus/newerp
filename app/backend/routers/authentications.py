@@ -24,6 +24,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = AuthenticationClass(db).create_token({'sub': str(user["user_data"]["rut"])}, token_expires)
     external_token = AuthenticationClass(db).create_external_token(form_data.username, form_data.password)
     expires_in_seconds = token_expires.total_seconds()
+    print("Login successful")
+    print(f"Access Token: {token}")
+    print(f"User RUT: {user['user_data']['rut']}")
+    print(f"User Role ID: {user['user_data']['rol_id']}")
+    print(f"User Role: {rol.rol}")
 
     return {
         "access_token": token,
