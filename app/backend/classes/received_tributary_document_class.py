@@ -384,28 +384,53 @@ class ReceivedTributaryDocumentClass:
         )
         amount = dte.total
        
-        data = {
-            "fecha": american_date,
-            "glosa": gloss,
-            "detalle": {
-                "debe": {
-                    expense_type.accounting_account.strip(): round(amount / 1.19),
-                    "111000122": round(amount - (amount / 1.19)),
+        # Si es DTE tipo 34 (factura exenta), no calcular IVA
+        if dte.dte_type_id == 34:
+            data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        expense_type.accounting_account.strip(): amount,
+                    },
+                    "haber": {
+                        "111000102": amount,
+                    },
                 },
-                "haber": {
-                    "111000102": amount,
+                "operacion": "E",
+                "documentos": {
+                    "recibidos": [
+                        {
+                            "dte": dte.dte_type_id,
+                            "folio": dte.folio,
+                        }
+                    ]
                 },
-            },
-            "operacion": "E",
-            "documentos": {
-                "recibidos": [
-                    {
-                        "dte": dte.dte_type_id,
-                        "folio": dte.folio,
-                    }
-                ]
-            },
-        }
+            }
+        else:
+            # Para DTEs con IVA (33, 39, etc.)
+            data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        expense_type.accounting_account.strip(): round(amount / 1.19),
+                        "111000122": round(amount - (amount / 1.19)),
+                    },
+                    "haber": {
+                        "111000102": amount,
+                    },
+                },
+                "operacion": "E",
+                "documentos": {
+                    "recibidos": [
+                        {
+                            "dte": dte.dte_type_id,
+                            "folio": dte.folio,
+                        }
+                    ]
+                },
+            }
 
         try:
             url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
