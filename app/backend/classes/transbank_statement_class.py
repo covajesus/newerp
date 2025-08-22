@@ -152,34 +152,39 @@ class TransbankStatementClass:
             
             total_rows = len(df)
             if progress_callback:
-                progress_callback(35, f"Procesando {total_rows} transacciones...")
+                progress_callback(35, f"📊 Iniciando procesamiento de {total_rows} transacciones...")
             
             processed_transactions = set()  # Para evitar duplicados en el mismo archivo
-            batch_size = 100
+            batch_size = 50  # Lotes más pequeños para commits más frecuentes
             batch_count = 0
             
+            # Crear cache de branch offices para evitar consultas repetidas
+            branch_office_cache = {}
+            
             for index, row in df.iterrows():
-                # Calcular progreso (35% a 85% para el procesamiento de filas)
-                progress_percent = 35 + int((index / total_rows) * 50)
+                # Calcular progreso más granular (35% a 85% para el procesamiento de filas)
+                progress_percent = 35 + ((index / total_rows) * 50)  # Usar float para más precisión
+                progress_percent = round(progress_percent, 1)  # Redondear a 1 decimal
                 
-                # Actualizar progreso más frecuentemente
-                update_frequency = max(1, min(50, total_rows // 20))
+                # Actualizar progreso mucho más frecuentemente - cada 5 registros o cada 0.5% de progreso
+                update_frequency = max(5, total_rows // 200)  # Cada 0.5% o mínimo cada 5 registros
                 
                 if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
-                    progress_callback(progress_percent, f"Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
+                    progress_callback(progress_percent, f"⚡ Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
                 
                 # Ahora las columnas están correctamente mapeadas
                 local_id = row.get("Local", "")  # ID del local
                 
-                branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
-                        first()
-                
-                check_branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                        filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
-                        count()
+                # Usar cache para branch offices
+                if local_id not in branch_office_cache:
+                    branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
+                            filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
+                            first()
+                    branch_office_cache[local_id] = branch_office_transbank_statement
+                else:
+                    branch_office_transbank_statement = branch_office_cache[local_id]
 
-                if check_branch_office_transbank_statement > 0:
+                if branch_office_transbank_statement:
                     # La fecha está en la columna "Fecha Venta"
                     raw_date = row.get("Fecha Venta", "").strip().lstrip("*")
 
@@ -250,14 +255,14 @@ class TransbankStatementClass:
                     # Commit en lotes para mejorar performance
                     if batch_count >= batch_size:
                         if progress_callback:
-                            progress_callback(progress_percent, f"Guardando lote de {batch_count} transacciones...")
+                            progress_callback(progress_percent, f"💾 Guardando lote de {batch_count} transacciones... ({progress_percent}%)")
                         self.db.commit()
                         batch_count = 0
 
             # Commit final para cualquier transacción restante
             if batch_count > 0:
                 if progress_callback:
-                    progress_callback(80, f"Guardando lote final de {batch_count} transacciones...")
+                    progress_callback(82, f"💾 Guardando lote final de {batch_count} transacciones...")
                 self.db.commit()
 
             if progress_callback:
