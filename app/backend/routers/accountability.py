@@ -65,3 +65,109 @@ def store(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
+
+@accountability.get("/income_assets/data/{period}")
+def get_monthly_collections_data(period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Obtiene datos de collections agrupados por sucursal y mes
+    """
+    try:
+        data = AccountabilityClass(db).get_monthly_collections_data(period)
+        
+        # Convertir a formato JSON serializable
+        result = []
+        for row in data:
+            result.append({
+                "branch_office_id": row.branch_office_id,
+                "ingresos": float(row.ingresos),
+                "subscribers_total": int(row.subscribers_total),
+                "year": int(row.year),
+                "month": int(row.month)
+            })
+        
+        return {"status": "success", "data": result}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener datos: {str(e)}")
+
+@accountability.post("/income_assets/store/{period}")
+def store_branch_office_incomes(period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Procesa los ingresos por sucursal para un período específico
+    Crea asientos contables con banco, ingresos por venta e IVA
+    """
+    try:
+        results = AccountabilityClass(db).store_branch_office_incomes(period)
+        
+        return {
+            "status": "success", 
+            "message": f"Asientos de ingresos procesados para el período {period}",
+            "processed_branches": len(results),
+            "details": results
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar ingresos: {str(e)}")
+
+@accountability.delete("/income_assets/delete/{period}")
+def delete_income_assets(period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Elimina asientos de ingresos para un período específico
+    """
+    try:
+        AccountabilityClass(db).delete_income_assets(period)
+        
+        return {
+            "status": "success", 
+            "message": f"Asientos de ingresos eliminados para el período {period}"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar asientos: {str(e)}")
+
+@accountability.post("/assets/store/{period}")
+def store_all_assets(period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Procesa TODOS los activos (ingresos y abonados) para un período específico
+    1. Elimina asientos existentes de ingresos y abonados
+    2. Crea asientos de ingresos por ventas (banco, ingresos, IVA)
+    3. Crea asientos de abonados (banco, ingresos abonados, IVA)
+    """
+    try:
+        results = AccountabilityClass(db).store_all_assets(period)
+        
+        summary = {
+            "status": "success",
+            "period": period,
+            "summary": {
+                "eliminated_income_assets": len(results["eliminated_income_assets"]),
+                "eliminated_subscriber_assets": len(results["eliminated_subscriber_assets"]),
+                "created_income_assets": len(results["created_income_assets"]),
+                "created_subscriber_assets": len(results["created_subscriber_assets"]),
+                "errors": len(results["errors"])
+            },
+            "message": f"Procesamiento completo de activos finalizado para {period}",
+            "details": results
+        }
+        
+        return summary
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar activos: {str(e)}")
+
+@accountability.get("/test/libredte")
+def test_libredte_response(session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Endpoint de prueba para ver qué devuelve LibreDTE
+    """
+    try:
+        result = AccountabilityClass(db).test_libredte_response()
+        
+        return {
+            "status": "success",
+            "message": "Consulta de prueba a LibreDTE completada",
+            "data": result
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en prueba LibreDTE: {str(e)}")
