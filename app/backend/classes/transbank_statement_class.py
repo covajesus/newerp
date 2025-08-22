@@ -115,8 +115,8 @@ class TransbankStatementClass:
             fixed_period = HelperClass.fix_current_dte_period(period)
             date = fixed_period + "-01"
 
-            # En lugar de TRUNCATE toda la tabla, eliminar solo registros del período actual
-            self.db.execute(text(f"DELETE FROM transbank_statements WHERE DATE_FORMAT(added_date, '%Y-%m') = '{fixed_period}'"))
+            # TRUNCATE completo de la tabla antes de cargar el Transbank
+            self.db.execute(text("TRUNCATE TABLE transbank_statements"))
             self.db.commit()
 
             response = requests.get(file_url)
