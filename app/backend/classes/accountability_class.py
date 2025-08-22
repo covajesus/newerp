@@ -276,6 +276,8 @@ class AccountabilityClass:
                 splitted_period = period.split('-')
                 utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
 
+                gross_amount = round(net_amount * 1.19)
+
                 gloss = (
                         branch_office.branch_office
                         + "_"
@@ -288,14 +290,14 @@ class AccountabilityClass:
                 data = {
                         "fecha": period + "-01",
                         "glosa": gloss,
-                        "detalle": {
-                            'debe': {
-                                '111000102': amount,
-                            },
-                            'haber': {
-                                '441000102': round(amount/1.19),
-                                '221000226': round(amount - (amount/1.19)),
-                            }
+                         "detalle": {
+                                'debe': {
+                                    '111000102': gross_amount,
+                                },
+                                'haber': {
+                                    '441000102': net_amount,
+                                    '221000226': (gross_amount - net_amount),
+                                }
                         },
                         "operacion": "I",
                         "documentos": {
