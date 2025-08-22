@@ -310,12 +310,18 @@ class TransbankStatementClass:
                 progress_callback(35, f"Procesando {total_rows} transacciones...")
             
             processed_transactions = set()
+            batch_size = 100  # Procesar en lotes de 100 transacciones
+            batch_count = 0
             
             for index, row in df.iterrows():
                 # Calcular progreso (35% a 85% para el procesamiento de filas)
                 progress_percent = 35 + int((index / total_rows) * 50)
-                if progress_callback and index % 100 == 0:  # Actualizar cada 100 filas
-                    progress_callback(progress_percent, f"Procesando transacción {index + 1} de {total_rows}")
+                
+                # Actualizar progreso más frecuentemente basado en el tamaño del archivo
+                update_frequency = max(1, min(50, total_rows // 20))  # Entre 1 y 50, dependiendo del tamaño
+                
+                if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
+                    progress_callback(progress_percent, f"Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
                 
                 # Resto del código igual al método original
                 local_id = row.get("Local", "")
@@ -388,7 +394,15 @@ class TransbankStatementClass:
                     transbank_statement.value_4 = row.get("N° Cuotas", "")
                     transbank_statement.added_date = formatted_date
                     self.db.add(transbank_statement)
-                    self.db.commit()
+                    
+                    batch_count += 1
+                    
+                    # Commit en lotes para mejorar performance
+                    if batch_count >= batch_size or index == total_rows - 1:
+                        if progress_callback:
+                            progress_callback(progress_percent, f"Guardando lote de {batch_count} transacciones...")
+                        self.db.commit()
+                        batch_count = 0
 
             if progress_callback:
                 progress_callback(85, "Procesando totales y colecciones...")
