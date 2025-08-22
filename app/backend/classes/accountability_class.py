@@ -213,7 +213,9 @@ class AccountabilityClass:
                 if collection_qty > 0:
                     collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).first()
               
-                    amount = collection.subscribers if collection else 0
+                    net_amount = collection.subscribers if collection else 0
+
+                    gross_amount = round(net_amount * 1.19)
 
                     expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                     splitted_period = period.split('-')
@@ -233,11 +235,11 @@ class AccountabilityClass:
                             "glosa": gloss,
                             "detalle": {
                                 'debe': {
-                                    '111000102': amount,
+                                    '111000102': gross_amount,
                                 },
                                 'haber': {
-                                    '441000102': round(amount/1.19),
-                                    '221000226': round(amount - (amount/1.19)),
+                                    '441000102': net_amount,
+                                    '221000226': round(net_amount - (net_amount/1.19)),
                                 }
                             },
                             "operacion": "I",

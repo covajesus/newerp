@@ -407,3 +407,294 @@ def old_dtes(db: Session = Depends(get_db)):
     conn.close()
 
     return {"data": result}
+
+@dtes.get("/send_ticket_bill_assets/{period}")
+def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
+    """
+    Obtiene DTEs con dte_version_id=2, que tengan expense_type_id definido 
+    y status_id igual a 4 o 5 para un período específico y crea asientos contables.
+    Primero elimina asientos existentes de FacturaCompra para el período.
+    """
+    try:
+        from app.backend.db.models import ExpenseTypeModel, BranchOfficeModel
+        from app.backend.classes.helper_class import HelperClass
+        import json
+        
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # PASO 1: Eliminar asientos existentes de FacturaCompra para el período
+        print(f"🗑️ Eliminando asientos de FacturaCompra existentes para período: {period}")
+        
+        # Buscar asientos con FacturaCompra en la glosa para el período
+        search_params = {
+            "cuenta": None,
+            "debe": None,
+            "debe_desde": None,
+            "debe_hasta": None,
+            "fecha_desde": f"{period}-01",
+            "fecha_hasta": f"{period}-31",
+            "glosa": "FacturaCompra",
+            "haber": None,
+            "haber_desde": None,
+            "haber_hasta": None,
+            "operacion": None,
+            "periodo": int(period.split('-')[0])  # Solo el año
+        }
+        
+        print(f"🔍 Parámetros de búsqueda FacturaCompra: {search_params}")
+        
+        # Buscar asientos existentes en LibreDTE
+        response = requests.post(
+            "https://libredte.cl/api/lce/lce_asientos/buscar/76063822",
+            json=search_params,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+        )
+        
+        print(f"📡 Respuesta búsqueda FacturaCompra: {response.status_code}")
+        print(f"📄 Contenido: {response.text}")
+        
+        # Procesar respuesta de búsqueda
+        try:
+            asientos = json.loads(response.text)
+            if isinstance(asientos, list):
+                asientos_list = asientos
+            elif isinstance(asientos, dict) and 'data' in asientos:
+                asientos_list = asientos['data']
+            else:
+                asientos_list = []
+        except json.JSONDecodeError:
+            asientos_list = []
+        
+        print(f"📊 Total de asientos FacturaCompra encontrados: {len(asientos_list)}")
+        
+        eliminated_entries = []
+        
+        # Eliminar cada asiento encontrado
+        for asiento in asientos_list:
+            if isinstance(asiento, dict) and "glosa" in asiento and "fecha" in asiento:
+                print(f"🔍 Revisando asiento: {asiento.get('asiento', 'N/A')} - {asiento.get('glosa', 'N/A')} - {asiento.get('fecha', 'N/A')}")
+                
+                # Verificar criterios de eliminación para FacturaCompra
+                has_factura_compra = "FacturaCompra" in asiento["glosa"]
+                has_period = period in asiento["fecha"]
+                
+                print(f"   📋 FacturaCompra en glosa: {has_factura_compra}")
+                print(f"   📅 Período {period} en fecha: {has_period}")
+                
+                if has_factura_compra and has_period:
+                    # Verificar si el asiento tiene el campo 'asiento'
+                    if 'asiento' not in asiento:
+                        print(f"⚠️ Asiento no tiene campo 'asiento', saltando eliminación: {asiento}")
+                        continue
+                        
+                    try:
+                        codigo_asiento = asiento['asiento']
+                        print(f"🗑️ Intentando eliminar asiento FacturaCompra: {codigo_asiento}")
+                        
+                        # Usar formato año/asiento/contribuyente
+                        year = period.split('-')[0]
+                        delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asiento}/76063822"
+                        print(f"🔗 URL de eliminación: {delete_url}")
+                        
+                        delete_response = requests.get(
+                            delete_url,
+                            headers={
+                                "Authorization": f"Bearer {TOKEN}",
+                                "Content-Type": "application/json",
+                            },
+                        )
+                        print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                        
+                        eliminated_entries.append({
+                            "codigo": codigo_asiento,
+                            "glosa": asiento.get("glosa", 'N/A'),
+                            "delete_status": delete_response.status_code,
+                            "response": delete_response.text
+                        })
+                        
+                        if delete_response.status_code == 200:
+                            print(f"✅ Eliminado asiento FacturaCompra: {codigo_asiento}")
+                        else:
+                            print(f"❌ No se pudo eliminar asiento: {codigo_asiento} - Status: {delete_response.status_code}")
+                            
+                    except Exception as e:
+                        print(f"❌ Error eliminando asiento FacturaCompra: {str(e)}")
+                else:
+                    print(f"⏭️ Asiento no cumple criterios para eliminación")
+            else:
+                print(f"⚠️ Asiento no tiene estructura válida: {asiento}")
+        
+        print(f"🧹 Eliminación completada. {len(eliminated_entries)} asientos procesados.")
+        
+        # PASO 2: Crear nuevos asientos contables
+        print(f"💼 Iniciando creación de nuevos asientos FacturaCompra para período: {period}")
+        
+        # Filtros según los criterios especificados
+        filters = [
+            DteModel.dte_version_id == 2,
+            DteModel.expense_type_id.isnot(None),  # Que tenga expense_type_id definido
+            DteModel.status_id.in_([4, 5]),       # status_id igual a 4 o 5
+            DteModel.period == period              # Período específico
+        ]
+        
+        # Consulta para obtener los DTEs que cumplen los criterios
+        dtes = db.query(DteModel).filter(*filters).all()
+        
+        # Procesar cada DTE en un foreach
+        result = []
+        successful_entries = 0
+        failed_entries = 0
+        
+        for dte in dtes:
+            try:
+                # Obtener datos necesarios para el asiento contable
+                expense_type = db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == dte.expense_type_id
+                ).first()
+                
+                branch_office = db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == dte.branch_office_id
+                ).first()
+                
+                if not expense_type or not branch_office:
+                    result.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "status": "error",
+                        "message": "Expense type or branch office not found"
+                    })
+                    failed_entries += 1
+                    continue
+                
+                # Crear fechas y glosa
+                american_date = period + '-01'
+                utf8_date = HelperClass.convert_to_utf8(american_date)
+                
+                gloss = (
+                    branch_office.branch_office
+                    + "_"
+                    + expense_type.accounting_account
+                    + "_"
+                    + utf8_date
+                    + "_FacturaCompra_"
+                    + str(dte.id)
+                    + "_"
+                    + str(dte.folio)
+                )
+                amount = dte.total
+                
+                # Crear estructura del asiento según el tipo de DTE
+                if dte.dte_type_id == 34:  # Factura exenta
+                    data = {
+                        "fecha": american_date,
+                        "glosa": gloss,
+                        "detalle": {
+                            "debe": {
+                                expense_type.accounting_account.strip(): amount,
+                            },
+                            "haber": {
+                                "111000102": amount,
+                            },
+                        },
+                        "operacion": "E",
+                        "documentos": {
+                            "recibidos": [
+                                {
+                                    "dte": dte.dte_type_id,
+                                    "folio": dte.folio,
+                                }
+                            ]
+                        },
+                    }
+                else:  # Para DTEs con IVA (33, 39, etc.)
+                    data = {
+                        "fecha": american_date,
+                        "glosa": gloss,
+                        "detalle": {
+                            "debe": {
+                                expense_type.accounting_account.strip(): round(amount / 1.19),
+                                "111000122": round(amount - (amount / 1.19)),
+                            },
+                            "haber": {
+                                "111000102": amount,
+                            },
+                        },
+                        "operacion": "E",
+                        "documentos": {
+                            "recibidos": [
+                                {
+                                    "dte": dte.dte_type_id,
+                                    "folio": dte.folio,
+                                }
+                            ]
+                        },
+                    }
+                
+                # Enviar asiento a LibreDTE
+                url = f"https://libredte.cl/api/lce/lce_asientos/crear/76063822"
+                
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                # Procesar respuesta
+                dte_result = {
+                    "id": dte.id,
+                    "folio": dte.folio,
+                    "rut": dte.rut,
+                    "branch_office_id": dte.branch_office_id,
+                    "expense_type_id": dte.expense_type_id,
+                    "status_id": dte.status_id,
+                    "period": dte.period,
+                    "total": dte.total,
+                    "dte_version_id": dte.dte_version_id,
+                    "dte_type_id": dte.dte_type_id,
+                    "added_date": dte.added_date.strftime('%Y-%m-%d %H:%M:%S') if dte.added_date else None,
+                    "payment_date": dte.payment_date.strftime('%Y-%m-%d') if dte.payment_date else None,
+                    "glosa": gloss,
+                    "libredte_response_status": response.status_code,
+                    "libredte_response": response.text
+                }
+                
+                if response.status_code == 200:
+                    dte_result["accounting_status"] = "success"
+                    dte_result["message"] = "Accounting entry created successfully"
+                    successful_entries += 1
+                else:
+                    dte_result["accounting_status"] = "failed"
+                    dte_result["message"] = "Accounting entry creation failed"
+                    failed_entries += 1
+                
+                result.append(dte_result)
+                
+            except Exception as e:
+                result.append({
+                    "id": dte.id,
+                    "folio": dte.folio,
+                    "status": "error",
+                    "message": f"Error processing DTE: {str(e)}"
+                })
+                failed_entries += 1
+        
+        return {
+            "status": "success",
+            "period": period,
+            "eliminated_factura_compra": len(eliminated_entries),
+            "total_dtes": len(result),
+            "successful_entries": successful_entries,
+            "failed_entries": failed_entries,
+            "message": f"Eliminados {len(eliminated_entries)} asientos FacturaCompra. Procesados {len(result)} DTEs para el período {period}. {successful_entries} exitosos, {failed_entries} fallidos.",
+            "elimination_details": eliminated_entries,
+            "data": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar DTEs: {str(e)}")
