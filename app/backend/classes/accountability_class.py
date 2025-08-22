@@ -253,6 +253,8 @@ class AccountabilityClass:
                             },
                         }
 
+                    print(data)
+
 
                     url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
 
@@ -309,6 +311,8 @@ class AccountabilityClass:
                             ]
                         },
                     }
+                
+                print(data)
 
 
                 url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
@@ -1314,6 +1318,8 @@ class AccountabilityClass:
                     
                     # Convertir amount a float para evitar problemas con Decimal
                     amount = float(amount)
+
+                    gross_amount = round(amount * 1.19)
                     
                     expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
                     splitted_period = period.split('-')
@@ -1333,11 +1339,11 @@ class AccountabilityClass:
                         "glosa": gloss,
                         "detalle": {
                             'debe': {
-                                '111000102': amount,
+                                '111000102': gross_amount,
                             },
                             'haber': {
-                                '441000102': round(amount/1.19),
-                                '221000226': round(amount - (amount/1.19)),
+                                '441000102': amount,
+                                '221000226': (gross_amount - amount),
                             }
                         },
                         "operacion": "I",
