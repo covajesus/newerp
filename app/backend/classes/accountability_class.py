@@ -239,7 +239,7 @@ class AccountabilityClass:
                                 },
                                 'haber': {
                                     '441000102': net_amount,
-                                    '221000226': round(net_amount - (net_amount/1.19)),
+                                    '221000226': (gross_amount - net_amount),
                                 }
                             },
                             "operacion": "I",
