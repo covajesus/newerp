@@ -506,3 +506,189 @@ class AccountabilityClass:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
+
+    def store_income_assets(self, branch_office_id, period):
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        if branch_office_id == 0:
+            branch_offices = self.db.query(BranchOfficeModel).all()
+
+            for branch_office in branch_offices:
+                collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.income > 0).count()
+
+                if collection_qty > 0:
+                    collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.income > 0).first()
+              
+                    amount = collection.income if collection else 0
+
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 24).first()
+                    splitted_period = period.split('-')
+                    utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
+
+                    gloss = (
+                            branch_office.branch_office
+                            + "_"
+                            + expense_type.accounting_account
+                            + "_"
+                            + utf8_date
+                            + "_Ingresos"
+                        )
+
+                    data = {
+                            "fecha": period + "-01",
+                            "glosa": gloss,
+                            "detalle": {
+                                'debe': {
+                                    '111000102': amount,
+                                },
+                                'haber': {
+                                    '441000103': round(amount/1.19),
+                                    '221000226': round(amount - (amount/1.19)),
+                                }
+                            },
+                            "operacion": "I",
+                            "documentos": {
+                                "emitidos": [
+                                    {
+                                        "dte": '',
+                                        "folio": 0,
+                                    }
+                                ]
+                            },
+                        }
+
+                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+
+                    print(response.text)
+        else:
+            branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+            collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.income > 0).first()
+            collection_qty = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office.id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.income > 0).count()
+            
+            if collection_qty > 0:
+                amount = collection.income if collection else 0
+
+                expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 24).first()
+                splitted_period = period.split('-')
+                utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
+
+                gloss = (
+                        branch_office.branch_office
+                        + "_"
+                        + expense_type.accounting_account
+                        + "_"
+                        + utf8_date
+                        + "_Ingresos"
+                    )
+
+                data = {
+                        "fecha": period + "-01",
+                        "glosa": gloss,
+                        "detalle": {
+                            'debe': {
+                                '111000102': amount,
+                            },
+                            'haber': {
+                                '441000103': round(amount/1.19),
+                                '221000226': round(amount - (amount/1.19)),
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": '',
+                                    "folio": 0,
+                                }
+                            ]
+                        },
+                    }
+
+                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                )
+
+                print(response.text)
+
+    def delete_income_assets(self, branch_office_id, period):
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        if branch_office_id != None and branch_office_id != '' and branch_office_id != 0:
+            branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+
+            gloss = str(branch_office.branch_office) + "_Ingresos"
+        else:
+            gloss = "Ingresos"
+
+        url = "https://libredte.cl/api/lce/lce_asientos/buscar/76063822"
+
+        since_date = f"{period}-01"
+        period_year = period.split("-")[0]
+        # Obtener último día del mes
+        year, month = map(int, period.split("-"))
+        last_day = monthrange(year, month)[1]
+        until_date = f"{period}-{last_day:02d}"
+
+        payload = {
+            "periodo": period_year,
+            "fecha_desde": since_date,
+            "fecha_hasta": until_date,
+            "glosa": gloss,
+            "operacion": None,
+            "cuenta": None,
+            "debe": None,
+            "debe_desde": None,
+            "debe_hasta": None,
+            "haber": None,
+            "haber_desde": None,
+            "haber_hasta": None,
+            "email": None,
+            "documento": None,
+            "documento_razon_social": None,
+            "documento_folio": None,
+            "solo_tipos_dte": None,
+            "solo_tipos_operacion": None,
+            "p": 0,
+            "d": "FEC",
+            "h": "D",
+            "total": True,
+        }
+
+        response = requests.get(
+            url,
+            params=payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        asientos = json.loads(response.text)
+
+        for asiento in asientos:
+            if "Ingresos" in asiento["glosa"]:
+                delete_response = requests.delete(
+                    f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asiento['codigo']}/76063822",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                )
+
+                print(delete_response.text)

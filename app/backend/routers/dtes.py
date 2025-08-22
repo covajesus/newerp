@@ -259,7 +259,7 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         dte.payment_date = Cobro["pagado"]
         dte.comment = f"Código de autorización: {authorization_code}"
         dte.payment_comment = f"Código de autorización: {authorization_code}"
-        dte.expense_type_id = 23
+        dte.expense_type_id = 25
         dte.status_id = 5
         db.commit()
         return {"status": "success", "message": "DTE actualizado correctamente"}

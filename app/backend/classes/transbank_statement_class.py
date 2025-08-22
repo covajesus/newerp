@@ -115,8 +115,10 @@ class TransbankStatementClass:
             fixed_period = HelperClass.fix_current_dte_period(period)
             date = fixed_period + "-01"
 
-            self.db.execute(text("TRUNCATE TABLE transbank_statements"))
+            # En lugar de TRUNCATE toda la tabla, eliminar solo registros del período actual
+            self.db.execute(text(f"DELETE FROM transbank_statements WHERE DATE_FORMAT(added_date, '%Y-%m') = '{fixed_period}'"))
             self.db.commit()
+
             response = requests.get(file_url)
 
             response.raise_for_status()
@@ -134,6 +136,8 @@ class TransbankStatementClass:
             data_lines = "\n".join(lines[start_index:])
             df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str, index_col=False)
             df = df.fillna("")
+            
+            processed_transactions = set()  # Para evitar duplicados en el mismo archivo
             
             for index, row in df.iterrows():
                 # Ahora las columnas están correctamente mapeadas
@@ -164,7 +168,38 @@ class TransbankStatementClass:
                         raise ValueError(f"Invalid date format: '{raw_date}'")
 
                     formatted_date = parsed_date.strftime("%Y-%m-%d")
-
+                    
+                    # Crear una clave única para evitar duplicados
+                    monto_afecto = row.get("Monto Afecto", "0")
+                    if monto_afecto == "" or monto_afecto == "-":
+                        monto_afecto = "0"
+                    
+                    transaction_key = (
+                        local_id,
+                        formatted_date,
+                        row.get("Identificador", ""),
+                        row.get("Código Autorización", ""),
+                        monto_afecto
+                    )
+                    
+                    # Evitar duplicados en el mismo archivo
+                    if transaction_key in processed_transactions:
+                        continue
+                    
+                    processed_transactions.add(transaction_key)
+                    
+                    # Verificar si ya existe en la base de datos
+                    existing_transaction = self.db.query(TransbankStatementModel).filter(
+                        TransbankStatementModel.code == local_id,
+                        TransbankStatementModel.original_date == formatted_date,
+                        TransbankStatementModel.card_number == row.get("Identificador", ""),
+                        TransbankStatementModel.value_3 == row.get("Código Autorización", ""),
+                        TransbankStatementModel.amount == int(monto_afecto.replace(".", "").replace(",", ""))
+                    ).first()
+                    
+                    if existing_transaction:
+                        continue  # Skip si ya existe
+                    
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.original_date = formatted_date
@@ -174,10 +209,6 @@ class TransbankStatementClass:
                     transbank_statement.payment_type = row.get("Tipo Tarjeta", "")
                     transbank_statement.card_number = row.get("Identificador", "")
                     transbank_statement.sale_description = row.get("Tipo Cuota", "")
-                    # El monto real está en "Monto Afecto"
-                    monto_afecto = row.get("Monto Afecto", "0")
-                    if monto_afecto == "" or monto_afecto == "-":
-                        monto_afecto = "0"
                     transbank_statement.amount = int(monto_afecto.replace(".", "").replace(",", ""))
                     transbank_statement.value_1 = row.get("Monto Afecto", "")
                     transbank_statement.value_2 = row.get("Monto Exento", "")
@@ -187,6 +218,7 @@ class TransbankStatementClass:
                     self.db.add(transbank_statement)
                     self.db.commit()
 
+            # Procesar totales y colecciones con mejor control de duplicados
             transbank_total = self.db.query(TransbankTotalModel).all()
 
             for item in transbank_total:
@@ -203,20 +235,19 @@ class TransbankStatementClass:
                 card_net_amount = round(item.total/1.19)
 
                 if check_cashier > 0:
-                    check_collection = self.db.query(CollectionModel). \
+                    # Eliminar colecciones existentes del período específico para evitar duplicados
+                    existing_collections = self.db.query(CollectionModel). \
                         filter(CollectionModel.branch_office_id == item.branch_office_id). \
                         filter(CollectionModel.cashier_id == cashier.id). \
                         filter(CollectionModel.added_date == item.added_date). \
-                        count()
+                        all()
 
-                    if check_collection > 0:
-                        collection = self.db.query(CollectionModel). \
-                        filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                        filter(CollectionModel.cashier_id == cashier.id). \
-                        filter(CollectionModel.added_date == item.added_date).delete()
-                        
-                        self.db.commit()
+                    for existing_collection in existing_collections:
+                        self.db.delete(existing_collection)
+                    
+                    self.db.commit()
 
+                    # Crear nueva colección
                     collection = CollectionModel(
                             branch_office_id=item.branch_office_id,
                             cashier_id=cashier.id,

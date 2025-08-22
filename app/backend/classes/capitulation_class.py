@@ -241,15 +241,19 @@ class CapitulationClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
         
-    def total_accepted_capitulations(self):
+    def total_accepted_capitulations(self, rut=None):
         try:
             query = self.db.query(
                 TotalAcceptedCapitulations.rut,
                 TotalAcceptedCapitulations.full_name,
                 TotalAcceptedCapitulations.amount
-            ).order_by(
-                TotalAcceptedCapitulations.rut
             )
+
+            # Si se proporciona un RUT, filtrar por él
+            if rut:
+                query = query.filter(TotalAcceptedCapitulations.rut == rut)
+
+            query = query.order_by(TotalAcceptedCapitulations.rut)
 
             data = query.all()
 

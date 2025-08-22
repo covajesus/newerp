@@ -172,8 +172,8 @@ def payment_support(id: int, db: Session = Depends(get_db)):
     return {"message": file}
 
 @capitulations.get("/total_accepted_capitulations")
-def paymenttotal_accepted_capitulations_support(db: Session = Depends(get_db)):
-    capitulations = CapitulationClass(db).total_accepted_capitulations()
+def total_accepted_capitulations(rut: str = None, db: Session = Depends(get_db)):
+    capitulations = CapitulationClass(db).total_accepted_capitulations(rut=rut)
 
     return {"message": capitulations}
 
