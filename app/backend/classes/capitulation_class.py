@@ -54,6 +54,46 @@ class CapitulationClass:
                 ).order_by(
                     CapitulationModel.id.desc(), CapitulationModel.status_id.asc()
                 )
+            elif rol_id == 5:
+                # Inicialización de filtros dinámicos
+                filters = []
+
+                # Construir la consulta base con los filtros aplicados
+                query = self.db.query(
+                    CapitulationModel.id,
+                    CapitulationModel.document_date,
+                    CapitulationModel.supplier_rut,
+                    CapitulationModel.document_number,
+                    CapitulationModel.document_type_id,
+                    CapitulationModel.capitulation_type_id,
+                    CapitulationModel.branch_office_id,
+                    CapitulationModel.expense_type_id,
+                    CapitulationModel.description,
+                    CapitulationModel.amount,
+                    CapitulationModel.support,
+                    CapitulationModel.status_id,
+                    BranchOfficeModel.id.label("branch_office_id"), 
+                    BranchOfficeModel.branch_office,
+                    ExpenseTypeModel.id.label("expense_type_id"),
+                    ExpenseTypeModel.expense_type,
+                    UserModel.full_name,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                    CapitulationModel.period,
+                    CapitulationModel.payment_support
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == CapitulationModel.branch_office_id
+                ).outerjoin(
+                    ExpenseTypeModel, ExpenseTypeModel.id == CapitulationModel.expense_type_id
+                ).outerjoin(
+                    UserModel, UserModel.rut == CapitulationModel.user_rut
+                ).filter(
+                    UserModel.rut == rut,
+                ).filter(
+                    *filters
+                ).order_by(
+                    CapitulationModel.id.desc(), CapitulationModel.status_id.asc()
+                )   
             else:
                 # Inicialización de filtros dinámicos
                 filters = []
