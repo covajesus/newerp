@@ -2012,3 +2012,18 @@ class HonoraryList(BaseModel):
     page: int
     branch_office_id: Optional[int] = None
     rut: Optional[str] = None
+
+class BankAccountUser(BaseModel):
+    page: int
+
+class StoreBankAccountUser(BaseModel):
+    bank_account_name: str
+    bank_account_type_id: int
+    bank_account_number: int
+    bank_account_email: str
+
+class UpdateBankAccountUser(BaseModel):
+    bank_account_name: str = None
+    bank_account_type_id: int = None
+    bank_account_number: int = None
+    bank_account_email: str = None

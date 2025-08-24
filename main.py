@@ -74,6 +74,7 @@ from app.backend.routers.suppliers import suppliers
 from app.backend.routers.kpis import kpis
 from app.backend.routers.seats import router as seats
 from app.backend.routers.scrappers import router as scrappers
+from app.backend.routers.bank_account_users import bank_account_users
 
 app = FastAPI(root_path="/api")
 application = app
@@ -171,6 +172,7 @@ app.include_router(suppliers)
 app.include_router(kpis)
 app.include_router(seats)
 app.include_router(scrappers)
+app.include_router(bank_account_users)
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -171,3 +171,21 @@ def test_libredte_response(session_user: UserLogin = Depends(get_current_active_
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en prueba LibreDTE: {str(e)}")
+
+@accountability.get("/delete_seats/{period}")
+def delete_seats_by_period(period: str, db: Session = Depends(get_db)):
+    """
+    Elimina asientos contables que contengan NotaCredito, Factura o BoletaElectronica para un período específico
+    """
+    try:
+        result = AccountabilityClass(db).delete_seats_by_period(period)
+        
+        return {
+            "status": "success",
+            "period": period,
+            "message": f"Eliminación de asientos completada para el período {period}",
+            "details": result
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar asientos: {str(e)}")

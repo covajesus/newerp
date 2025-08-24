@@ -1852,3 +1852,15 @@ class SinisterReviewModel(Base):
     support = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+class BankAccountUserModel(Base):
+    __tablename__ = 'bank_account_users'
+    
+    id = Column(Integer, primary_key=True)
+    rut = Column(String(255))
+    bank_account_name = Column(String(255))
+    bank_account_type_id = Column(Integer)
+    bank_account_number = Column(Integer)
+    bank_account_email = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())

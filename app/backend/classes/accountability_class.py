@@ -1631,3 +1631,169 @@ class AccountabilityClass:
             "raw_response": response.text,
             "headers": dict(response.headers)
         }
+
+    def delete_seats_by_period(self, period):
+        """
+        Elimina asientos contables que contengan NotaCredito, Factura o BoletaElectronica 
+        para un período específico
+        """
+        token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Lista de términos a buscar en las glosas
+        search_terms = ["NotaCredito", "Factura", "BoletaElectronica"]
+        
+        results = {
+            "period": period,
+            "eliminated_seats": [],
+            "errors": []
+        }
+        
+        try:
+            print(f"🗑️ Iniciando eliminación de asientos para período: {period}")
+            print(f"🔍 Buscando asientos con términos: {search_terms}")
+            
+            # Para cada término, buscar y eliminar asientos
+            for term in search_terms:
+                print(f"\n📋 Procesando término: {term}")
+                
+                # Parámetros de búsqueda
+                search_params = {
+                    "cuenta": None,
+                    "debe": None,
+                    "debe_desde": None,
+                    "debe_hasta": None,
+                    "fecha_desde": f"{period}-01",
+                    "fecha_hasta": f"{period}-31",
+                    "glosa": term,
+                    "haber": None,
+                    "haber_desde": None,
+                    "haber_hasta": None,
+                    "operacion": None,
+                    "periodo": int(period.split('-')[0])  # Solo el año
+                }
+                
+                print(f"🔍 Parámetros de búsqueda para {term}: {search_params}")
+                
+                # Buscar asientos en LibreDTE
+                response = requests.post(
+                    "https://libredte.cl/api/lce/lce_asientos/buscar/76063822",
+                    json=search_params,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                print(f"📡 Respuesta búsqueda {term}: {response.status_code}")
+                print(f"📄 Contenido: {response.text}")
+                
+                # Procesar respuesta de búsqueda
+                try:
+                    asientos = json.loads(response.text)
+                    if isinstance(asientos, list):
+                        asientos_list = asientos
+                    elif isinstance(asientos, dict) and 'data' in asientos:
+                        asientos_list = asientos['data']
+                    else:
+                        asientos_list = []
+                except json.JSONDecodeError:
+                    asientos_list = []
+                
+                print(f"📊 Total de asientos {term} encontrados: {len(asientos_list)}")
+                
+                # Eliminar cada asiento encontrado
+                for asiento in asientos_list:
+                    if isinstance(asiento, dict) and "glosa" in asiento and "fecha" in asiento:
+                        print(f"🔍 Revisando asiento: {asiento.get('asiento', 'N/A')} - {asiento.get('glosa', 'N/A')} - {asiento.get('fecha', 'N/A')}")
+                        
+                        # Verificar criterios de eliminación
+                        has_term = term in asiento["glosa"]
+                        has_period = period in asiento["fecha"]
+                        
+                        print(f"   📋 {term} en glosa: {has_term}")
+                        print(f"   📅 Período {period} en fecha: {has_period}")
+                        
+                        if has_term and has_period:
+                            # Verificar si el asiento tiene el campo 'asiento'
+                            if 'asiento' not in asiento:
+                                print(f"⚠️ Asiento no tiene campo 'asiento', saltando eliminación: {asiento}")
+                                results["errors"].append({
+                                    "type": "missing_asiento_field",
+                                    "term": term,
+                                    "error": "Asiento sin campo 'asiento'",
+                                    "asiento": asiento
+                                })
+                                continue
+                                
+                            try:
+                                codigo_asiento = asiento['asiento']
+                                print(f"🗑️ Intentando eliminar asiento {term}: {codigo_asiento}")
+                                
+                                # Usar formato año/asiento/contribuyente
+                                year = period.split('-')[0]
+                                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asiento}/76063822"
+                                print(f"🔗 URL de eliminación: {delete_url}")
+                                
+                                delete_response = requests.get(
+                                    delete_url,
+                                    headers={
+                                        "Authorization": f"Bearer {token}",
+                                        "Content-Type": "application/json",
+                                    },
+                                )
+                                print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                                
+                                results["eliminated_seats"].append({
+                                    "term": term,
+                                    "codigo": codigo_asiento,
+                                    "glosa": asiento.get("glosa", 'N/A'),
+                                    "fecha": asiento.get("fecha", 'N/A'),
+                                    "delete_status": delete_response.status_code,
+                                    "response": delete_response.text
+                                })
+                                
+                                if delete_response.status_code == 200:
+                                    print(f"✅ Eliminado asiento {term}: {codigo_asiento}")
+                                else:
+                                    print(f"❌ No se pudo eliminar asiento: {codigo_asiento} - Status: {delete_response.status_code}")
+                                    
+                            except Exception as e:
+                                print(f"❌ Error eliminando asiento {term}: {str(e)}")
+                                results["errors"].append({
+                                    "type": "delete_error",
+                                    "term": term,
+                                    "error": str(e),
+                                    "asiento": asiento
+                                })
+                        else:
+                            print(f"⏭️ Asiento no cumple criterios para eliminación")
+                    else:
+                        print(f"⚠️ Asiento no tiene estructura válida: {asiento}")
+            
+            print(f"\n🧹 Eliminación completada para período {period}")
+            print(f"📊 Total asientos eliminados: {len(results['eliminated_seats'])}")
+            print(f"❌ Total errores: {len(results['errors'])}")
+            
+            # Resumen por término
+            summary_by_term = {}
+            for seat in results["eliminated_seats"]:
+                term = seat["term"]
+                if term not in summary_by_term:
+                    summary_by_term[term] = 0
+                summary_by_term[term] += 1
+            
+            results["summary"] = {
+                "total_eliminated": len(results["eliminated_seats"]),
+                "total_errors": len(results["errors"]),
+                "by_term": summary_by_term
+            }
+            
+            return results
+            
+        except Exception as e:
+            print(f"❌ Error general en eliminación: {str(e)}")
+            results["errors"].append({
+                "type": "general_error",
+                "error": str(e)
+            })
+            return results
