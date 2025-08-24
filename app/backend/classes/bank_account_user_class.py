@@ -118,8 +118,8 @@ class BankAccountUserClass:
             bank_account_user.bank_account_type_id = bank_account_user_inputs.bank_account_type_id
             bank_account_user.bank_account_number = bank_account_user_inputs.bank_account_number
             bank_account_user.bank_account_email = bank_account_user_inputs.bank_account_email
-            bank_account_user.added_date = HelperClass.get_current_datetime()
-            bank_account_user.updated_date = HelperClass.get_current_datetime()
+            bank_account_user.added_date = datetime.now()
+            bank_account_user.updated_date = datetime.now()
 
             self.db.add(bank_account_user)
             
@@ -146,7 +146,7 @@ class BankAccountUserClass:
             bank_account_user.bank_account_type_id = bank_account_user_inputs.bank_account_type_id
             bank_account_user.bank_account_number = bank_account_user_inputs.bank_account_number
             bank_account_user.bank_account_email = bank_account_user_inputs.bank_account_email
-            bank_account_user.updated_date = HelperClass.get_current_datetime()
+            bank_account_user.updated_date = datetime.now()
 
             try:
                 self.db.commit()
