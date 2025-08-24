@@ -1857,6 +1857,7 @@ class BankAccountUserModel(Base):
     __tablename__ = 'bank_account_users'
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)  # Nuevo campo para el usuario
     rut = Column(String(255))
     bank_account_name = Column(String(255))
     bank_account_type_id = Column(Integer)
