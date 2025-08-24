@@ -7,7 +7,7 @@ class BankAccountUserClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, user_id, page=0, items_per_page=10):
+    def get_all(self, id, page=0, items_per_page=10):
         try:
             # Construir la consulta base
             query = self.db.query(
@@ -19,7 +19,7 @@ class BankAccountUserClass:
                 BankAccountUserModel.bank_account_number,
                 BankAccountUserModel.bank_account_email,
                 BankAccountUserModel.added_date
-            ).filter(BankAccountUserModel.user_id == user_id).order_by(
+            ).filter(BankAccountUserModel.user_id == id).order_by(
                 BankAccountUserModel.id.desc()
             )
 
@@ -109,12 +109,12 @@ class BankAccountUserClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def store(self, bank_account_user_inputs, session_user_id, session_rut):
+    def store(self, bank_account_user_inputs, session_id, session_rut):
         try:
             bank_account_user = BankAccountUserModel()
             
             # Asignar los valores del formulario a la instancia del modelo
-            bank_account_user.user_id = session_user_id  # Nuevo campo user_id
+            bank_account_user.user_id = session_id  # Nuevo campo id
             bank_account_user.rut = session_rut
             bank_account_user.bank_account_name = bank_account_user_inputs.bank_account_name
             bank_account_user.bank_account_type_id = bank_account_user_inputs.bank_account_type_id
@@ -135,7 +135,7 @@ class BankAccountUserClass:
         except Exception as e:
             return {"status": "error", "message": f"Error: {str(e)}"}
 
-    def update(self, id, bank_account_user_inputs, session_user_id, session_rut):
+    def update(self, id, bank_account_user_inputs, session_id, session_rut):
         try:
             bank_account_user = self.db.query(BankAccountUserModel).filter(BankAccountUserModel.id == id).first()
             
@@ -143,7 +143,7 @@ class BankAccountUserClass:
                 return {"status": "error", "message": "Bank Account User not found"}
 
             # Actualizar campos
-            bank_account_user.user_id = session_user_id
+            bank_account_user.user_id = session_id
             bank_account_user.rut = session_rut
             bank_account_user.bank_account_name = bank_account_user_inputs.bank_account_name
             bank_account_user.bank_account_type_id = bank_account_user_inputs.bank_account_type_id

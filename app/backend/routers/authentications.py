@@ -31,6 +31,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     print(f"User Role: {rol.rol}")
 
     return {
+        "id": user["user_data"]["id"],
         "access_token": token,
         "rut": user["user_data"]["rut"],
         "rol_id": user["user_data"]["rol_id"],

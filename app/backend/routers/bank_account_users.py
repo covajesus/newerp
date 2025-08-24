@@ -15,7 +15,7 @@ def index(bank_account_user_inputs: BankAccountUser, session_user: UserLogin = D
     """
     Obtener todos los usuarios de cuentas bancarias con paginación
     """
-    data = BankAccountUserClass(db).get_all(session_user.user_id, bank_account_user_inputs.page)
+    data = BankAccountUserClass(db).get_all(session_user.id, bank_account_user_inputs.page)
     return {"message": data}
 
 @bank_account_users.get("/")
@@ -23,7 +23,7 @@ def get_all(session_user: UserLogin = Depends(get_current_active_user), db: Sess
     """
     Obtener todos los usuarios de cuentas bancarias sin paginación
     """
-    data = BankAccountUserClass(db).get_all(session_user.user_id)
+    data = BankAccountUserClass(db).get_all(session_user.id)
     return {"message": data}
 
 @bank_account_users.get("/{id}")
@@ -39,7 +39,7 @@ def store(bank_account_user_inputs: StoreBankAccountUser, session_user: UserLogi
     """
     Crear un nuevo usuario de cuenta bancaria
     """
-    data = BankAccountUserClass(db).store(bank_account_user_inputs, session_user.user_id, session_user.rut)
+    data = BankAccountUserClass(db).store(bank_account_user_inputs, session_user.id, session_user.rut)
     return {"message": data}
 
 @bank_account_users.put("/update/{id}")
@@ -47,7 +47,7 @@ def update(id: int, bank_account_user_inputs: UpdateBankAccountUser, session_use
     """
     Actualizar un usuario de cuenta bancaria existente
     """
-    data = BankAccountUserClass(db).update(id, bank_account_user_inputs, session_user.user_id, session_user.rut)
+    data = BankAccountUserClass(db).update(id, bank_account_user_inputs, session_user.id, session_user.rut)
     return {"message": data}
 
 @bank_account_users.delete("/delete/{id}")

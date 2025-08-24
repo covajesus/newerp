@@ -237,6 +237,7 @@ class UpdateEmployee(BaseModel):
     born_date: str = None
 
 class UserLogin(BaseModel):
+    id: Union[int, None]
     rol_id: Union[int, None]
     rut: Union[int, None]
     branch_office_id: Union[int, None]
