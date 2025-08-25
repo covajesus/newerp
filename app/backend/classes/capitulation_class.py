@@ -14,11 +14,18 @@ class CapitulationClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, rol_id=None, rut=None, page=0, items_per_page=10):
+    def get_all(self, rol_id=None, rut=None, page=0, items_per_page=10, branch_office_id=None, status_id=None):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
                 filters = []
+                
+                # Agregar filtros opcionales
+                if branch_office_id is not None:
+                    filters.append(CapitulationModel.branch_office_id == branch_office_id)
+                
+                if status_id is not None:
+                    filters.append(CapitulationModel.status_id == status_id)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
@@ -57,6 +64,13 @@ class CapitulationClass:
             elif rol_id == 5:
                 # Inicialización de filtros dinámicos
                 filters = []
+                
+                # Agregar filtros opcionales
+                if branch_office_id is not None:
+                    filters.append(CapitulationModel.branch_office_id == branch_office_id)
+                
+                if status_id is not None:
+                    filters.append(CapitulationModel.status_id == status_id)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
@@ -97,6 +111,13 @@ class CapitulationClass:
             else:
                 # Inicialización de filtros dinámicos
                 filters = []
+                
+                # Agregar filtros opcionales
+                if branch_office_id is not None:
+                    filters.append(CapitulationModel.branch_office_id == branch_office_id)
+                
+                if status_id is not None:
+                    filters.append(CapitulationModel.status_id == status_id)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(

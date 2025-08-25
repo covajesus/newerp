@@ -1660,6 +1660,8 @@ class PatentList(BaseModel):
 
 class CapitulationList(BaseModel):
     page: int
+    branch_office_id: Optional[int] = None
+    status_id: Optional[int] = None
 
 class CashierList(BaseModel):
     page: int

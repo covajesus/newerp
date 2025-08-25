@@ -20,8 +20,26 @@ capitulations = APIRouter(
 
 @capitulations.post("/")
 def index(capitulation: CapitulationList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = CapitulationClass(db).get_all(session_user.rol_id, session_user.rut, capitulation.page)
+    data = CapitulationClass(db).get_all(
+        session_user.rol_id, 
+        session_user.rut, 
+        capitulation.page,
+        items_per_page=10,
+        branch_office_id=capitulation.branch_office_id,
+        status_id=capitulation.status_id
+    )
+    return {"message": data}
 
+@capitulations.post("/search")
+def search(capitulation: CapitulationList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CapitulationClass(db).get_all(
+        session_user.rol_id, 
+        session_user.rut, 
+        capitulation.page,
+        items_per_page=10,
+        branch_office_id=capitulation.branch_office_id,
+        status_id=capitulation.status_id
+    )
     return {"message": data}
 
 @capitulations.post("/store")
