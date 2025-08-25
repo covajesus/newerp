@@ -52,7 +52,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.id.desc(), CapitulationModel.status_id.asc()
+                    CapitulationModel.id.desc()
                 )
             elif rol_id == 5:
                 # Inicialización de filtros dinámicos
@@ -132,7 +132,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.id.desc(), CapitulationModel.status_id.asc()
+                    CapitulationModel.id.desc()
                 )
 
             if page > 0:
