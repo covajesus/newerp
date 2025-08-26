@@ -1209,7 +1209,7 @@ class AccountabilityClass:
             
             for row in collections_data:
                 branch_office_id = row.branch_office_id
-                gross_incomes = row.ingresos * 1.19
+                gross_incomes = float(row.ingresos) * 1.19
 
                 if gross_incomes <= 0:
                     continue
