@@ -109,6 +109,32 @@ class BankAccountUserClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
+    def get_by_rut(self, rut):
+        try:
+            data_query = self.db.query(BankAccountUserModel).filter(BankAccountUserModel.rut == rut).all()
+
+            if data_query:
+                # Serializar los datos
+                serialized_data = [{
+                    "id": item.id,
+                    "user_id": item.user_id,
+                    "rut": item.rut,
+                    "bank_account_name": item.bank_account_name,
+                    "bank_account_type_id": item.bank_account_type_id,
+                    "bank_account_number": item.bank_account_number,
+                    "bank_account_email": item.bank_account_email,
+                    "added_date": item.added_date.strftime('%Y-%m-%d %H:%M:%S') if item.added_date else None,
+                    "updated_date": item.updated_date.strftime('%Y-%m-%d %H:%M:%S') if item.updated_date else None
+                } for item in data_query]
+
+                return {"status": "success", "data": serialized_data}
+            else:
+                return {"status": "error", "message": "No se encontraron cuentas bancarias para el RUT especificado."}
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": f"Error: {error_message}"}
+
     def store(self, bank_account_user_inputs, session_id, session_rut):
         try:
             bank_account_user = BankAccountUserModel()

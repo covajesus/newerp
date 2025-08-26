@@ -34,6 +34,14 @@ def get_by_id(id: int, session_user: UserLogin = Depends(get_current_active_user
     data = BankAccountUserClass(db).get(id)
     return {"message": data}
 
+@bank_account_users.post("/get_by_rut/{rut}")
+def get_by_rut(rut: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Obtener cuentas bancarias de usuario por RUT
+    """
+    data = BankAccountUserClass(db).get_by_rut(rut)
+    return {"message": data}
+
 @bank_account_users.post("/store")
 def store(bank_account_user_inputs: StoreBankAccountUser, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """
