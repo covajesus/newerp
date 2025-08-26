@@ -964,26 +964,26 @@ class AccountabilityClass:
                     print(f"🔍 Revisando asset: {asset.get('asiento', 'N/A')} - {asset.get('glosa', 'N/A')} - {asset.get('fecha', 'N/A')}")
                     
                     # Verificar criterios de eliminación para BoletaFiscal
-                    has_boleta_fiscal = "BoletaFiscal" in asiento["glosa"]
-                    has_period = period in asiento["fecha"]
+                    has_boleta_fiscal = "BoletaFiscal" in asset["glosa"]
+                    has_period = period in asset["fecha"]
                     
                     print(f"   📋 BoletaFiscal en glosa: {has_boleta_fiscal}")
                     print(f"   📅 Período {period} en fecha: {has_period}")
                     
                     if has_boleta_fiscal and has_period:
-                        # Verificar si el asiento tiene el campo 'asiento' antes de intentar eliminarlo
-                        if 'asiento' not in asiento:
-                            print(f"⚠️ Asiento no tiene campo 'asiento', saltando eliminación: {asiento}")
+                        # Verificar si el asset tiene el campo 'asiento' antes de intentar eliminarlo
+                        if 'asiento' not in asset:
+                            print(f"⚠️ Asset no tiene campo 'asiento', saltando eliminación: {asset}")
                             results["errors"].append({
                                 "type": "missing_asiento_field",
-                                "error": "Asiento sin campo 'asiento'",
-                                "asiento": asiento
+                                "error": "Asset sin campo 'asiento'",
+                                "asset": asset
                             })
                             continue
                             
                         try:
-                            codigo_asiento = asiento['asiento']  # Usar 'asiento' en lugar de 'codigo'
-                            print(f"🗑️ Intentando eliminar asiento de ingresos: {codigo_asiento}")
+                            codigo_asset = asset['asiento']  # Usar 'asiento' en lugar de 'codigo'
+                            print(f"🗑️ Intentando eliminar asset de ingresos: {codigo_asset}")
                             
                             # Usar directamente el formato que funciona: año/asiento/contribuyente
                             year = period.split('-')[0]  # Extraer año del período (ej: "2025-08" -> "2025")
@@ -1770,7 +1770,7 @@ class AccountabilityClass:
                     else:
                         print(f"⚠️ Asset no tiene estructura válida: {asset}")
             
-            print(f"\n🧹 Eliminación completada para período {period}")
+            print(f"🧹 Eliminación completada para período {period}")
             print(f"📊 Total asientos eliminados: {len(results['eliminated_seats'])}")
             print(f"❌ Total errores: {len(results['errors'])}")
             
