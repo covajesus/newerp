@@ -688,12 +688,12 @@ class AccountabilityClass:
             },
         )
 
-        asientos = json.loads(response.text)
+        assets = json.loads(response.text)
 
-        for asiento in asientos:
-            if "Ingresos" in asiento["glosa"]:
+        for asset in assets:
+            if "Ingresos" in asset["glosa"]:
                 delete_response = requests.get(
-                    f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asiento['codigo']}/76063822",
+                    f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asset['codigo']}/76063822",
                     headers={
                         "Authorization": f"Bearer {token}",
                         "Content-Type": "application/json",
@@ -750,7 +750,7 @@ class AccountabilityClass:
         
         for row in collections_data:
             branch_office_id = row.branch_office_id
-            ingresos_brutos = row.ingresos
+            gross_incomes = row.ingresos * 1.19
             subscribers_total = row.subscribers_total
             year = row.year
             month = row.month
@@ -760,12 +760,12 @@ class AccountabilityClass:
                 BranchOfficeModel.id == branch_office_id
             ).first()
             
-            if not branch_office or ingresos_brutos <= 0:
+            if not branch_office or gross_incomes <= 0:
                 continue
                 
             # Calcular montos
-            ingreso_neto = round(ingresos_brutos / 1.19)  # Monto sin IVA
-            iva_amount = ingresos_brutos - ingreso_neto   # IVA
+            net_incomes = round(gross_incomes)  # Monto sin IVA
+            iva_amount = gross_incomes - net_incomes   # IVA
             
             # Crear fecha en formato correcto
             splitted_period = period.split('-')
@@ -785,10 +785,10 @@ class AccountabilityClass:
                 "glosa": gloss,
                 "detalle": {
                     'debe': {
-                        '111000102': ingresos_brutos,  # Banco
+                        '111000102': gross_incomes,  # Banco
                     },
                     'haber': {
-                        '441000101': ingreso_neto,     # Ingresos por venta
+                        '441000101': net_incomes,     # Ingresos por venta
                         '221000226': iva_amount,       # IVA débito fiscal
                     }
                 },
@@ -820,8 +820,8 @@ class AccountabilityClass:
                     "branch_office_id": branch_office_id,
                     "branch_office_name": branch_office.branch_office,
                     "period": period,
-                    "ingresos_brutos": ingresos_brutos,
-                    "ingreso_neto": ingreso_neto,
+                    "ingresos_brutos": gross_incomes,
+                    "ingreso_neto": net_incomes,
                     "iva_amount": iva_amount,
                     "subscribers_total": subscribers_total,
                     "gloss": gloss,
@@ -858,12 +858,12 @@ class AccountabilityClass:
             },
         )
 
-        asientos = json.loads(response.text)
+        assets = json.loads(response.text)
 
-        for asiento in asientos:
-            if "BoletaFiscal" in asiento["glosa"] and period in asiento["fecha"]:
+        for asset in assets:
+            if "BoletaFiscal" in asset["glosa"] and period in asset["fecha"]:
                 delete_response = requests.get(
-                    f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asiento['codigo']}/76063822",
+                    f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asset['codigo']}/76063822",
                     headers={
                         "Authorization": f"Bearer {token}",
                         "Content-Type": "application/json",
@@ -933,35 +933,35 @@ class AccountabilityClass:
                 
                 # Verificar si la respuesta es una lista
                 if isinstance(response_data, list):
-                    asientos = response_data
+                    assets = response_data
                 elif isinstance(response_data, dict):
                     # Si es un diccionario, puede tener una estructura diferente
                     if 'asientos' in response_data:
-                        asientos = response_data['asientos']
+                        assets = response_data['asientos']
                     elif 'data' in response_data:
-                        asientos = response_data['data']
+                        assets = response_data['data']
                     else:
-                        print("⚠️ Respuesta de LibreDTE no contiene asientos en formato esperado")
+                        print("⚠️ Respuesta de LibreDTE no contiene assets en formato esperado")
                         print(f"🔑 Keys disponibles: {list(response_data.keys()) if isinstance(response_data, dict) else 'No es dict'}")
-                        asientos = []
+                        assets = []
                 elif isinstance(response_data, str):
                     print("⚠️ Respuesta es un string, posiblemente un mensaje de error")
                     print(f"📝 Mensaje: {response_data}")
-                    asientos = []
+                    assets = []
                 else:
                     print(f"⚠️ Respuesta de LibreDTE no es una lista ni diccionario válido. Tipo: {type(response_data)}")
-                    asientos = []
+                    assets = []
                     
             except json.JSONDecodeError as e:
                 print(f"❌ Error al parsear JSON de LibreDTE: {str(e)}")
                 print(f"📄 Respuesta raw: {response.text}")
-                asientos = []
+                assets = []
             
-            print(f"📊 Total de asientos encontrados: {len(asientos)}")
+            print(f"📊 Total de assets encontrados: {len(assets)}")
             
-            for asiento in asientos:
-                if isinstance(asiento, dict) and "glosa" in asiento and "fecha" in asiento:
-                    print(f"🔍 Revisando asiento: {asiento.get('asiento', 'N/A')} - {asiento.get('glosa', 'N/A')} - {asiento.get('fecha', 'N/A')}")
+            for asset in assets:
+                if isinstance(asset, dict) and "glosa" in asset and "fecha" in asset:
+                    print(f"🔍 Revisando asset: {asset.get('asiento', 'N/A')} - {asset.get('glosa', 'N/A')} - {asset.get('fecha', 'N/A')}")
                     
                     # Verificar criterios de eliminación para BoletaFiscal
                     has_boleta_fiscal = "BoletaFiscal" in asiento["glosa"]
@@ -1689,49 +1689,49 @@ class AccountabilityClass:
                 
                 # Procesar respuesta de búsqueda
                 try:
-                    asientos = json.loads(response.text)
-                    if isinstance(asientos, list):
-                        asientos_list = asientos
-                    elif isinstance(asientos, dict) and 'data' in asientos:
-                        asientos_list = asientos['data']
+                    assets = json.loads(response.text)
+                    if isinstance(assets, list):
+                        assets_list = assets
+                    elif isinstance(assets, dict) and 'data' in assets:
+                        assets_list = assets['data']
                     else:
-                        asientos_list = []
+                        assets_list = []
                 except json.JSONDecodeError:
-                    asientos_list = []
+                    assets_list = []
                 
-                print(f"📊 Total de asientos {term} encontrados: {len(asientos_list)}")
+                print(f"📊 Total de assets {term} encontrados: {len(assets_list)}")
                 
-                # Eliminar cada asiento encontrado
-                for asiento in asientos_list:
-                    if isinstance(asiento, dict) and "glosa" in asiento and "fecha" in asiento:
-                        print(f"🔍 Revisando asiento: {asiento.get('asiento', 'N/A')} - {asiento.get('glosa', 'N/A')} - {asiento.get('fecha', 'N/A')}")
+                # Eliminar cada asset encontrado
+                for asset in assets_list:
+                    if isinstance(asset, dict) and "glosa" in asset and "fecha" in asset:
+                        print(f"🔍 Revisando asset: {asset.get('asiento', 'N/A')} - {asset.get('glosa', 'N/A')} - {asset.get('fecha', 'N/A')}")
                         
                         # Verificar criterios de eliminación
-                        has_term = term in asiento["glosa"]
-                        has_period = period in asiento["fecha"]
+                        has_term = term in asset["glosa"]
+                        has_period = period in asset["fecha"]
                         
                         print(f"   📋 {term} en glosa: {has_term}")
                         print(f"   📅 Período {period} en fecha: {has_period}")
                         
                         if has_term and has_period:
-                            # Verificar si el asiento tiene el campo 'asiento'
-                            if 'asiento' not in asiento:
-                                print(f"⚠️ Asiento no tiene campo 'asiento', saltando eliminación: {asiento}")
+                            # Verificar si el asset tiene el campo 'asiento'
+                            if 'asiento' not in asset:
+                                print(f"⚠️ Asset no tiene campo 'asiento', saltando eliminación: {asset}")
                                 results["errors"].append({
                                     "type": "missing_asiento_field",
                                     "term": term,
-                                    "error": "Asiento sin campo 'asiento'",
-                                    "asiento": asiento
+                                    "error": "Asset sin campo 'asiento'",
+                                    "asset": asset
                                 })
                                 continue
                                 
                             try:
-                                codigo_asiento = asiento['asiento']
-                                print(f"🗑️ Intentando eliminar asiento {term}: {codigo_asiento}")
+                                codigo_asset = asset['asiento']
+                                print(f"🗑️ Intentando eliminar asset {term}: {codigo_asset}")
                                 
                                 # Usar formato año/asiento/contribuyente
                                 year = period.split('-')[0]
-                                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asiento}/76063822"
+                                delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asset}/76063822"
                                 print(f"🔗 URL de eliminación: {delete_url}")
                                 
                                 delete_response = requests.get(
@@ -1745,30 +1745,30 @@ class AccountabilityClass:
                                 
                                 results["eliminated_seats"].append({
                                     "term": term,
-                                    "codigo": codigo_asiento,
-                                    "glosa": asiento.get("glosa", 'N/A'),
-                                    "fecha": asiento.get("fecha", 'N/A'),
+                                    "codigo": codigo_asset,
+                                    "glosa": asset.get("glosa", 'N/A'),
+                                    "fecha": asset.get("fecha", 'N/A'),
                                     "delete_status": delete_response.status_code,
                                     "response": delete_response.text
                                 })
                                 
                                 if delete_response.status_code == 200:
-                                    print(f"✅ Eliminado asiento {term}: {codigo_asiento}")
+                                    print(f"✅ Eliminado asset {term}: {codigo_asset}")
                                 else:
-                                    print(f"❌ No se pudo eliminar asiento: {codigo_asiento} - Status: {delete_response.status_code}")
+                                    print(f"❌ No se pudo eliminar asset: {codigo_asset} - Status: {delete_response.status_code}")
                                     
                             except Exception as e:
-                                print(f"❌ Error eliminando asiento {term}: {str(e)}")
+                                print(f"❌ Error eliminando asset {term}: {str(e)}")
                                 results["errors"].append({
                                     "type": "delete_error",
                                     "term": term,
                                     "error": str(e),
-                                    "asiento": asiento
+                                    "asset": asset
                                 })
                         else:
-                            print(f"⏭️ Asiento no cumple criterios para eliminación")
+                            print(f"⏭️ Asset no cumple criterios para eliminación")
                     else:
-                        print(f"⚠️ Asiento no tiene estructura válida: {asiento}")
+                        print(f"⚠️ Asset no tiene estructura válida: {asset}")
             
             print(f"\n🧹 Eliminación completada para período {period}")
             print(f"📊 Total asientos eliminados: {len(results['eliminated_seats'])}")
