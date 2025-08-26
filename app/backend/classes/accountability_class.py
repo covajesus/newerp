@@ -1209,9 +1209,9 @@ class AccountabilityClass:
             
             for row in collections_data:
                 branch_office_id = row.branch_office_id
-                ingresos_brutos = row.ingresos
-                
-                if ingresos_brutos <= 0:
+                gross_incomes = row.ingresos * 1.19
+
+                if gross_incomes <= 0:
                     continue
                 
                 branch_office = self.db.query(BranchOfficeModel).filter(
@@ -1222,10 +1222,10 @@ class AccountabilityClass:
                     continue
                 
                 # Calcular montos para ingresos
-                ingresos_brutos = float(ingresos_brutos)  # Convertir Decimal a float
-                ingreso_neto = round(ingresos_brutos / 1.19)
-                iva_amount = ingresos_brutos - ingreso_neto
-                
+                gross_incomes = float(gross_incomes)  # Convertir Decimal a float
+                net_incomes = round(gross_incomes / 1.19)
+                iva_amount = gross_incomes - net_incomes
+
                 splitted_period = period.split('-')
                 utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
                 
@@ -1241,10 +1241,10 @@ class AccountabilityClass:
                     "glosa": gloss,
                     "detalle": {
                         'debe': {
-                            '111000102': ingresos_brutos,
+                            '111000102': gross_incomes,
                         },
                         'haber': {
-                            '441000101': ingreso_neto,
+                            '441000101': net_incomes,
                             '221000226': iva_amount,
                         }
                     },
@@ -1272,8 +1272,8 @@ class AccountabilityClass:
                     results["created_income_assets"].append({
                         "branch_office_id": branch_office_id,
                         "branch_office_name": branch_office.branch_office,
-                        "ingresos_brutos": ingresos_brutos,
-                        "ingreso_neto": ingreso_neto,
+                        "ingresos_brutos": gross_incomes,
+                        "ingreso_neto": net_incomes,
                         "iva_amount": iva_amount,
                         "gloss": gloss,
                         "response_status": response.status_code,
