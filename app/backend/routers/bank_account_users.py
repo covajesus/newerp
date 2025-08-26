@@ -35,7 +35,7 @@ def get_by_id(id: int, session_user: UserLogin = Depends(get_current_active_user
     return {"message": data}
 
 @bank_account_users.post("/get_by_rut/{rut}")
-def get_by_rut(rut: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def get_by_rut(rut: str, db: Session = Depends(get_db)):
     """
     Obtener cuentas bancarias de usuario por RUT
     """
