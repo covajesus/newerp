@@ -987,7 +987,7 @@ class AccountabilityClass:
                             
                             # Usar directamente el formato que funciona: año/asiento/contribuyente
                             year = period.split('-')[0]  # Extraer año del período (ej: "2025-08" -> "2025")
-                            delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asiento}/76063822"
+                            delete_url = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{year}/{codigo_asset}/76063822"
                             print(f"🔗 URL de eliminación: {delete_url}")
                             
                             delete_response = requests.get(
@@ -1003,7 +1003,7 @@ class AccountabilityClass:
                             if delete_response.status_code != 200:
                                 print(f"❌ Primer formato falló, probando formato alternativo...")
                                 # Probar con el año completo
-                                delete_url_alt = f"https://libredte.cl/api/lce/lce_asientos/eliminar/2025/{codigo_asiento}/76063822"
+                                delete_url_alt = f"https://libredte.cl/api/lce/lce_asientos/eliminar/2025/{codigo_asset}/76063822"
                                 print(f"🔗 URL alternativa: {delete_url_alt}")
                                 
                                 delete_response_alt = requests.get(
@@ -1018,8 +1018,8 @@ class AccountabilityClass:
                                 # Si tampoco funciona, probar con el ID completo
                                 if delete_response_alt.status_code != 200 and 'id' in asiento:
                                     print(f"❌ Formato alternativo falló, probando con ID completo...")
-                                    asiento_id = asiento['id']  # '2025-28435'
-                                    delete_url_id = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asiento_id}/76063822"
+                                    asset_id = asset['id']  # '2025-28435'
+                                    delete_url_id = f"https://libredte.cl/api/lce/lce_asientos/eliminar/{asset_id}/76063822"
                                     print(f"🔗 URL con ID: {delete_url_id}")
                                     
                                     delete_response_id = requests.get(
@@ -1035,28 +1035,28 @@ class AccountabilityClass:
                                     delete_response = delete_response_alt
                             
                             results["eliminated_income_assets"].append({
-                                "codigo": codigo_asiento,
+                                "codigo": codigo_asset,
                                 "glosa": asiento.get("glosa", 'N/A'),
                                 "delete_status": delete_response.status_code,
                                 "response": delete_response.text
                             })
                             
                             if delete_response.status_code == 200:
-                                print(f"✅ Eliminado asiento de ingresos: {codigo_asiento}")
+                                print(f"🔍 Eliminado asset de ingresos: {codigo_asset}")
                             else:
-                                print(f"❌ No se pudo eliminar asiento: {codigo_asiento} - Status: {delete_response.status_code}")
+                                print(f"❌ No se pudo eliminar asset: {codigo_asset} - Status: {delete_response.status_code}")
                                 
                         except Exception as e:
                             print(f"❌ Error eliminando asiento de ingresos: {str(e)}")
                             results["errors"].append({
                                 "type": "delete_income_asset",
                                 "error": str(e),
-                                "asiento": asiento
+                                "asset": asset
                             })
                     else:
-                        print(f"⏭️ Asiento no cumple criterios para eliminación")
+                        print(f"⏭️ Asset no cumple criterios para eliminación")
                 else:
-                    print(f"⚠️ Asiento no tiene estructura válida: {asiento}")
+                    print(f"⚠️ Asset no tiene estructura válida: {asset}")
             
             # PASO 2: Eliminar asientos existentes de abonados
             print("🗑️ Eliminando asientos de abonados existentes...")
