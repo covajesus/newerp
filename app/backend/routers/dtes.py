@@ -249,7 +249,6 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="No se encontró código de autorización en la respuesta de LibreDTE")
 
     # 6. Buscar y actualizar DTE
-    print(Cobro["emitido"])
     dte_qty = db.query(DteModel).filter(
         DteModel.folio == Cobro["emitido"],
         DteModel.dte_version_id == 1
@@ -267,10 +266,10 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         dte.expense_type_id = 25
         dte.status_id = 5
         db.commit()
-        return {"status": "success", "message": "DTE actualizado correctamente"}
 
-    print(Cobro["emitido"])
     WhatsappClass(db).notify_payment(Cobro["emitido"])
+
+    return {"status": "success", "message": "DTE actualizado correctamente"}
 
     # 7. Si no se encuentra
     raise HTTPException(status_code=404, detail="DTE no encontrado")
