@@ -247,7 +247,7 @@ async def pay(request: Request, db: Session = Depends(get_db)):
     authorization_code = datos.get("detailOutput", {}).get("authorizationCode")
     if not authorization_code:
         raise HTTPException(status_code=500, detail="No se encontró código de autorización en la respuesta de LibreDTE")
-
+    print(232323)
     # 6. Buscar y actualizar DTE
     dte_qty = db.query(DteModel).filter(
         DteModel.folio == Cobro["emitido"],
