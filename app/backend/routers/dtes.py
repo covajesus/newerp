@@ -271,9 +271,6 @@ async def pay(request: Request, db: Session = Depends(get_db)):
 
     return {"status": "success", "message": "DTE actualizado correctamente"}
 
-    # 7. Si no se encuentra
-    raise HTTPException(status_code=404, detail="DTE no encontrado")
-
 @dtes.get("/dtes_data3")
 def dtes_data(db: Session = Depends(get_db)):
     print("Enviando DTEs a Whatsapp")
