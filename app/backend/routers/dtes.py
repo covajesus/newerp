@@ -264,6 +264,8 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "success", "message": "DTE actualizado correctamente"}
 
+    WhatsappClass(db).notify_payment(Cobro["emitido"])
+
     # 7. Si no se encuentra
     raise HTTPException(status_code=404, detail="DTE no encontrado")
 

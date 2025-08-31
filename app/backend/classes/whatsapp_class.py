@@ -525,7 +525,7 @@ class WhatsappClass:
             self.resend(dte.id, customer.phone)
    
 
-    def notify_paymeent(self, folio):
+    def notify_payment(self, folio):
         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte.branch_office_id).first()

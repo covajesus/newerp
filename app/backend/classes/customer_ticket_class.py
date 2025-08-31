@@ -1248,6 +1248,6 @@ class CustomerTicketClass:
 
                             print("Dte actualizado correctamente: " + str(dte.folio))
 
-                            WhatsappClass(self.db).notify_paymeent(dte.folio)
+                            WhatsappClass(self.db).notify_payment(dte.folio)
 
 
