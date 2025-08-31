@@ -1244,6 +1244,8 @@ class CustomerTicketClass:
                             self.db.commit()
                             self.db.refresh(dte)
 
+                            print('232323')
+
                             authorization_code_response = DteClass(self.db).get_dte_authorization_code(dte.folio)
 
                             print("Dte actualizado correctamente: " + str(dte.folio))
