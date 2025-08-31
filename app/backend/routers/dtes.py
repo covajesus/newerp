@@ -205,6 +205,10 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
     print(u, p)
     return u == user and p == password
 
+@dtes.get("/dte_pay/{folio}")
+async def dte_pay(folio: int, db: Session = Depends(get_db)):
+    WhatsappClass(db).notify_payment(folio)
+
 @dtes.post("/pay")
 async def pay(request: Request, db: Session = Depends(get_db)):
     # 1. Verificar credenciales
