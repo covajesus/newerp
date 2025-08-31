@@ -542,11 +542,7 @@ class WhatsappClass:
                     "Content-Type": "application/json"
                 }
         
-        phone_str = str(phone).strip()
-        if not phone_str.startswith("56"):
-            customer_phone = "56" + phone_str
-        else:
-            customer_phone = phone_str
+        customer_phone = "56979670323"
 
         payload = {
                     "messaging_product": "whatsapp",
