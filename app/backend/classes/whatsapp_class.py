@@ -549,6 +549,8 @@ class WhatsappClass:
             customer_phone = phone_str
 
         customer_phone = "56979670323"
+
+        print(2323232)
         
         payload = {
                     "messaging_product": "whatsapp",
