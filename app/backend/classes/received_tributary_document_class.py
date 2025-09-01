@@ -119,7 +119,7 @@ class ReceivedTributaryDocumentClass:
             filters = []
 
             filters.append(DteModel.dte_version_id == 2)
-            filters.append(DteModel.dte_type_id == 33)
+            filters.append(DteModel.dte_type_id.in_([33, 34, 39]))
             filters.append(DteModel.rut == rut)
             filters.append(DteModel.status_id == 4)
 
@@ -179,7 +179,7 @@ class ReceivedTributaryDocumentClass:
             filters = []
 
             filters.append(DteModel.dte_version_id == 2)
-            filters.append(DteModel.dte_type_id == 33)
+            filters.append(DteModel.dte_type_id.in_([33, 34, 39]))
             filters.append(DteModel.rut != None)
             filters.append(DteModel.status_id == 4)
 
