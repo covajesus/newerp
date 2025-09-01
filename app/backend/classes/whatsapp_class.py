@@ -550,8 +550,6 @@ class WhatsappClass:
 
         print("Customer Phone:", customer_phone)
 
-        customer_phone = "56979670323"
-
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer_phone}",
