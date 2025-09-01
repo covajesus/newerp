@@ -547,7 +547,9 @@ class WhatsappClass:
             customer_phone = "56" + phone_str
         else:
             customer_phone = phone_str
-        
+
+        print("Customer Phone:", customer_phone)
+
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer_phone}",
