@@ -550,6 +550,9 @@ class WhatsappClass:
 
         print("Customer Phone:", customer_phone)
 
+        if customer_phone == "56942547662" or customer_phone == "56942998970":
+            customer_phone = "56986843524"  # Número de teléfono predeterminado
+
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer_phone}",
