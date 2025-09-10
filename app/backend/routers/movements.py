@@ -21,7 +21,6 @@ class MovementsRouter:
         self.router.delete("/delete/{movement_id}")(self.delete)
         self.router.get("/{movement_id}")(self.show)
         self.router.get("/{movement_id}/products")(self.get_movement_products)
-        self.router.get("/movement_products/{movement_id}")(self.movement_products)
         self.router.get("/")(self.get_all_movements)
         self.router.get("/types/")(self.get_movement_types)
 
