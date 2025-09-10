@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import requests
 import json
-from sqlalchemy import cast, String
+from sqlalchemy import cast, String, case
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -59,6 +59,10 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
+                    case(
+                        (CapitulationModel.status_id == 13, 0),
+                        else_=1
+                    ),
                     CapitulationModel.id.desc()
                 )
             elif rol_id == 5:
