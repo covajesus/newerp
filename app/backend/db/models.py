@@ -1910,3 +1910,13 @@ class MovementProductModel(Base):
     qty = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class KardexValueModel(Base):
+    __tablename__ = 'kardex_values'
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.product_id'))
+    qty = Column(Integer)
+    cost = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

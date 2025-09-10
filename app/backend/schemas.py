@@ -660,6 +660,47 @@ class FamilyCoreDatum(BaseModel):
                 born_date: str = Form()
                 ):
         return cls(family_type_id=family_type_id, employee_rut=employee_rut, gender_id=gender_id, rut=rut, names=names, father_lastname=father_lastname, mother_lastname=mother_lastname, born_date=born_date)
+
+# Kardex Value Schemas
+class KardexValueDatum(BaseModel):
+    product_id: int
+    qty: float
+    cost: float
+
+    @classmethod
+    def as_form(cls, 
+                product_id: int = Form(),
+                qty: float = Form(),
+                cost: float = Form()
+                ):
+        return cls(product_id=product_id, qty=qty, cost=cost)
+
+class UpdateKardexValue(BaseModel):
+    product_id: int = None
+    qty: float = None
+    cost: float = None
+    updated_date: str = None
+
+class KardexRequest(BaseModel):
+    page: int
+
+class KardexSearchRequest(BaseModel):
+    page: int
+    code: str = None
+    product_id: int = None
+
+    @classmethod
+    def as_form(cls, 
+                family_type_id: int = Form(),
+                employee_rut: int = Form(),
+                gender_id: int = Form(),
+                rut: str = Form(),
+                names: str = Form(),
+                father_lastname: str = Form(),
+                mother_lastname: str = Form(),
+                born_date: str = Form()
+                ):
+        return cls(family_type_id=family_type_id, employee_rut=employee_rut, gender_id=gender_id, rut=rut, names=names, father_lastname=father_lastname, mother_lastname=mother_lastname, born_date=born_date)
    
 class OldFamilyCoreDatum(BaseModel):
     family_type_id: int

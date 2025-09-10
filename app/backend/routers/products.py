@@ -22,6 +22,7 @@ class ProductsRouter:
         self.router.get("/{product_id}")(self.show)
         self.router.put("/update-stock/{product_id}")(self.update_stock)
         self.router.get("/")(self.get_all_products)
+        self.router.post("/list")(self.list_products)
 
     def index(self, product_list: ProductList, db: Session = Depends(get_db)):
         """
@@ -113,6 +114,50 @@ class ProductsRouter:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error retrieving products: {str(e)}")
 
+    def list_products(self, db: Session = Depends(get_db)):
+        """
+        Obtener lista simple de productos para selects/combos
+        """
+        try:
+            data = ProductClass(db).get_all(page=0)
+            
+            # Formatear datos para el frontend (solo id y name)
+            if isinstance(data, list):
+                products_list = [{"id": product.get("product_id"), "name": product.get("name", product.get("description", ""))} for product in data]
+            elif isinstance(data, dict) and "data" in data:
+                products_list = [{"id": product.get("product_id"), "name": product.get("name", product.get("description", ""))} for product in data["data"]]
+            else:
+                products_list = []
+                
+            return {"message": products_list}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error retrieving products list: {str(e)}")
+
 # Crear instancia del router
 products_router = ProductsRouter()
 products = products_router.router
+
+# Router adicional para compatibilidad con frontend (ruta /product)
+product_router = APIRouter(prefix="/product", tags=["Product"])
+
+@product_router.post("/list")
+async def list_products_endpoint(db: Session = Depends(get_db)):
+    """
+    Obtener lista simple de productos para selects/combos (endpoint para frontend)
+    """
+    try:
+        data = ProductClass(db).get_all(page=0)
+        
+        # Formatear datos para el frontend (solo id y name)
+        if isinstance(data, list):
+            # data es una lista directa de productos
+            products_list = [{"id": product["product_id"], "name": product.get("name", product.get("description", ""))} for product in data]
+        elif isinstance(data, dict) and "data" in data:
+            # data es un dict con estructura paginada
+            products_list = [{"id": product["product_id"], "name": product.get("name", product.get("description", ""))} for product in data["data"]]
+        else:
+            products_list = []
+            
+        return {"message": products_list}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving products list: {str(e)}")
