@@ -1865,3 +1865,48 @@ class BankAccountUserModel(Base):
     bank_account_email = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+class ProductModel(Base):
+    __tablename__ = 'products'
+
+    product_id = Column(Integer, primary_key=True)
+    name = Column(String(255))
+    description = Column(Text)
+    cost = Column(Integer)
+    price = Column(Integer)
+    stock = Column(Integer)
+    category_id = Column(Integer)
+    supplier_id = Column(Integer)
+    brand = Column(String(255))
+    model = Column(String(255))
+    barcode = Column(String(255))
+    status_id = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class MovementModel(Base):
+    __tablename__ = 'movements'
+
+    movement_id = Column(Integer, primary_key=True)
+    movement_type = Column(String(50))  # 'IN' para entrada, 'OUT' para salida
+    reference_number = Column(String(255))
+    description = Column(Text)
+    total_amount = Column(Integer)
+    branch_office_id = Column(Integer)
+    supplier_id = Column(Integer)
+    user_rut = Column(String(255))
+    status_id = Column(Integer, default=1)
+    movement_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class MovementProductModel(Base):
+    __tablename__ = 'movements_products'
+
+    movement_product_id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.product_id'))
+    movement_id = Column(Integer, ForeignKey('movements.movement_id'))
+    cost = Column(Integer)
+    qty = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

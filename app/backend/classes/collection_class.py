@@ -433,14 +433,16 @@ class CollectionClass:
         
     def existence(self, branch_office_id, cashier_id, added_date):
         try:
-            existence = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.cashier_id == cashier_id).filter(CollectionModel.added_date == added_date).first()
+            existence = self.db.query(CollectionModel).filter(
+                CollectionModel.branch_office_id == branch_office_id,
+                CollectionModel.cashier_id == cashier_id,
+                CollectionModel.added_date == added_date
+            ).first()
             
-            if existence:
-                return existence
-            else:
-                return 0
+            return existence  # Retorna el objeto o None
         except Exception as e:
-            return 0
+            print(f"Error checking collection existence: {e}")
+            raise e  # Lanza la excepción para manejo en store
     
     def store_redcomercio(self, cashier_id, branch_office_id, gross_total, net_total, total_tickets, date):
         print(cashier_id, branch_office_id, gross_total, net_total, total_tickets, date)
@@ -552,68 +554,81 @@ class CollectionClass:
             return "No se encontró la colección para actualizar."
 
     def store(self, collection_inputs):
-        tz = pytz.timezone('America/Santiago')
-        current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            tz = pytz.timezone('America/Santiago')
+            current_date = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
-        collection_count = self.existence(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
-
-        credit_note_amount = DteClass(self.db).verifiy_credit_note_amount(collection_inputs['branch_office_id'], collection_inputs['cashier_id'], collection_inputs['added_date'])
-
-        check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
-
-        if check_token_status == 0:
-            print('El token está vencido.')
-
-            AuthenticationClass(self.db).create_simplefactura_token()
-        else:
-            print('El token está vigente.')
-
-        if credit_note_amount > 0:
-            cash_gross_total = int(collection_inputs['cash_gross_amount']) - int(credit_note_amount)
-            cash_net_total = round(int(cash_gross_total)/1.19)
-        else:
-            cash_gross_total = int(collection_inputs['cash_gross_amount'])
-            cash_net_total = round(int(cash_gross_total)/1.19)
-
-        if collection_count == 0:
-            collection = CollectionModel(
-                branch_office_id=collection_inputs['branch_office_id'],
-                cashier_id=collection_inputs['cashier_id'],
-                cash_gross_amount=cash_gross_total,
-                cash_net_amount=cash_net_total,
-                card_gross_amount=collection_inputs['card_gross_amount'],
-                card_net_amount=collection_inputs['card_net_amount'],
-                total_tickets=collection_inputs['total_tickets'],
-                added_date=collection_inputs['added_date'],
-                updated_date=current_date
+            # Verificar si ya existe la colección
+            existing_collection = self.existence(
+                collection_inputs['branch_office_id'], 
+                collection_inputs['cashier_id'], 
+                collection_inputs['added_date']
             )
 
-            self.db.add(collection)
+            credit_note_amount = DteClass(self.db).verifiy_credit_note_amount(
+                collection_inputs['branch_office_id'], 
+                collection_inputs['cashier_id'], 
+                collection_inputs['added_date']
+            )
 
-            try:
+            check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
+
+            if check_token_status == 0:
+                print('El token está vencido.')
+                AuthenticationClass(self.db).create_simplefactura_token()
+            else:
+                print('El token está vigente.')
+
+            # Calcular montos con descuento de nota de crédito
+            if credit_note_amount > 0:
+                cash_gross_total = int(collection_inputs['cash_gross_amount']) - int(credit_note_amount)
+                cash_net_total = round(int(cash_gross_total)/1.19)
+            else:
+                cash_gross_total = int(collection_inputs['cash_gross_amount'])
+                cash_net_total = round(int(cash_gross_total)/1.19)
+
+            if existing_collection is None:
+                # Crear nueva colección
+                collection = CollectionModel(
+                    branch_office_id=collection_inputs['branch_office_id'],
+                    cashier_id=collection_inputs['cashier_id'],
+                    cash_gross_amount=cash_gross_total,
+                    cash_net_amount=cash_net_total,
+                    card_gross_amount=collection_inputs['card_gross_amount'],
+                    card_net_amount=collection_inputs['card_net_amount'],
+                    total_tickets=collection_inputs['total_tickets'],
+                    added_date=collection_inputs['added_date'],
+                    updated_date=current_date
+                )
+
+                self.db.add(collection)
                 self.db.commit()
                 return "Collection stored successfully"
-            except Exception as e:
-                error_message = str(e)
-                return f"Error: {error_message}"
-        else:
-            check_collection = self.db.query(CollectionModel).filter(
-                CollectionModel.cashier_id == collection_inputs['cashier_id'],
-                CollectionModel.branch_office_id == collection_inputs['branch_office_id'],
-                CollectionModel.added_date == collection_inputs['added_date']
-            ).first()
-            
-            if check_collection.cash_gross_amount != collection_inputs['cash_gross_amount'] or check_collection.card_gross_amount != collection_inputs['card_gross_amount']:
-                check_collection.cash_gross_amount = collection_inputs['cash_gross_amount']
-                check_collection.cash_net_amount = collection_inputs['cash_net_amount']
-                check_collection.card_gross_amount = collection_inputs['card_gross_amount']
-                check_collection.card_net_amount = collection_inputs['card_net_amount']
-                check_collection.total_tickets = collection_inputs['total_tickets']
-                check_collection.updated_date = current_date
-                self.db.add(check_collection)
-                self.db.commit()
-            
-            return "Collection updated successfully"
+            else:
+                # Actualizar colección existente si hay cambios
+                input_cash_gross = int(collection_inputs['cash_gross_amount'])
+                input_card_gross = int(collection_inputs['card_gross_amount'])
+                
+                if (existing_collection.cash_gross_amount != input_cash_gross or 
+                    existing_collection.card_gross_amount != input_card_gross):
+                    
+                    existing_collection.cash_gross_amount = cash_gross_total
+                    existing_collection.cash_net_amount = cash_net_total
+                    existing_collection.card_gross_amount = collection_inputs['card_gross_amount']
+                    existing_collection.card_net_amount = collection_inputs['card_net_amount']
+                    existing_collection.total_tickets = collection_inputs['total_tickets']
+                    existing_collection.updated_date = current_date
+                    
+                    self.db.commit()
+                    return "Collection updated successfully"
+                else:
+                    return "Collection already exists with same values"
+                    
+        except Exception as e:
+            self.db.rollback()
+            error_message = str(e)
+            print(f"Error in store method: {error_message}")
+            return f"Error: {error_message}"
         
     def manual_store(self, collection_inputs):
         tz = pytz.timezone('America/Santiago')

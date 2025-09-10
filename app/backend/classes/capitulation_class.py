@@ -449,12 +449,24 @@ class CapitulationClass:
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         capitulation = self.db.query(CapitulationModel).filter(CapitulationModel.id == form_data.id).first()
-        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == capitulation.branch_office_id).first()
-        expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == capitulation.expense_type_id).first()
+        if not capitulation:
+            return {"status": "error", "message": "Capitulation not found"}
+            
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
+        if not branch_office:
+            return {"status": "error", "message": "Branch office not found"}
+            
+        expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == form_data.expense_type_id).first()
+        if not expense_type:
+            return {"status": "error", "message": "Expense type not found"}
+            
         period = form_data.period.split('-')
         utf8_date = '01-' + period[1] + '-' + period[0]
 
-        capitulation.period =  period[1] + '-' + period[0]
+        # Actualizar la capitulación con los nuevos valores del formulario
+        capitulation.branch_office_id = form_data.branch_office_id
+        capitulation.expense_type_id = form_data.expense_type_id
+        capitulation.period = period[1] + '-' + period[0]
         capitulation.status_id = 5
 
         self.db.add(capitulation)

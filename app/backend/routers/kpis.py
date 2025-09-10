@@ -48,3 +48,9 @@ def sales(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
     url = "https://api.jisreportes.com/dashboard/kpi/ventas"
     response = make_request_with_fresh_token_if_needed(url, credentials, db)
     return {"message": response.text}
+
+@kpis.post("/get_daily_summary_indicadores_summary_get")
+def get_daily_summary_indicadores_summary_get(credentials: ExternalApiCredentials, db: Session = Depends(get_db)):
+    url = "https://api.jisreportes.com/docs#/Indicadores%20Econ%C3%B3micos/get_daily_summary_indicadores_summary_get"
+    response = make_request_with_fresh_token_if_needed(url, credentials, db)
+    return {"message": response.text}

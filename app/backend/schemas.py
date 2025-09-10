@@ -963,14 +963,18 @@ class UpdateSetting(BaseModel):
     
 class ImputeCapitulation(BaseModel):
     id: int
+    expense_type_id: int
     period: str
+    branch_office_id: int
 
     @classmethod
     def as_form(cls,
                 id: int = Form(),
-                period: str = Form()
+                expense_type_id: int = Form(),
+                period: str = Form(),
+                branch_office_id: int = Form()
                 ):
-        return cls(id=id, period=period)
+        return cls(id=id, expense_type_id=expense_type_id, period=period, branch_office_id=branch_office_id)
     
 class Capitulation(BaseModel):
     document_date: str
@@ -2030,3 +2034,74 @@ class UpdateBankAccountUser(BaseModel):
     bank_account_type_id: int = None
     bank_account_number: int = None
     bank_account_email: str = None
+
+# Product Schemas
+class Product(BaseModel):
+    name: str
+    description: Optional[str] = None
+    cost: int
+    price: int
+    stock: Optional[int] = 0
+    category_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    barcode: Optional[str] = None
+    status_id: Optional[int] = 1
+
+class UpdateProduct(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    cost: Optional[int] = None
+    price: Optional[int] = None
+    stock: Optional[int] = None
+    category_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    barcode: Optional[str] = None
+    status_id: Optional[int] = None
+
+class ProductList(BaseModel):
+    page: int = 0
+    items_per_page: int = 10
+    search: Optional[str] = None
+    category_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+
+# Movement Product Schema
+class MovementProduct(BaseModel):
+    product_id: int
+    cost: int
+    qty: int
+
+# Movement Schemas
+class Movement(BaseModel):
+    movement_type: str  # 'IN' o 'OUT'
+    reference_number: Optional[str] = None
+    description: Optional[str] = None
+    branch_office_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+    user_rut: str
+    status_id: Optional[int] = 1
+    movement_date: Optional[str] = None
+    products: List[MovementProduct]
+
+class UpdateMovement(BaseModel):
+    movement_type: Optional[str] = None
+    reference_number: Optional[str] = None
+    description: Optional[str] = None
+    branch_office_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+    user_rut: Optional[str] = None
+    status_id: Optional[int] = None
+    movement_date: Optional[str] = None
+
+class MovementList(BaseModel):
+    page: int = 0
+    items_per_page: int = 10
+    movement_type: Optional[str] = None
+    branch_office_id: Optional[int] = None
+    supplier_id: Optional[int] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
