@@ -12,27 +12,11 @@ kardex_values = APIRouter(
 @kardex_values.post("/")
 async def index(
     data: KardexRequest,
-    session: Session = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
-    kardex_class = KardexValueClass(session)
-    result = kardex_class.get_all(
-        page=data.page,
-        items_per_page=10,
-        code=None,
-        product_id=None
-    )
+    result = KardexValueClass(db).get_all(data.code, data.product_id, data.branch_office_id, data.page, items_per_page=10)
     
-    # Formatear respuesta para coincidir con el frontend
-    if isinstance(result, dict) and result.get("status") == "success":
-        response_data = {
-            "data": result.get("data", []),
-            "total_items": result.get("total_items", 0),
-            "items_per_page": 10,
-            "current_page": result.get("current_page", 1)
-        }
-        return {"message": response_data}
-    else:
-        return {"message": {"data": [], "total_items": 0, "items_per_page": 10, "current_page": 1}}
+    return {"message": result}
 
 @kardex_values.post("/search")
 async def search_kardex_data(

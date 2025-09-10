@@ -682,12 +682,16 @@ class UpdateKardexValue(BaseModel):
     updated_date: str = None
 
 class KardexRequest(BaseModel):
-    page: int
+    page: int = 1
+    code: Optional[str] = None
+    product_id: Optional[int] = None
+    branch_office_id: int = 1
+    items_per_page: int = 10
 
 class KardexSearchRequest(BaseModel):
-    page: int
-    code: str = None
-    product_id: int = None
+    page: int = 1
+    code: Optional[str] = None
+    product_id: Optional[int] = None
 
     @classmethod
     def as_form(cls, 

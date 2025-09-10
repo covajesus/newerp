@@ -1,122 +1,99 @@
-from app.backend.db.models import KardexValueModel, ProductModel
+from app.backend.db.database import SessionLocal
+from app.backend.db.models import ProductModel, MovementModel, MovementProductModel, KardexValueModel
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, or_
-from datetime import datetime
-import json
-from app.backend.db.models import MovementProductModel, MovementModel
 
 class KardexValueClass:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, page=0, items_per_page=10, code=None, product_id=None):
+    def get_all(self, code=None, product_id=None, branch_office_id=None, page=0, items_per_page=10):
         try:
+            # Construir la consulta base
             query = self.db.query(
-                ProductModel.barcode.label("code"),
-                ProductModel.description.label("description"),
-                ProductModel.category.label("category"),
-                func.date_format(MovementModel.created_at, "%Y-%m-%d").label("fecha"),
-                MovementModel.movement_type.label("tipo_movimiento"),
-                MovementProductModel.qty.label("cantidad"),
-                MovementProductModel.cost.label("precio_unitario"),
-                (MovementProductModel.qty * MovementProductModel.cost).label("total"),
-                KardexValueModel.kardex_value_id
-            ).select_from(MovementProductModel)\
-            .join(ProductModel, ProductModel.product_id == MovementProductModel.product_id)\
-            .join(MovementModel, MovementModel.movement_id == MovementProductModel.movement_id)\
-            .outerjoin(KardexValueModel, KardexValueModel.product_id == ProductModel.product_id)\
-            .filter(
-                ProductModel.description != '',
-                ProductModel.description.isnot(None),
-                MovementModel.status_id != 9,
-                ProductModel.visibility_id == 1
-            )
-
-            # Aplicar filtros
-            if code is not None and code != 'null' and code != '':
-                query = query.filter(ProductModel.barcode == code)
+                KardexValueModel.qty,
+                KardexValueModel.cost,
+                ProductModel.id,
+                ProductModel.code,
+                ProductModel.description
+            ).select_from(ProductModel)
             
-            if product_id is not None and product_id != 'null' and product_id != '':
-                query = query.filter(ProductModel.product_id == product_id)
-
-            # Ordenar por fecha descendente
-            query = query.order_by(MovementModel.created_at.desc())
-
+            # JOIN con KardexValueModel
+            query = query.outerjoin(
+                KardexValueModel, KardexValueModel.product_id == ProductModel.id
+            )
+            
+            # Solo agregar JOINs si los filtros correspondientes están presentes
+            if branch_office_id is not None or product_id is not None:
+                # JOIN con MovementProductModel
+                query = query.outerjoin(
+                    MovementProductModel, MovementProductModel.product_id == ProductModel.id
+                )
+                
+                # JOIN con MovementModel solo si necesitamos filtrar por branch_office
+                if branch_office_id is not None:
+                    query = query.outerjoin(
+                        MovementModel, MovementModel.id == MovementProductModel.movement_id
+                    )
+            
+            # Aplicar filtros dinámicos
+            filters = []
+            if branch_office_id is not None:
+                filters.append(MovementModel.branch_office_id == branch_office_id)
+            if product_id is not None:
+                filters.append(MovementProductModel.product_id == product_id)
+            if code is not None:
+                filters.append(ProductModel.code == code)
+            
+            if filters:
+                query = query.filter(*filters)
+            
+            # Agregar DISTINCT para evitar duplicados y ordenar
+            query = query.distinct().order_by(ProductModel.description.asc())
+            
+            # Si se solicita paginación
             if page > 0:
+                # Calcular el total de registros
                 total_items = query.count()
                 total_pages = (total_items + items_per_page - 1) // items_per_page
-
+                
                 if page < 1 or page > total_pages:
                     return {"status": "error", "message": "Invalid page number"}
-
+                
+                # Aplicar paginación en la consulta
                 data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
-
+                
                 if not data:
                     return {"status": "error", "message": "No data found"}
-
-                # Calcular saldo acumulado (esto es una simplificación, idealmente deberías calcularlo correctamente)
-                saldo_acumulado = 0
-                serialized_data = []
                 
-                for movement in data:
-                    # Ajustar saldo según tipo de movimiento
-                    if movement.tipo_movimiento and movement.tipo_movimiento.upper() == 'IN':
-                        saldo_acumulado += movement.cantidad or 0
-                        tipo_display = 'ENTRADA'
-                    else:
-                        saldo_acumulado -= movement.cantidad or 0
-                        tipo_display = 'SALIDA'
-                    
-                    item = {
-                        "id": movement.kardex_value_id or hash(f"{movement.code}{movement.fecha}"),
-                        "codigo": movement.code or "",
-                        "descripcion": movement.description or "",
-                        "categoria": movement.category or "General",
-                        "fecha": movement.fecha or "2024-01-01",
-                        "tipo_movimiento": tipo_display,
-                        "cantidad": movement.cantidad or 0,
-                        "precio_unitario": movement.precio_unitario or 0,
-                        "total": movement.total or 0,
-                        "saldo": max(0, saldo_acumulado)  # No permitir saldos negativos
-                    }
-                    serialized_data.append(item)
-
+                # Serializar los datos
+                serialized_data = [{
+                    "id": row.id,
+                    "code": row.code,
+                    "description": row.description,
+                    "quantity": row.qty,
+                    "cost": row.cost
+                } for row in data]
+                
                 return {
-                    "status": "success",
-                    "data": serialized_data,
                     "total_items": total_items,
                     "total_pages": total_pages,
-                    "current_page": page
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
                 }
-            else:
-                data = query.all()
-                
-                saldo_acumulado = 0
-                serialized_data = []
-                
-                for movement in data:
-                    if movement.tipo_movimiento and movement.tipo_movimiento.upper() == 'IN':
-                        saldo_acumulado += movement.cantidad or 0
-                        tipo_display = 'ENTRADA'
-                    else:
-                        saldo_acumulado -= movement.cantidad or 0
-                        tipo_display = 'SALIDA'
-                    
-                    item = {
-                        "id": movement.kardex_value_id or hash(f"{movement.code}{movement.fecha}"),
-                        "codigo": movement.code or "",
-                        "descripcion": movement.description or "",
-                        "categoria": movement.category or "General",
-                        "fecha": movement.fecha or "2024-01-01",
-                        "tipo_movimiento": tipo_display,
-                        "cantidad": movement.cantidad or 0,
-                        "precio_unitario": movement.precio_unitario or 0,
-                        "total": movement.total or 0,
-                        "saldo": max(0, saldo_acumulado)
-                    }
-                    serialized_data.append(item)
-
-                return {"status": "success", "data": serialized_data}
-
+            
+            # Sin paginación - obtener todos los datos
+            data = query.all()
+            serialized_data = [{
+                "id": row.id,
+                "code": row.code,
+                "description": row.description,
+                "quantity": row.qty,
+                "cost": row.cost
+            } for row in data]
+            
+            return serialized_data
+            
         except Exception as e:
-            return {"status": "error", "message": f"Error retrieving kardex movements: {str(e)}"}
+            error_message = str(e)
+            return {"status": "error", "message": error_message}
