@@ -705,6 +705,11 @@ class KardexSearchRequest(BaseModel):
                 born_date: str = Form()
                 ):
         return cls(family_type_id=family_type_id, employee_rut=employee_rut, gender_id=gender_id, rut=rut, names=names, father_lastname=father_lastname, mother_lastname=mother_lastname, born_date=born_date)
+
+class ProductRequest(BaseModel):
+    page: int = 1
+    code: Optional[int] = None
+    description: Optional[str] = None
    
 class OldFamilyCoreDatum(BaseModel):
     family_type_id: int
