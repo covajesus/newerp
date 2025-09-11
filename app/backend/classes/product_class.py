@@ -8,6 +8,7 @@ class ProductClass:
     def get_list(self):
         try:
             data = self.db.query(ProductModel). \
+                    filter(ProductModel.visibility_id == 1). \
                     order_by(ProductModel.description). \
                     all()
             
