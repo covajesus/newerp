@@ -61,3 +61,12 @@ def update(id: int, honorary: UpdateHonorary, session_user: UserLogin = Depends(
         data = HonoraryClass(db).send(honorary)
 
     return {"message": data}
+
+@honoraries.get("/get_data_by_rut/{rut}")
+def get_data_by_rut(rut: str, db: Session = Depends(get_db)):
+    """
+    Busca si el usuario con el RUT dado tiene boletas de honorarios 
+    y devuelve la más próxima (próxima fecha de inicio)
+    """
+    data = HonoraryClass(db).get_data_by_rut(rut)
+    return {"message": data}

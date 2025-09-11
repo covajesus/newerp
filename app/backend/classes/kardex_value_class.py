@@ -22,27 +22,14 @@ class KardexValueClass:
                 KardexValueModel, KardexValueModel.product_id == ProductModel.id
             )
             
-            # Solo agregar JOINs si los filtros correspondientes están presentes
-            if branch_office_id is not None or product_id is not None:
-                # JOIN con MovementProductModel
-                query = query.outerjoin(
-                    MovementProductModel, MovementProductModel.product_id == ProductModel.id
-                )
-                
-                # JOIN con MovementModel solo si necesitamos filtrar por branch_office
-                if branch_office_id is not None:
-                    query = query.outerjoin(
-                        MovementModel, MovementModel.id == MovementProductModel.movement_id
-                    )
-            
             # Aplicar filtros dinámicos
             filters = []
-            if branch_office_id is not None:
-                filters.append(MovementModel.branch_office_id == branch_office_id)
-            if product_id is not None:
-                filters.append(MovementProductModel.product_id == product_id)
-            if code is not None:
+            if product_id is not None and product_id > 0:
+                filters.append(ProductModel.id == product_id)
+            if code is not None and code != "":
                 filters.append(ProductModel.code == code)
+            
+            filters.append(ProductModel.visibility_id == 1)
             
             if filters:
                 query = query.filter(*filters)
@@ -73,7 +60,9 @@ class KardexValueClass:
                     "quantity": row.qty,
                     "cost": row.cost
                 } for row in data]
-                
+
+                print(serialized_data)
+
                 return {
                     "total_items": total_items,
                     "total_pages": total_pages,

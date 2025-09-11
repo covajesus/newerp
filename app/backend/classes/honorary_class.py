@@ -362,3 +362,98 @@ class HonoraryClass:
         except Exception as e:
             print(f"Error de conexión con Simple Factura: {str(e)}")
             return 0
+
+    def get_data_by_rut(self, rut):
+        """
+        Busca si el usuario con el RUT dado tiene boletas de honorarios 
+        y devuelve la más próxima (próxima fecha de inicio)
+        """
+        try:
+            # Buscar honorarios para el RUT dado que estén activos y con fecha futura
+            current_date = datetime.now().date()
+            
+            honorary = self.db.query(
+                HonoraryModel.id,
+                HonoraryModel.replacement_employee_rut,
+                HonoraryModel.replacement_employee_full_name,
+                HonoraryModel.start_date,
+                HonoraryModel.end_date,
+                HonoraryModel.amount,
+                HonoraryModel.status_id,
+                HonoraryReasonModel.honorary_reason,
+                BranchOfficeModel.branch_office
+            ).outerjoin(
+                HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id
+            ).filter(
+                HonoraryModel.replacement_employee_rut == rut,
+                HonoraryModel.start_date >= current_date,  # Solo fechas futuras o actuales
+                HonoraryModel.status_id.in_([1, 2, 3])  # Estados activos (ajustar según tu lógica)
+            ).order_by(
+                HonoraryModel.start_date.asc()  # La más próxima primero
+            ).first()
+
+            if honorary:
+                return {
+                    "status": "found",
+                    "data": {
+                        "id": honorary.id,
+                        "rut": honorary.replacement_employee_rut,
+                        "full_name": honorary.replacement_employee_full_name,
+                        "start_date": honorary.start_date.strftime("%Y-%m-%d") if honorary.start_date else None,
+                        "end_date": honorary.end_date.strftime("%Y-%m-%d") if honorary.end_date else None,
+                        "amount": honorary.amount,
+                        "status_id": honorary.status_id,
+                        "honorary_reason": honorary.honorary_reason,
+                        "branch_office": honorary.branch_office
+                    }
+                }
+            else:
+                # Si no encontró honorarios futuros, buscar el más reciente
+                last_honorary = self.db.query(
+                    HonoraryModel.id,
+                    HonoraryModel.replacement_employee_rut,
+                    HonoraryModel.replacement_employee_full_name,
+                    HonoraryModel.start_date,
+                    HonoraryModel.end_date,
+                    HonoraryModel.amount,
+                    HonoraryModel.status_id,
+                    HonoraryReasonModel.honorary_reason,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id
+                ).filter(
+                    HonoraryModel.replacement_employee_rut == rut
+                ).order_by(
+                    HonoraryModel.start_date.desc()  # El más reciente primero
+                ).first()
+
+                if last_honorary:
+                    return {
+                        "status": "found_past",
+                        "data": {
+                            "id": last_honorary.id,
+                            "rut": last_honorary.replacement_employee_rut,
+                            "full_name": last_honorary.replacement_employee_full_name,
+                            "start_date": last_honorary.start_date.strftime("%Y-%m-%d") if last_honorary.start_date else None,
+                            "end_date": last_honorary.end_date.strftime("%Y-%m-%d") if last_honorary.end_date else None,
+                            "amount": last_honorary.amount,
+                            "status_id": last_honorary.status_id,
+                            "honorary_reason": last_honorary.honorary_reason,
+                            "branch_office": last_honorary.branch_office
+                        }
+                    }
+                else:
+                    return {
+                        "status": "not_found",
+                        "message": "No se encontraron boletas de honorarios para este RUT"
+                    }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Error al buscar honorarios: {str(e)}"
+            }
