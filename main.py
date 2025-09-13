@@ -76,7 +76,6 @@ from app.backend.routers.summary_indicators import summary_indicators
 from app.backend.routers.seats import router as seats
 from app.backend.routers.scrappers import router as scrappers
 from app.backend.routers.bank_account_users import bank_account_users
-from app.backend.routers.products import products
 from app.backend.routers.movements import movements
 from app.backend.routers.movement_products import movement_products
 from app.backend.routers.kardex import kardex_values
@@ -180,11 +179,8 @@ app.include_router(summary_indicators)
 app.include_router(seats)
 app.include_router(scrappers)
 app.include_router(bank_account_users)
-app.include_router(products)
 app.include_router(movements)
 app.include_router(movement_products)
-app.include_router(kardex_values)
-app.include_router(test_router)
 
 if __name__ == "__main__":
     uvicorn.run(
