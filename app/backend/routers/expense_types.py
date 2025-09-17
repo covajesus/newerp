@@ -23,6 +23,14 @@ def index(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@expense_types.get("/list")
+def list(db: Session = Depends(get_db)):
+    """
+    Lista simple de expense types
+    """
+    data = ExpenseTypeClass(db).get_all()
+    return {"message": data}
+
 @expense_types.get("/capitulation_visibles")
 def capitulation_visibles(db: Session = Depends(get_db)):
     data = ExpenseTypeClass(db).get_all_capitulation_visibles()

@@ -1866,6 +1866,15 @@ class BankAccountUserModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class ProductCategoryModel(Base):
+    __tablename__ = 'product_categories'
+
+    id = Column(Integer, primary_key=True)
+    product_category = Column(String(255))
+    accounting_account = Column(Text)
+    added_date = Column(DateTime, default=datetime.utcnow)
+    updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class ProductModel(Base):
     __tablename__ = 'products'
 
@@ -1886,14 +1895,9 @@ class MovementModel(Base):
 
     id = Column(Integer, primary_key=True)
     type_id = Column(Integer)
-    reference_number = Column(String(255))
-    description = Column(Text)
-    total_amount = Column(Integer)
     branch_office_id = Column(Integer)
-    supplier_id = Column(Integer)
-    user_rut = Column(String(255))
     status_id = Column(Integer, default=1)
-    movement_date = Column(DateTime)
+    document_number = Column(Integer, default=1)
     added_date = Column(DateTime, default=datetime.utcnow)
     updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -1912,8 +1916,16 @@ class KardexValueModel(Base):
     __tablename__ = 'kardex_values'
 
     id = Column(Integer, primary_key=True)
-    product_id = Column(Integer, ForeignKey('products.product_id'))
+    product_id = Column(Integer, ForeignKey('products.id'))
     qty = Column(Integer)
     cost = Column(Integer)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    added_date = Column(DateTime, default=datetime.utcnow)
+    updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SinisterTypeModel(Base):
+    __tablename__ = 'sinister_types'
+
+    id = Column(Integer, primary_key=True)
+    sinister_type = Column(String(255))
+    added_date = Column(DateTime, default=datetime.utcnow)
+    updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

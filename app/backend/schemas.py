@@ -708,8 +708,53 @@ class KardexSearchRequest(BaseModel):
 
 class ProductRequest(BaseModel):
     page: int = 1
-    code: Optional[int] = None
+    code: Optional[str] = None
     description: Optional[str] = None
+    product_category_id: Optional[int] = None
+
+class CreateProduct(BaseModel):
+    product_category_id: int
+    visibility_id: int
+    code: str
+    description: str
+    min_stock: int
+    max_stock: int
+    measure: str
+    balance: int
+
+class UpdateProduct(BaseModel):
+    product_category_id: int = None
+    visibility_id: int = None
+    code: str = None
+    description: str = None
+    min_stock: int = None
+    max_stock: int = None
+    measure: str = None
+    balance: int = None
+
+    @classmethod
+    def as_form(cls,
+        id: int = Form(None),
+        product_category_id: int = Form(None),
+        visibility_id: int = Form(None),
+        code: str = Form(None),
+        description: str = Form(None),
+        min_stock: int = Form(None),
+        max_stock: int = Form(None),
+        measure: str = Form(None),
+        balance: int = Form(None)
+    ):
+        return cls(
+            id=id,
+            product_category_id=product_category_id,
+            visibility_id=visibility_id,
+            code=code,
+            description=description,
+            min_stock=min_stock,
+            max_stock=max_stock,
+            measure=measure,
+            balance=balance
+        )
    
 class OldFamilyCoreDatum(BaseModel):
     family_type_id: int
@@ -2099,19 +2144,6 @@ class Product(BaseModel):
     barcode: Optional[str] = None
     status_id: Optional[int] = 1
 
-class UpdateProduct(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    cost: Optional[int] = None
-    price: Optional[int] = None
-    stock: Optional[int] = None
-    category_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    brand: Optional[str] = None
-    model: Optional[str] = None
-    barcode: Optional[str] = None
-    status_id: Optional[int] = None
-
 class ProductList(BaseModel):
     page: int = 0
     items_per_page: int = 10
@@ -2122,19 +2154,14 @@ class ProductList(BaseModel):
 # Movement Product Schema
 class MovementProduct(BaseModel):
     product_id: int
+    quantity: int
     cost: int
-    qty: int
 
 # Movement Schemas
 class Movement(BaseModel):
-    movement_type: str  # 'IN' o 'OUT'
-    reference_number: Optional[str] = None
-    description: Optional[str] = None
-    branch_office_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    user_rut: str
-    status_id: Optional[int] = 1
-    movement_date: Optional[str] = None
+    branch_office_id: int
+    type_id: int
+    alert_id: Optional[int] = None
     products: List[MovementProduct]
 
 class UpdateMovement(BaseModel):
@@ -2150,8 +2177,5 @@ class UpdateMovement(BaseModel):
 class MovementList(BaseModel):
     page: int = 0
     items_per_page: int = 10
-    movement_type: Optional[str] = None
+    type_id: Optional[int] = None
     branch_office_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    date_from: Optional[str] = None
-    date_to: Optional[str] = None

@@ -86,3 +86,56 @@ class KardexValueClass:
         except Exception as e:
             error_message = str(e)
             return {"status": "error", "message": error_message}
+
+    def store_kardex_entry(self, product_id, qty_change, new_cost):
+        """
+        Crear/actualizar registro de kardex con costo promedio ponderado
+        qty_change: cantidad a sumar o restar (positivo para entradas, negativo para salidas)
+        new_cost: costo unitario del nuevo movimiento
+        """
+        try:
+            # Obtener el registro actual del kardex para este producto
+            current_kardex = self.db.query(KardexValueModel).filter(
+                KardexValueModel.product_id == product_id
+            ).first()
+            
+            if current_kardex:
+                # Existe registro previo - calcular costo promedio ponderado
+                current_qty = current_kardex.qty or 0
+                current_cost = current_kardex.cost or 0
+                
+                # Nueva cantidad total
+                new_qty_total = current_qty + qty_change
+                
+                if new_qty_total <= 0:
+                    # Si la cantidad queda en 0 o negativa, mantener costo actual
+                    new_avg_cost = current_cost
+                    new_qty_total = max(0, new_qty_total)  # No permitir cantidades negativas
+                else:
+                    # Calcular costo promedio ponderado
+                    # (costo_anterior * qty_anterior + costo_nuevo * qty_cambio) / qty_total_nueva
+                    if qty_change > 0:  # Solo para entradas (aumentos de stock)
+                        total_cost_value = (current_cost * current_qty) + (new_cost * qty_change)
+                        new_avg_cost = int(total_cost_value / new_qty_total)
+                    else:  # Para salidas, mantener el costo promedio actual
+                        new_avg_cost = current_cost
+                
+                # Actualizar registro existente
+                current_kardex.qty = new_qty_total
+                current_kardex.cost = new_avg_cost
+                
+            else:
+                # No existe registro previo - crear nuevo
+                new_kardex = KardexValueModel(
+                    product_id=product_id,
+                    qty=max(0, qty_change),  # No permitir cantidades negativas
+                    cost=new_cost if qty_change > 0 else 0
+                )
+                self.db.add(new_kardex)
+            
+            self.db.commit()
+            return {"status": "success", "message": "Kardex updated successfully"}
+            
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error updating kardex: {str(e)}"}

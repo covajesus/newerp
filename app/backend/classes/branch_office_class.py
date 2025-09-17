@@ -3,7 +3,8 @@ from app.backend.db.models import BranchOfficeModel, RegionModel, ZoneModel
 class BranchOfficeClass:
     def __init__(self, db):
         self.db = db
-
+    
+        
     def get_all(self, rol_id = None, rut = None, branch_office_id = None):
         try:
             if rol_id == 1 or rol_id == 2 or rol_id == 3:

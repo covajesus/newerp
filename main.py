@@ -48,6 +48,7 @@ from app.backend.routers.received_tributary_documents import received_tributary_
 from app.backend.routers.customer_tickets_bills import customer_tickets_bills
 from app.backend.routers.cashiers import cashiers
 from app.backend.routers.biller_data import biller_data
+from app.backend.routers.sinister_types import sinister_types
 from app.backend.routers.settings import settings
 from app.backend.routers.carbon_monoxides import carbon_monoxides
 from app.backend.routers.sinisters import sinisters
@@ -79,7 +80,8 @@ from app.backend.routers.bank_account_users import bank_account_users
 from app.backend.routers.movements import movements
 from app.backend.routers.movement_products import movement_products
 from app.backend.routers.kardex import kardex_values
-from app.backend.routers.test_router import test_router
+from app.backend.routers.products import products
+from app.backend.routers.product_categories import product_categories
 
 app = FastAPI(root_path="/api")
 application = app
@@ -181,6 +183,10 @@ app.include_router(scrappers)
 app.include_router(bank_account_users)
 app.include_router(movements)
 app.include_router(movement_products)
+app.include_router(kardex_values)
+app.include_router(products)
+app.include_router(product_categories)
+app.include_router(sinister_types)
 
 if __name__ == "__main__":
     uvicorn.run(
