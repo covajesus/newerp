@@ -1,5 +1,7 @@
-from app.backend.db.models import FolioModel
+from app.backend.db.models import FolioModel, CashierModel
 import json
+from fastapi.responses import Response
+from sqlalchemy import text
 
 class CafClass:
     def __init__(self, db):
@@ -63,3 +65,97 @@ class CafClass:
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
+
+    def manual(self, branch_office_id, cashier_id, quantity):
+        """
+        Crear CAF manual: seleccionar folios disponibles, actualizarlos y generar archivo SQL
+        """
+        try:
+            # Paso 0: Obtener el folio_segment_id del cashier
+            cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
+            if not cashier:
+                return {"status": "error", "message": f"Cashier with ID {cashier_id} not found"}
+            
+            folio_segment_id = cashier.folio_segment_id
+            if not folio_segment_id:
+                return {"status": "error", "message": f"Cashier {cashier_id} does not have a folio_segment_id assigned"}
+            
+            # Paso 1: Seleccionar folios disponibles
+            select_query = text("""
+                SELECT 0 as used_id, folio 
+                FROM folios 
+                WHERE folio_segment_id = :folio_segment_id 
+                AND cashier_id = 0 
+                AND requested_status_id = 0 
+                ORDER BY id DESC 
+                LIMIT :quantity
+            """)
+            
+            result = self.db.execute(select_query, {
+                "folio_segment_id": folio_segment_id,
+                "quantity": quantity
+            })
+            folios_data = result.fetchall()
+            
+            if not folios_data:
+                return {"status": "error", "message": f"No hay folios disponibles para el segment {folio_segment_id}"}
+            
+            if len(folios_data) < quantity:
+                return {"status": "error", "message": f"Solo hay {len(folios_data)} folios disponibles para el segment {folio_segment_id}, se solicitaron {quantity}"}
+            
+            # Obtener el rango de folios (desde el menor hasta el mayor)
+            folios_numbers = [row.folio for row in folios_data]
+            folio_min = min(folios_numbers)
+            folio_max = max(folios_numbers)
+            
+            # Paso 2: Actualizar los folios seleccionados
+            update_query = text("""
+                UPDATE folios 
+                SET cashier_id = :cashier_id, 
+                    branch_office_id = :branch_office_id, 
+                    requested_status_id = 1 
+                WHERE folio <= :folio_max 
+                AND folio >= :folio_min
+                AND folio_segment_id = :folio_segment_id 
+                AND cashier_id = 0 
+                AND requested_status_id = 0
+            """)
+            
+            self.db.execute(update_query, {
+                "cashier_id": cashier_id,
+                "branch_office_id": branch_office_id,
+                "folio_max": folio_max,
+                "folio_min": folio_min,
+                "folio_segment_id": folio_segment_id
+            })
+            
+            self.db.commit()
+            
+            # Paso 3: Generar contenido del archivo SQL
+            sql_content = "-- CAF Manual Generated SQL\n"
+            sql_content += f"-- Range: {folio_min} to {folio_max}\n"
+            sql_content += f"-- Quantity: {quantity}\n"
+            sql_content += f"-- Branch Office ID: {branch_office_id}\n"
+            sql_content += f"-- Cashier ID: {cashier_id}\n"
+            sql_content += f"-- Folio Segment ID: {folio_segment_id}\n\n"
+            
+            for folio_number in sorted(folios_numbers):
+                sql_content += f"INSERT INTO folios (used_id, folio) VALUES (0, {folio_number});\n"
+            
+            return {
+                "status": "success",
+                "message": f"CAF manual creado exitosamente. Folios del {folio_min} al {folio_max} para segment {folio_segment_id}",
+                "data": {
+                    "folios_assigned": len(folios_data),
+                    "folio_min": folio_min,
+                    "folio_max": folio_max,
+                    "branch_office_id": branch_office_id,
+                    "cashier_id": cashier_id,
+                    "folio_segment_id": folio_segment_id,
+                    "sql_content": sql_content
+                }
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error creating manual CAF: {str(e)}"}
