@@ -429,7 +429,7 @@ class MovementClass:
     def massive_upload(self, file, user_rut):
         """
         Carga masiva de movimientos desde archivo Excel
-        Columnas esperadas: sucursal, código, tipo de movimiento, cantidad, periodo
+        Columnas esperadas: sucursal, codigo, tipo de movimiento, cantidad, periodo
         """
         try:
             # Verificar que el archivo sea Excel
@@ -457,7 +457,7 @@ class MovementClass:
                 try:
                     # Obtener datos de la fila
                     branch_office_name = str(row['sucursal']).strip()
-                    product_code = str(row['código']).strip()
+                    product_code = str(row['codigo']).strip()
                     movement_type = int(row['tipo de movimiento'])
                     quantity = int(row['cantidad'])
                     period = str(row['periodo']).strip()
@@ -471,7 +471,7 @@ class MovementClass:
                         error_rows.append(f"Row {index + 2}: Branch office '{branch_office_name}' not found")
                         continue
                     
-                    # Buscar producto por código
+                    # Buscar producto por codigo
                     product = self.db.query(ProductModel).filter(
                         ProductModel.code == product_code
                     ).first()
