@@ -473,7 +473,7 @@ class MovementClass:
                     
                     # Buscar producto por codigo
                     product = self.db.query(ProductModel).filter(
-                        ProductModel.code == product_code
+                        ProductModel.id == product_code
                     ).first()
                     
                     if not product:
