@@ -37,7 +37,7 @@ def store(movement_inputs: Movement, session_user: UserLogin = Depends(get_curre
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating movement: {str(e)}")
 
-@movements.post("/massive")
+@movements.post("/massive_upload")
 def massive_upload(file: UploadFile = File(...), session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """
     Carga masiva de movimientos desde archivo Excel
