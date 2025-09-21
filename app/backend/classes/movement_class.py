@@ -494,8 +494,8 @@ class MovementClass:
                     new_movement = MovementModel(
                         type_id=movement_type,
                         branch_office_id=branch_office.id,
-                        description=f"Carga masiva - Periodo: {period}",
-                        status_id=1,
+                        status_id=17,
+                        document_number=0,
                         added_date=datetime.utcnow(),
                         updated_date=datetime.utcnow()
                     )
