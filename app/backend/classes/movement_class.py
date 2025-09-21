@@ -441,7 +441,7 @@ class MovementClass:
             df = pd.read_excel(io.BytesIO(contents))
             
             # Validar columnas requeridas
-            required_columns = ['sucursal', 'código', 'tipo de movimiento', 'cantidad', 'periodo']
+            required_columns = ['sucursal', 'codigo', 'tipo de movimiento', 'cantidad', 'periodo']
             missing_columns = [col for col in required_columns if col not in df.columns]
             
             if missing_columns:
