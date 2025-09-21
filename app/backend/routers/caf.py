@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from app.backend.classes.folio_class import FolioClass
 from app.backend.classes.caf_class import CafClass
-from app.backend.db.database import get_db
+from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.schemas import CafList, UserLogin
 from app.backend.auth.auth_user import get_current_active_user
@@ -26,12 +26,12 @@ def get_all(caf: CafList, db: Session = Depends(get_db)):
     return {"message": data}
 
 @cafs.post("/manual")
-def manual_caf(request: ManualCafRequest, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def manual_caf(request: ManualCafRequest, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
     """
     Crear CAF manual con los parámetros especificados y devolver archivo SQL para descarga
     """
     try:
-        result = CafClass(db).manual(request.branch_office_id, request.cashier_id, request.quantity)
+        result = CafClass(db, db2).manual(request.branch_office_id, request.cashier_id, request.quantity)
         
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result.get("message"))

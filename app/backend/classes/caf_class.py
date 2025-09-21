@@ -4,8 +4,9 @@ from fastapi.responses import Response
 from sqlalchemy import text
 
 class CafClass:
-    def __init__(self, db):
+    def __init__(self, db, db2=None):
         self.db = db
+        self.db2 = db2
 
     # Funcion para obtener a todos los folios con paginacion
     def get_all(self, page=0, items_per_page=10):
@@ -72,7 +73,7 @@ class CafClass:
         """
         try:
             # Paso 0: Obtener el folio_segment_id del cashier
-            cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
+            cashier = self.db2.query(CashierModel).filter(CashierModel.id == cashier_id).first()
             if not cashier:
                 return {"status": "error", "message": f"Cashier with ID {cashier_id} not found"}
             
@@ -91,7 +92,7 @@ class CafClass:
                 LIMIT :quantity
             """)
             
-            result = self.db.execute(select_query, {
+            result = self.db2.execute(select_query, {
                 "folio_segment_id": folio_segment_id,
                 "quantity": quantity
             })
@@ -121,7 +122,7 @@ class CafClass:
                 AND requested_status_id = 0
             """)
             
-            self.db.execute(update_query, {
+            self.db2.execute(update_query, {
                 "cashier_id": cashier_id,
                 "branch_office_id": branch_office_id,
                 "folio_max": folio_max,
@@ -129,7 +130,7 @@ class CafClass:
                 "folio_segment_id": folio_segment_id
             })
             
-            self.db.commit()
+            self.db2.commit()
             
             # Paso 3: Generar contenido del archivo SQL
             sql_content = "-- CAF Manual Generated SQL\n"
@@ -157,5 +158,5 @@ class CafClass:
             }
             
         except Exception as e:
-            self.db.rollback()
+            self.db2.rollback()
             return {"status": "error", "message": f"Error creating manual CAF: {str(e)}"}
