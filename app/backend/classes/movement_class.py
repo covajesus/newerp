@@ -456,7 +456,7 @@ class MovementClass:
             for index, row in df.iterrows():
                 try:
                     # Obtener datos de la fila
-                    branch_office_name = str(row['sucursal']).strip()
+                    branch_office = row['sucursal']
                     product_code = str(row['codigo']).strip()
                     movement_type = int(row['tipo de movimiento'])
                     quantity = int(row['cantidad'])
@@ -464,11 +464,11 @@ class MovementClass:
                     
                     # Buscar sucursal por nombre
                     branch_office = self.db.query(BranchOfficeModel).filter(
-                        BranchOfficeModel.branch_office.ilike(f"%{branch_office_name}%")
+                        BranchOfficeModel.branch_office == branch_office
                     ).first()
                     
                     if not branch_office:
-                        error_rows.append(f"Row {index + 2}: Branch office '{branch_office_name}' not found")
+                        error_rows.append(f"Row {index + 2}: Branch office '{branch_office}' not found")
                         continue
                     
                     # Buscar producto por codigo
