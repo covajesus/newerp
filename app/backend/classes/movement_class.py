@@ -170,7 +170,7 @@ class MovementClass:
             new_movement = MovementModel(
                 type_id=form_data.type_id,
                 branch_office_id=form_data.branch_office_id,
-                status_id=1,
+                status_id=17,
                 added_date=datetime.utcnow(),
                 updated_date=datetime.utcnow()
             )
@@ -456,45 +456,45 @@ class MovementClass:
             for index, row in df.iterrows():
                 try:
                     # Obtener datos de la fila
-                    sucursal = str(row['sucursal']).strip()
-                    codigo = str(row['código']).strip()
-                    tipo_movimiento = int(row['tipo de movimiento'])
-                    cantidad = int(row['cantidad'])
-                    periodo = str(row['periodo']).strip()
+                    branch_office_name = str(row['sucursal']).strip()
+                    product_code = str(row['código']).strip()
+                    movement_type = int(row['tipo de movimiento'])
+                    quantity = int(row['cantidad'])
+                    period = str(row['periodo']).strip()
                     
                     # Buscar sucursal por nombre
                     branch_office = self.db.query(BranchOfficeModel).filter(
-                        BranchOfficeModel.branch_office.ilike(f"%{sucursal}%")
+                        BranchOfficeModel.branch_office.ilike(f"%{branch_office_name}%")
                     ).first()
                     
                     if not branch_office:
-                        error_rows.append(f"Row {index + 2}: Branch office '{sucursal}' not found")
+                        error_rows.append(f"Row {index + 2}: Branch office '{branch_office_name}' not found")
                         continue
                     
                     # Buscar producto por código
                     product = self.db.query(ProductModel).filter(
-                        ProductModel.code == codigo
+                        ProductModel.code == product_code
                     ).first()
                     
                     if not product:
-                        error_rows.append(f"Row {index + 2}: Product with code '{codigo}' not found")
+                        error_rows.append(f"Row {index + 2}: Product with code '{product_code}' not found")
                         continue
                     
                     # Validar tipo de movimiento (1=Entrada, 2=Salida, 3=Ajuste+, 4=Ajuste-)
-                    if tipo_movimiento not in [1, 2, 3, 4]:
-                        error_rows.append(f"Row {index + 2}: Invalid movement type '{tipo_movimiento}'. Must be 1, 2, 3, or 4")
+                    if movement_type not in [1, 2, 3, 4]:
+                        error_rows.append(f"Row {index + 2}: Invalid movement type '{movement_type}'. Must be 1, 2, 3, or 4")
                         continue
                     
                     # Validar cantidad
-                    if cantidad <= 0:
+                    if quantity <= 0:
                         error_rows.append(f"Row {index + 2}: Quantity must be greater than 0")
                         continue
                     
                     # Crear movimiento individual para cada producto
                     new_movement = MovementModel(
-                        type_id=tipo_movimiento,
+                        type_id=movement_type,
                         branch_office_id=branch_office.id,
-                        description=f"Carga masiva - Periodo: {periodo}",
+                        description=f"Carga masiva - Periodo: {period}",
                         status_id=1,
                         added_date=datetime.utcnow(),
                         updated_date=datetime.utcnow()
@@ -504,12 +504,12 @@ class MovementClass:
                     self.db.flush()  # Para obtener el ID sin hacer commit
                     
                     # Determinar cantidad para BD y kardex
-                    if tipo_movimiento in [2, 4]:  # Salidas
-                        qty_to_save = -abs(cantidad)
-                        qty_for_kardex = -cantidad
+                    if movement_type in [2, 4]:  # Salidas
+                        qty_to_save = -abs(quantity)
+                        qty_for_kardex = -quantity
                     else:  # Entradas
-                        qty_to_save = abs(cantidad)
-                        qty_for_kardex = cantidad
+                        qty_to_save = abs(quantity)
+                        qty_for_kardex = quantity
                     
                     # Crear registro de producto del movimiento
                     movement_product = MovementProductModel(
@@ -525,10 +525,10 @@ class MovementClass:
                     
                     # Actualizar stock
                     product_class = ProductClass(self.db)
-                    if tipo_movimiento in [1, 3]:  # Entradas
-                        stock_result = product_class.update_stock(product.id, cantidad, "add")
+                    if movement_type in [1, 3]:  # Entradas
+                        stock_result = product_class.update_stock(product.id, quantity, "add")
                     else:  # Salidas
-                        stock_result = product_class.update_stock(product.id, cantidad, "subtract")
+                        stock_result = product_class.update_stock(product.id, quantity, "subtract")
                         if stock_result and isinstance(stock_result, dict) and stock_result.get("status") == "error":
                             error_rows.append(f"Row {index + 2}: {stock_result.get('message')}")
                             continue
@@ -544,6 +544,105 @@ class MovementClass:
                     if kardex_result and isinstance(kardex_result, dict) and kardex_result.get("status") == "error":
                         error_rows.append(f"Row {index + 2}: Kardex error - {kardex_result.get('message')}")
                         continue
+                    
+                    # Imputar automáticamente solo si es un movimiento de salida (tipo 2)
+                    if movement_type == 2:
+                        try:
+                            # Obtener la categoría del producto para la cuenta contable
+                            category = self.db.query(ProductCategoryModel).filter(
+                                ProductCategoryModel.id == product.product_category_id
+                            ).first()
+                            
+                            if category and category.accounting_account:
+                                # Configuración de LibreDTE
+                                TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+                                url_base = "https://libredte.cl"
+                                emisor = "76063822"
+                                
+                                # Obtener el costo del kardex para el cálculo
+                                kardex_value = self.db.query(KardexValueModel).filter(
+                                    KardexValueModel.product_id == product.id
+                                ).first()
+                                
+                                # Usar el costo del kardex o un valor por defecto
+                                cost_to_use = kardex_value.cost if kardex_value and kardex_value.cost else 100  # Valor por defecto para carga masiva
+                                
+                                # Procesar fecha usando el período del Excel
+                                try:
+                                    year_str, month_str = period.split('-')
+                                    year = int(year_str)
+                                    month = int(month_str)
+                                    
+                                    # Obtener día actual para lógica del día 25
+                                    current_day = datetime.now().day
+                                    
+                                    # Si estamos después del día 25, usar el mes siguiente
+                                    if current_day > 25:
+                                        month += 1
+                                        if month > 12:
+                                            month = 1
+                                            year += 1
+                                    
+                                    # Formatear fecha para LibreDTE (YYYY-MM-DD)
+                                    fecha_libredte = f"{year}-{month:02d}-01"
+                                    
+                                    # Formatear fecha para mensaje (DD-MM-YYYY)
+                                    fecha_mensaje = f"01-{month:02d}-{year}"
+                                    
+                                    # Crear mensaje/glosa
+                                    accounting_account = str(category.accounting_account).strip()
+                                    message = f"{branch_office.branch_office}_{accounting_account}_{fecha_mensaje}_SalidaInventario_Masiva_{new_movement.id}_{movement_product.id}"
+                                    
+                                    # Calcular montos
+                                    total_amount = round(cost_to_use * quantity)
+                                    
+                                    # Crear datos para LibreDTE
+                                    datos = {
+                                        "fecha": fecha_libredte,
+                                        "glosa": message,
+                                        "detalle": {
+                                            "debe": {
+                                                accounting_account: total_amount  # Cuenta de gasto/costo
+                                            },
+                                            "haber": {
+                                                "111000102": total_amount  # Cuenta de inventario
+                                            }
+                                        },
+                                        "operacion": "I",
+                                        "documentos": {
+                                            "emitidos": [
+                                                {
+                                                    "dte": "",
+                                                    "folio": str(new_movement.id)
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    
+                                    # Enviar a LibreDTE
+                                    url_create = f"{url_base}/api/lce/lce_asientos/crear/{emisor}"
+                                    
+                                    response = requests.post(
+                                        url_create,
+                                        json=datos,
+                                        headers={
+                                            "Authorization": f"Bearer {TOKEN}",
+                                            "Content-Type": "application/json"
+                                        }
+                                    )
+                                    
+                                    # Si la imputación es exitosa, actualizar status del movimiento
+                                    if response.status_code == 200:
+                                        new_movement.status_id = 15  # Imputado
+                                    else:
+                                        print(f"Warning: Failed to create accounting entry for movement {new_movement.id}: {response.text}")
+                                        
+                                except Exception as date_error:
+                                    print(f"Error processing period {period} for movement {new_movement.id}: {str(date_error)}")
+                                    
+                        except Exception as impute_error:
+                            print(f"Error creating accounting entry for movement {new_movement.id}: {str(impute_error)}")
+                            # No agregar a error_rows para no fallar el procesamiento del movimiento
                     
                     processed_rows += 1
                     
@@ -571,3 +670,164 @@ class MovementClass:
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": f"Error processing Excel file: {str(e)}"}
+
+    def impute(self, movement_id, period):
+        """
+        Imputa un movimiento creando asientos contables en LibreDTE
+        Actualiza el status_id del movimiento y crea asientos contables para cada producto
+        """
+        try:
+            # Buscar el movimiento
+            movement = self.db.query(MovementModel).filter(MovementModel.id == movement_id).first()
+            if not movement:
+                return {"status": "error", "message": "Movement not found"}
+            
+            # Actualizar el status_id del movimiento (manteniendo el patrón del sistema)
+            movement.status_id = 15  # Asumiendo que 15 es "imputado" como en honorary_class
+            movement.updated_date = datetime.now()
+            
+            # Obtener los productos del movimiento
+            movement_products = self.db.query(MovementProductModel).filter(
+                MovementProductModel.movement_id == movement_id
+            ).all()
+            
+            if not movement_products:
+                return {"status": "error", "message": "No products found for this movement"}
+            
+            # Configuración de LibreDTE
+            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            url_base = "https://libredte.cl"
+            emisor = "76063822"
+            
+            # Procesar cada producto del movimiento
+            for movement_product in movement_products:
+                try:
+                    # Calcular el PMP (Precio Medio Ponderado) para el producto
+                    pmp_result = self.db.query(
+                        KardexValueModel.cost.label('pmp')
+                    ).join(
+                        ProductModel, ProductModel.id == KardexValueModel.product_id
+                    ).filter(
+                        ProductModel.id == movement_product.product_id
+                    ).first()
+                    
+                    pmp = round(pmp_result.pmp) if pmp_result.pmp else 0
+                    
+                    # Obtener detalles del producto y categoría
+                    product = self.db.query(ProductModel).filter(
+                        ProductModel.id == movement_product.product_id
+                    ).first()
+                    
+                    if not product:
+                        continue
+                    
+                    category = self.db.query(ProductCategoryModel).filter(
+                        ProductCategoryModel.id == product.product_category_id
+                    ).first()
+                    
+                    if not category or not category.accounting_account:
+                        continue
+                    
+                    # Obtener sucursal
+                    branch_office = self.db.query(BranchOfficeModel).filter(
+                        BranchOfficeModel.id == movement.branch_office_id
+                    ).first()
+                    
+                    branch_office_name = branch_office.branch_office if branch_office else "Unknown"
+                    accounting_account = category.accounting_account.strip()
+                    
+                    # Procesar fecha usando el período proporcionado
+                    try:
+                        # Usar el período proporcionado (formato YYYY-MM)
+                        year_str, month_str = period.split('-')
+                        year = int(year_str)
+                        month = int(month_str)
+                        
+                        # Obtener día actual para lógica del día 25
+                        current_day = datetime.now().day
+                        
+                        # Si estamos después del día 25, usar el mes siguiente
+                        if current_day > 25:
+                            month += 1
+                            if month > 12:
+                                month = 1
+                                year += 1
+                        
+                        # Formatear mes con cero inicial si es necesario
+                        month_str = f"{month:02d}"
+                        
+                        # Formatear fecha para LibreDTE (YYYY-MM-DD)
+                        fecha_libredte = f"{year}-{month_str}-01"
+                        
+                        # Formatear fecha para mensaje (DD-MM-YYYY)
+                        fecha_mensaje = f"01-{month_str}-{year}"
+                        
+                    except Exception as date_error:
+                        return {"status": "error", "message": f"Error processing period {period}: {str(date_error)}"}
+                    
+                    # Crear mensaje/glosa
+                    message = f"{branch_office_name}_{accounting_account}_{fecha_mensaje}_SalidaInventario_{movement.id}_{movement_product.id}"
+                    
+                    # Calcular montos
+                    qty = abs(movement_product.qty)
+                    total_amount = round(pmp * qty)
+                    
+                    # Crear datos para LibreDTE
+                    datos = {
+                        "fecha": fecha_libredte,
+                        "glosa": message,
+                        "detalle": {
+                            "debe": {
+                                str(accounting_account): total_amount  # Cuenta de gasto/costo como string
+                            },
+                            "haber": {
+                                "111000102": total_amount  # Cuenta de inventario
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": "",
+                                    "folio": str(movement.document_number) if movement.document_number else ""
+                                }
+                            ]
+                        }
+                    }
+                    
+                    # Enviar a LibreDTE
+                    url_create = f"{url_base}/api/lce/lce_asientos/crear/{emisor}"
+                    
+                    response = requests.post(
+                        url_create,
+                        json=datos,
+                        headers={
+                            "Authorization": f"Bearer {TOKEN}",
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    
+                    print(f"LibreDTE Response for product {movement_product.id}: {response.text}")
+                    
+                    # Verificar respuesta siguiendo el patrón de otras clases
+                    if response.status_code != 200:
+                        print(f"Warning: Failed to create accounting entry for product {movement_product.id}: {response.text}")
+                        # Continuar con el siguiente producto
+                        continue
+                        
+                except Exception as product_error:
+                    print(f"Error processing product {movement_product.id}: {str(product_error)}")
+                    # Continuar con el siguiente producto
+                    continue
+            
+            # Guardar cambios en el movimiento
+            self.db.commit()
+            
+            return {
+                "status": "success", 
+                "message": "Movement imputed successfully. Accounting entries created."
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error imputing movement: {str(e)}"}

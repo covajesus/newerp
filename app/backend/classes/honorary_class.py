@@ -374,18 +374,29 @@ class HonoraryClass:
             
             honorary = self.db.query(
                 HonoraryModel.id,
+                HonoraryModel.honorary_reason_id,
+                HonoraryModel.branch_office_id,
+                HonoraryModel.foreigner_id,
+                HonoraryModel.bank_id,
+                HonoraryModel.schedule_id,
+                HonoraryModel.region_id,
+                HonoraryModel.commune_id,
+                HonoraryModel.account_type_id,
+                HonoraryModel.requested_by,
+                HonoraryModel.status_id,
+                HonoraryModel.employee_to_replace,
                 HonoraryModel.replacement_employee_rut,
-                HonoraryModel.replacement_employee_full_name,
+                HonoraryModel.address,
+                HonoraryModel.account_number,
                 HonoraryModel.start_date,
                 HonoraryModel.end_date,
+                HonoraryModel.email,
                 HonoraryModel.amount,
-                HonoraryModel.status_id,
+                HonoraryModel.observation,
+                HonoraryModel.replacement_employee_full_name,
                 HonoraryReasonModel.honorary_reason,
-                BranchOfficeModel.branch_office
             ).outerjoin(
                 HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id
             ).filter(
                 HonoraryModel.replacement_employee_rut == rut,
                 HonoraryModel.start_date >= current_date,  # Solo fechas futuras o actuales
@@ -399,32 +410,55 @@ class HonoraryClass:
                     "status": "found",
                     "data": {
                         "id": honorary.id,
-                        "rut": honorary.replacement_employee_rut,
-                        "full_name": honorary.replacement_employee_full_name,
+                        "honorary_reason_id": honorary.honorary_reason_id,
+                        "branch_office_id": honorary.branch_office_id,
+                        "foreigner_id": honorary.foreigner_id,
+                        "bank_id": honorary.bank_id,
+                        "schedule_id": honorary.schedule_id,
+                        "region_id": honorary.region_id,
+                        "commune_id": honorary.commune_id,
+                        "account_type_id": honorary.account_type_id,
+                        "requested_by": honorary.requested_by,
+                        "replacement_employee_rut": honorary.replacement_employee_rut,
+                        "replacement_employee_full_name": honorary.replacement_employee_full_name,
+                        "address": honorary.address,
+                        "account_number": honorary.account_number,
                         "start_date": honorary.start_date.strftime("%Y-%m-%d") if honorary.start_date else None,
                         "end_date": honorary.end_date.strftime("%Y-%m-%d") if honorary.end_date else None,
+                        "email": honorary.email,
                         "amount": honorary.amount,
                         "status_id": honorary.status_id,
-                        "honorary_reason": honorary.honorary_reason,
-                        "branch_office": honorary.branch_office
+                        "observation": honorary.observation,
+                        "honorary_reason": honorary.honorary_reason
                     }
                 }
             else:
                 # Si no encontró honorarios futuros, buscar el más reciente
                 last_honorary = self.db.query(
                     HonoraryModel.id,
+                    HonoraryModel.honorary_reason_id,
+                    HonoraryModel.branch_office_id,
+                    HonoraryModel.foreigner_id,
+                    HonoraryModel.bank_id,
+                    HonoraryModel.schedule_id,
+                    HonoraryModel.region_id,
+                    HonoraryModel.commune_id,
+                    HonoraryModel.account_type_id,
+                    HonoraryModel.requested_by,
+                    HonoraryModel.status_id,
+                    HonoraryModel.employee_to_replace,
                     HonoraryModel.replacement_employee_rut,
-                    HonoraryModel.replacement_employee_full_name,
+                    HonoraryModel.address,
+                    HonoraryModel.account_number,
                     HonoraryModel.start_date,
                     HonoraryModel.end_date,
+                    HonoraryModel.email,
                     HonoraryModel.amount,
-                    HonoraryModel.status_id,
+                    HonoraryModel.observation,
+                    HonoraryModel.replacement_employee_full_name,
                     HonoraryReasonModel.honorary_reason,
-                    BranchOfficeModel.branch_office
                 ).outerjoin(
                     HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id
-                ).outerjoin(
-                    BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id
                 ).filter(
                     HonoraryModel.replacement_employee_rut == rut
                 ).order_by(
@@ -436,14 +470,26 @@ class HonoraryClass:
                         "status": "found_past",
                         "data": {
                             "id": last_honorary.id,
-                            "rut": last_honorary.replacement_employee_rut,
-                            "full_name": last_honorary.replacement_employee_full_name,
+                            "honorary_reason_id": last_honorary.honorary_reason_id,
+                            "branch_office_id": last_honorary.branch_office_id,
+                            "foreigner_id": last_honorary.foreigner_id,
+                            "bank_id": last_honorary.bank_id,
+                            "schedule_id": last_honorary.schedule_id,
+                            "region_id": last_honorary.region_id,
+                            "commune_id": last_honorary.commune_id,
+                            "account_type_id": last_honorary.account_type_id,
+                            "requested_by": last_honorary.requested_by,
+                            "replacement_employee_rut": last_honorary.replacement_employee_rut,
+                            "replacement_employee_full_name": last_honorary.replacement_employee_full_name,
+                            "address": last_honorary.address,
+                            "account_number": last_honorary.account_number,
                             "start_date": last_honorary.start_date.strftime("%Y-%m-%d") if last_honorary.start_date else None,
                             "end_date": last_honorary.end_date.strftime("%Y-%m-%d") if last_honorary.end_date else None,
+                            "email": last_honorary.email,
                             "amount": last_honorary.amount,
                             "status_id": last_honorary.status_id,
-                            "honorary_reason": last_honorary.honorary_reason,
-                            "branch_office": last_honorary.branch_office
+                            "observation": last_honorary.observation,
+                            "honorary_reason": last_honorary.honorary_reason
                         }
                     }
                 else:

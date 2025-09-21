@@ -129,3 +129,14 @@ def get_movement_types(session_user: UserLogin = Depends(get_current_active_user
             ]
         }
     }
+
+@movements.post("/impute/{movement_id}/{period}")
+def impute_movement(movement_id: int, period: str, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """
+    Imputar un movimiento creando asientos contables en LibreDTE
+    """
+    try:
+        data = MovementClass(db).impute(movement_id, period)
+        return {"message": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error imputing movement: {str(e)}")
