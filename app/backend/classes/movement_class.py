@@ -464,7 +464,7 @@ class MovementClass:
                     
                     # Buscar sucursal por nombre
                     branch_office = self.db.query(BranchOfficeModel).filter(
-                        BranchOfficeModel.branch_office == branch_office
+                        BranchOfficeModel.id == branch_office
                     ).first()
                     
                     if not branch_office:
