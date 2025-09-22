@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import CustomerModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel, CapitulationModel, ExpenseTypeModel
+from app.backend.db.models import CustomerModel, MovementModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel, CapitulationModel, ExpenseTypeModel
 import os
 from dotenv import load_dotenv
 from datetime import datetime
@@ -121,6 +121,71 @@ class WhatsappClass:
         print(payload)
         response = requests.post(url, json=payload, headers=headers)
 
+        print(response.text)
+
+    def movements(self, movement_id):
+        movement = self.db.query(MovementModel).filter(MovementModel.id == movement_id).first()
+        branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == movement.branch_office_id).first()
+        user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 4).first()
+        
+        # Obtener los productos del movimiento
+        from app.backend.db.models import MovementProductModel, ProductModel
+        movement_products = self.db.query(MovementProductModel, ProductModel).join(
+            ProductModel, ProductModel.id == MovementProductModel.product_id
+        ).filter(MovementProductModel.movement_id == movement_id).all()
+        
+        # Crear lista de nombres de productos separados por coma
+        products = ", ".join([product_model.description for movement_product, product_model in movement_products])
+        
+        phone = user.phone  # Ej: '912345678'
+        supervisor_name = user.full_name
+        movement_id = movement.id
+
+        # URL de la API
+        url = 'https://graph.facebook.com/v20.0/101066132689690/messages'
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        # Cabeceras
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+
+        phone_str = str(phone).strip()
+        if not phone_str.startswith("56"):
+            phone = "56" + phone_str
+        else:
+            phone = phone_str
+
+        # Payload en formato JSON
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": f"{phone}",
+            "type": "template",
+            "template": {
+                "name": whatsapp_template.title,
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": str(supervisor_name)},
+                            {"type": "text", "text": str(movement_id)},
+                            {"type": "text", "text": str(products)}
+                        ]
+                    }
+                ]
+            }
+        }
+
+        print(payload)
+
+        # Enviar la solicitud POST
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+        # Mostrar la respuesta
         print(response.text)
 
     def reject_capitulation(self, capitulation_id):

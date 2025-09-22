@@ -47,3 +47,17 @@ async def search_kardex_data(
     else:
         return {"message": {"data": [], "total_items": 0, "items_per_page": 10, "current_page": 1}}
 
+
+@kardex_values.get("/edit/{id}")
+async def edit_kardex_by_product_id(
+    id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener datos de kardex por product_id para edición
+    """
+    kardex_class = KardexValueClass(db)
+    result = kardex_class.get_by_product_id(id)
+    
+    return {"message": result}
+

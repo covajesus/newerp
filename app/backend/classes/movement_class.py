@@ -3,6 +3,7 @@ from app.backend.classes.product_class import ProductClass
 from app.backend.classes.kardex_value_class import KardexValueClass
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_
+from app.backend.classes.whatsapp_class import WhatsappClass
 from datetime import datetime
 import json
 import pandas as pd
@@ -233,6 +234,11 @@ class MovementClass:
                 # Crear asiento contable para salidas (type_id == 2)
                 if form_data.type_id == 2:
                     try:
+                        if form_data.alert_id == 1:
+                            # Enviar notificación por WhatsApp
+                            whatsapp_class = WhatsappClass(self.db)
+                            whatsapp_class.movements(new_movement.id)
+
                         # Obtener datos necesarios para el asiento
                         product = self.db.query(ProductModel).filter(ProductModel.id == product_data.product_id).first()
                         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()

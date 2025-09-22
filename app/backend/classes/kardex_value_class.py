@@ -139,3 +139,38 @@ class KardexValueClass:
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": f"Error updating kardex: {str(e)}"}
+
+    def get_by_product_id(self, product_id):
+        """
+        Obtener los datos de kardex por product_id
+        """
+        try:
+            # Consultar kardex y datos del producto
+            result = self.db.query(
+                KardexValueModel.qty,
+                KardexValueModel.cost,
+                ProductModel.id,
+                ProductModel.code,
+                ProductModel.description
+            ).select_from(ProductModel).outerjoin(
+                KardexValueModel, KardexValueModel.product_id == ProductModel.id
+            ).filter(
+                ProductModel.id == product_id
+            ).first()
+            
+            if not result:
+                return {"status": "error", "message": "Product not found"}
+            
+            return {
+                "status": "success",
+                "data": {
+                    "id": result.id,
+                    "code": result.code,
+                    "description": result.description,
+                    "quantity": result.qty if result.qty is not None else 0,
+                    "cost": result.cost if result.cost is not None else 0
+                }
+            }
+            
+        except Exception as e:
+            return {"status": "error", "message": f"Error retrieving kardex data: {str(e)}"}
