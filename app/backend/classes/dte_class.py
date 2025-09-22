@@ -655,15 +655,21 @@ class DteClass:
         url = "https://libredte.cl/api/dte/dte_emitidos/buscar/76063822"
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
+        # Calcular fecha desde 2 meses atrás
+        two_months_ago = datetime.now() - relativedelta(months=2)
+        since_date = two_months_ago.strftime("%Y-%m-01")
+
         payload = json.dumps({
             "receptor": rut,
-            "fecha_desde": datetime.now().strftime("%Y-%m-01")
+            "fecha_desde": since_date
         })
 
         headers = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {token}'
         }
+
+        print(payload)
 
         response = requests.post(url, headers=headers, data=payload)
 
