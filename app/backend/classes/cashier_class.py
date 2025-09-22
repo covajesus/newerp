@@ -171,7 +171,7 @@ class CashierClass:
                     self.db.commit()
             else:
                 new_data = {
-                    'cashier_id': cashier_id,
+                    'id': cashier_id,
                     'available_folios': available_folios,
                     'updated_date': current_date
                 }
