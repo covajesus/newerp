@@ -208,12 +208,12 @@ class FolioClass:
         
     def get(self, branch_office_id, cashier_id, requested_quantity, quantity_in_cashier):
         try:
-            if requested_quantity > 0:
-                cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
-                cashier.available_folios = quantity_in_cashier
-                self.db.add(cashier)
-                self.db.commit()
+            cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).limit(1).first()
+            cashier.available_folios = quantity_in_cashier
+            self.db.add(cashier)
+            self.db.commit()
             
+            if requested_quantity > 0:
                 response_validate_caf_limit = self.validate_caf_limit(cashier.folio_segment_id)
 
                 if response_validate_caf_limit == 1:
