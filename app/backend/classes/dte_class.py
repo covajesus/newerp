@@ -1455,7 +1455,7 @@ class DteClass:
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 29
+                DteModel.branch_office_id == 32
             ).all()
             
             whatsapp_class = WhatsappClass(self.db)
@@ -1831,7 +1831,7 @@ class DteClass:
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 29
+                DteModel.branch_office_id == 32
             ).all()
             
             if not dtes:
@@ -1876,7 +1876,7 @@ class DteClass:
                         DteModel.rut == dte.rut,
                         DteModel.dte_type_id == dte.dte_type_id,
                         DteModel.period == current_period,
-                        DteModel.branch_office_id == 106,
+                        DteModel.branch_office_id == 32,
                         DteModel.id != dte.id
                     ).first()
                     
