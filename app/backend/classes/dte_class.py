@@ -1912,11 +1912,14 @@ class DteClass:
                     
                     from app.backend.classes.customer_class import CustomerClass
                     customer_class = CustomerClass(self.db)
-                    customer = customer_class.get_customer_by_rut(dte.rut)
+                    customer_response = customer_class.get_by_rut(dte.rut)
                     
-                    if customer:
-                        customer_name = customer.customer_name
-                        customer_phone = customer.phone
+                    if customer_response:
+                        import json
+                        customer_data = json.loads(customer_response)
+                        if customer_data and 'customer_data' in customer_data:
+                            customer_name = customer_data['customer_data'].get('customer', 'Cliente no encontrado')
+                            customer_phone = customer_data['customer_data'].get('phone', 'No disponible')
                     
                     # Preparar datos del WhatsApp
                     whatsapp_data = {
