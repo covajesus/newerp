@@ -762,7 +762,7 @@ def send_massive_dtes(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en envío masivo de WhatsApp: {str(e)}")
 
-@dtes.get("/send_massive_dtes_stream")
+@dtes.get("/send_massive_dtes_stream/{branch_office_id}")
 def send_massive_dtes_stream(branch_office_id: int, db: Session = Depends(get_db)):
     """
     Endpoint para enviar WhatsApp masivamente con streaming de respuestas en tiempo real
