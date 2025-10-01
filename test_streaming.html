@@ -90,6 +90,21 @@
     <div class="container">
         <h1>🚀 Test DTE Streaming - Envío Masivo WhatsApp</h1>
         
+        <div style="margin-bottom: 20px;">
+            <label for="branchOfficeId">Sucursal (Branch Office ID):</label>
+            <input type="number" id="branchOfficeId" value="32" min="1" style="margin-left: 10px; padding: 5px;">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <button class="button" onclick="checkTotalDtes()" style="background-color: #28a745;">
+                Consultar DTEs Pendientes
+            </button>
+        </div>
+        
+        <button id="checkTotalButton" class="button" onclick="checkTotalDtes()" style="background-color: #28a745;">
+            Consultar Total DTEs
+        </button>
+        
         <button id="startButton" class="button" onclick="startStreaming()">
             Iniciar Envío Masivo
         </button>
@@ -162,8 +177,44 @@
             }
         }
 
+        async function checkTotalDtes() {
+            const branchOfficeId = document.getElementById('branchOfficeId').value;
+            
+            if (!branchOfficeId || branchOfficeId < 1) {
+                alert('Por favor ingresa un Branch Office ID válido');
+                return;
+            }
+            
+            try {
+                log(`🔍 Consultando total DTEs para sucursal ${branchOfficeId}...`, 'info');
+                
+                const response = await fetch(`http://localhost:8000/api/backend/dtes/total_dtes_to_be_sent?branch_office_id=${branchOfficeId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    log(`📊 Total DTEs pendientes: ${data.quantity}`, 'success');
+                    log(`🏢 Sucursal: ${data.branch_office_id}`, 'info');
+                    log(`📅 Período: ${data.period}`, 'info');
+                    
+                    // Actualizar la estadística en tiempo real
+                    document.getElementById('totalDtes').textContent = data.quantity;
+                } else {
+                    log(`❌ Error: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`💥 Error de conexión: ${error.message}`, 'error');
+            }
+        }
+
         function startStreaming() {
             const button = document.getElementById('startButton');
+            const branchOfficeId = document.getElementById('branchOfficeId').value;
+            
+            if (!branchOfficeId || branchOfficeId < 1) {
+                alert('Por favor ingresa un Branch Office ID válido');
+                return;
+            }
+            
             button.disabled = true;
             button.textContent = 'Procesando...';
             
@@ -180,9 +231,9 @@
             });
             updateProgress(0, 100);
 
-            log('🚀 Iniciando conexión con servidor...', 'info');
+            log(`🚀 Iniciando conexión con servidor para sucursal ${branchOfficeId}...`, 'info');
 
-            eventSource = new EventSource('http://localhost:8000/api/backend/dtes/send_massive_dtes_stream');
+            eventSource = new EventSource(`http://localhost:8000/api/backend/dtes/send_massive_dtes_stream?branch_office_id=${branchOfficeId}`);
 
             eventSource.onopen = function(e) {
                 log('✅ Conexión establecida con el servidor', 'success');

@@ -705,19 +705,24 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar DTEs: {str(e)}")
 
-@dtes.get("/total_dtes_to_be_sent")
-def total_dtes_to_be_sent(db: Session = Depends(get_db)):
+@dtes.get("/total_dtes_to_be_sent/{branch_office_id}")
+def total_dtes_to_be_sent(branch_office_id: int, db: Session = Depends(get_db)):
     """
-    Endpoint para obtener la cantidad total de DTEs que deben ser enviados masivamente
+    Endpoint para obtener la cantidad total de DTEs que deben ser enviados masivamente por sucursal
     """
     try:
         dte_class = DteClass(db)
-        quantity = dte_class.total_dtes_to_be_sent()
+        quantity = dte_class.total_dtes_to_be_sent(branch_office_id)
+        
+        # Obtener período actual para el response
+        current_period = datetime.now().strftime('%Y-%m')
         
         return {
             "status": "success", 
             "quantity": quantity,
-            "message": f"Total DTEs to be sent: {quantity}"
+            "branch_office_id": branch_office_id,
+            "period": current_period,
+            "message": f"Total DTEs to be sent for branch {branch_office_id}: {quantity}"
         }
         
     except Exception as e:
@@ -758,7 +763,7 @@ def send_massive_dtes(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error en envío masivo de WhatsApp: {str(e)}")
 
 @dtes.get("/send_massive_dtes_stream")
-def send_massive_dtes_stream(db: Session = Depends(get_db)):
+def send_massive_dtes_stream(branch_office_id: int, db: Session = Depends(get_db)):
     """
     Endpoint para enviar WhatsApp masivamente con streaming de respuestas en tiempo real
     """
@@ -772,7 +777,8 @@ def send_massive_dtes_stream(db: Session = Depends(get_db)):
             dtes = db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 32
+                DteModel.dte_version_id == 1,
+                DteModel.branch_office_id == branch_office_id
             ).all()
             
             # Enviar información inicial
@@ -796,7 +802,7 @@ def send_massive_dtes_stream(db: Session = Depends(get_db)):
                 return
             
             # Procesar DTEs uno por uno usando el generador
-            for progress_data in dte_class.send_massive_dtes_streaming():
+            for progress_data in dte_class.send_massive_dtes_streaming(branch_office_id):
                 yield f"data: {json.dumps(progress_data)}\n\n"
             
         except Exception as e:

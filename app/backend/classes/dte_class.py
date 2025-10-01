@@ -1407,16 +1407,23 @@ class DteClass:
             print(f"Error al procesar folio {dte.folio}: {str(e)}")
             return 2
 
-    def total_dtes_to_be_sent(self):
+    def total_dtes_to_be_sent(self, branch_office_id):
         """
-        Obtiene la cantidad total de DTEs que deben ser enviados desde la tabla total_dtes_to_be_sent con id = 1
+        Obtiene la cantidad total de DTEs que deben ser enviados contando directamente desde DteModel
+        con filtros específicos: status_id=2, dte_version_id=1, período actual y branch_office_id
         """
         try:
-            total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
-            if total_record:
-                return total_record.quantity
-            else:
-                return 0
+            from datetime import datetime
+            current_period = datetime.now().strftime('%Y-%m')
+            
+            quantity = self.db.query(DteModel).filter(
+                DteModel.period == current_period,
+                DteModel.status_id == 2,
+                DteModel.dte_version_id == 1,
+                DteModel.branch_office_id == branch_office_id
+            ).count()
+            
+            return quantity
         except Exception as e:
             print(f"Error al obtener total DTEs to be sent: {str(e)}")
             return 0
@@ -1818,7 +1825,7 @@ class DteClass:
         except Exception as e:
             return {"status": "error", "message": f"Error generando DTE: {str(e)}"}
 
-    def send_massive_dtes_streaming(self):
+    def send_massive_dtes_streaming(self, branch_office_id):
         """
         Generador que envía WhatsApp masivamente y produce progreso en tiempo real
         Yields dict con información de progreso para cada DTE procesado
@@ -1831,7 +1838,8 @@ class DteClass:
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 32
+                DteModel.dte_version_id == 1,
+                DteModel.branch_office_id == branch_office_id
             ).all()
             
             if not dtes:
@@ -1936,10 +1944,14 @@ class DteClass:
                     whatsapp_class = WhatsappClass(self.db)
                     whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
-                    # Obtener contador actualizado desde la vista
+                    # Obtener contador actualizado desde DteModel
                     try:
-                        total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
-                        remaining_dtes = total_record.quantity if total_record else 0
+                        remaining_dtes = self.db.query(DteModel).filter(
+                            DteModel.period == current_period,
+                            DteModel.status_id == 2,
+                            DteModel.dte_version_id == 1,
+                            DteModel.branch_office_id == branch_office_id
+                        ).count()
                     except:
                         remaining_dtes = 0
                     
@@ -1981,8 +1993,12 @@ class DteClass:
                     
                     # Obtener contador actualizado incluso en errores
                     try:
-                        total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
-                        remaining_dtes = total_record.quantity if total_record else 0
+                        remaining_dtes = self.db.query(DteModel).filter(
+                            DteModel.period == current_period,
+                            DteModel.status_id == 2,
+                            DteModel.dte_version_id == 1,
+                            DteModel.branch_office_id == branch_office_id
+                        ).count()
                     except:
                         remaining_dtes = 0
                     
@@ -2012,10 +2028,14 @@ class DteClass:
                             "whatsapp_response": None
                         }
             
-            # Obtener contador actualizado desde la vista
+            # Obtener contador actualizado desde DteModel
             try:
-                total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
-                remaining_dtes = total_record.quantity if total_record else 0
+                remaining_dtes = self.db.query(DteModel).filter(
+                    DteModel.period == current_period,
+                    DteModel.status_id == 2,
+                    DteModel.dte_version_id == 1,
+                    DteModel.branch_office_id == branch_office_id
+                ).count()
                 print(f"✅ DTEs restantes por enviar (actualizado): {remaining_dtes}")
             except Exception as e:
                 remaining_dtes = 0
