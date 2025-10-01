@@ -702,3 +702,37 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar DTEs: {str(e)}")
+
+@dtes.get("/total_dtes_to_be_sent")
+def total_dtes_to_be_sent(db: Session = Depends(get_db)):
+    """
+    Endpoint para obtener la cantidad total de DTEs que deben ser enviados masivamente
+    """
+    try:
+        dte_class = DteClass(db)
+        quantity = dte_class.total_dtes_to_be_sent()
+        
+        return {
+            "status": "success", 
+            "quantity": quantity,
+            "message": f"Total DTEs to be sent: {quantity}"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener DTEs para envío masivo: {str(e)}")
+
+@dtes.get("/send_massive_dtes")
+def send_massive_dtes(db: Session = Depends(get_db)):
+    """
+    Endpoint para enviar WhatsApp masivamente a DTEs del período actual con status_id = 2
+    """
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.send_massive_dtes()
+        
+        return {
+            "message": result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en envío masivo de WhatsApp: {str(e)}")

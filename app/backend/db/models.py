@@ -1929,3 +1929,9 @@ class SinisterTypeModel(Base):
     sinister_type = Column(String(255))
     added_date = Column(DateTime, default=datetime.utcnow)
     updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class TotalDtesToBeSentModel(Base):
+    __tablename__ = 'total_dtes_to_be_sent'
+
+    id = Column(Integer, primary_key=True)
+    quantity = Column(Integer)

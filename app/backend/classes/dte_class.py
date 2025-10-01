@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel
+from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel, TotalDtesToBeSentModel
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from app.backend.classes.helper_class import HelperClass
@@ -1405,3 +1405,136 @@ class DteClass:
         except Exception as e:
             print(f"Error al procesar folio {dte.folio}: {str(e)}")
             return 2
+
+    def total_dtes_to_be_sent(self):
+        """
+        Obtiene la cantidad total de DTEs que deben ser enviados desde la tabla total_dtes_to_be_sent con id = 1
+        """
+        try:
+            total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
+            if total_record:
+                return total_record.quantity
+            else:
+                return 0
+        except Exception as e:
+            print(f"Error al obtener total DTEs to be sent: {str(e)}")
+            return 0
+
+    def send_massive_dtes(self):
+        """
+        Envía WhatsApp masivamente para DTEs del período actual con status_id = 2
+        """
+        from app.backend.classes.whatsapp_class import WhatsappClass
+        
+        try:
+            # Obtener el período actual en formato YYYY-MM
+            current_period = datetime.now().strftime('%Y-%m')
+            
+            # Buscar DTEs del período actual con status_id = 2
+            dtes = self.db.query(DteModel).filter(
+                DteModel.period == current_period,
+                DteModel.status_id == 2
+            ).all()
+            
+            whatsapp_class = WhatsappClass(self.db)
+            successful_sends = 0
+            failed_sends = 0
+            results = []
+            
+            print(f"Enviando WhatsApp masivo para {len(dtes)} DTEs del período {current_period}")
+            
+            for dte in dtes:
+                try:
+                    # Aplicar el mismo proceso que en generate_ticket
+                    # Si el DTE no tiene folio, necesita generarlo primero
+                    if not dte.folio or dte.folio == 0:
+                        # Importar las clases necesarias
+                        from app.backend.classes.customer_class import CustomerClass
+                        from app.backend.classes.customer_ticket_class import CustomerTicketClass
+                        
+                        # Obtener datos del cliente
+                        customer = CustomerClass(self.db).get_by_rut(dte.rut)
+                        customer_data = json.loads(customer)
+                        
+                        # Crear instancia de CustomerTicketClass para acceder a sus métodos
+                        customer_ticket_class = CustomerTicketClass(self.db)
+                        
+                        # Crear un objeto form_data simulado para pre_generate_ticket
+                        class FormDataSimulator:
+                            def __init__(self, dte):
+                                self.branch_office_id = dte.branch_office_id
+                                self.rut = dte.rut
+                                self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
+                                self.chip_id = dte.chip_id
+                                self.will_save = 0  # No guardar, solo generar
+                        
+                        form_data_sim = FormDataSimulator(dte)
+                        
+                        # Pre-generar el ticket
+                        code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
+                        
+                        if code is not None and code != 402:
+                            # Generar el ticket con folio
+                            folio = customer_ticket_class.generate_ticket(dte.rut, code)
+                            
+                            if folio:
+                                # Guardar PDF
+                                customer_ticket_class.save_pdf_ticket(folio)
+                                
+                                # Actualizar DTE con folio y status
+                                dte.folio = folio
+                                dte.status_id = 4
+                                self.db.commit()
+                                self.db.refresh(dte)
+                                
+                                # Enviar WhatsApp
+                                whatsapp_class.send(dte, dte.rut)
+                            else:
+                                raise Exception("No se pudo generar el folio")
+                        else:
+                            raise Exception("Error en pre-generación del ticket")
+                    else:
+                        # Si ya tiene folio, solo actualizar status y enviar WhatsApp
+                        dte.status_id = 4
+                        self.db.commit()
+                        whatsapp_class.send(dte, dte.rut)
+                    
+                    successful_sends += 1
+                    results.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "status": "success",
+                        "message": "DTE processed and WhatsApp sent successfully"
+                    })
+                    
+                    print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}")
+                    
+                except Exception as e:
+                    failed_sends += 1
+                    results.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "status": "error",
+                        "message": f"Error sending WhatsApp: {str(e)}"
+                    })
+                    
+                    print(f"❌ Error enviando WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}: {str(e)}")
+            
+            return {
+                "status": "success",
+                "period": current_period,
+                "total_dtes": len(dtes),
+                "successful_sends": successful_sends,
+                "failed_sends": failed_sends,
+                "message": f"Envío masivo completado para período {current_period}. {successful_sends} exitosos, {failed_sends} fallidos.",
+                "results": results
+            }
+            
+        except Exception as e:
+            print(f"Error en envío masivo de WhatsApp: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Error en envío masivo: {str(e)}"
+            }
