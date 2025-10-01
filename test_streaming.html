@@ -111,6 +111,10 @@
                 <div class="stat-value error" id="failed">0</div>
                 <div class="stat-label">Fallidos</div>
             </div>
+            <div class="stat">
+                <div class="stat-value info" id="remaining">-</div>
+                <div class="stat-label">Restantes</div>
+            </div>
         </div>
         
         <div class="progress-bar">
@@ -144,6 +148,9 @@
             if (data.failed_sends !== undefined) {
                 document.getElementById('failed').textContent = data.failed_sends;
             }
+            if (data.remaining_dtes !== undefined) {
+                document.getElementById('remaining').textContent = data.remaining_dtes;
+            }
         }
 
         function updateProgress(current, total) {
@@ -168,7 +175,8 @@
                 total_dtes: 0,
                 processed: 0,
                 successful_sends: 0,
-                failed_sends: 0
+                failed_sends: 0,
+                remaining_dtes: '-'
             });
             updateProgress(0, 100);
 
@@ -207,6 +215,13 @@
                             const statusType = data.status === 'success' ? 'success' : 
                                              data.status.includes('duplicate') ? 'warning' : 'error';
                             log(`${statusIcon} DTE ${data.dte_id}: ${data.message}`, statusType);
+                            
+                            // Actualizar estadísticas incluyendo DTEs restantes
+                            updateStats(data);
+                            
+                            if (data.remaining_dtes !== undefined && data.status === 'success') {
+                                log(`📊 DTEs restantes por enviar: ${data.remaining_dtes}`, 'info');
+                            }
                             break;
                             
                         case 'complete':
