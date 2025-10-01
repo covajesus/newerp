@@ -1921,21 +1921,10 @@ class DteClass:
                             customer_name = customer_data['customer_data'].get('customer', 'Cliente no encontrado')
                             customer_phone = customer_data['customer_data'].get('phone', 'No disponible')
                     
-                    # Preparar datos del WhatsApp
-                    whatsapp_data = {
-                        "customer_rut": dte.rut,
-                        "customer_name": customer_name,
-                        "customer_phone": customer_phone,
-                        "dte_folio": dte.folio,
-                        "dte_total": dte.total,
-                        "dte_type": dte.dte_type_id,
-                        "pdf_url": generation_result.get("pdf_url")
-                    }
-                    
                     # Enviar WhatsApp
                     from app.backend.classes.whatsapp_class import WhatsappClass
                     whatsapp_class = WhatsappClass(self.db)
-                    whatsapp_response = whatsapp_class.send_dte_whatsapp(whatsapp_data)
+                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
                     if whatsapp_response and whatsapp_response.get("status") == "success":
                         successful_sends += 1
