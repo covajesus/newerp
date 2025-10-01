@@ -8,11 +8,13 @@ from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from fastapi import UploadFile, File, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from datetime import datetime
 import pymysql
 import uuid
 import base64
 import requests
+import json
 
 dtes = APIRouter(
     prefix="/dtes",
@@ -721,6 +723,24 @@ def total_dtes_to_be_sent(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener DTEs para envío masivo: {str(e)}")
 
+@dtes.get("/decrease_dtes_to_be_sent")
+def decrease_dtes_to_be_sent(db: Session = Depends(get_db)):
+    """
+    Endpoint para decrementar manualmente la cantidad de DTEs pendientes (para testing)
+    """
+    try:
+        dte_class = DteClass(db)
+        remaining = dte_class.decrease_dtes_to_be_sent()
+        
+        return {
+            "status": "success", 
+            "remaining_quantity": remaining,
+            "message": f"DTEs restantes: {remaining}"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al decrementar DTEs pendientes: {str(e)}")
+
 @dtes.get("/send_massive_dtes")
 def send_massive_dtes(db: Session = Depends(get_db)):
     """
@@ -736,3 +756,63 @@ def send_massive_dtes(db: Session = Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en envío masivo de WhatsApp: {str(e)}")
+
+@dtes.get("/send_massive_dtes_stream")
+def send_massive_dtes_stream(db: Session = Depends(get_db)):
+    """
+    Endpoint para enviar WhatsApp masivamente con streaming de respuestas en tiempo real
+    """
+    def generate_dte_stream():
+        try:
+            dte_class = DteClass(db)
+            
+            # Obtener el período actual y los DTEs
+            current_period = datetime.now().strftime('%Y-%m')
+            
+            dtes = db.query(DteModel).filter(
+                DteModel.period == current_period,
+                DteModel.status_id == 2,
+                DteModel.branch_office_id == 106
+            ).all()
+            
+            # Enviar información inicial
+            initial_data = {
+                "type": "init",
+                "period": current_period,
+                "total_dtes": len(dtes),
+                "message": f"Iniciando envío masivo para {len(dtes)} DTEs del período {current_period}"
+            }
+            yield f"data: {json.dumps(initial_data)}\n\n"
+            
+            if not dtes:
+                no_data = {
+                    "type": "complete",
+                    "total_dtes": 0,
+                    "successful_sends": 0,
+                    "failed_sends": 0,
+                    "message": "No hay DTEs para procesar"
+                }
+                yield f"data: {json.dumps(no_data)}\n\n"
+                return
+            
+            # Procesar DTEs uno por uno usando el generador
+            for progress_data in dte_class.send_massive_dtes_streaming():
+                yield f"data: {json.dumps(progress_data)}\n\n"
+            
+        except Exception as e:
+            error_data = {
+                "type": "error",
+                "message": f"Error en envío masivo: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+    
+    return StreamingResponse(
+        generate_dte_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )

@@ -1421,6 +1421,25 @@ class DteClass:
             print(f"Error al obtener total DTEs to be sent: {str(e)}")
             return 0
 
+    def decrease_dtes_to_be_sent(self):
+        """
+        Decrementa en 1 la cantidad total de DTEs que deben ser enviados en la tabla total_dtes_to_be_sent con id = 1
+        """
+        try:
+            total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
+            if total_record and total_record.quantity > 0:
+                total_record.quantity -= 1
+                self.db.commit()
+                self.db.refresh(total_record)
+                print(f"✅ DTEs restantes por enviar: {total_record.quantity}")
+                return total_record.quantity
+            else:
+                print("⚠️ No hay DTEs pendientes para decrementar")
+                return 0
+        except Exception as e:
+            print(f"Error al decrementar total DTEs to be sent: {str(e)}")
+            return 0
+
     def send_massive_dtes(self):
         """
         Envía WhatsApp masivamente para DTEs del período actual con status_id = 2
@@ -1578,6 +1597,10 @@ class DteClass:
                     # Verificar si WhatsApp fue exitoso
                     if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
                         successful_sends += 1
+                        
+                        # Decrementar contador de DTEs pendientes
+                        remaining_dtes = self.decrease_dtes_to_be_sent()
+                        
                         results.append({
                             "id": dte.id,
                             "folio": dte.folio,
@@ -1587,13 +1610,18 @@ class DteClass:
                             "dte_type_id": dte.dte_type_id,
                             "status": "success",
                             "message": "DTE processed and WhatsApp sent successfully",
-                            "whatsapp_response": whatsapp_response
+                            "whatsapp_response": whatsapp_response,
+                            "remaining_dtes": remaining_dtes
                         })
                         
                         print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
                     else:
                         # WhatsApp falló pero DTE se procesó
                         failed_sends += 1
+                        
+                        # Decrementar contador de DTEs pendientes (DTE se procesó aunque WhatsApp falló)
+                        remaining_dtes = self.decrease_dtes_to_be_sent()
+                        
                         results.append({
                             "id": dte.id,
                             "folio": dte.folio,
@@ -1603,7 +1631,8 @@ class DteClass:
                             "dte_type_id": dte.dte_type_id,
                             "status": "partial_success",
                             "message": "DTE processed but WhatsApp failed",
-                            "whatsapp_response": whatsapp_response
+                            "whatsapp_response": whatsapp_response,
+                            "remaining_dtes": remaining_dtes
                         })
                         
                         print(f"⚠️ DTE procesado pero WhatsApp falló para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
@@ -1660,5 +1689,314 @@ class DteClass:
             print(f"Error en envío masivo de WhatsApp: {str(e)}")
             return {
                 "status": "error",
+                "message": f"Error en envío masivo: {str(e)}"
+            }
+
+    def _generate_complete_dte(self, dte):
+        """
+        Método auxiliar para generar un DTE completo (folio, PDF, etc.)
+        Retorna dict con status y pdf_url
+        """
+        try:
+            from app.backend.classes.customer_class import CustomerClass
+            from datetime import datetime
+            import json
+            
+            # Obtener datos del cliente
+            customer = CustomerClass(self.db).get_by_rut(dte.rut)
+            customer_data = json.loads(customer)
+            
+            # Si el DTE ya tiene folio, solo necesitamos el URL del PDF
+            if dte.folio and dte.folio != 0:
+                pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{dte.folio}/{dte.dte_type_id}"
+                return {
+                    "status": "success",
+                    "message": "DTE ya generado",
+                    "pdf_url": pdf_url
+                }
+            
+            # Crear un objeto form_data simulado
+            class FormDataSimulator:
+                def __init__(self, dte):
+                    self.branch_office_id = dte.branch_office_id
+                    self.rut = dte.rut
+                    self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
+                    self.chip_id = dte.chip_id
+                    self.will_save = 0  # No guardar, solo generar
+                    self.id = dte.id  # Necesario para customer_bill_class
+            
+            form_data_sim = FormDataSimulator(dte)
+            
+            # Generar según el tipo de DTE
+            if dte.dte_type_id == 39:  # Boleta electrónica
+                from app.backend.classes.customer_ticket_class import CustomerTicketClass
+                
+                # Validar duplicados
+                check_dte_existence = self.db.query(DteModel).filter(
+                    DteModel.branch_office_id == dte.branch_office_id,
+                    DteModel.rut == dte.rut,
+                    DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                    DteModel.dte_type_id == 39,
+                    DteModel.dte_version_id == 1,
+                    DteModel.status_id == 4,
+                    DteModel.period == datetime.now().strftime('%Y-%m')
+                ).count()
+                
+                if check_dte_existence > 0:
+                    raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
+                
+                # Generar ticket
+                customer_ticket_class = CustomerTicketClass(self.db)
+                code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
+                
+                if code is not None and code != 402:
+                    folio = customer_ticket_class.generate_ticket(dte.rut, code)
+                    if folio:
+                        customer_ticket_class.save_pdf_ticket(folio)
+                        # Actualizar DTE
+                        dte.folio = folio
+                        dte.status_id = 4
+                        self.db.commit()
+                        self.db.refresh(dte)
+                        
+                        pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
+                        return {
+                            "status": "success",
+                            "message": "Ticket generado exitosamente",
+                            "pdf_url": pdf_url
+                        }
+                    else:
+                        return {"status": "error", "message": "No se pudo generar el folio del ticket"}
+                else:
+                    return {"status": "error", "message": "Error en pre-generación del ticket"}
+                    
+            elif dte.dte_type_id == 33:  # Factura electrónica
+                from app.backend.classes.customer_bill_class import CustomerBillClass
+                
+                # Validar duplicados
+                check_dte_existence = self.db.query(DteModel).filter(
+                    DteModel.branch_office_id == dte.branch_office_id,
+                    DteModel.rut == dte.rut,
+                    DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                    DteModel.dte_type_id == 33,
+                    DteModel.dte_version_id == 1,
+                    DteModel.status_id == 4,
+                    DteModel.period == datetime.now().strftime('%Y-%m')
+                ).count()
+                
+                if check_dte_existence > 0:
+                    raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
+                
+                # Generar factura
+                customer_bill_class = CustomerBillClass(self.db)
+                code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
+                
+                if code is not None and code != 402:
+                    folio = customer_bill_class.generate_bill(dte.rut, code)
+                    if folio:
+                        customer_bill_class.save_pdf_bill(folio)
+                        # Actualizar DTE
+                        dte.folio = folio
+                        dte.status_id = 4
+                        self.db.commit()
+                        self.db.refresh(dte)
+                        
+                        pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
+                        return {
+                            "status": "success",
+                            "message": "Factura generada exitosamente",
+                            "pdf_url": pdf_url
+                        }
+                    else:
+                        return {"status": "error", "message": "No se pudo generar el folio de la factura"}
+                else:
+                    return {"status": "error", "message": "Error en pre-generación de la factura"}
+            else:
+                return {"status": "error", "message": f"Tipo de DTE no soportado: {dte.dte_type_id}"}
+                
+        except Exception as e:
+            return {"status": "error", "message": f"Error generando DTE: {str(e)}"}
+
+    def send_massive_dtes_streaming(self):
+        """
+        Generador que envía WhatsApp masivamente y produce progreso en tiempo real
+        Yields dict con información de progreso para cada DTE procesado
+        """
+        try:
+            # Obtener DTEs del período actual
+            from datetime import datetime
+            current_period = datetime.now().strftime('%Y-%m')
+            
+            dtes = self.db.query(DteModel).filter(
+                DteModel.period == current_period,
+                DteModel.status_id == 2,
+                DteModel.branch_office_id == 106
+            ).all()
+            
+            if not dtes:
+                yield {
+                    "type": "complete",
+                    "total_dtes": 0,
+                    "processed": 0,
+                    "successful_sends": 0,
+                    "failed_sends": 0,
+                    "message": "No hay DTEs para procesar"
+                }
+                return
+            
+            total_dtes = len(dtes)
+            successful_sends = 0
+            failed_sends = 0
+            processed = 0
+            
+            # Procesar cada DTE individualmente
+            for i, dte in enumerate(dtes, 1):
+                try:
+                    processed += 1
+                    
+                    # Enviar progreso
+                    yield {
+                        "type": "progress",
+                        "current": i,
+                        "total": total_dtes,
+                        "percentage": round((i / total_dtes) * 100, 2),
+                        "processing_dte": {
+                            "id": dte.id,
+                            "rut": dte.rut,
+                            "dte_type_id": dte.dte_type_id
+                        },
+                        "successful_sends": successful_sends,
+                        "failed_sends": failed_sends,
+                        "message": f"Procesando DTE {i}/{total_dtes}"
+                    }
+                    
+                    # Validar duplicado
+                    existing_dte = self.db.query(DteModel).filter(
+                        DteModel.rut == dte.rut,
+                        DteModel.dte_type_id == dte.dte_type_id,
+                        DteModel.period == current_period,
+                        DteModel.branch_office_id == 106,
+                        DteModel.id != dte.id
+                    ).first()
+                    
+                    if existing_dte:
+                        failed_sends += 1
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "duplicate_skipped",
+                            "message": f"DTE duplicado - Saltado (existe ID: {existing_dte.id})",
+                            "current": i,
+                            "total": total_dtes
+                        }
+                        continue
+                    
+                    # Generar el DTE completo
+                    generation_result = self._generate_complete_dte(dte)
+                    
+                    if generation_result.get("status") == "error":
+                        failed_sends += 1
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "generation_error",
+                            "message": generation_result.get("message", "Error en generación"),
+                            "current": i,
+                            "total": total_dtes
+                        }
+                        continue
+                    
+                    # Obtener datos del cliente
+                    customer_name = "Cliente no encontrado"
+                    customer_phone = None
+                    
+                    from app.backend.classes.customer_class import CustomerClass
+                    customer_class = CustomerClass(self.db)
+                    customer = customer_class.get_customer_by_rut(dte.rut)
+                    
+                    if customer:
+                        customer_name = customer.customer_name
+                        customer_phone = customer.phone
+                    
+                    # Preparar datos del WhatsApp
+                    whatsapp_data = {
+                        "customer_rut": dte.rut,
+                        "customer_name": customer_name,
+                        "customer_phone": customer_phone,
+                        "dte_folio": dte.folio,
+                        "dte_total": dte.total,
+                        "dte_type": dte.dte_type_id,
+                        "pdf_url": generation_result.get("pdf_url")
+                    }
+                    
+                    # Enviar WhatsApp
+                    from app.backend.classes.whatsapp_class import WhatsappClass
+                    whatsapp_class = WhatsappClass(self.db)
+                    whatsapp_response = whatsapp_class.send_dte_whatsapp(whatsapp_data)
+                    
+                    if whatsapp_response and whatsapp_response.get("status") == "success":
+                        successful_sends += 1
+                        # Decrementar contador
+                        self.decrease_dtes_to_be_sent()
+                        
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "success",
+                            "message": "WhatsApp enviado exitosamente",
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "current": i,
+                            "total": total_dtes
+                        }
+                    else:
+                        failed_sends += 1
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "whatsapp_error",
+                            "message": f"Error enviando WhatsApp: {whatsapp_response.get('message') if whatsapp_response else 'Sin respuesta'}",
+                            "current": i,
+                            "total": total_dtes
+                        }
+                        
+                except Exception as e:
+                    failed_sends += 1
+                    processed += 1
+                    
+                    # Detectar si es error de duplicado
+                    if "Duplicate entry" in str(e):
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "duplicate_error",
+                            "message": f"DTE duplicado detectado: {str(e)}",
+                            "current": i,
+                            "total": total_dtes
+                        }
+                    else:
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "error",
+                            "message": f"Error procesando DTE: {str(e)}",
+                            "current": i,
+                            "total": total_dtes
+                        }
+            
+            # Resultado final
+            yield {
+                "type": "complete",
+                "period": current_period,
+                "total_dtes": total_dtes,
+                "processed": processed,
+                "successful_sends": successful_sends,
+                "failed_sends": failed_sends,
+                "message": f"Envío masivo completado. {successful_sends} exitosos, {failed_sends} fallidos."
+            }
+            
+        except Exception as e:
+            yield {
+                "type": "error",
                 "message": f"Error en envío masivo: {str(e)}"
             }
