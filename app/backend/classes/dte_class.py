@@ -1830,7 +1830,7 @@ class DteClass:
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 106
+                DteModel.branch_office_id == 29
             ).all()
             
             if not dtes:

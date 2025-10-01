@@ -772,7 +772,7 @@ def send_massive_dtes_stream(db: Session = Depends(get_db)):
             dtes = db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 106
+                DteModel.branch_office_id == 29
             ).all()
             
             # Enviar información inicial
