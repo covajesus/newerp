@@ -216,10 +216,21 @@
                                              data.status.includes('duplicate') ? 'warning' : 'error';
                             log(`${statusIcon} DTE ${data.dte_id}: ${data.message}`, statusType);
                             
+                            // Mostrar información de WhatsApp si está disponible
+                            if (data.whatsapp_status) {
+                                const waIcon = data.whatsapp_status === 'success' ? '📱✅' : 
+                                             data.whatsapp_status === 'not_sent' ? '📱❌' : '📱⚠️';
+                                log(`${waIcon} WhatsApp Status: ${data.whatsapp_status}`, statusType);
+                                
+                                if (data.whatsapp_response) {
+                                    log(`📋 WhatsApp Response: ${JSON.stringify(data.whatsapp_response)}`, 'info');
+                                }
+                            }
+                            
                             // Actualizar estadísticas incluyendo DTEs restantes
                             updateStats(data);
                             
-                            if (data.remaining_dtes !== undefined && data.status === 'success') {
+                            if (data.remaining_dtes !== undefined) {
                                 log(`📊 DTEs restantes por enviar: ${data.remaining_dtes}`, 'info');
                             }
                             break;

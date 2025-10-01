@@ -1936,15 +1936,15 @@ class DteClass:
                     whatsapp_class = WhatsappClass(self.db)
                     whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
+                    # Obtener contador actualizado desde la vista
+                    try:
+                        total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
+                        remaining_dtes = total_record.quantity if total_record else 0
+                    except:
+                        remaining_dtes = 0
+                    
                     if whatsapp_response and whatsapp_response.get("status") == "success":
                         successful_sends += 1
-                        
-                        # Obtener contador actualizado desde la vista
-                        try:
-                            total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
-                            remaining_dtes = total_record.quantity if total_record else 0
-                        except:
-                            remaining_dtes = 0
                         
                         yield {
                             "type": "dte_result",
@@ -1955,7 +1955,9 @@ class DteClass:
                             "customer_phone": customer_phone,
                             "current": i,
                             "total": total_dtes,
-                            "remaining_dtes": remaining_dtes
+                            "remaining_dtes": remaining_dtes,
+                            "whatsapp_status": whatsapp_response.get("status"),
+                            "whatsapp_response": whatsapp_response
                         }
                     else:
                         failed_sends += 1
@@ -1965,7 +1967,10 @@ class DteClass:
                             "status": "whatsapp_error",
                             "message": f"Error enviando WhatsApp: {whatsapp_response.get('message') if whatsapp_response else 'Sin respuesta'}",
                             "current": i,
-                            "total": total_dtes
+                            "total": total_dtes,
+                            "remaining_dtes": remaining_dtes,
+                            "whatsapp_status": whatsapp_response.get("status") if whatsapp_response else "no_response",
+                            "whatsapp_response": whatsapp_response
                         }
                         
                 except Exception as e:
@@ -1973,6 +1978,13 @@ class DteClass:
                     self.db.rollback()
                     failed_sends += 1
                     processed += 1
+                    
+                    # Obtener contador actualizado incluso en errores
+                    try:
+                        total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
+                        remaining_dtes = total_record.quantity if total_record else 0
+                    except:
+                        remaining_dtes = 0
                     
                     # Detectar si es error de duplicado
                     if "Duplicate entry" in str(e):
@@ -1982,7 +1994,10 @@ class DteClass:
                             "status": "duplicate_error",
                             "message": f"DTE duplicado detectado: {str(e)}",
                             "current": i,
-                            "total": total_dtes
+                            "total": total_dtes,
+                            "remaining_dtes": remaining_dtes,
+                            "whatsapp_status": "not_sent",
+                            "whatsapp_response": None
                         }
                     else:
                         yield {
@@ -1991,7 +2006,10 @@ class DteClass:
                             "status": "error",
                             "message": f"Error procesando DTE: {str(e)}",
                             "current": i,
-                            "total": total_dtes
+                            "total": total_dtes,
+                            "remaining_dtes": remaining_dtes,
+                            "whatsapp_status": "not_sent",
+                            "whatsapp_response": None
                         }
             
             # Obtener contador actualizado desde la vista
