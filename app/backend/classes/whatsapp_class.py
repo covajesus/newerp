@@ -122,6 +122,24 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
+        
+        # Devolver la respuesta del envío de WhatsApp
+        try:
+            response_data = response.json()
+            return {
+                "status": "success" if response.status_code == 200 else "error",
+                "status_code": response.status_code,
+                "response": response_data,
+                "whatsapp_accepted": "accepted" if response.status_code == 200 else "rejected"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "status_code": response.status_code,
+                "response": response.text,
+                "error": str(e),
+                "whatsapp_accepted": "rejected"
+            }
 
     def movements(self, movement_id):
         movement = self.db.query(MovementModel).filter(MovementModel.id == movement_id).first()

@@ -7,6 +7,7 @@ from sqlalchemy import cast, Date, func
 from datetime import datetime, timedelta
 from sqlalchemy import or_
 from dateutil.relativedelta import relativedelta
+from app.backend.classes.customer_class import CustomerClass
 import json
 
 class DteClass:
@@ -1434,7 +1435,7 @@ class DteClass:
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 106
+                DteModel.branch_office_id == 29
             ).all()
             
             whatsapp_class = WhatsappClass(self.db)
@@ -1445,16 +1446,24 @@ class DteClass:
             print(f"Enviando WhatsApp masivo para {len(dtes)} DTEs del período {current_period}")
             
             for dte in dtes:
+                whatsapp_response = None
+                customer_name = "No disponible"
+                customer_phone = "No disponible"
+                
                 try:
+                    # Obtener datos del cliente para todos los casos (siempre necesario para el response)
+                    
+                    customer = CustomerClass(self.db).get_by_rut(dte.rut)
+                    customer_data = json.loads(customer)
+                    
+                    # Extraer nombre y teléfono del cliente
+                    if customer_data and 'customer_data' in customer_data:
+                        customer_name = customer_data['customer_data'].get('customer', 'No disponible')
+                        customer_phone = customer_data['customer_data'].get('phone', 'No disponible')
+                    
                     # Aplicar el mismo proceso que en generate_ticket/generate_bill según el tipo
                     # Si el DTE no tiene folio, necesita generarlo primero
                     if not dte.folio or dte.folio == 0:
-                        # Importar las clases necesarias
-                        from app.backend.classes.customer_class import CustomerClass
-                        
-                        # Obtener datos del cliente
-                        customer = CustomerClass(self.db).get_by_rut(dte.rut)
-                        customer_data = json.loads(customer)
                         
                         # Crear un objeto form_data simulado
                         class FormDataSimulator:
@@ -1471,6 +1480,20 @@ class DteClass:
                         # Verificar el tipo de DTE para usar la clase correcta
                         if dte.dte_type_id == 39:  # Boleta electrónica
                             from app.backend.classes.customer_ticket_class import CustomerTicketClass
+                            
+                            # Validar que no exista un DTE duplicado (misma validación que en customer_ticket_class)
+                            check_dte_existence = self.db.query(DteModel).filter(
+                                DteModel.branch_office_id == dte.branch_office_id,
+                                DteModel.rut == dte.rut,
+                                DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                                DteModel.dte_type_id == 39,
+                                DteModel.dte_version_id == 1,
+                                DteModel.status_id == 4,
+                                DteModel.period == datetime.now().strftime('%Y-%m')
+                            ).count()
+                            
+                            if check_dte_existence > 0:
+                                raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
                             
                             # Crear instancia de CustomerTicketClass
                             customer_ticket_class = CustomerTicketClass(self.db)
@@ -1492,8 +1515,8 @@ class DteClass:
                                     self.db.commit()
                                     self.db.refresh(dte)
                                     
-                                    # Enviar WhatsApp
-                                    whatsapp_class.send(dte, dte.rut)
+                                    # Enviar WhatsApp y capturar respuesta
+                                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
                                 else:
                                     raise Exception("No se pudo generar el folio del ticket")
                             else:
@@ -1501,6 +1524,20 @@ class DteClass:
                                 
                         elif dte.dte_type_id == 33:  # Factura electrónica
                             from app.backend.classes.customer_bill_class import CustomerBillClass
+                            
+                            # Validar que no exista un DTE duplicado (misma validación que en customer_bill_class)
+                            check_dte_existence = self.db.query(DteModel).filter(
+                                DteModel.branch_office_id == dte.branch_office_id,
+                                DteModel.rut == dte.rut,
+                                DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                                DteModel.dte_type_id == 33,
+                                DteModel.dte_version_id == 1,
+                                DteModel.status_id == 4,
+                                DteModel.period == datetime.now().strftime('%Y-%m')
+                            ).count()
+                            
+                            if check_dte_existence > 0:
+                                raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
                             
                             # Crear instancia de CustomerBillClass
                             customer_bill_class = CustomerBillClass(self.db)
@@ -1522,8 +1559,8 @@ class DteClass:
                                     self.db.commit()
                                     self.db.refresh(dte)
                                     
-                                    # Enviar WhatsApp
-                                    whatsapp_class.send(dte, dte.rut)
+                                    # Enviar WhatsApp y capturar respuesta
+                                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
                                 else:
                                     raise Exception("No se pudo generar el folio de la factura")
                             else:
@@ -1535,32 +1572,79 @@ class DteClass:
                         # Si ya tiene folio, solo actualizar status y enviar WhatsApp
                         dte.status_id = 4
                         self.db.commit()
-                        whatsapp_class.send(dte, dte.rut)
+                        # Enviar WhatsApp y capturar respuesta
+                        whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
-                    successful_sends += 1
-                    results.append({
-                        "id": dte.id,
-                        "folio": dte.folio,
-                        "rut": dte.rut,
-                        "dte_type_id": dte.dte_type_id,
-                        "status": "success",
-                        "message": "DTE processed and WhatsApp sent successfully"
-                    })
-                    
-                    print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
+                    # Verificar si WhatsApp fue exitoso
+                    if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
+                        successful_sends += 1
+                        results.append({
+                            "id": dte.id,
+                            "folio": dte.folio,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "dte_type_id": dte.dte_type_id,
+                            "status": "success",
+                            "message": "DTE processed and WhatsApp sent successfully",
+                            "whatsapp_response": whatsapp_response
+                        })
+                        
+                        print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
+                    else:
+                        # WhatsApp falló pero DTE se procesó
+                        failed_sends += 1
+                        results.append({
+                            "id": dte.id,
+                            "folio": dte.folio,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "dte_type_id": dte.dte_type_id,
+                            "status": "partial_success",
+                            "message": "DTE processed but WhatsApp failed",
+                            "whatsapp_response": whatsapp_response
+                        })
+                        
+                        print(f"⚠️ DTE procesado pero WhatsApp falló para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
                     
                 except Exception as e:
+                    # Capturar cualquier error y continuar con el siguiente DTE
                     failed_sends += 1
-                    results.append({
-                        "id": dte.id,
-                        "folio": dte.folio,
-                        "rut": dte.rut,
-                        "dte_type_id": dte.dte_type_id,
-                        "status": "error",
-                        "message": f"Error sending WhatsApp: {str(e)}"
-                    })
                     
-                    print(f"❌ Error enviando WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}: {str(e)}")
+                    # Verificar si es un error de duplicado - NO ENVIAR WhatsApp
+                    if "duplicado" in str(e).lower():
+                        results.append({
+                            "id": dte.id,
+                            "folio": dte.folio if hasattr(dte, 'folio') else None,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "dte_type_id": dte.dte_type_id,
+                            "status": "duplicate_error",
+                            "message": f"DTE duplicado detectado - No se envió WhatsApp: {str(e)}",
+                            "whatsapp_response": None
+                        })
+                        
+                        print(f"🚫 DTE duplicado detectado para ID: {dte.id}, RUT: {dte.rut}, Tipo: {dte.dte_type_id}: {str(e)}")
+                    else:
+                        # Otros errores
+                        results.append({
+                            "id": dte.id,
+                            "folio": dte.folio if hasattr(dte, 'folio') else None,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "dte_type_id": dte.dte_type_id,
+                            "status": "error",
+                            "message": f"Error processing DTE: {str(e)}",
+                            "whatsapp_response": whatsapp_response
+                        })
+                        
+                        print(f"❌ Error procesando DTE ID: {dte.id}, RUT: {dte.rut}, Tipo: {dte.dte_type_id}: {str(e)}")
+                    
+                    # Continuar con el siguiente DTE sin detener el foreach
+                    continue
             
             return {
                 "status": "success",
