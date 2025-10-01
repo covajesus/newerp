@@ -1433,7 +1433,8 @@ class DteClass:
             # Buscar DTEs del período actual con status_id = 2
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
-                DteModel.status_id == 2
+                DteModel.status_id == 2,
+                DteModel.branch_office_id == 106
             ).all()
             
             whatsapp_class = WhatsappClass(self.db)
@@ -1445,21 +1446,17 @@ class DteClass:
             
             for dte in dtes:
                 try:
-                    # Aplicar el mismo proceso que en generate_ticket
+                    # Aplicar el mismo proceso que en generate_ticket/generate_bill según el tipo
                     # Si el DTE no tiene folio, necesita generarlo primero
                     if not dte.folio or dte.folio == 0:
                         # Importar las clases necesarias
                         from app.backend.classes.customer_class import CustomerClass
-                        from app.backend.classes.customer_ticket_class import CustomerTicketClass
                         
                         # Obtener datos del cliente
                         customer = CustomerClass(self.db).get_by_rut(dte.rut)
                         customer_data = json.loads(customer)
                         
-                        # Crear instancia de CustomerTicketClass para acceder a sus métodos
-                        customer_ticket_class = CustomerTicketClass(self.db)
-                        
-                        # Crear un objeto form_data simulado para pre_generate_ticket
+                        # Crear un objeto form_data simulado
                         class FormDataSimulator:
                             def __init__(self, dte):
                                 self.branch_office_id = dte.branch_office_id
@@ -1467,32 +1464,73 @@ class DteClass:
                                 self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
                                 self.chip_id = dte.chip_id
                                 self.will_save = 0  # No guardar, solo generar
+                                self.id = dte.id  # Necesario para customer_bill_class
                         
                         form_data_sim = FormDataSimulator(dte)
                         
-                        # Pre-generar el ticket
-                        code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
-                        
-                        if code is not None and code != 402:
-                            # Generar el ticket con folio
-                            folio = customer_ticket_class.generate_ticket(dte.rut, code)
+                        # Verificar el tipo de DTE para usar la clase correcta
+                        if dte.dte_type_id == 39:  # Boleta electrónica
+                            from app.backend.classes.customer_ticket_class import CustomerTicketClass
                             
-                            if folio:
-                                # Guardar PDF
-                                customer_ticket_class.save_pdf_ticket(folio)
+                            # Crear instancia de CustomerTicketClass
+                            customer_ticket_class = CustomerTicketClass(self.db)
+                            
+                            # Pre-generar el ticket
+                            code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
+                            
+                            if code is not None and code != 402:
+                                # Generar el ticket con folio
+                                folio = customer_ticket_class.generate_ticket(dte.rut, code)
                                 
-                                # Actualizar DTE con folio y status
-                                dte.folio = folio
-                                dte.status_id = 4
-                                self.db.commit()
-                                self.db.refresh(dte)
-                                
-                                # Enviar WhatsApp
-                                whatsapp_class.send(dte, dte.rut)
+                                if folio:
+                                    # Guardar PDF
+                                    customer_ticket_class.save_pdf_ticket(folio)
+                                    
+                                    # Actualizar DTE con folio y status
+                                    dte.folio = folio
+                                    dte.status_id = 4
+                                    self.db.commit()
+                                    self.db.refresh(dte)
+                                    
+                                    # Enviar WhatsApp
+                                    whatsapp_class.send(dte, dte.rut)
+                                else:
+                                    raise Exception("No se pudo generar el folio del ticket")
                             else:
-                                raise Exception("No se pudo generar el folio")
+                                raise Exception("Error en pre-generación del ticket")
+                                
+                        elif dte.dte_type_id == 33:  # Factura electrónica
+                            from app.backend.classes.customer_bill_class import CustomerBillClass
+                            
+                            # Crear instancia de CustomerBillClass
+                            customer_bill_class = CustomerBillClass(self.db)
+                            
+                            # Pre-generar la factura
+                            code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
+                            
+                            if code is not None and code != 402:
+                                # Generar la factura con folio
+                                folio = customer_bill_class.generate_bill(dte.rut, code)
+                                
+                                if folio:
+                                    # Guardar PDF
+                                    customer_bill_class.save_pdf_bill(folio)
+                                    
+                                    # Actualizar DTE con folio y status
+                                    dte.folio = folio
+                                    dte.status_id = 4
+                                    self.db.commit()
+                                    self.db.refresh(dte)
+                                    
+                                    # Enviar WhatsApp
+                                    whatsapp_class.send(dte, dte.rut)
+                                else:
+                                    raise Exception("No se pudo generar el folio de la factura")
+                            else:
+                                raise Exception("Error en pre-generación de la factura")
                         else:
-                            raise Exception("Error en pre-generación del ticket")
+                            raise Exception(f"Tipo de DTE no soportado: {dte.dte_type_id}")
+                            
                     else:
                         # Si ya tiene folio, solo actualizar status y enviar WhatsApp
                         dte.status_id = 4
@@ -1504,11 +1542,12 @@ class DteClass:
                         "id": dte.id,
                         "folio": dte.folio,
                         "rut": dte.rut,
+                        "dte_type_id": dte.dte_type_id,
                         "status": "success",
                         "message": "DTE processed and WhatsApp sent successfully"
                     })
                     
-                    print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}")
+                    print(f"✅ DTE procesado y WhatsApp enviado para ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
                     
                 except Exception as e:
                     failed_sends += 1
@@ -1516,11 +1555,12 @@ class DteClass:
                         "id": dte.id,
                         "folio": dte.folio,
                         "rut": dte.rut,
+                        "dte_type_id": dte.dte_type_id,
                         "status": "error",
                         "message": f"Error sending WhatsApp: {str(e)}"
                     })
                     
-                    print(f"❌ Error enviando WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}: {str(e)}")
+                    print(f"❌ Error enviando WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}: {str(e)}")
             
             return {
                 "status": "success",
