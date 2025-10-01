@@ -1426,6 +1426,9 @@ class DteClass:
         Decrementa en 1 la cantidad total de DTEs que deben ser enviados en la tabla total_dtes_to_be_sent con id = 1
         """
         try:
+            # Rollback cualquier transacción pendiente
+            self.db.rollback()
+            
             total_record = self.db.query(TotalDtesToBeSentModel).filter(TotalDtesToBeSentModel.id == 1).first()
             if total_record and total_record.quantity > 0:
                 total_record.quantity -= 1
@@ -1437,6 +1440,7 @@ class DteClass:
                 print("⚠️ No hay DTEs pendientes para decrementar")
                 return 0
         except Exception as e:
+            self.db.rollback()
             print(f"Error al decrementar total DTEs to be sent: {str(e)}")
             return 0
 
@@ -1852,6 +1856,8 @@ class DteClass:
             # Procesar cada DTE individualmente
             for i, dte in enumerate(dtes, 1):
                 try:
+                    # Limpiar cualquier transacción pendiente
+                    self.db.rollback()
                     processed += 1
                     
                     # Enviar progreso
@@ -1928,8 +1934,6 @@ class DteClass:
                     
                     if whatsapp_response and whatsapp_response.get("status") == "success":
                         successful_sends += 1
-                        # Decrementar contador
-                        self.decrease_dtes_to_be_sent()
                         
                         yield {
                             "type": "dte_result",
@@ -1953,6 +1957,8 @@ class DteClass:
                         }
                         
                 except Exception as e:
+                    # Rollback en caso de error
+                    self.db.rollback()
                     failed_sends += 1
                     processed += 1
                     
@@ -1975,6 +1981,14 @@ class DteClass:
                             "current": i,
                             "total": total_dtes
                         }
+            
+            # Decrementar contador por cada envío exitoso
+            if successful_sends > 0:
+                try:
+                    for _ in range(successful_sends):
+                        self.decrease_dtes_to_be_sent()
+                except Exception as counter_error:
+                    print(f"Error al decrementar contadores: {str(counter_error)}")
             
             # Resultado final
             yield {
