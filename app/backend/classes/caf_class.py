@@ -145,10 +145,11 @@ class CafClass:
             sql_content += f"-- Quantity: {quantity}\n"
             sql_content += f"-- Branch Office ID: {branch_office_id}\n"
             sql_content += f"-- Cashier ID: {cashier_id}\n"
-            sql_content += f"-- Folio Segment ID: {folio_segment_id}\n\n"
+            sql_content += f"-- Folio Segment ID: {folio_segment_id}\n"
+            sql_content += f"-- Generated Date: {current_datetime}\n\n"
             
             for folio_number in sorted(folios_numbers):
-                sql_content += f"INSERT INTO folios (used_id, folio) VALUES (0, {folio_number});\n"
+                sql_content += f"INSERT INTO folios (used_id, folio, added_date, updated_date) VALUES (0, {folio_number}, '{current_datetime}', '{current_datetime}');\n"
             
             return {
                 "status": "success",
