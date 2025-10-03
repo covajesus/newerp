@@ -110,11 +110,16 @@ class CafClass:
             folio_max = max(folios_numbers)
             
             # Paso 2: Actualizar los folios seleccionados
+            from datetime import datetime
+            current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             update_query = text("""
                 UPDATE folios 
                 SET cashier_id = :cashier_id, 
                     branch_office_id = :branch_office_id, 
-                    requested_status_id = 1 
+                    requested_status_id = 1,
+                    added_date = :added_date,
+                    updated_date = :updated_date
                 WHERE folio <= :folio_max 
                 AND folio >= :folio_min
                 AND folio_segment_id = :folio_segment_id 
@@ -127,7 +132,9 @@ class CafClass:
                 "branch_office_id": branch_office_id,
                 "folio_max": folio_max,
                 "folio_min": folio_min,
-                "folio_segment_id": folio_segment_id
+                "folio_segment_id": folio_segment_id,
+                "added_date": current_datetime,
+                "updated_date": current_datetime
             })
             
             self.db2.commit()
