@@ -766,6 +766,13 @@ def send_massive_dtes(db: Session = Depends(get_db)):
 def send_massive_dtes_stream(branch_office_id: int, db: Session = Depends(get_db)):
     """
     Endpoint para enviar WhatsApp masivamente con streaming de respuestas en tiempo real
+    
+    Parámetros:
+    - branch_office_id: ID de la sucursal (si es 0, procesa todas las sucursales)
+    
+    Comportamiento:
+    - branch_office_id = 0: Envía DTEs de todas las sucursales
+    - branch_office_id > 0: Envía DTEs solo de la sucursal específica
     """
     def generate_dte_stream():
         try:
@@ -774,29 +781,39 @@ def send_massive_dtes_stream(branch_office_id: int, db: Session = Depends(get_db
             # Obtener el período actual y los DTEs
             current_period = datetime.now().strftime('%Y-%m')
             
-            dtes = db.query(DteModel).filter(
+            # Construir filtro base
+            base_filter = [
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.dte_version_id == 1,
-                DteModel.branch_office_id == branch_office_id
-            ).all()
+                DteModel.dte_version_id == 1
+            ]
+            
+            # Si branch_office_id es 0, procesar todas las sucursales
+            if branch_office_id != 0:
+                base_filter.append(DteModel.branch_office_id == branch_office_id)
+            
+            dtes = db.query(DteModel).filter(*base_filter).all()
             
             # Enviar información inicial
+            branch_info = f" de sucursal {branch_office_id}" if branch_office_id != 0 else " de todas las sucursales"
             initial_data = {
                 "type": "init",
                 "period": current_period,
                 "total_dtes": len(dtes),
-                "message": f"Iniciando envío masivo para {len(dtes)} DTEs del período {current_period}"
+                "branch_office_id": branch_office_id,
+                "message": f"Iniciando envío masivo para {len(dtes)} DTEs{branch_info} del período {current_period}"
             }
             yield f"data: {json.dumps(initial_data)}\n\n"
             
             if not dtes:
+                branch_scope = f" en sucursal {branch_office_id}" if branch_office_id != 0 else " en todas las sucursales"
                 no_data = {
                     "type": "complete",
                     "total_dtes": 0,
                     "successful_sends": 0,
                     "failed_sends": 0,
-                    "message": "No hay DTEs para procesar"
+                    "branch_office_id": branch_office_id,
+                    "message": f"No hay DTEs para procesar{branch_scope}"
                 }
                 yield f"data: {json.dumps(no_data)}\n\n"
                 return

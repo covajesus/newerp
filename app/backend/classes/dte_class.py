@@ -1411,17 +1411,26 @@ class DteClass:
         """
         Obtiene la cantidad total de DTEs que deben ser enviados contando directamente desde DteModel
         con filtros específicos: status_id=2, dte_version_id=1, período actual y branch_office_id
+        
+        Parámetros:
+        - branch_office_id: ID de la sucursal (si es 0, cuenta todas las sucursales)
         """
         try:
             from datetime import datetime
             current_period = datetime.now().strftime('%Y-%m')
             
-            quantity = self.db.query(DteModel).filter(
+            # Construir filtro base
+            base_filter = [
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.dte_version_id == 1,
-                DteModel.branch_office_id == branch_office_id
-            ).count()
+                DteModel.dte_version_id == 1
+            ]
+            
+            # Si branch_office_id no es 0, filtrar por sucursal específica
+            if branch_office_id != 0:
+                base_filter.append(DteModel.branch_office_id == branch_office_id)
+            
+            quantity = self.db.query(DteModel).filter(*base_filter).count()
             
             return quantity
         except Exception as e:
@@ -1835,21 +1844,28 @@ class DteClass:
             from datetime import datetime
             current_period = datetime.now().strftime('%Y-%m')
             
-            dtes = self.db.query(DteModel).filter(
+            # Construir filtro base
+            base_filter = [
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.dte_version_id == 1,
-                DteModel.branch_office_id == branch_office_id
-            ).all()
+                DteModel.dte_version_id == 1
+            ]
+            
+            # Si branch_office_id es 0, procesar todas las sucursales
+            if branch_office_id != 0:
+                base_filter.append(DteModel.branch_office_id == branch_office_id)
+            
+            dtes = self.db.query(DteModel).filter(*base_filter).all()
             
             if not dtes:
+                branch_info = f" en sucursal {branch_office_id}" if branch_office_id != 0 else " en todas las sucursales"
                 yield {
                     "type": "complete",
                     "total_dtes": 0,
                     "processed": 0,
                     "successful_sends": 0,
                     "failed_sends": 0,
-                    "message": "No hay DTEs para procesar"
+                    "message": f"No hay DTEs para procesar{branch_info}"
                 }
                 return
             
@@ -1880,13 +1896,18 @@ class DteClass:
                     }
                     
                     # Validar duplicado
-                    existing_dte = self.db.query(DteModel).filter(
+                    duplicate_filter = [
                         DteModel.rut == dte.rut,
                         DteModel.dte_type_id == dte.dte_type_id,
                         DteModel.period == current_period,
-                        DteModel.branch_office_id == 32,
                         DteModel.id != dte.id
-                    ).first()
+                    ]
+                    
+                    # Si branch_office_id no es 0, filtrar por sucursal específica
+                    if branch_office_id != 0:
+                        duplicate_filter.append(DteModel.branch_office_id == branch_office_id)
+                    
+                    existing_dte = self.db.query(DteModel).filter(*duplicate_filter).first()
                     
                     if existing_dte:
                         failed_sends += 1
@@ -1932,12 +1953,17 @@ class DteClass:
                     customer_class = CustomerClass(self.db)
                     customer_response = customer_class.get_by_rut(dte.rut)
                     
-                    if customer_response:
-                        import json
-                        customer_data = json.loads(customer_response)
-                        if customer_data and 'customer_data' in customer_data:
-                            customer_name = customer_data['customer_data'].get('customer', 'Cliente no encontrado')
-                            customer_phone = customer_data['customer_data'].get('phone', 'No disponible')
+                    if customer_response and customer_response != "No se encontraron datos para el campo especificado." and not customer_response.startswith("Error:"):
+                        try:
+                            import json
+                            customer_data = json.loads(customer_response)
+                            if customer_data and 'customer_data' in customer_data:
+                                customer_name = customer_data['customer_data'].get('customer', 'Cliente no encontrado')
+                                customer_phone = customer_data['customer_data'].get('phone', 'No disponible')
+                        except (json.JSONDecodeError, TypeError, AttributeError) as e:
+                            # Si hay error parseando el JSON o accediendo a los datos, usar valores por defecto
+                            customer_name = "Cliente no encontrado"
+                            customer_phone = "No disponible"
                     
                     # Enviar WhatsApp
                     from app.backend.classes.whatsapp_class import WhatsappClass
@@ -1946,12 +1972,17 @@ class DteClass:
                     
                     # Obtener contador actualizado desde DteModel
                     try:
-                        remaining_dtes = self.db.query(DteModel).filter(
+                        remaining_filter = [
                             DteModel.period == current_period,
                             DteModel.status_id == 2,
-                            DteModel.dte_version_id == 1,
-                            DteModel.branch_office_id == branch_office_id
-                        ).count()
+                            DteModel.dte_version_id == 1
+                        ]
+                        
+                        # Si branch_office_id no es 0, filtrar por sucursal específica
+                        if branch_office_id != 0:
+                            remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        
+                        remaining_dtes = self.db.query(DteModel).filter(*remaining_filter).count()
                     except:
                         remaining_dtes = 0
                     
@@ -1993,12 +2024,17 @@ class DteClass:
                     
                     # Obtener contador actualizado incluso en errores
                     try:
-                        remaining_dtes = self.db.query(DteModel).filter(
+                        error_remaining_filter = [
                             DteModel.period == current_period,
                             DteModel.status_id == 2,
-                            DteModel.dte_version_id == 1,
-                            DteModel.branch_office_id == branch_office_id
-                        ).count()
+                            DteModel.dte_version_id == 1
+                        ]
+                        
+                        # Si branch_office_id no es 0, filtrar por sucursal específica
+                        if branch_office_id != 0:
+                            error_remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        
+                        remaining_dtes = self.db.query(DteModel).filter(*error_remaining_filter).count()
                     except:
                         remaining_dtes = 0
                     
@@ -2030,18 +2066,25 @@ class DteClass:
             
             # Obtener contador actualizado desde DteModel
             try:
-                remaining_dtes = self.db.query(DteModel).filter(
+                final_remaining_filter = [
                     DteModel.period == current_period,
                     DteModel.status_id == 2,
-                    DteModel.dte_version_id == 1,
-                    DteModel.branch_office_id == branch_office_id
-                ).count()
-                print(f"✅ DTEs restantes por enviar (actualizado): {remaining_dtes}")
+                    DteModel.dte_version_id == 1
+                ]
+                
+                # Si branch_office_id no es 0, filtrar por sucursal específica
+                if branch_office_id != 0:
+                    final_remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                
+                remaining_dtes = self.db.query(DteModel).filter(*final_remaining_filter).count()
+                branch_info = f" (sucursal {branch_office_id})" if branch_office_id != 0 else " (todas las sucursales)"
+                print(f"✅ DTEs restantes por enviar{branch_info}: {remaining_dtes}")
             except Exception as e:
                 remaining_dtes = 0
                 print(f"⚠️ Error al obtener contador actualizado: {str(e)}")
             
             # Resultado final
+            branch_scope = f" (sucursal {branch_office_id})" if branch_office_id != 0 else " (todas las sucursales)"
             yield {
                 "type": "complete",
                 "period": current_period,
@@ -2050,7 +2093,8 @@ class DteClass:
                 "successful_sends": successful_sends,
                 "failed_sends": failed_sends,
                 "remaining_dtes": remaining_dtes,
-                "message": f"Envío masivo completado. {successful_sends} exitosos, {failed_sends} fallidos. Restantes: {remaining_dtes}"
+                "branch_office_id": branch_office_id,
+                "message": f"Envío masivo completado{branch_scope}. {successful_sends} exitosos, {failed_sends} fallidos. Restantes: {remaining_dtes}"
             }
             
         except Exception as e:

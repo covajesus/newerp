@@ -197,7 +197,21 @@ class DepositClass:
             return f"Error: {error_message}"
 
     def store(self, form_data, support):
-        # Crear una nueva instancia de ContractModel
+        # Validar que el depósito no existe (evitar duplicados)
+        existing_deposit = self.db.query(DepositModel).filter(
+            DepositModel.branch_office_id == form_data.branch_office_id,
+            DepositModel.payment_number == form_data.payment_number,
+            DepositModel.deposited_amount == form_data.deposited_amount,
+            DepositModel.deposit_date == form_data.deposit_date
+        ).first()
+        
+        if existing_deposit:
+            return {
+                "status": "error", 
+                "message": f"Ya existe un depósito con los mismos datos: Sucursal {form_data.branch_office_id}, Número {form_data.payment_number}, Monto {form_data.deposited_amount}, Fecha {form_data.deposit_date}"
+            }
+        
+        # Crear una nueva instancia de DepositModel
         deposit = DepositModel()
         
         # Asignar los valores del formulario a la instancia del modelo
