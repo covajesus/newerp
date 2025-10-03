@@ -62,14 +62,12 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(value=CapitulationModel.status_id,
-                         whens={
-                             1: 0,   # No Revisado
-                             2: 1,   # Aceptado
-                             13: 2,  # Pagada
-                             5: 3    # Imputada Pagada
-                         },
-                         else_=100
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
                     ),
                     CapitulationModel.document_date.desc()
                 )
@@ -121,14 +119,12 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(value=CapitulationModel.status_id,
-                         whens={
-                             1: 0,   # No Revisado
-                             2: 1,   # Aceptado
-                             13: 2,  # Pagada
-                             5: 3    # Imputada Pagada
-                         },
-                         else_=100
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
                     ),
                     CapitulationModel.document_date.desc()
                 )   
@@ -180,14 +176,12 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(value=CapitulationModel.status_id,
-                         whens={
-                             1: 0,   # No Revisado
-                             2: 1,   # Aceptado
-                             13: 2,  # Pagada
-                             5: 3    # Imputada Pagada
-                         },
-                         else_=100
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
                     ),
                     CapitulationModel.document_date.desc()
                 )
