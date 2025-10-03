@@ -26,6 +26,9 @@ class CapitulationClass:
                 
                 if status_id is not None:
                     filters.append(CapitulationModel.status_id == status_id)
+                
+                # No mostrar rechazadas
+                filters.append(CapitulationModel.status_id != 3)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
@@ -59,9 +62,14 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(
-                        (CapitulationModel.status_id == 13, 0),
-                        else_=1
+                    case(value=CapitulationModel.status_id,
+                         whens={
+                             1: 0,   # No Revisado
+                             2: 1,   # Aceptado
+                             13: 2,  # Pagada
+                             5: 3    # Imputada Pagada
+                         },
+                         else_=100
                     ),
                     CapitulationModel.document_date.desc()
                 )
@@ -75,6 +83,9 @@ class CapitulationClass:
                 
                 if status_id is not None:
                     filters.append(CapitulationModel.status_id == status_id)
+                
+                # No mostrar rechazadas
+                filters.append(CapitulationModel.status_id != 3)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
@@ -110,7 +121,16 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    CapitulationModel.document_date.desc(), CapitulationModel.status_id.asc()
+                    case(value=CapitulationModel.status_id,
+                         whens={
+                             1: 0,   # No Revisado
+                             2: 1,   # Aceptado
+                             13: 2,  # Pagada
+                             5: 3    # Imputada Pagada
+                         },
+                         else_=100
+                    ),
+                    CapitulationModel.document_date.desc()
                 )   
             else:
                 # Inicialización de filtros dinámicos
@@ -122,6 +142,9 @@ class CapitulationClass:
                 
                 if status_id is not None:
                     filters.append(CapitulationModel.status_id == status_id)
+                
+                # No mostrar rechazadas
+                filters.append(CapitulationModel.status_id != 3)
 
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
@@ -157,6 +180,15 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
+                    case(value=CapitulationModel.status_id,
+                         whens={
+                             1: 0,   # No Revisado
+                             2: 1,   # Aceptado
+                             13: 2,  # Pagada
+                             5: 3    # Imputada Pagada
+                         },
+                         else_=100
+                    ),
                     CapitulationModel.document_date.desc()
                 )
 
