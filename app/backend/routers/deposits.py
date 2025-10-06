@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.deposit_class import DepositClass
 from app.backend.schemas import Deposit, DepositList
+from app.backend.db.models import DepositModel
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
 import uuid
@@ -54,6 +55,20 @@ def store(
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
+    # Validar que el depósito no existe (evitar duplicados)
+    existing_deposit = db.query(DepositModel).filter(
+            DepositModel.branch_office_id == form_data.branch_office_id,
+            DepositModel.payment_number == form_data.payment_number,
+            DepositModel.deposited_amount == form_data.deposited_amount
+        ).count()
+
+        
+    if existing_deposit > 0:
+        return {
+            "status": "error", 
+            "message": f"Ya existe un depósito con los mismos datos"
+        }
+        
     try:
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]
