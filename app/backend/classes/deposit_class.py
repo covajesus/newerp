@@ -224,6 +224,26 @@ class DepositClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
+    def _convert_date_format(self, date_str):
+        """
+        Convierte fecha de formato DD-MM-YYYY a YYYY-MM-DD para MySQL
+        """
+        if not date_str:
+            return date_str
+        
+        try:
+            # Si la fecha ya está en formato YYYY-MM-DD, devolverla tal como está
+            if '-' in date_str and len(date_str.split('-')[0]) == 4:
+                return date_str
+            
+            # Convertir de DD-MM-YYYY a YYYY-MM-DD
+            from datetime import datetime
+            date_obj = datetime.strptime(date_str, '%d-%m-%Y')
+            return date_obj.strftime('%Y-%m-%d')
+        except ValueError:
+            # Si no se puede convertir, devolver la fecha original
+            return date_str
+
     def accept(self, id, deposit_data=None):
         """
         Acepta un depósito y opcionalmente actualiza sus datos.
@@ -240,12 +260,16 @@ class DepositClass:
         try:
             # Si se proporcionan datos adicionales, verificar si existe un duplicado
             if deposit_data:
+                # Convertir fechas al formato correcto antes de la consulta
+                deposit_date_formatted = self._convert_date_format(deposit_data.get('deposit_date'))
+                collection_date_formatted = self._convert_date_format(deposit_data.get('collection_date'))
+                
                 # Verificar duplicados usando los mismos criterios que en store()
                 existing_deposit = self.db.query(DepositModel).filter(
                     DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
                     DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
                     DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
-                    DepositModel.deposit_date == deposit_data.get('deposit_date', deposit.deposit_date),
+                    DepositModel.deposit_date == deposit_date_formatted if deposit_date_formatted else deposit.deposit_date,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 
@@ -274,7 +298,7 @@ class DepositClass:
                 if 'deposited_amount' in deposit_data:
                     target_deposit.deposited_amount = deposit_data['deposited_amount']
                 if 'deposit_date' in deposit_data:
-                    target_deposit.deposit_date = deposit_data['deposit_date']
+                    target_deposit.deposit_date = deposit_date_formatted
                 if 'payment_number' in deposit_data:
                     target_deposit.payment_number = deposit_data['payment_number']
                 if 'collection_id' in deposit_data:
@@ -282,7 +306,7 @@ class DepositClass:
                 if 'collection_amount' in deposit_data:
                     target_deposit.collection_amount = deposit_data['collection_amount']
                 if 'collection_date' in deposit_data:
-                    target_deposit.collection_date = deposit_data['collection_date']
+                    target_deposit.collection_date = collection_date_formatted
 
             self.db.commit()
             self.db.refresh(target_deposit)
@@ -313,12 +337,16 @@ class DepositClass:
         try:
             # Si se proporcionan datos adicionales, verificar si existe un duplicado
             if deposit_data:
+                # Convertir fechas al formato correcto antes de la consulta
+                deposit_date_formatted = self._convert_date_format(deposit_data.get('deposit_date'))
+                collection_date_formatted = self._convert_date_format(deposit_data.get('collection_date'))
+                
                 # Verificar duplicados usando los mismos criterios que en store()
                 existing_deposit = self.db.query(DepositModel).filter(
                     DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
                     DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
                     DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
-                    DepositModel.deposit_date == deposit_data.get('deposit_date', deposit.deposit_date),
+                    DepositModel.deposit_date == deposit_date_formatted if deposit_date_formatted else deposit.deposit_date,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 
@@ -347,7 +375,7 @@ class DepositClass:
                 if 'deposited_amount' in deposit_data:
                     target_deposit.deposited_amount = deposit_data['deposited_amount']
                 if 'deposit_date' in deposit_data:
-                    target_deposit.deposit_date = deposit_data['deposit_date']
+                    target_deposit.deposit_date = deposit_date_formatted
                 if 'payment_number' in deposit_data:
                     target_deposit.payment_number = deposit_data['payment_number']
                 if 'collection_id' in deposit_data:
@@ -355,7 +383,7 @@ class DepositClass:
                 if 'collection_amount' in deposit_data:
                     target_deposit.collection_amount = deposit_data['collection_amount']
                 if 'collection_date' in deposit_data:
-                    target_deposit.collection_date = deposit_data['collection_date']
+                    target_deposit.collection_date = collection_date_formatted
 
             self.db.commit()
             self.db.refresh(target_deposit)
