@@ -87,20 +87,32 @@ def store(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
-@deposits.get("/accept/{id}")
-def accept(id:int, db: Session = Depends(get_db)):
-    data = DepositClass(db).accept(id)
+@deposits.post("/accept/{id}")
+def accept(id: int, deposit_data: dict, db: Session = Depends(get_db)):
+    """
+    Acepta un depósito con datos adicionales del frontend
+    """
+    try:
+        # Llamar al método accept con los datos adicionales
+        result = DepositClass(db).accept(id, deposit_data)
+        return {"message": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al aceptar depósito: {str(e)}")
 
-    return {"message": data}
-
-@deposits.get("/reject/{id}")
-def accept(id:int, db: Session = Depends(get_db)):
-    data = DepositClass(db).reject(id)
-
-    return {"message": data}
+@deposits.post("/reject/{id}")
+def reject(id: int, deposit_data: dict, db: Session = Depends(get_db)):
+    """
+    Rechaza un depósito con datos adicionales del frontend
+    """
+    try:
+        # Llamar al método reject con los datos adicionales
+        result = DepositClass(db).reject(id, deposit_data)
+        return {"message": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al rechazar depósito: {str(e)}")
 
 @deposits.delete("/delete/{id}")
-def accept(id:int, db: Session = Depends(get_db)):
+def delete(id: int, db: Session = Depends(get_db)):
     data = DepositClass(db).delete(id)
 
     return {"message": data}

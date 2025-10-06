@@ -224,33 +224,151 @@ class DepositClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def accept(self, id):
+    def accept(self, id, deposit_data=None):
         """
-        Actualiza los datos de la patente en la base de datos.
-        """
-        deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
-        if not deposit:
-            raise HTTPException(status_code=404, detail="Patente no encontrada")
-
-        # Actualizar campos
-        deposit.status_id = 6
-
-        self.db.commit()
-        self.db.refresh(deposit)
-
-    def reject(self, id):
-        """
-        Actualiza los datos de la patente en la base de datos.
+        Acepta un depósito y opcionalmente actualiza sus datos.
+        Si encuentra un registro duplicado, lo actualiza en lugar de crear uno nuevo.
+        
+        Args:
+            id: ID del depósito a aceptar
+            deposit_data: Datos adicionales del depósito (opcional)
         """
         deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
         if not deposit:
-            raise HTTPException(status_code=404, detail="Patente no encontrada")
+            raise HTTPException(status_code=404, detail="Depósito no encontrado")
 
-        # Actualizar campos
-        deposit.status_id = 3
+        try:
+            # Si se proporcionan datos adicionales, verificar si existe un duplicado
+            if deposit_data:
+                # Verificar duplicados usando los mismos criterios que en store()
+                existing_deposit = self.db.query(DepositModel).filter(
+                    DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
+                    DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
+                    DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
+                    DepositModel.deposit_date == deposit_data.get('deposit_date', deposit.deposit_date),
+                    DepositModel.id != id  # Excluir el registro actual
+                ).first()
+                
+                if existing_deposit:
+                    # Si existe un duplicado, actualizar ese registro en lugar del actual
+                    target_deposit = existing_deposit
+                    # También marcar el depósito original como procesado si es diferente
+                    if deposit.id != existing_deposit.id:
+                        deposit.status_id = 6  # Aceptar el original también
+                else:
+                    # No hay duplicados, usar el depósito original
+                    target_deposit = deposit
+            else:
+                # Sin datos adicionales, usar el depósito original
+                target_deposit = deposit
 
-        self.db.commit()
-        self.db.refresh(deposit)
+            # Actualizar campos básicos
+            target_deposit.status_id = 6
+
+            # Si se proporcionan datos adicionales, actualizar los campos correspondientes
+            if deposit_data:
+                if 'branch_office_id' in deposit_data:
+                    target_deposit.branch_office_id = deposit_data['branch_office_id']
+                if 'payment_type_id' in deposit_data:
+                    target_deposit.payment_type_id = deposit_data['payment_type_id']
+                if 'deposited_amount' in deposit_data:
+                    target_deposit.deposited_amount = deposit_data['deposited_amount']
+                if 'deposit_date' in deposit_data:
+                    target_deposit.deposit_date = deposit_data['deposit_date']
+                if 'payment_number' in deposit_data:
+                    target_deposit.payment_number = deposit_data['payment_number']
+                if 'collection_id' in deposit_data:
+                    target_deposit.collection_id = deposit_data['collection_id']
+                if 'collection_amount' in deposit_data:
+                    target_deposit.collection_amount = deposit_data['collection_amount']
+                if 'collection_date' in deposit_data:
+                    target_deposit.collection_date = deposit_data['collection_date']
+
+            self.db.commit()
+            self.db.refresh(target_deposit)
+            
+            message = "Depósito aceptado exitosamente"
+            if deposit_data and existing_deposit and deposit.id != existing_deposit.id:
+                message += " (se actualizó registro duplicado existente)"
+            
+            return {"status": "success", "message": message}
+            
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error al aceptar depósito: {str(e)}"}
+
+    def reject(self, id, deposit_data=None):
+        """
+        Rechaza un depósito y opcionalmente actualiza sus datos.
+        Si encuentra un registro duplicado, lo actualiza en lugar de crear uno nuevo.
+        
+        Args:
+            id: ID del depósito a rechazar
+            deposit_data: Datos adicionales del depósito (opcional)
+        """
+        deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
+        if not deposit:
+            raise HTTPException(status_code=404, detail="Depósito no encontrado")
+
+        try:
+            # Si se proporcionan datos adicionales, verificar si existe un duplicado
+            if deposit_data:
+                # Verificar duplicados usando los mismos criterios que en store()
+                existing_deposit = self.db.query(DepositModel).filter(
+                    DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
+                    DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
+                    DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
+                    DepositModel.deposit_date == deposit_data.get('deposit_date', deposit.deposit_date),
+                    DepositModel.id != id  # Excluir el registro actual
+                ).first()
+                
+                if existing_deposit:
+                    # Si existe un duplicado, actualizar ese registro en lugar del actual
+                    target_deposit = existing_deposit
+                    # También marcar el depósito original como rechazado si es diferente
+                    if deposit.id != existing_deposit.id:
+                        deposit.status_id = 3  # Rechazar el original también
+                else:
+                    # No hay duplicados, usar el depósito original
+                    target_deposit = deposit
+            else:
+                # Sin datos adicionales, usar el depósito original
+                target_deposit = deposit
+
+            # Actualizar campos básicos (status_id = 3 para rechazado)
+            target_deposit.status_id = 3
+
+            # Si se proporcionan datos adicionales, actualizar los campos correspondientes
+            if deposit_data:
+                if 'branch_office_id' in deposit_data:
+                    target_deposit.branch_office_id = deposit_data['branch_office_id']
+                if 'payment_type_id' in deposit_data:
+                    target_deposit.payment_type_id = deposit_data['payment_type_id']
+                if 'deposited_amount' in deposit_data:
+                    target_deposit.deposited_amount = deposit_data['deposited_amount']
+                if 'deposit_date' in deposit_data:
+                    target_deposit.deposit_date = deposit_data['deposit_date']
+                if 'payment_number' in deposit_data:
+                    target_deposit.payment_number = deposit_data['payment_number']
+                if 'collection_id' in deposit_data:
+                    target_deposit.collection_id = deposit_data['collection_id']
+                if 'collection_amount' in deposit_data:
+                    target_deposit.collection_amount = deposit_data['collection_amount']
+                if 'collection_date' in deposit_data:
+                    target_deposit.collection_date = deposit_data['collection_date']
+
+            self.db.commit()
+            self.db.refresh(target_deposit)
+            
+            message = "Depósito rechazado exitosamente"
+            if deposit_data and existing_deposit and deposit.id != existing_deposit.id:
+                message += " (se actualizó registro duplicado existente)"
+            
+            return {"status": "success", "message": message}
+            
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error al rechazar depósito: {str(e)}"}
 
     def update(self, id, form_data, support_file = None):
         """
