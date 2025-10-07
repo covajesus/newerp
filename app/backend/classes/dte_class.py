@@ -8,9 +8,6 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 from dateutil.relativedelta import relativedelta
 from app.backend.classes.customer_class import CustomerClass
-from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.classes.customer_ticket_class import CustomerTicketClass
-from app.backend.classes.customer_bill_class import CustomerBillClass
 import json
 
 class DteClass:
