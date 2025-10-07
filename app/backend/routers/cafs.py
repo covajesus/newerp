@@ -49,8 +49,8 @@ def manual_caf(request: ManualCafRequest, session_user: UserLogin = Depends(get_
         folio_max = result["data"]["folio_max"]
         
         # Crear respuesta de descarga del archivo SQL
-        filename = f"caf_manual_{folio_min}_{folio_max}.sql"
-        
+        filename = f"caf_manual_{request.branch_office_id}_{request.cashier_id}_{folio_min}_{folio_max}.sql"
+
         return Response(
             content=sql_content,
             media_type="application/sql",
