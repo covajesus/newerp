@@ -677,7 +677,6 @@ class WhatsappClass:
         else:
             customer_phone = phone_str
 
-        customer_phone = 56928783036
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer_phone}",
