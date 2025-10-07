@@ -470,6 +470,11 @@ class CapitulationClass:
 
         try:
             self.db.commit()
+            
+            # Enviar notificación de WhatsApp sobre el estado de capitulación
+            whatsapp_class = WhatsappClass(self.db)
+            whatsapp_class.status_capitulation(capitulation.user_rut, capitulation.amount)
+            
             return {"status": "success", "message": "Capitulation paid successfully"}
         except Exception as e:
             self.db.rollback()

@@ -1,5 +1,5 @@
 import requests
-from app.backend.db.models import CustomerModel, MovementModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel, CapitulationModel, ExpenseTypeModel
+from app.backend.db.models import CustomerModel, MovementModel, WhatsappTemplateModel, BranchOfficeModel, UserModel, DteModel, CapitulationModel, ExpenseTypeModel, MovementProductModel, ProductModel
 import os
 from dotenv import load_dotenv
 from datetime import datetime
@@ -148,7 +148,6 @@ class WhatsappClass:
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 4).first()
         
         # Obtener los productos del movimiento
-        from app.backend.db.models import MovementProductModel, ProductModel
         movement_products = self.db.query(MovementProductModel, ProductModel).join(
             ProductModel, ProductModel.id == MovementProductModel.product_id
         ).filter(MovementProductModel.movement_id == movement_id).all()
@@ -593,20 +592,15 @@ class WhatsappClass:
             except Exception as e:
                 print(f"❌ Error procesando DTE folio {dte.folio}: {e}")
 
-
-
     def cron_to_resend(self):
         dtes = self.db.query(DteModel).filter(DteModel.status_id == 4).filter(DteModel.dte_type_id == 39).filter(DteModel.dte_version_id == 1).filter(DteModel.period == '2025-08').all()
 
         for dte in dtes:
             print(dte.folio)
             
-
             customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
-
             
             self.resend(dte.id, customer.phone)
-   
 
     def notify_payment(self, folio):
         dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
@@ -631,11 +625,6 @@ class WhatsappClass:
         else:
             customer_phone = phone_str
 
-        print("Customer Phone:", customer_phone)
-
-        if customer_phone == "56942547662" or customer_phone == "56942998970":
-            customer_phone = "56986843524"  # Número de teléfono predeterminado
-
         payload = {
                     "messaging_product": "whatsapp",
                     "to": f"{customer_phone}",
@@ -656,6 +645,54 @@ class WhatsappClass:
                                     {"type": "text", "text": branch_office.branch_office},
                                     {"type": "text", "text": str(dte.total)},
                                     {"type": "text", "text": datetime.strptime(dte.payment_date, '%Y-%m-%d').strftime('%d-%m-%Y')},
+                                ]
+                            }
+                        ]
+                    }
+                }
+
+        print(payload)
+        response = requests.post(url, json=payload, headers=headers)
+
+        print(response.text)
+
+
+    def status_capitulation(self, rut, amount):
+        user = self.db.query(UserModel).filter(UserModel.rut == rut).first()
+        phone = user.phone
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 5).first()
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
+        headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+        
+        phone_str = str(phone).strip()
+        if not phone_str.startswith("56"):
+            customer_phone = "56" + phone_str
+        else:
+            customer_phone = phone_str
+
+        payload = {
+                    "messaging_product": "whatsapp",
+                    "to": f"{customer_phone}",
+                    "type": "template",
+                    "template": {
+                        "name": whatsapp_template.title,
+                        "language": {
+                            "code": "es"
+                        },
+                        "components": [
+                            {
+                                "type": "body",
+                                "parameters": [
+                                    {"type": "text", "text": user.full_name},
+                                    {"type": "text", "text": amount},
+                                    {"type": "text", "text": 'Pagadas'},
                                 ]
                             }
                         ]

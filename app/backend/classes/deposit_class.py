@@ -237,7 +237,6 @@ class DepositClass:
                 return date_str
             
             # Convertir de DD-MM-YYYY a YYYY-MM-DD
-            from datetime import datetime
             date_obj = datetime.strptime(date_str, '%d-%m-%Y')
             return date_obj.strftime('%Y-%m-%d')
         except ValueError:
