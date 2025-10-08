@@ -107,7 +107,24 @@ class FolioClass:
             serialized_data.append(folio_report_dict)
 
         return json.dumps(serialized_data)
-    
+
+    def quantity(self, cashier_id, quantity):
+        try:
+            cashier = self.db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
+
+            if not cashier:
+                return "Cajero no encontrado."
+            
+            cashier.available_folios = quantity
+            self.db.commit()
+            return "Cantidad de folios actualizada."
+
+        except Exception as e:
+            # Captura cualquier error y retorna el mensaje de error
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
+
     def validate(self):
         try:
             folio_count = self.db.query(FolioModel).filter(FolioModel.requested_status_id == 0).count()

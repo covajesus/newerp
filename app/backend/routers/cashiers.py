@@ -70,8 +70,5 @@ def edit(cashier_inputs:SearchCashier, session_user: UserLogin = Depends(get_cur
 
 @cashiers.get("/available_folios/cron")
 def available_folios_cron(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
-    data = CashierClass(db2).get_all_cashiers()
-
-    CashierClass(db).update_all_cashiers(data)
 
     return {"message": 'Updated o inserted cashiers in the second database.'}
