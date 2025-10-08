@@ -116,6 +116,7 @@ class FolioClass:
                 return "Cajero no encontrado."
             
             cashier.available_folios = quantity
+            cashier.updated_date = datetime.datetime.now(pytz.timezone('America/Santiago'))
             self.db.commit()
             return "Cantidad de folios actualizada."
 
