@@ -1407,13 +1407,14 @@ class DteClass:
             print(f"Error al procesar folio {dte.folio}: {str(e)}")
             return 2
 
-    def total_dtes_to_be_sent(self, branch_office_id):
+    def total_dtes_to_be_sent(self, branch_office_id, dte_type_id):
         """
         Obtiene la cantidad total de DTEs que deben ser enviados contando directamente desde DteModel
-        con filtros específicos: status_id=2, dte_version_id=1, período actual y branch_office_id
+        con filtros específicos: status_id=2, dte_version_id=1, período actual, branch_office_id y dte_type_id
         
         Parámetros:
         - branch_office_id: ID de la sucursal (si es 0, cuenta todas las sucursales)
+        - dte_type_id: ID del tipo de DTE (si es 0, cuenta todos los tipos)
         """
         try:
             from datetime import datetime
@@ -1429,6 +1430,10 @@ class DteClass:
             # Si branch_office_id no es 0, filtrar por sucursal específica
             if branch_office_id != 0:
                 base_filter.append(DteModel.branch_office_id == branch_office_id)
+            
+            # Si dte_type_id es mayor que 0, filtrar por tipo de DTE
+            if dte_type_id > 0:
+                base_filter.append(DteModel.dte_type_id == dte_type_id)
             
             quantity = self.db.query(DteModel).filter(*base_filter).count()
             
@@ -1834,10 +1839,14 @@ class DteClass:
         except Exception as e:
             return {"status": "error", "message": f"Error generando DTE: {str(e)}"}
 
-    def send_massive_dtes_streaming(self, branch_office_id):
+    def send_massive_dtes_streaming(self, branch_office_id, dte_type_id):
         """
         Generador que envía WhatsApp masivamente y produce progreso en tiempo real
         Yields dict con información de progreso para cada DTE procesado
+        
+        Parámetros:
+        - branch_office_id: ID de la sucursal (si es 0, procesa todas las sucursales)
+        - dte_type_id: ID del tipo de DTE (si es 0, procesa todos los tipos)
         """
         try:
             # Obtener DTEs del período actual
@@ -1854,6 +1863,10 @@ class DteClass:
             # Si branch_office_id es 0, procesar todas las sucursales
             if branch_office_id != 0:
                 base_filter.append(DteModel.branch_office_id == branch_office_id)
+            
+            # Si dte_type_id es mayor que 0, filtrar por tipo de DTE
+            if dte_type_id > 0:
+                base_filter.append(DteModel.dte_type_id == dte_type_id)
             
             dtes = self.db.query(DteModel).filter(*base_filter).all()
             
