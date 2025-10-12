@@ -911,17 +911,17 @@ class DteClass:
                             print(f"Error al guardar el cliente: {str(e)}")
 
                     print(f"""
-    Tipo: {dte.get('tipo')}
-    Folio: {dte.get('folio')}
-    Razón Social: {dte.get('razon_social')}
-    Fecha: {dte.get('fecha')}
-    Total: {dte.get('total')}
-    Estado: {dte.get('estado')}
-    Track ID: {dte.get('track_id')}
-    Usuario: {dte.get('usuario')}
-    ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
-    -----------------------------
-    """)
+                            Tipo: {dte.get('tipo')}
+                            Folio: {dte.get('folio')}
+                            Razón Social: {dte.get('razon_social')}
+                            Fecha: {dte.get('fecha')}
+                            Total: {dte.get('total')}
+                            Estado: {dte.get('estado')}
+                            Track ID: {dte.get('track_id')}
+                            Usuario: {dte.get('usuario')}
+                            ¿Tiene XML?: {"Sí" if dte.get("has_xml") else "No"}
+                            -----------------------------
+                            """)
 
                     dte_qty = self.db.query(DteModel).filter(DteModel.folio == dte.get('folio')).count()
                     if dte_qty == 0:
@@ -2114,4 +2114,48 @@ class DteClass:
             yield {
                 "type": "error",
                 "message": f"Error en envío masivo: {str(e)}"
+            }
+
+    def get_dte_data(self, dte_type_id: int, folio: int, issuer: str = "76063822"):
+        try:
+            url = f"https://libredte.cl/api/dte/dte_emitidos/info/{dte_type_id}/{folio}/{issuer}"
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {token}'
+            }
+            
+            print(f"Consultando LibreDTE: {url}")
+            
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "status": "success",
+                    "status_code": response.status_code,
+                    "data": data
+                }
+            else:
+                return {
+                    "status": "error",
+                    "status_code": response.status_code,
+                    "message": f"Error al consultar LibreDTE: {response.text}",
+                    "data": None
+                }
+                
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "status_code": None,
+                "message": f"Error de conexión con LibreDTE: {str(e)}",
+                "data": None
+            }
+        except Exception as e:
+            return {
+                "status": "error", 
+                "status_code": None,
+                "message": f"Error inesperado: {str(e)}",
+                "data": None
             }

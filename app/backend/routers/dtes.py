@@ -189,6 +189,17 @@ def dtes_data(db: Session = Depends(get_db)):
 
     return {"message": "Listo"}
 
+@dtes.get("/info/{dte_type_id}/{folio}/{issuer}")
+def get_dte_info(dte_type_id: int, folio: int, issuer: str = "76063822", db: Session = Depends(get_db)):
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.get_dte_data(dte_type_id, folio, issuer)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener información del DTE: {str(e)}")
+
 async def auth_check(request: Request, user: str, password: str) -> bool:
     print(user, password)
     # Leer cabeceras HTTP
