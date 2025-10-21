@@ -330,7 +330,7 @@ class HonoraryClass:
                 "Rut": data.replacement_employee_rut,
                 "Nombre": data.replacement_employee_full_name,
                 "Direccion": data.address,
-                "Region": region.simplefactura_region_code,
+                "Region": str(region.simplefactura_region_code) if region else "No especificada",
                 "Comuna": commune.commune if commune else "No especificada"
             },
             "Detalles": [
