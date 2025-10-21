@@ -142,7 +142,7 @@ class AccountabilityClass:
             "periodo": period_year,
             "fecha_desde": since_date,
             "fecha_hasta": until_date,
-            "glosa": None,
+            "glosa": gloss,
             "operacion": None,
             "cuenta": expense_type.accounting_account,
             "debe": None,
