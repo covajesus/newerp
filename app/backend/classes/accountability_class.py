@@ -142,7 +142,7 @@ class AccountabilityClass:
             "periodo": period_year,
             "fecha_desde": since_date,
             "fecha_hasta": until_date,
-            "glosa": gloss,
+            "glosa": None,
             "operacion": None,
             "cuenta": expense_type.accounting_account,
             "debe": None,
@@ -163,6 +163,8 @@ class AccountabilityClass:
 
         try:
             entries = response.json()
+
+            print(entries)
         except json.JSONDecodeError:
             print("⚠ Error al decodificar JSON de la respuesta:")
             print(response.text)
@@ -217,7 +219,7 @@ class AccountabilityClass:
 
                     gross_amount = round(net_amount * 1.19)
 
-                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 25).first()
                     splitted_period = period.split('-')
                     utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
 
