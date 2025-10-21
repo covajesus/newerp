@@ -1323,7 +1323,7 @@ class AccountabilityClass:
 
                     gross_amount = round(amount * 1.19)
                     
-                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 23).first()
+                    expense_type = self.db.query(ExpenseTypeModel).filter(ExpenseTypeModel.id == 25).first()
                     splitted_period = period.split('-')
                     utf8_date = '01-' + splitted_period[1] + '-' + splitted_period[0]
                     
