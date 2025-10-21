@@ -922,8 +922,6 @@ class CustomerBillClass:
             try:
                 self.db.commit()
 
-                self.create_account_asset(credit_note_dte)
-
                 return {"status": "success", "message": "Credit Note saved successfully"}
             except Exception as e:
                 self.db.rollback()
