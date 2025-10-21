@@ -258,7 +258,8 @@ class RegionModel(Base):
 
     id = Column(Integer, primary_key=True)
     region = Column(String(255))    
-    region_remuneration_code = Column(Integer) 
+    region_remuneration_code = Column(Integer)
+    simplefactura_region_code = Column(Integer) 
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

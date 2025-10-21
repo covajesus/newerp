@@ -324,13 +324,13 @@ class HonoraryClass:
             "Retencion": 1,
             "FechaEmision": current_date,
             "Emisor": {
-                "Direccion": "Matucana 40"
+                "Direccion": 1
             },
             "Receptor": {
                 "Rut": data.replacement_employee_rut,
                 "Nombre": data.replacement_employee_full_name,
                 "Direccion": data.address,
-                "Region": region.region if region else "No especificada",
+                "Region": region.simplefactura_region_code,
                 "Comuna": commune.commune if commune else "No especificada"
             },
             "Detalles": [
@@ -340,6 +340,8 @@ class HonoraryClass:
                 }
             ]
         }
+
+        print(payload)
         
         headers = {
             'Authorization': f'Bearer {token}',

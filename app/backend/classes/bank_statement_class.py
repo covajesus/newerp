@@ -232,19 +232,43 @@ class BankStatementClass:
 
             data = []
             for index, row in df.iterrows():
-                row_data = {}
+                # Verificar si la fila contiene "Saldos diarios" y omitirla
+                if any("Saldos diarios" in str(value) for value in row.values):
+                    print(f"Omitiendo fila {index}: contiene 'Saldos diarios'")
+                    continue
+                
+                # Inicializar variables para esta fila
+                deposit_number = None
+                amount = None
+                deposit_date = None
+                bank_statement_type_id = None
+                rut = None
+                valid_row = True
+                
+                # Procesar cada columna
                 for col in df.columns:
                     if col == "N° DOCUMENTO":
                         deposit_number = row[col]
-                    if col == "MONTO":
+                    elif col == "MONTO":
                         amount = row[col]
-                    if col == "FECHA":
-                        deposit_date = row[col]
-
-                        deposit_date = datetime.strptime(deposit_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-                    if col == "DESCRIPCIÓN MOVIMIENTO":
+                    elif col == "FECHA":
+                        raw_date = row[col]
+                        
+                        # Verificar que sea una fecha válida antes de parsear
+                        if str(raw_date).strip() == "" or "Saldos diarios" in str(raw_date):
+                            print(f"Omitiendo fila {index}: fecha inválida '{raw_date}'")
+                            valid_row = False
+                            break
+                            
+                        try:
+                            deposit_date = datetime.strptime(str(raw_date), "%d/%m/%Y").strftime("%Y-%m-%d")
+                        except (ValueError, TypeError) as e:
+                            print(f"Error parseando fecha en fila {index}: {raw_date} - {str(e)}")
+                            valid_row = False
+                            break
+                            
+                    elif col == "DESCRIPCIÓN MOVIMIENTO":
                         words = ["DeposDoctoMBanco", "DeposDoctoOBancos", "Depósito", "Dep", "Pago Remuneraciones", "Trabajo"]
-
                         pattern = "|".join(words)
 
                         if re.search(pattern, row[col]):
@@ -254,33 +278,39 @@ class BankStatementClass:
                             bank_statement_type_id = 2
                             
                             raw = row[col]
-
-                            cleaned = re.sub(r'[^\dkK]', '', raw)  # Elimina puntos y guiones
+                            cleaned = re.sub(r'[^\dkK]', '', raw)
 
                             match = re.fullmatch(r'\d{8,9}[\dkK]', cleaned)
                             if match:
-                                cuerpo = cleaned[:-1].lstrip("0")  # Elimina ceros a la izquierda del cuerpo
-                                dv = cleaned[-1].upper()  # Dígito verificador
+                                cuerpo = cleaned[:-1].lstrip("0")
+                                dv = cleaned[-1].upper()
                                 rut = f"{cuerpo}-{dv}"
                                 print("Match:", rut)
                             else:
                                 rut = 0
                                 print("No es un RUT válido en formato")
+                
+                # Solo guardar si la fila es válida y tiene todos los datos necesarios
+                if valid_row and deposit_number is not None and amount is not None and deposit_date is not None:
+                    fixed_period = HelperClass.fix_current_dte_period(period)
 
-                fixed_period = HelperClass.fix_current_dte_period(period)
+                    bank_statement = BankStatementModel()
+                    bank_statement.bank_statement_type_id = bank_statement_type_id
+                    bank_statement.rut = rut
+                    bank_statement.deposit_number = deposit_number
+                    bank_statement.amount = amount
+                    bank_statement.period = fixed_period
+                    bank_statement.deposit_date = deposit_date
 
-                bank_statement = BankStatementModel()
-                bank_statement.bank_statement_type_id = bank_statement_type_id
-                bank_statement.rut = rut
-                bank_statement.deposit_number = deposit_number
-                bank_statement.amount = amount
-                bank_statement.period = fixed_period
-                bank_statement.deposit_date = deposit_date
+                    self.db.add(bank_statement)
+                    self.db.commit()
+                else:
+                    if not valid_row:
+                        print(f"Fila {index} omitida por datos inválidos")
+                    else:
+                        print(f"Fila {index} omitida por datos faltantes: documento={deposit_number}, monto={amount}, fecha={deposit_date}")
 
-                self.db.add(bank_statement)
-                self.db.commit()
-
-            return bank_statement
+            return "Procesamiento completado"
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
