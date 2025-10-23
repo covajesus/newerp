@@ -25,8 +25,8 @@ def search(customer_ticket_bill_inputs:CustomerTicketBillSearch, db: Session = D
     return {"message": data}
 
 @customer_tickets_bills.post("/generate_credit_note")
-def generate_credit_note(customer_credit_note_ticket_bill_inputs:GenerateCustomerCreditNoteTicketBill, db: Session = Depends(get_db)):
-    data = CustomerTicketBillClass(db).store_credit_note(customer_credit_note_ticket_bill_inputs)
+def generate_credit_note(customer_credit_note_ticket_bill_inputs:GenerateCustomerCreditNoteTicketBill, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
+    data = CustomerTicketBillClass(db).store_credit_note(customer_credit_note_ticket_bill_inputs, session_user.rol_id)
 
     return {"message": data}
 

@@ -624,37 +624,19 @@ class CustomerTicketBillClass:
         else:
             return f"Accounting entry creation failed."
 
-    def store_credit_note(self, form_data):
+    def store_credit_note(self, form_data, rol_id):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         
         customer = CustomerClass(self.db).get_by_rut(dte.rut)
         customer_data = json.loads(customer)
 
-        dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
-
-        code = self.pre_generate_credit_note_ticket(customer_data, dte.dte_type_id, dte.folio, dte.cash_amount, dte_date)
-
-        print(code)
-
-        folio = None
-
-        if code is not None:
-            if code == 402:
-                return "LibreDTE payment required"
-
-            folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code, dte.dte_type_id)
-
-        if folio != None:
-            dte.status_id = 5
-            dte.reason_id = form_data.reason_id
-            dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
-            self.db.add(dte)
-            self.db.commit()
-
-            added_date = dte_date
-            period = added_date.split(' ')
-            period = period[0].split('-')
-            period = period[0] + '-' + period[1]
+        # Si es rol 4 (supervisor), solo crear la nota de crédito con status 14
+        if rol_id == 4:
+            added_date = dte.added_date
+            if added_date:
+                period = added_date.strftime('%Y-%m')
+            else:
+                period = datetime.now().strftime('%Y-%m')
 
             credit_note_dte = DteModel()
                     
@@ -663,10 +645,10 @@ class CustomerTicketBillClass:
             credit_note_dte.cashier_id = 0
             credit_note_dte.dte_type_id = 61
             credit_note_dte.dte_version_id = 1
-            credit_note_dte.status_id = 5
+            credit_note_dte.status_id = 14  # Status 14 para supervisores
             credit_note_dte.chip_id = 0
             credit_note_dte.rut = customer_data['customer_data']['rut']
-            credit_note_dte.folio = folio
+            credit_note_dte.folio = 0  # Sin folio para status 14
             credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
             credit_note_dte.card_amount = 0
             credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
@@ -678,14 +660,67 @@ class CustomerTicketBillClass:
 
             self.db.add(credit_note_dte)
             self.db.commit()
-            self.create_account_asset(credit_note_dte)
+            
+            return "Credit note created with status 14"
 
-            update_dte = self.db.query(DteModel).filter(DteModel.folio == dte.folio).first()
-            update_dte.status_id = 5
-            self.db.add(update_dte)
-            self.db.commit()
+        # Proceso completo para roles 1 y 2
+        elif rol_id == 1 or rol_id == 2:
+            dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
+
+            code = self.pre_generate_credit_note_ticket(customer_data, dte.dte_type_id, dte.folio, dte.cash_amount, dte_date)
+            folio = None
+
+            if code is not None:
+                if code == 402:
+                    return "LibreDTE payment required"
+
+                folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code, dte.dte_type_id)
+
+            if folio != None:
+                dte.status_id = 5
+                dte.reason_id = form_data.reason_id
+                dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
+                self.db.add(dte)
+                self.db.commit()
+
+                added_date = dte_date
+                period = added_date.split(' ')
+                period = period[0].split('-')
+                period = period[0] + '-' + period[1]
+
+                credit_note_dte = DteModel()
+                        
+                # Asignar los valores del formulario a la instancia del modelo
+                credit_note_dte.branch_office_id = dte.branch_office_id
+                credit_note_dte.cashier_id = 0
+                credit_note_dte.dte_type_id = 61
+                credit_note_dte.dte_version_id = 1
+                credit_note_dte.status_id = 5
+                credit_note_dte.chip_id = 0
+                credit_note_dte.rut = customer_data['customer_data']['rut']
+                credit_note_dte.folio = folio
+                credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
+                credit_note_dte.card_amount = 0
+                credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+                credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
+                credit_note_dte.discount = 0
+                credit_note_dte.total = -abs(int(dte.cash_amount))
+                credit_note_dte.period = period
+                credit_note_dte.added_date = dte.added_date
+
+                self.db.add(credit_note_dte)
+                self.db.commit()
+
+                update_dte = self.db.query(DteModel).filter(DteModel.folio == dte.folio).first()
+                update_dte.status_id = 5
+                self.db.add(update_dte)
+                self.db.commit()
+
+                return "Creditnote created successfully"
+            else:
+                return "Creditnote was not created"
         else:
-            return "Creditnote was not created"
+            return "Unauthorized role for this operation"
     
     def get_dte_date(self, dte_type_id, folio):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
