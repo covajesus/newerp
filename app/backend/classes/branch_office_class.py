@@ -1,4 +1,5 @@
-from app.backend.db.models import BranchOfficeModel, RegionModel, ZoneModel
+from app.backend.db.models import BranchOfficeModel, RegionModel, ZoneModel, BranchOfficesTransbankStatementsModel
+from sqlalchemy.sql import func
 
 class BranchOfficeClass:
     def __init__(self, db):
@@ -6,8 +7,13 @@ class BranchOfficeClass:
     
     def get_all(self, rol_id = None, rut = None, branch_office_id = None, filter_branch_office_id = None):
         try:
-            query = self.db.query(BranchOfficeModel). \
-                filter(BranchOfficeModel.status_id == 7). \
+            query = self.db.query(
+                BranchOfficeModel,
+                func.group_concat(BranchOfficesTransbankStatementsModel.transbank_code.distinct()).label('transbank_codes')
+            ).outerjoin(
+                BranchOfficesTransbankStatementsModel, 
+                BranchOfficesTransbankStatementsModel.branch_office_id == BranchOfficeModel.id
+            ).filter(BranchOfficeModel.status_id == 7). \
                 filter(BranchOfficeModel.visibility_id == 1)
             
             # Aplicar filtros según el rol
@@ -22,7 +28,15 @@ class BranchOfficeClass:
             if filter_branch_office_id is not None:
                 query = query.filter(BranchOfficeModel.id == filter_branch_office_id)
             
-            data = query.order_by(BranchOfficeModel.branch_office).all()
+            # Agrupar por ID de sucursal para concatenar los códigos
+            result = query.group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
+
+            # Convertir el resultado para incluir transbank_codes en el objeto branch_office
+            data = []
+            for branch_office, transbank_codes in result:
+                # Agregar transbank_codes como atributo al objeto branch_office
+                branch_office.transbank_code = transbank_codes
+                data.append(branch_office)
 
             return data
         except Exception as e:
@@ -31,36 +45,35 @@ class BranchOfficeClass:
     
     def get_all_basement(self, rol_id = None, rut = None, branch_office_id = None):
         try:
+            base_query = self.db.query(
+                BranchOfficeModel,
+                func.group_concat(BranchOfficesTransbankStatementsModel.transbank_code.distinct()).label('transbank_codes')
+            ).outerjoin(
+                BranchOfficesTransbankStatementsModel, 
+                BranchOfficesTransbankStatementsModel.branch_office_id == BranchOfficeModel.id
+            ).filter(BranchOfficeModel.status_id == 7). \
+                filter(BranchOfficeModel.visibility_id == 1). \
+                filter(BranchOfficeModel.basement_id == 1)
+            
             if rol_id == 1 or rol_id == 2 or rol_id == 3:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.basement_id == 1). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+                result = base_query.group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
             elif rol_id == 4:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.basement_id == 1). \
-                    filter(BranchOfficeModel.principal_supervisor == rut). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+                result = base_query.filter(BranchOfficeModel.principal_supervisor == rut). \
+                    group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
             elif rol_id == 5:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.basement_id == 1). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+                result = base_query.group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
             elif rol_id == 6:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.basement_id == 1). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.id == branch_office_id). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+                result = base_query.filter(BranchOfficeModel.id == branch_office_id). \
+                    group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
+            else:
+                return []
+            
+            # Convertir el resultado para incluir transbank_codes en el objeto branch_office
+            data = []
+            for branch_office, transbank_codes in result:
+                # Agregar transbank_codes como atributo al objeto branch_office
+                branch_office.transbank_code = transbank_codes
+                data.append(branch_office)
             
             return data
         except Exception as e:
@@ -69,7 +82,13 @@ class BranchOfficeClass:
         
     def get_full_data(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            query = self.db.query(BranchOfficeModel)
+            query = self.db.query(
+                BranchOfficeModel,
+                func.group_concat(BranchOfficesTransbankStatementsModel.transbank_code.distinct()).label('transbank_codes')
+            ).outerjoin(
+                BranchOfficesTransbankStatementsModel, 
+                BranchOfficesTransbankStatementsModel.branch_office_id == BranchOfficeModel.id
+            )
             
             # Aplicar filtros según el rol
             if rol_id == 4:
@@ -77,7 +96,15 @@ class BranchOfficeClass:
             elif rol_id == 6:
                 query = query.filter(BranchOfficeModel.id == branch_office_id)
             
-            data = query.order_by(BranchOfficeModel.branch_office).all()
+            # Agrupar por ID de sucursal para concatenar los códigos
+            result = query.group_by(BranchOfficeModel.id).order_by(BranchOfficeModel.branch_office).all()
+            
+            # Convertir el resultado para incluir transbank_codes en el objeto branch_office
+            data = []
+            for branch_office, transbank_codes in result:
+                # Agregar transbank_codes como atributo al objeto branch_office
+                branch_office.transbank_code = transbank_codes
+                data.append(branch_office)
             
             return data
         except Exception as e:
@@ -86,10 +113,23 @@ class BranchOfficeClass:
 
     def get_with_machine(self):
         try:
-            data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.getaway_machine_id == 1). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+            result = self.db.query(
+                BranchOfficeModel,
+                func.group_concat(BranchOfficesTransbankStatementsModel.transbank_code.distinct()).label('transbank_codes')
+            ).outerjoin(
+                BranchOfficesTransbankStatementsModel, 
+                BranchOfficesTransbankStatementsModel.branch_office_id == BranchOfficeModel.id
+            ).filter(BranchOfficeModel.getaway_machine_id == 1). \
+                group_by(BranchOfficeModel.id). \
+                order_by(BranchOfficeModel.branch_office). \
+                all()
+            
+            # Convertir el resultado para incluir transbank_codes en el objeto branch_office
+            data = []
+            for branch_office, transbank_codes in result:
+                # Agregar transbank_codes como atributo al objeto branch_office
+                branch_office.transbank_code = transbank_codes
+                data.append(branch_office)
             
             return data
         except Exception as e:
