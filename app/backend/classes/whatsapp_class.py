@@ -703,3 +703,96 @@ class WhatsappClass:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.text)
+
+    def rejected_deposit_notification(self, deposit_data, deposit_id):
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 6).first()
+
+        """
+        Envía notificación WhatsApp cuando un depósito es rechazado
+        """
+        try:
+            # Obtener datos de la sucursal
+            branch_office = self.db.query(BranchOfficeModel).filter(
+                BranchOfficeModel.id == deposit_data.branch_office_id
+            ).first()
+            
+            if not branch_office:
+                print(f"No se encontró la sucursal con ID: {deposit_data.branch_office_id}")
+                return
+            
+            # Obtener datos del supervisor principal
+            user = self.db.query(UserModel).filter(
+                UserModel.rut == branch_office.principal_supervisor
+            ).first()
+            
+            if not user:
+                print(f"No se encontró el supervisor principal con RUT: {branch_office.principal_supervisor}")
+                return
+
+            # Token de WhatsApp
+            token = os.getenv('LIBREDTE_TOKEN')
+            url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+
+            # Formatear fecha de depósito
+            deposit_date_formatted = 'No especificada'
+            if hasattr(deposit_data, 'deposit_date') and deposit_data.deposit_date:
+                try:
+                    # Si viene en formato DD-MM-YYYY, mantenerlo
+                    if '-' in str(deposit_data.deposit_date) and len(str(deposit_data.deposit_date).split('-')) == 3:
+                        deposit_date_formatted = str(deposit_data.deposit_date)
+                    else:
+                        # Si viene en otro formato, intentar convertir
+                        from datetime import datetime
+                        date_obj = datetime.strptime(str(deposit_data.deposit_date), '%Y-%m-%d')
+                        deposit_date_formatted = date_obj.strftime('%d-%m-%Y')
+                except:
+                    deposit_date_formatted = str(deposit_data.deposit_date)
+
+            # Obtener motivo del rechazo
+            rejection_reason = "Motivo no especificado"
+            if hasattr(deposit_data, 'reject_reason_id') and deposit_data.reject_reason_id:
+                if deposit_data.reject_reason_id == 1:
+                    rejection_reason = "Fotografía no corresponde"
+                elif deposit_data.reject_reason_id == 2:
+                    rejection_reason = "Monto no cuadra"
+                else:
+                    rejection_reason = f"Razón ID: {deposit_data.reject_reason_id}"
+
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": user.phone,
+                "type": "template",
+                "template": {
+                    "name": whatsapp_template.title,
+                    "language": {"code": "es"},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": user.full_name},
+                                {"type": "text", "text": str(deposit_id)},
+                                {"type": "text", "text": branch_office.branch_office},
+                                {"type": "text", "text": deposit_date_formatted},
+                                {"type": "text", "text": rejection_reason},
+                            ]
+                        }
+                    ]
+                }
+            }
+
+            print("Enviando notificación de depósito rechazado...")
+            print(payload)
+            
+            response = requests.post(url, json=payload, headers=headers)
+            print(f"Respuesta WhatsApp: {response.text}")
+            
+            return response.json()
+            
+        except Exception as e:
+            print(f"Error al enviar notificación WhatsApp: {str(e)}")
+            return None

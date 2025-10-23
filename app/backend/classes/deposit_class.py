@@ -8,6 +8,7 @@ import json
 from sqlalchemy import case
 from app.backend.db.models import DepositModel, BranchOfficeModel
 from sqlalchemy import func
+from app.backend.classes.whatsapp_class import WhatsappClass
 
 class DepositClass:
     def __init__(self, db: Session):
@@ -156,7 +157,8 @@ class DepositClass:
                         DepositModel.collection_date, 
                         BranchOfficeModel.branch_office,
                         DepositModel.added_date,
-                        DepositModel.support
+                        DepositModel.support,
+                        DepositModel.reject_reason_id
                         ). \
                         outerjoin(BranchOfficeModel, BranchOfficeModel.id == DepositModel.branch_office_id). \
                         filter(DepositModel.id == id). \
@@ -176,7 +178,8 @@ class DepositClass:
                     "collection_date": data_query.collection_date.strftime('%d-%m-%Y'),
                     "branch_office": data_query.branch_office,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y'),
-                    "support": data_query.support
+                    "support": data_query.support,
+                    "reject_reason_id": data_query.reject_reason_id
                 }
 
                 # Crear el resultado final como un diccionario
@@ -250,7 +253,7 @@ class DepositClass:
         
         Args:
             id: ID del depósito a aceptar
-            deposit_data: Datos adicionales del depósito (opcional)
+            deposit_data: Datos adicionales del depósito (objeto Deposit)
         """
         deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
         if not deposit:
@@ -260,15 +263,15 @@ class DepositClass:
             # Si se proporcionan datos adicionales, verificar si existe un duplicado
             if deposit_data:
                 # Convertir fechas al formato correcto antes de la consulta
-                deposit_date_formatted = self._convert_date_format(deposit_data.get('deposit_date'))
-                collection_date_formatted = self._convert_date_format(deposit_data.get('collection_date'))
+                deposit_date_formatted = self._convert_date_format(deposit_data.deposit_date)
+                collection_date_formatted = self._convert_date_format(deposit_data.collection_date)
                 
                 # Verificar duplicados usando los mismos criterios que en store()
                 existing_deposit = self.db.query(DepositModel).filter(
-                    DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
-                    DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
-                    DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
-                    DepositModel.deposit_date == deposit_date_formatted if deposit_date_formatted else deposit.deposit_date,
+                    DepositModel.branch_office_id == deposit_data.branch_office_id,
+                    DepositModel.payment_number == deposit_data.payment_number,
+                    DepositModel.deposited_amount == deposit_data.deposited_amount,
+                    DepositModel.deposit_date == deposit_date_formatted,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 
@@ -290,22 +293,14 @@ class DepositClass:
 
             # Si se proporcionan datos adicionales, actualizar los campos correspondientes
             if deposit_data:
-                if 'branch_office_id' in deposit_data:
-                    target_deposit.branch_office_id = deposit_data['branch_office_id']
-                if 'payment_type_id' in deposit_data:
-                    target_deposit.payment_type_id = deposit_data['payment_type_id']
-                if 'deposited_amount' in deposit_data:
-                    target_deposit.deposited_amount = deposit_data['deposited_amount']
-                if 'deposit_date' in deposit_data:
-                    target_deposit.deposit_date = deposit_date_formatted
-                if 'payment_number' in deposit_data:
-                    target_deposit.payment_number = deposit_data['payment_number']
-                if 'collection_id' in deposit_data:
-                    target_deposit.collection_id = deposit_data['collection_id']
-                if 'collection_amount' in deposit_data:
-                    target_deposit.collection_amount = deposit_data['collection_amount']
-                if 'collection_date' in deposit_data:
-                    target_deposit.collection_date = collection_date_formatted
+                target_deposit.branch_office_id = deposit_data.branch_office_id
+                target_deposit.payment_type_id = deposit_data.payment_type_id
+                target_deposit.deposited_amount = deposit_data.deposited_amount
+                target_deposit.deposit_date = deposit_date_formatted
+                target_deposit.payment_number = deposit_data.payment_number
+                target_deposit.collection_id = deposit_data.collection_id
+                target_deposit.collection_amount = deposit_data.collection_amount
+                target_deposit.collection_date = collection_date_formatted
 
             self.db.commit()
             self.db.refresh(target_deposit)
@@ -327,7 +322,7 @@ class DepositClass:
         
         Args:
             id: ID del depósito a rechazar
-            deposit_data: Datos adicionales del depósito (opcional)
+            deposit_data: Datos adicionales del depósito (objeto Deposit)
         """
         deposit = self.db.query(DepositModel).filter(DepositModel.id == id).first()
         if not deposit:
@@ -337,15 +332,15 @@ class DepositClass:
             # Si se proporcionan datos adicionales, verificar si existe un duplicado
             if deposit_data:
                 # Convertir fechas al formato correcto antes de la consulta
-                deposit_date_formatted = self._convert_date_format(deposit_data.get('deposit_date'))
-                collection_date_formatted = self._convert_date_format(deposit_data.get('collection_date'))
+                deposit_date_formatted = self._convert_date_format(deposit_data.deposit_date)
+                collection_date_formatted = self._convert_date_format(deposit_data.collection_date)
                 
                 # Verificar duplicados usando los mismos criterios que en store()
                 existing_deposit = self.db.query(DepositModel).filter(
-                    DepositModel.branch_office_id == deposit_data.get('branch_office_id', deposit.branch_office_id),
-                    DepositModel.payment_number == deposit_data.get('payment_number', deposit.payment_number),
-                    DepositModel.deposited_amount == deposit_data.get('deposited_amount', deposit.deposited_amount),
-                    DepositModel.deposit_date == deposit_date_formatted if deposit_date_formatted else deposit.deposit_date,
+                    DepositModel.branch_office_id == deposit_data.branch_office_id,
+                    DepositModel.payment_number == deposit_data.payment_number,
+                    DepositModel.deposited_amount == deposit_data.deposited_amount,
+                    DepositModel.deposit_date == deposit_date_formatted,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 
@@ -367,25 +362,28 @@ class DepositClass:
 
             # Si se proporcionan datos adicionales, actualizar los campos correspondientes
             if deposit_data:
-                if 'branch_office_id' in deposit_data:
-                    target_deposit.branch_office_id = deposit_data['branch_office_id']
-                if 'payment_type_id' in deposit_data:
-                    target_deposit.payment_type_id = deposit_data['payment_type_id']
-                if 'deposited_amount' in deposit_data:
-                    target_deposit.deposited_amount = deposit_data['deposited_amount']
-                if 'deposit_date' in deposit_data:
-                    target_deposit.deposit_date = deposit_date_formatted
-                if 'payment_number' in deposit_data:
-                    target_deposit.payment_number = deposit_data['payment_number']
-                if 'collection_id' in deposit_data:
-                    target_deposit.collection_id = deposit_data['collection_id']
-                if 'collection_amount' in deposit_data:
-                    target_deposit.collection_amount = deposit_data['collection_amount']
-                if 'collection_date' in deposit_data:
-                    target_deposit.collection_date = collection_date_formatted
+                target_deposit.branch_office_id = deposit_data.branch_office_id
+                target_deposit.payment_type_id = deposit_data.payment_type_id
+                target_deposit.deposited_amount = deposit_data.deposited_amount
+                target_deposit.deposit_date = deposit_date_formatted
+                target_deposit.payment_number = deposit_data.payment_number
+                target_deposit.collection_id = deposit_data.collection_id
+                target_deposit.collection_amount = deposit_data.collection_amount
+                target_deposit.collection_date = collection_date_formatted
+                # Agregar el reject_reason_id si está presente
+                if hasattr(deposit_data, 'reject_reason_id') and deposit_data.reject_reason_id is not None:
+                    target_deposit.reject_reason_id = deposit_data.reject_reason_id
 
             self.db.commit()
             self.db.refresh(target_deposit)
+            
+            # Enviar notificación WhatsApp
+            try:
+                whatsapp = WhatsappClass(self.db)
+                whatsapp.rejected_deposit_notification(deposit_data, id)
+            except Exception as whatsapp_error:
+                print(f"Error al enviar WhatsApp: {str(whatsapp_error)}")
+                # No fallar la operación principal por error de WhatsApp
             
             message = "Depósito rechazado exitosamente"
             if deposit_data and existing_deposit and deposit.id != existing_deposit.id:

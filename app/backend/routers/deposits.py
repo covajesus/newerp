@@ -88,7 +88,7 @@ def store(
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
 @deposits.post("/accept/{id}")
-def accept(id: int, deposit_data: dict, db: Session = Depends(get_db)):
+def accept(id: int, deposit_data: Deposit, db: Session = Depends(get_db)):
     """
     Acepta un depósito con datos adicionales del frontend
     """
@@ -100,7 +100,7 @@ def accept(id: int, deposit_data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error al aceptar depósito: {str(e)}")
 
 @deposits.post("/reject/{id}")
-def reject(id: int, deposit_data: dict, db: Session = Depends(get_db)):
+def reject(id: int, deposit_data: Deposit, db: Session = Depends(get_db)):
     """
     Rechaza un depósito con datos adicionales del frontend
     """

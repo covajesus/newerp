@@ -962,6 +962,7 @@ class Deposit(BaseModel):
     deposited_amount: int
     deposit_date: str
     payment_number: str
+    reject_reason_id: Optional[int] = None
 
     @classmethod
     def as_form(cls,
@@ -973,9 +974,10 @@ class Deposit(BaseModel):
                 payment_type_id: int = Form(),
                 deposited_amount: int = Form(),
                 deposit_date: str = Form(),
-                payment_number: str = Form()
+                payment_number: str = Form(),
+                reject_reason_id: int = Form(None)
                 ):
-        return cls(branch_office_id=branch_office_id, total=total, collection_amount=collection_amount, collection_id=collection_id, collection_date=collection_date, payment_type_id=payment_type_id, deposited_amount=deposited_amount, deposit_date=deposit_date, payment_number=payment_number)
+        return cls(branch_office_id=branch_office_id, total=total, collection_amount=collection_amount, collection_id=collection_id, collection_date=collection_date, payment_type_id=payment_type_id, deposited_amount=deposited_amount, deposit_date=deposit_date, payment_number=payment_number, reject_reason_id=reject_reason_id)
 
 class Patent(BaseModel):
     branch_office_id: int

@@ -1078,6 +1078,7 @@ class DepositModel(Base):
     collection_date = Column(Text)
     deposit_date = Column(Text)
     support = Column(Text)
+    reject_reason_id = Column(Integer)
     added_date = Column(Date)
     updated_date = Column(Date)
 
