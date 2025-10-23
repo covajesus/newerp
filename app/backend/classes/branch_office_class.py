@@ -4,35 +4,25 @@ class BranchOfficeClass:
     def __init__(self, db):
         self.db = db
     
-        
-    def get_all(self, rol_id = None, rut = None, branch_office_id = None):
+    def get_all(self, rol_id = None, rut = None, branch_office_id = None, filter_branch_office_id = None):
         try:
-            if rol_id == 1 or rol_id == 2 or rol_id == 3:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
-            elif rol_id == 4:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.principal_supervisor == rut). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
-            elif rol_id == 5:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+            query = self.db.query(BranchOfficeModel). \
+                filter(BranchOfficeModel.status_id == 7). \
+                filter(BranchOfficeModel.visibility_id == 1)
+            
+            # Aplicar filtros según el rol
+            if rol_id == 4:
+                query = query.filter(BranchOfficeModel.principal_supervisor == rut)
             elif rol_id == 6:
-                data = self.db.query(BranchOfficeModel). \
-                    filter(BranchOfficeModel.status_id == 7). \
-                    filter(BranchOfficeModel.visibility_id == 1). \
-                    filter(BranchOfficeModel.id == branch_office_id). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+                query = query.filter(BranchOfficeModel.id == branch_office_id)
+
+            print(filter_branch_office_id)
+            
+            # Aplicar filtro adicional si se proporciona (para el endpoint de search)
+            if filter_branch_office_id is not None:
+                query = query.filter(BranchOfficeModel.id == filter_branch_office_id)
+            
+            data = query.order_by(BranchOfficeModel.branch_office).all()
 
             return data
         except Exception as e:
@@ -77,11 +67,17 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
-    def get_full_data(self):
+    def get_full_data(self, rol_id = None, rut = None, branch_office_id = None):
         try:
-            data = self.db.query(BranchOfficeModel). \
-                    order_by(BranchOfficeModel.branch_office). \
-                    all()
+            query = self.db.query(BranchOfficeModel)
+            
+            # Aplicar filtros según el rol
+            if rol_id == 4:
+                query = query.filter(BranchOfficeModel.principal_supervisor == rut)
+            elif rol_id == 6:
+                query = query.filter(BranchOfficeModel.id == branch_office_id)
+            
+            data = query.order_by(BranchOfficeModel.branch_office).all()
             
             return data
         except Exception as e:

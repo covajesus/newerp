@@ -20,6 +20,7 @@ class BranchOfficeModel(Base):
     opening_date = Column(Integer)
     dte_code = Column(Integer)
     principal_supervisor = Column(Integer)
+    transbank_code = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

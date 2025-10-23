@@ -137,6 +137,15 @@ class UpdateBranchOffice(BaseModel):
             principal_supervisor=principal_supervisor,
             getaway_machine_id=getaway_machine_id
         )
+
+class SearchBranchOffice(BaseModel):
+    branch_office_id: Optional[int] = None
+
+    @classmethod
+    def as_form(cls,
+        branch_office_id: int = Form(None)
+    ):
+        return cls(branch_office_id=branch_office_id)
     
 class Gender(BaseModel):
     gender: str
