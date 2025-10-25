@@ -89,6 +89,11 @@ def total_amount(user: GetDte, session_user: UserLogin = Depends(get_current_act
 
     return {"message": data}
 
+@dtes.get("/get_credit_notes")
+def get_credit_notes(page: int = 1, items_per_page: int = 10, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
+    data = DteClass(db).get_credit_notes(session_user.rol_id, session_user.rut, session_user.branch_office_id, page, items_per_page)
+    return data
+
 @dtes.get("/send_to_sii/{machine_id}")
 def send_to_sii(machine_id:int, db: Session = Depends(get_db)):
     DteClass(db).send_to_sii(machine_id)
@@ -800,12 +805,19 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
             # Obtener el período actual y los DTEs
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Construir filtro base
+            # Construir filtro base con lógica de status según tipo de DTE
             base_filter = [
                 DteModel.period == current_period,
-                DteModel.status_id == 2,
                 DteModel.dte_version_id == 1
             ]
+            
+            # Aplicar filtro de status según el tipo de DTE
+            if dte_type_id == 61:
+                # Para notas de crédito, buscar status 2 o 14
+                base_filter.append(DteModel.status_id.in_([2, 14]))
+            else:
+                # Para otros tipos de DTE, buscar status 2
+                base_filter.append(DteModel.status_id == 2)
             
             # Si branch_office_id es 0, procesar todas las sucursales
             if branch_office_id != 0:

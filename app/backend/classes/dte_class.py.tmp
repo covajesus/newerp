@@ -23,6 +23,7 @@ class FormDataSimulator:
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
 
+
 class CreditNoteFormDataSimulator:
     def __init__(self, dte_id, reason_id=1):
         self.id = dte_id
@@ -376,6 +377,7 @@ class DteClass:
             data = query.offset(offset).limit(items_per_page).all()
 
             # Mostrar consulta generada
+            from sqlalchemy.dialects import mysql
             print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
             # Mostrar rango de elementos
@@ -504,6 +506,7 @@ class DteClass:
             data = query.offset(offset).limit(items_per_page).all()
 
             # Mostrar consulta generada
+            from sqlalchemy.dialects import mysql
             print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
             # Mostrar rango de elementos
@@ -632,6 +635,7 @@ class DteClass:
             data = query.offset(offset).limit(items_per_page).all()
 
             # Mostrar consulta generada
+            from sqlalchemy.dialects import mysql
             print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
             # Mostrar rango de elementos
@@ -1090,6 +1094,8 @@ class DteClass:
         else:
             return 0
 
+    from datetime import datetime, timedelta
+
     def validate_quantity_tickets(self, total_machine_ticket, branch_office_id, cashier_id, added_date):
         # Convertir string a date
         added_date_obj = datetime.strptime(added_date, "%Y-%m-%d").date()
@@ -1430,21 +1436,21 @@ class DteClass:
         - dte_type_id: ID del tipo de DTE (si es 0, cuenta todos los tipos)
         """
         try:
+            from datetime import datetime
             current_period = datetime.now().strftime('%Y-%m')
+            
+            # Determinar el status_id según el tipo de DTE
+            if dte_type_id == 61:
+                status_id = 14
+            else:
+                status_id = 2
             
             # Construir filtro base
             base_filter = [
                 DteModel.period == current_period,
+                DteModel.status_id == status_id,
                 DteModel.dte_version_id == 1
             ]
-            
-            # Aplicar filtro de status según el tipo de DTE
-            if dte_type_id == 61:
-                # Para notas de crédito, buscar status 2 o 14
-                base_filter.append(DteModel.status_id.in_([2, 14]))
-            else:
-                # Para otros tipos de DTE, buscar status 2
-                base_filter.append(DteModel.status_id == 2)
             
             # Si branch_office_id no es 0, filtrar por sucursal específica
             if branch_office_id != 0:
@@ -1485,6 +1491,8 @@ class DteClass:
         """
         Envía WhatsApp masivamente para DTEs del período actual con status_id = 2
         """
+        from app.backend.classes.whatsapp_class import WhatsappClass
+        
         try:
             # Obtener el período actual en formato YYYY-MM
             current_period = datetime.now().strftime('%Y-%m')
@@ -1524,10 +1532,21 @@ class DteClass:
                     if not dte.folio or dte.folio == 0:
                         
                         # Crear un objeto form_data simulado
+                        class FormDataSimulator:
+                            def __init__(self, dte):
+                                self.branch_office_id = dte.branch_office_id
+                                self.rut = dte.rut
+                                self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
+                                self.chip_id = dte.chip_id
+                                self.will_save = 0  # No guardar, solo generar
+                                self.id = dte.id  # Necesario para customer_bill_class
+                        
                         form_data_sim = FormDataSimulator(dte)
                         
                         # Verificar el tipo de DTE para usar la clase correcta
                         if dte.dte_type_id == 39:  # Boleta electrónica
+                            from app.backend.classes.customer_ticket_class import CustomerTicketClass
+                            
                             # Validar que no exista un DTE duplicado (misma validación que en customer_ticket_class)
                             check_dte_existence = self.db.query(DteModel).filter(
                                 DteModel.branch_office_id == dte.branch_office_id,
@@ -1570,6 +1589,8 @@ class DteClass:
                                 raise Exception("Error en pre-generación del ticket")
                                 
                         elif dte.dte_type_id == 33:  # Factura electrónica
+                            from app.backend.classes.customer_bill_class import CustomerBillClass
+                            
                             # Validar que no exista un DTE duplicado (misma validación que en customer_bill_class)
                             check_dte_existence = self.db.query(DteModel).filter(
                                 DteModel.branch_office_id == dte.branch_office_id,
@@ -1724,6 +1745,10 @@ class DteClass:
         Retorna dict con status y pdf_url
         """
         try:
+            from app.backend.classes.customer_class import CustomerClass
+            from datetime import datetime
+            import json
+            
             # Obtener datos del cliente
             customer = CustomerClass(self.db).get_by_rut(dte.rut)
             customer_data = json.loads(customer)
@@ -1738,10 +1763,21 @@ class DteClass:
                 }
             
             # Crear un objeto form_data simulado
+            class FormDataSimulator:
+                def __init__(self, dte):
+                    self.branch_office_id = dte.branch_office_id
+                    self.rut = dte.rut
+                    self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
+                    self.chip_id = dte.chip_id
+                    self.will_save = 0  # No guardar, solo generar
+                    self.id = dte.id  # Necesario para customer_bill_class
+            
             form_data_sim = FormDataSimulator(dte)
             
             # Generar según el tipo de DTE
             if dte.dte_type_id == 39:  # Boleta electrónica
+                from app.backend.classes.customer_ticket_class import CustomerTicketClass
+                
                 # Validar duplicados
                 check_dte_existence = self.db.query(DteModel).filter(
                     DteModel.branch_office_id == dte.branch_office_id,
@@ -1782,6 +1818,8 @@ class DteClass:
                     return {"status": "error", "message": "Error en pre-generación del ticket"}
                     
             elif dte.dte_type_id == 33:  # Factura electrónica
+                from app.backend.classes.customer_bill_class import CustomerBillClass
+                
                 # Validar duplicados
                 check_dte_existence = self.db.query(DteModel).filter(
                     DteModel.branch_office_id == dte.branch_office_id,
@@ -1820,34 +1858,50 @@ class DteClass:
                         return {"status": "error", "message": "No se pudo generar el folio de la factura"}
                 else:
                     return {"status": "error", "message": "Error en pre-generación de la factura"}
-            elif dte.dte_type_id == 61:  # Nota de crédito electrónica
-                try:
-                    # Para notas de crédito, usar la clase CustomerTicketBillClass
-                    customer_ticket_bill_class = CustomerTicketBillClass(self.db)
-                    
-                    # Crear form_data para nota de crédito
-                    credit_note_form = CreditNoteFormDataSimulator(dte.id)
-                    
-                    # Generar la nota de crédito (rol_id = 1 para envío masivo, is_massive_sending=True)
-                    folio = customer_ticket_bill_class.store_credit_note(credit_note_form, rol_id=1, is_massive_sending=True)
-                except Exception as credit_note_error:
-                    return {"status": "error", "message": f"Error en generación de nota de crédito para DTE {dte.id} (RUT: {dte.rut}): {str(credit_note_error)}"}
+            
+            elif dte.dte_type_id == 61:  # Nota de crédito
+                from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillClass
                 
-                if folio and folio != "Error generating credit note":
-                    # Actualizar DTE - para notas de crédito cambiar status de 14 a 5
-                    dte.folio = folio
-                    dte.status_id = 5  # Status final para notas de crédito
-                    self.db.commit()
+                # Validar si ya existe una nota de crédito generada (status 5) para evitar duplicados
+                existing_credit_note = self.db.query(DteModel).filter(
+                    DteModel.branch_office_id == dte.branch_office_id,
+                    DteModel.rut == dte.rut,
+                    DteModel.dte_type_id == 61,
+                    DteModel.dte_version_id == 1,
+                    DteModel.status_id == 5,
+                    DteModel.period == dte.period,
+                    DteModel.id != dte.id  # Excluir el DTE actual
+                ).first()
+                
+                if existing_credit_note:
+                    return {"status": "error", "message": f"Ya existe una nota de crédito generada (folio: {existing_credit_note.folio}) para este cliente en el período"}
+                
+                # Crear instancia de CustomerTicketBillClass y procesar nota de crédito con rol 1 (admin)
+                customer_ticket_bill_class = CustomerTicketBillClass(self.db)
+                
+                # Crear objeto simulado form_data para store_credit_note
+                class CreditNoteFormDataSimulator:
+                    def __init__(self, dte_id):
+                        self.id = dte_id
+                        self.reason_id = getattr(dte, 'reason_id', 1)  # Usar reason_id existente o 1 por defecto
+                
+                credit_note_form = CreditNoteFormDataSimulator(dte.id)
+                
+                # Ejecutar store_credit_note con rol 1 (que genera folio y cambia status a 5)
+                result = customer_ticket_bill_class.store_credit_note(credit_note_form, rol_id=1)
+                
+                if result == "Creditnote created successfully":
+                    # Refrescar el DTE actual desde la BD
                     self.db.refresh(dte)
                     
-                    pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
                     return {
                         "status": "success",
-                        "message": "Nota de crédito generada exitosamente",
-                        "pdf_url": pdf_url
+                        "message": "Nota de crédito procesada exitosamente",
+                        "result": result
                     }
                 else:
-                    return {"status": "error", "message": "No se pudo generar la nota de crédito"}
+                    return {"status": "error", "message": f"Error procesando nota de crédito: {result}"}
+            
             else:
                 return {"status": "error", "message": f"Tipo de DTE no soportado: {dte.dte_type_id}"}
                 
@@ -1865,22 +1919,19 @@ class DteClass:
         """
         try:
             # Obtener DTEs del período actual
+            from datetime import datetime
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Construir filtro base
-            # Para tipo 61 (notas de crédito) aceptar tanto status_id = 2 como 14
+            # Determinar el status_id según el tipo de DTE
             if dte_type_id == 61:
-                status_filter = DteModel.status_id.in_([2, 14])
+                status_id = 14
             else:
-                # Si no se especifica tipo o es diferente de 61, incluir ambos status
-                if dte_type_id == 0:
-                    status_filter = DteModel.status_id.in_([2, 14])
-                else:
-                    status_filter = DteModel.status_id == 2
+                status_id = 2
             
+            # Construir filtro base
             base_filter = [
                 DteModel.period == current_period,
-                status_filter,
+                DteModel.status_id == status_id,
                 DteModel.dte_version_id == 1
             ]
             
@@ -1892,61 +1943,17 @@ class DteClass:
             if dte_type_id > 0:
                 base_filter.append(DteModel.dte_type_id == dte_type_id)
             
-            # Información de depuración para diagnóstico
-            expected_status = 14 if dte_type_id == 61 else (2 if dte_type_id != 0 else "2 o 14")
-            branch_info = f"sucursal {branch_office_id}" if branch_office_id != 0 else "todas las sucursales"
-            type_info = f"tipo {dte_type_id}" if dte_type_id != 0 else "todos los tipos"
-            
-            # Enviar mensaje inicial con información de filtros
-            yield {
-                "type": "init",
-                "period": current_period,
-                "branch_office_id": branch_office_id,
-                "dte_type_id": dte_type_id,
-                "expected_status": expected_status,
-                "message": f"Iniciando envío masivo para {type_info} en {branch_info} del período {current_period}"
-            }
-            
             dtes = self.db.query(DteModel).filter(*base_filter).all()
             
-            # Información adicional de depuración si no hay DTEs
             if not dtes:
-                # Contar DTEs en la sucursal sin filtro de status para diagnóstico
-                debug_filter = [
-                    DteModel.period == current_period,
-                    DteModel.dte_version_id == 1
-                ]
-                if branch_office_id != 0:
-                    debug_filter.append(DteModel.branch_office_id == branch_office_id)
-                if dte_type_id > 0:
-                    debug_filter.append(DteModel.dte_type_id == dte_type_id)
-                
-                total_in_period = self.db.query(DteModel).filter(*debug_filter).count()
-                
-                # Obtener información de status de DTEs existentes para diagnóstico
-                
-                status_counts = {}
-                if total_in_period > 0:
-                    # Contar DTEs por status_id
-                    status_query = self.db.query(DteModel.status_id, func.count(DteModel.id)).filter(*debug_filter).group_by(DteModel.status_id).all()
-                    for status_id, count in status_query:
-                        status_counts[status_id] = count
-                
-                debug_message = f"No hay DTEs para procesar en {branch_info} de {type_info}. "
-                debug_message += f"Total en período: {total_in_period}. "
-                if status_counts:
-                    status_info = ", ".join([f"status {s}: {c} DTEs" for s, c in status_counts.items()])
-                    debug_message += f"Status encontrados: [{status_info}]"
-        
+                branch_info = f" en sucursal {branch_office_id}" if branch_office_id != 0 else " en todas las sucursales"
                 yield {
                     "type": "complete",
                     "total_dtes": 0,
                     "processed": 0,
                     "successful_sends": 0,
                     "failed_sends": 0,
-                    "branch_office_id": branch_office_id,
-                    "dte_type_id": dte_type_id,
-                    "message": debug_message
+                    "message": f"No hay DTEs para procesar{branch_info}"
                 }
                 return
             
@@ -2020,29 +2027,23 @@ class DteClass:
                     # Refrescar el objeto DTE desde la BD para obtener cambios
                     self.db.refresh(dte)
                     
-                    # Verificar y asegurar que el status se actualizó correctamente
-                    # Para notas de crédito (tipo 61), el status debe ser 5
-                    # Para otros tipos (33, 39), el status debe ser 4
-                    if dte.dte_type_id == 61:
-                        if dte.status_id != 5:
-                            dte.status_id = 5
-                            self.db.commit()
-                            self.db.refresh(dte)
-                    else:
-                        if dte.status_id != 4:
-                            dte.status_id = 4
-                            self.db.commit()
-                            self.db.refresh(dte)
+                    # Verificar y asegurar que el status se actualizó (excepto para notas de crédito tipo 61)
+                    if dte.dte_type_id != 61 and dte.status_id != 4:
+                        dte.status_id = 4
+                        self.db.commit()
+                        self.db.refresh(dte)
                     
                     # Obtener datos del cliente
                     customer_name = "Cliente no encontrado"
                     customer_phone = None
                     
+                    from app.backend.classes.customer_class import CustomerClass
                     customer_class = CustomerClass(self.db)
                     customer_response = customer_class.get_by_rut(dte.rut)
                     
                     if customer_response and customer_response != "No se encontraron datos para el campo especificado." and not customer_response.startswith("Error:"):
                         try:
+                            import json
                             customer_data = json.loads(customer_response)
                             if customer_data and 'customer_data' in customer_data:
                                 customer_name = customer_data['customer_data'].get('customer', 'Cliente no encontrado')
@@ -2052,30 +2053,37 @@ class DteClass:
                             customer_name = "Cliente no encontrado"
                             customer_phone = "No disponible"
                     
-                    # Enviar WhatsApp
-                    whatsapp_class = WhatsappClass(self.db)
-                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
+                    # Enviar WhatsApp solo para DTEs que no sean notas de crédito (tipo 61)
+                    whatsapp_response = None
+                    if dte.dte_type_id != 61:
+                        from app.backend.classes.whatsapp_class import WhatsappClass
+                        whatsapp_class = WhatsappClass(self.db)
+                        whatsapp_response = whatsapp_class.send(dte, dte.rut)
+                    else:
+                        # Para notas de crédito, simular respuesta exitosa ya que no requieren WhatsApp
+                        whatsapp_response = {
+                            "status": "success",
+                            "message": "Nota de crédito procesada - No requiere envío de WhatsApp"
+                        }
                     
                     # Obtener contador actualizado desde DteModel
                     try:
-                        # Usar la misma lógica de filtro que al inicio
-                        if dte_type_id == 61:
-                            remaining_status_filter = DteModel.status_id.in_([2, 14])
-                        else:
-                            if dte_type_id == 0:
-                                remaining_status_filter = DteModel.status_id.in_([2, 14])
-                            else:
-                                remaining_status_filter = DteModel.status_id == 2
+                        # Determinar el status_id según el tipo de DTE
+                        remaining_status_id = 14 if dte_type_id == 61 else 2
                         
                         remaining_filter = [
                             DteModel.period == current_period,
-                            remaining_status_filter,
+                            DteModel.status_id == remaining_status_id,
                             DteModel.dte_version_id == 1
                         ]
                         
                         # Si branch_office_id no es 0, filtrar por sucursal específica
                         if branch_office_id != 0:
                             remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        
+                        # Si dte_type_id es mayor que 0, filtrar por tipo de DTE específico
+                        if dte_type_id > 0:
+                            remaining_filter.append(DteModel.dte_type_id == dte_type_id)
                         
                         remaining_dtes = self.db.query(DteModel).filter(*remaining_filter).count()
                     except:
@@ -2119,24 +2127,22 @@ class DteClass:
                     
                     # Obtener contador actualizado incluso en errores
                     try:
-                        # Usar la misma lógica de filtro que al inicio
-                        if dte_type_id == 61:
-                            error_status_filter = DteModel.status_id == 14
-                        else:
-                            if dte_type_id == 0:
-                                error_status_filter = DteModel.status_id.in_([2, 14])
-                            else:
-                                error_status_filter = DteModel.status_id == 2
+                        # Determinar el status_id según el tipo de DTE
+                        error_status_id = 14 if dte_type_id == 61 else 2
                         
                         error_remaining_filter = [
                             DteModel.period == current_period,
-                            error_status_filter,
+                            DteModel.status_id == error_status_id,
                             DteModel.dte_version_id == 1
                         ]
                         
                         # Si branch_office_id no es 0, filtrar por sucursal específica
                         if branch_office_id != 0:
                             error_remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        
+                        # Si dte_type_id es mayor que 0, filtrar por tipo de DTE específico
+                        if dte_type_id > 0:
+                            error_remaining_filter.append(DteModel.dte_type_id == dte_type_id)
                         
                         remaining_dtes = self.db.query(DteModel).filter(*error_remaining_filter).count()
                     except:
@@ -2170,18 +2176,12 @@ class DteClass:
             
             # Obtener contador actualizado desde DteModel
             try:
-                # Usar la misma lógica de filtro que al inicio
-                if dte_type_id == 61:
-                    final_status_filter = DteModel.status_id == 14
-                else:
-                    if dte_type_id == 0:
-                        final_status_filter = DteModel.status_id.in_([2, 14])
-                    else:
-                        final_status_filter = DteModel.status_id == 2
+                # Determinar el status_id según el tipo de DTE
+                final_status_id = 14 if dte_type_id == 61 else 2
                 
                 final_remaining_filter = [
                     DteModel.period == current_period,
-                    final_status_filter,
+                    DteModel.status_id == final_status_id,
                     DteModel.dte_version_id == 1
                 ]
                 
@@ -2189,7 +2189,7 @@ class DteClass:
                 if branch_office_id != 0:
                     final_remaining_filter.append(DteModel.branch_office_id == branch_office_id)
                 
-                # Si dte_type_id es mayor que 0, filtrar por tipo de DTE
+                # Si dte_type_id es mayor que 0, filtrar por tipo de DTE específico
                 if dte_type_id > 0:
                     final_remaining_filter.append(DteModel.dte_type_id == dte_type_id)
                 
@@ -2202,7 +2202,6 @@ class DteClass:
             
             # Resultado final
             branch_scope = f" (sucursal {branch_office_id})" if branch_office_id != 0 else " (todas las sucursales)"
-      
             yield {
                 "type": "complete",
                 "period": current_period,
@@ -2220,61 +2219,6 @@ class DteClass:
                 "type": "error",
                 "message": f"Error en envío masivo: {str(e)}"
             }
-
-    def debug_dte_type_61_status(self, branch_office_id=None):
-        """
-        Función de debug para verificar el status de DTEs tipo 61
-        """
-        try:
-            current_period = datetime.now().strftime('%Y-%m')
-            
-            # Filtro base
-            filters = [
-                DteModel.dte_type_id == 61,
-                DteModel.dte_version_id == 1,
-                DteModel.period == current_period
-            ]
-            
-            if branch_office_id:
-                filters.append(DteModel.branch_office_id == branch_office_id)
-            
-            # Contar por status
-            status_counts = self.db.query(
-                DteModel.status_id, 
-                func.count(DteModel.id)
-            ).filter(*filters).group_by(DteModel.status_id).all()
-            
-            # Obtener detalles de algunos DTEs
-            sample_dtes = self.db.query(
-                DteModel.id,
-                DteModel.folio, 
-                DteModel.status_id,
-                DteModel.rut,
-                DteModel.branch_office_id,
-                DteModel.period
-            ).filter(*filters).limit(10).all()
-            
-            result = {
-                "period": current_period,
-                "branch_office_id": branch_office_id,
-                "total_type_61": sum([count for _, count in status_counts]),
-                "status_breakdown": {status: count for status, count in status_counts},
-                "sample_dtes": [
-                    {
-                        "id": dte.id,
-                        "folio": dte.folio,
-                        "status_id": dte.status_id,
-                        "rut": dte.rut,
-                        "branch_office_id": dte.branch_office_id,
-                        "period": dte.period
-                    } for dte in sample_dtes
-                ]
-            }
-            
-            return result
-            
-        except Exception as e:
-            return {"error": str(e)}
 
     def get_dte_data(self, dte_type_id: int, folio: int, issuer: str = "76063822"):
         try:
@@ -2319,3 +2263,146 @@ class DteClass:
                 "message": f"Error inesperado: {str(e)}",
                 "data": None
             }
+
+    def get_credit_notes(self, rol_id=None, rut=None, branch_office_id=None, page=1, items_per_page=10):
+        """
+        Obtiene todas las notas de crédito (dte_type_id = 61, dte_version_id = 1, status_id = 14)
+        """
+        try:
+            # Inicialización de filtros dinámicos
+            filters = []
+            filters.append(DteModel.dte_type_id == 61)
+            filters.append(DteModel.dte_version_id == 1)
+            filters.append(DteModel.status_id == 14)
+
+            # Aplicar filtros según el rol
+            if rol_id == 4:
+                # Supervisor: solo ve las sucursales que supervisa
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.dte_type_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    DteModel.payment_date,
+                    BranchOfficeModel.branch_office,
+                    CustomerModel.customer.label('customer')
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    BranchOfficeModel.principal_supervisor == rut
+                ).filter(*filters)
+            elif rol_id == 6:
+                # Cajero: solo ve su sucursal
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.dte_type_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    DteModel.payment_date,
+                    BranchOfficeModel.branch_office,
+                    CustomerModel.customer.label('customer')
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    DteModel.branch_office_id == branch_office_id
+                ).filter(*filters)
+            else:
+                # Administradores y otros roles: ven todo
+                query = self.db.query(
+                    DteModel.id, 
+                    DteModel.branch_office_id, 
+                    DteModel.dte_type_id, 
+                    DteModel.folio, 
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    DteModel.payment_date,
+                    BranchOfficeModel.branch_office,
+                    CustomerModel.customer.label('customer')
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(*filters)
+
+            query = query.order_by(DteModel.added_date.desc())
+
+            # Si se solicita paginación
+            if page > 0:
+                # Calcular el total de registros
+                total_items = query.count()
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+                if page < 1 or page > total_pages:
+                    return {"status": "error", "message": "Invalid page number"}
+
+                # Aplicar paginación en la consulta
+                data = query.offset((page - 1) * items_per_page).limit(items_per_page).all()
+
+                if not data:
+                    return {"status": "error", "message": "No data found"}
+
+                # Serializar los datos
+                serialized_data = [{
+                    "id": dte.id,
+                    "rut": dte.rut,
+                    "branch_office_id": dte.branch_office_id,
+                    "dte_type_id": dte.dte_type_id,
+                    "customer": dte.customer,
+                    "chip_id": dte.chip_id,
+                    "folio": dte.folio,
+                    "total": dte.total,
+                    "payment_date": dte.payment_date,
+                    "status_id": dte.status_id,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                    "branch_office": dte.branch_office
+                } for dte in data]
+
+                return {
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": serialized_data
+                }
+
+            # Si no se solicita paginación, traer todos los datos
+            else:
+                data = query.all()
+
+                # Serializar los datos
+                serialized_data = [{
+                    "id": dte.id,
+                    "rut": dte.rut,
+                    "branch_office_id": dte.branch_office_id,
+                    "customer": dte.customer,
+                    "chip_id": dte.chip_id,
+                    "folio": dte.folio,
+                    "total": dte.total,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
+                    "payment_date": dte.payment_date,
+                    "branch_office": dte.branch_office,
+                    "status_id": dte.status_id,
+                    "dte_type_id": dte.dte_type_id
+                } for dte in data]
+
+                return serialized_data
+
+        except Exception as e:
+            error_message = str(e)
+            return {"status": "error", "message": error_message}

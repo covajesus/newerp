@@ -624,14 +624,46 @@ class CustomerTicketBillClass:
         else:
             return f"Accounting entry creation failed."
 
-    def store_credit_note(self, form_data, rol_id):
+    def store_credit_note(self, form_data, rol_id, is_massive_sending=False):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         
         customer = CustomerClass(self.db).get_by_rut(dte.rut)
-        customer_data = json.loads(customer)
+        
+        # Debug: Mostrar qué contiene customer
+        print(f"DEBUG - RUT: {dte.rut}, Customer type: {type(customer)}, Customer content: {repr(customer)}")
+        
+        # Verificar si customer es un JSON válido
+        try:
+            customer_data = json.loads(customer)
+            if not isinstance(customer_data, dict) or 'customer_data' not in customer_data:
+                return f"Error: Invalid customer data format for RUT {dte.rut}"
+        except json.JSONDecodeError as e:
+            return f"Error: Invalid JSON from customer lookup for RUT {dte.rut}: {customer}"
 
         # Si es rol 4 (supervisor), solo crear la nota de crédito con status 14
         if rol_id == 4:
+            # Verificar si ya existe una nota de crédito para este DTE
+            existing_credit_note = self.db.query(DteModel).filter(
+                DteModel.rut == dte.rut,
+                DteModel.period == dte.period,
+                DteModel.cash_amount == -abs(int(dte.cash_amount)),  # Monto negativo (nota de crédito)
+                DteModel.dte_type_id == 61,  # Tipo nota de crédito
+                DteModel.dte_version_id == 1
+            ).first()
+            
+            if existing_credit_note:
+                return f"Ya existe una nota de crédito para el DTE {dte.id} (RUT: {dte.rut}, período: {dte.period}). Folio existente: {existing_credit_note.folio}"
+            
+            # Buscar el DTE original (factura/boleta) para actualizarlo a status 5
+            original_dte = self.db.query(DteModel).filter(
+                DteModel.rut == dte.rut,
+                DteModel.period == dte.period,
+                DteModel.cash_amount == abs(dte.cash_amount),  # Monto positivo original
+                DteModel.dte_type_id.in_([33, 39]),  # Facturas o boletas
+                DteModel.status_id == 4,  # Enviadas exitosamente
+                DteModel.folio > 0  # Con folio válido
+            ).first()
+            
             added_date = dte.added_date
             if added_date:
                 period = added_date.strftime('%Y-%m')
@@ -659,28 +691,80 @@ class CustomerTicketBillClass:
             credit_note_dte.added_date = dte.added_date
 
             self.db.add(credit_note_dte)
+            
+            # Actualizar el DTE original (factura/boleta) a status 5 si existe
+            if original_dte:
+                original_dte.status_id = 5
+                self.db.add(original_dte)
+                print(f"DEBUG - DTE original {original_dte.folio} actualizado a status 5 (rol_id=4)")
+            
             self.db.commit()
             
             return "Credit note created with status 14"
 
         # Proceso completo para roles 1 y 2
         elif rol_id == 1 or rol_id == 2:
-            dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
+            print(f"DEBUG - Antes de get_dte_date, dte.dte_type_id: {dte.dte_type_id}, dte.folio: {dte.folio}")
+            
+            # Si el folio es 0, usar la fecha del DTE desde la base de datos
+            if dte.folio == 0:
+                dte_date = dte.added_date.strftime('%Y-%m-%d') if dte.added_date else datetime.now().strftime('%Y-%m-%d')
+                print(f"DEBUG - Folio es 0, usando dte_date desde BD: {dte_date}")
+            else:
+                dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
+                print(f"DEBUG - dte_date obtenida de LibreDTE: {dte_date}")
 
-            code = self.pre_generate_credit_note_ticket(customer_data, dte.dte_type_id, dte.folio, dte.cash_amount, dte_date)
+            print(f"DEBUG - DTE info: id={dte.id}, rut={dte.rut}, period={dte.period}, cash_amount={dte.cash_amount}")
+            
+            # Buscar el DTE original que esta nota de crédito debe anular
+            # Buscar facturas/boletas del mismo RUT, período y monto para referenciar
+            original_dte = self.db.query(DteModel).filter(
+                DteModel.rut == dte.rut,
+                DteModel.period == dte.period,
+                DteModel.cash_amount == abs(dte.cash_amount),  # Monto positivo original
+                DteModel.dte_type_id.in_([33, 39]),  # Facturas o boletas
+                DteModel.status_id == 4,  # Enviadas exitosamente
+                DteModel.folio > 0  # Con folio válido
+            ).first()
+            
+            if original_dte:
+                print(f"DEBUG - DTE original encontrado: folio={original_dte.folio}, tipo={original_dte.dte_type_id}")
+                original_folio = original_dte.folio
+                original_tipo = original_dte.dte_type_id
+            else:
+                print(f"DEBUG - No se encontró DTE original, usando valores por defecto")
+                original_folio = 1  # Valor por defecto
+                original_tipo = 39  # Boleta por defecto
+            
+            print(f"DEBUG - Antes de pre_generate_credit_note_ticket, customer_data type: {type(customer_data)}")
+            code = self.pre_generate_credit_note_ticket(customer_data, original_tipo, original_folio, dte.cash_amount, dte_date)
             folio = None
 
             if code is not None:
                 if code == 402:
                     return "LibreDTE payment required"
 
+                print(f"DEBUG - Antes de generate_credit_note_ticket, customer_data type: {type(customer_data)}")
+                print(f"DEBUG - customer_data: {customer_data}")
                 folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code, dte.dte_type_id)
 
             if folio != None:
+                # Si viene del envío masivo, solo generar la nota de crédito sin guardar DTE
+                if is_massive_sending:
+                    return folio  # Retornar solo el folio generado
+                
+                # Proceso completo (no masivo): actualizar DTE original y crear registro de nota de crédito
                 dte.status_id = 5
                 dte.reason_id = form_data.reason_id
                 dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
                 self.db.add(dte)
+                
+                # Actualizar el DTE original (factura/boleta) a status 5 si existe
+                if original_dte:
+                    original_dte.status_id = 5
+                    self.db.add(original_dte)
+                    print(f"DEBUG - DTE original {original_dte.folio} actualizado a status 5")
+                
                 self.db.commit()
 
                 added_date = dte_date
@@ -718,7 +802,7 @@ class CustomerTicketBillClass:
 
                 return "Creditnote created successfully"
             else:
-                return "Creditnote was not created"
+                return "Error generating credit note"
         else:
             return "Unauthorized role for this operation"
     
@@ -742,10 +826,19 @@ class CustomerTicketBillClass:
         return response_data['fecha']
 
     def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date):  # Added self as the first argument
+        print(f"DEBUG pre_generate_credit_note_ticket - customer_data type: {type(customer_data)}")
+        print(f"DEBUG pre_generate_credit_note_ticket - customer_data content: {customer_data}")
+        
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        amount = round(int(cash_amount)/1.19)
+        amount = round(abs(int(cash_amount))/1.19)
 
+        try:
+            print(f"DEBUG - Accediendo a customer_data['customer_data']['rut']: {customer_data['customer_data']['rut']}")
+        except Exception as e:
+            print(f"ERROR accediendo a customer_data: {str(e)}")
+            print(f"customer_data keys: {list(customer_data.keys()) if hasattr(customer_data, 'keys') else 'No keys method'}")
+            
         data = {
                 "Encabezado": {
                     "IdDoc": {
@@ -797,7 +890,9 @@ class CustomerTicketBillClass:
                     "Content-Type": "application/json",
                 },
             )
-            
+
+            print(f"DEBUG - Respuesta de la API: {response.status_code} {response.text}")
+
             # Manejar la respuesta
             if response.status_code == 200:
                 dte_data = response.json()
@@ -820,6 +915,8 @@ class CustomerTicketBillClass:
             "dte": 61,
             "codigo": code
         }
+
+        print(data)
 
         try:
             # Endpoint para generar un DTE temporal
