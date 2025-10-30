@@ -720,20 +720,11 @@ class CustomerTicketBillClass:
                 if is_massive_sending:
                     return folio  # Retornar solo el folio generado
                 
-                # Proceso completo (no masivo): actualizar DTE original y crear registro de nota de crédito
-                dte.status_id = 5
-                dte.reason_id = form_data.reason_id
-                dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
-                self.db.add(dte)
-                
-                # Actualizar el DTE original (factura/boleta) a status 5 si existe
-                if original_dte_folio and original_dte_folio > 0:
-                    original_dte_to_update = self.db.query(DteModel).filter(DteModel.id == dte.id).first()
-                    if original_dte_to_update:
-                        original_dte_to_update.status_id = 5
-                        self.db.add(original_dte_to_update)
-                
-                self.db.commit()
+                # Verificar si ya existe una nota de crédito con este denied_folio
+                existing_credit_note = self.db.query(DteModel).filter(
+                    DteModel.dte_type_id == 61,
+                    DteModel.denied_folio == original_dte_folio
+                ).first()
 
                 added_date = dte_date
                 period = added_date.split(' ')
@@ -741,43 +732,83 @@ class CustomerTicketBillClass:
                 period = period[0] + '-' + period[1]
 
                 try:
-                    credit_note_dte = DteModel()
-                            
-                    # Asignar los valores del formulario a la instancia del modelo
-                    credit_note_dte.branch_office_id = dte.branch_office_id
-                    credit_note_dte.cashier_id = 0
-                    credit_note_dte.dte_type_id = 61
-                    credit_note_dte.dte_version_id = 1
-                    credit_note_dte.status_id = 5
-                    credit_note_dte.chip_id = 0
-                    credit_note_dte.rut = customer_data['customer_data']['rut']
-                    credit_note_dte.folio = folio
-                    credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
-                    credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
-                    credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
-                    credit_note_dte.card_amount = 0
-                    credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
-                    credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
-                    credit_note_dte.discount = 0
-                    credit_note_dte.total = -abs(int(dte.cash_amount))
-                    credit_note_dte.period = period
-                    credit_note_dte.added_date = dte.added_date
+                    if existing_credit_note:
+                        # Actualizar la nota de crédito existente
+                        existing_credit_note.branch_office_id = dte.branch_office_id
+                        existing_credit_note.rut = customer_data['customer_data']['rut']
+                        existing_credit_note.folio = folio
+                        existing_credit_note.reason_id = form_data.reason_id
+                        existing_credit_note.cash_amount = -abs(int(dte.cash_amount))
+                        existing_credit_note.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+                        existing_credit_note.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
+                        existing_credit_note.total = -abs(int(dte.cash_amount))
+                        existing_credit_note.period = period
+                        existing_credit_note.status_id = 5
 
-                    self.db.add(credit_note_dte)
+                        self.db.add(existing_credit_note)
+                        
+                        action_message = "Credit note updated successfully"
+                        credit_note_id = existing_credit_note.id
+                    else:
+                        # Crear nueva nota de crédito
+                        credit_note_dte = DteModel()
+                                
+                        # Asignar los valores del formulario a la instancia del modelo
+                        credit_note_dte.branch_office_id = dte.branch_office_id
+                        credit_note_dte.cashier_id = 0
+                        credit_note_dte.dte_type_id = 61
+                        credit_note_dte.dte_version_id = 1
+                        credit_note_dte.status_id = 5
+                        credit_note_dte.chip_id = 0
+                        credit_note_dte.rut = customer_data['customer_data']['rut']
+                        credit_note_dte.folio = folio
+                        credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
+                        credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
+                        credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
+                        credit_note_dte.card_amount = 0
+                        credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+                        credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
+                        credit_note_dte.discount = 0
+                        credit_note_dte.total = -abs(int(dte.cash_amount))
+                        credit_note_dte.period = period
+                        credit_note_dte.added_date = dte.added_date
+
+                        self.db.add(credit_note_dte)
+                        
+                        action_message = "Credit note created successfully"
+                        credit_note_id = credit_note_dte.id
+
+                    # Actualizar el DTE actual a status 5
+                    dte.status_id = 5
+                    dte.reason_id = form_data.reason_id
+                    dte.comment = 'Código de autorización: Nota de Crédito ' + str(code)
+                    self.db.add(dte)
+                    
+                    # Actualizar el DTE original (33 o 39) a status 5 si existe y es diferente al actual
+                    if original_dte_folio and original_dte_folio > 0 and original_dte_folio != dte.folio:
+                        original_dte_to_update = self.db.query(DteModel).filter(
+                            DteModel.folio == original_dte_folio,
+                            or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39)
+                        ).first()
+                        if original_dte_to_update:
+                            original_dte_to_update.status_id = 5
+                            self.db.add(original_dte_to_update)
+                    
                     self.db.commit()
 
                     return {
                         "status": "success",
-                        "message": "Credit note created successfully",
-                        "credit_note_id": credit_note_dte.id,
+                        "message": action_message,
+                        "credit_note_id": credit_note_id,
                         "folio": folio,
-                        "denied_folio": original_dte_folio
+                        "denied_folio": original_dte_folio,
+                        "original_dte_updated": original_dte_folio != dte.folio
                     }
                 except Exception as e:
                     self.db.rollback()
                     return {
                         "status": "error",
-                        "message": f"Error creating credit note: {str(e)}",
+                        "message": f"Error creating/updating credit note: {str(e)}",
                         "error_type": type(e).__name__
                     }
             else:
