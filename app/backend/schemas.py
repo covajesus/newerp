@@ -2049,10 +2049,25 @@ class GenerateMachineCreditNoteTicket(BaseModel):
 class GenerateCustomerCreditNoteTicketBill(BaseModel):
     id: int
     reason_id: int
+    action_id: Optional[int] = None  # 1 = generate credit note, 2 = delete existing credit note
 
 class GenerateCustomerCreditNoteBill(BaseModel):
     id: int
     reason_id: int
+
+class CustomerCreditNoteList(BaseModel):
+    page: int
+
+class GeneratedCustomerCreditNoteList(BaseModel):
+    page: int
+
+class CustomerCreditNoteSearch(BaseModel):
+    branch_office_id: Optional[int] = None
+    rut: Optional[str] = None
+    customer: Optional[str] = None
+    status_id: Optional[int] = None
+    supervisor_id: Optional[int] = None
+    page: int
 
 class CustomerBillList(BaseModel):
     page: int

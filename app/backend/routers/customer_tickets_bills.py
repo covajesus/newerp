@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 from app.backend.schemas import GeneratedCustomerTicketBillList, CustomerTicketBillList, GenerateCustomerCreditNoteTicketBill, CustomerTicketBillSearch, ToBeAcceptedCustomerTicketBill, ChangeStatusInCustomerTicketBill
 from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillClass
 from app.backend.classes.customer_class import CustomerClass
+from app.backend.classes.customer_credit_note_class import CustomerCreditNoteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.schemas import UserLogin
+import json
 
 customer_tickets_bills = APIRouter(
     prefix="/customer_tickets_bills",
@@ -26,9 +28,29 @@ def search(customer_ticket_bill_inputs:CustomerTicketBillSearch, db: Session = D
 
 @customer_tickets_bills.post("/generate_credit_note")
 def generate_credit_note(customer_credit_note_ticket_bill_inputs:GenerateCustomerCreditNoteTicketBill, db: Session = Depends(get_db), session_user: UserLogin = Depends(get_current_active_user)):
-    data = CustomerTicketBillClass(db).store_credit_note(customer_credit_note_ticket_bill_inputs, session_user.rol_id)
+    # Check action_id to determine the operation
+    if customer_credit_note_ticket_bill_inputs.action_id == 2:
+        # Action 2: Delete existing credit note with matching denied_folio
+        # First, get the original document to find its folio
 
-    return {"message": data}
+        print(customer_credit_note_ticket_bill_inputs.id)
+        ticket_bill_json = CustomerTicketBillClass(db).get(customer_credit_note_ticket_bill_inputs.id)
+        if ticket_bill_json == "No se encontraron datos para el campo especificado.":
+            return {"message": "Document not found"}
+        
+        # Parse the JSON response to get the folio
+        ticket_data = json.loads(ticket_bill_json)
+        folio = ticket_data['customer_ticket_bill_data']['denied_folio']
+        
+        # Find and delete credit notes where denied_folio matches the original document folio
+        credit_note_class = CustomerCreditNoteClass(db)
+        deleted_count = credit_note_class.delete_by_denied_folio(folio)
+        
+        return {"message": f"Deleted {deleted_count} credit note(s) with denied_folio {folio}"}
+    else:
+        # Action 1 (default): Generate credit note normally
+        data = CustomerTicketBillClass(db).store_credit_note(customer_credit_note_ticket_bill_inputs, session_user.rol_id)
+        return {"message": data}
 
 @customer_tickets_bills.post("/to_be_accepted")
 def to_be_accepted(customer_ticket_bill_inputs:ToBeAcceptedCustomerTicketBill, db: Session = Depends(get_db)):

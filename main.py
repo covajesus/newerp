@@ -41,6 +41,7 @@ from app.backend.routers.customers import customers
 from app.backend.routers.cafs import cafs
 from app.backend.routers.customer_tickets import customer_tickets
 from app.backend.routers.customer_bills import customer_bills
+from app.backend.routers.customer_credit_notes import customer_credit_notes
 from app.backend.routers.machine_tickets import machine_tickets
 from app.backend.routers.supervisors import supervisors
 from app.backend.routers.expense_types import expense_types
@@ -146,6 +147,7 @@ app.include_router(customers)
 app.include_router(cafs)
 app.include_router(customer_tickets)
 app.include_router(customer_bills)
+app.include_router(customer_credit_notes)
 app.include_router(machine_tickets)
 app.include_router(supervisors)
 app.include_router(expense_types)
