@@ -740,36 +740,58 @@ class CustomerTicketBillClass:
                 period = period[0].split('-')
                 period = period[0] + '-' + period[1]
 
-                credit_note_dte = DteModel()
-                        
-                # Asignar los valores del formulario a la instancia del modelo
-                credit_note_dte.branch_office_id = dte.branch_office_id
-                credit_note_dte.cashier_id = 0
-                credit_note_dte.dte_type_id = 61
-                credit_note_dte.dte_version_id = 1
-                credit_note_dte.status_id = 5
-                credit_note_dte.chip_id = 0
-                credit_note_dte.rut = customer_data['customer_data']['rut']
-                credit_note_dte.folio = folio
-                credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
-                credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
-                credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
-                credit_note_dte.card_amount = 0
-                credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
-                credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
-                credit_note_dte.discount = 0
-                credit_note_dte.total = -abs(int(dte.cash_amount))
-                credit_note_dte.period = period
-                credit_note_dte.added_date = dte.added_date
+                try:
+                    credit_note_dte = DteModel()
+                            
+                    # Asignar los valores del formulario a la instancia del modelo
+                    credit_note_dte.branch_office_id = dte.branch_office_id
+                    credit_note_dte.cashier_id = 0
+                    credit_note_dte.dte_type_id = 61
+                    credit_note_dte.dte_version_id = 1
+                    credit_note_dte.status_id = 5
+                    credit_note_dte.chip_id = 0
+                    credit_note_dte.rut = customer_data['customer_data']['rut']
+                    credit_note_dte.folio = folio
+                    credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
+                    credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
+                    credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
+                    credit_note_dte.card_amount = 0
+                    credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+                    credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
+                    credit_note_dte.discount = 0
+                    credit_note_dte.total = -abs(int(dte.cash_amount))
+                    credit_note_dte.period = period
+                    credit_note_dte.added_date = dte.added_date
 
-                self.db.add(credit_note_dte)
-                self.db.commit()
+                    self.db.add(credit_note_dte)
+                    self.db.commit()
 
-                return "Creditnote created successfully"
+                    return {
+                        "status": "success",
+                        "message": "Credit note created successfully",
+                        "credit_note_id": credit_note_dte.id,
+                        "folio": folio,
+                        "denied_folio": original_dte_folio
+                    }
+                except Exception as e:
+                    self.db.rollback()
+                    return {
+                        "status": "error",
+                        "message": f"Error creating credit note: {str(e)}",
+                        "error_type": type(e).__name__
+                    }
             else:
-                return "Error generating credit note"
+                return {
+                    "status": "error",
+                    "message": "Error generating credit note - folio is None",
+                    "error_type": "GenerationError"
+                }
         else:
-            return "Unauthorized role for this operation"
+            return {
+                "status": "error", 
+                "message": "Unauthorized role for this operation",
+                "error_type": "AuthorizationError"
+            }
     
     def get_dte_date(self, dte_type_id, folio):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
