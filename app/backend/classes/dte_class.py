@@ -2201,7 +2201,13 @@ class DteClass:
                 print(f"⚠️ Error al obtener contador actualizado: {str(e)}")
             
             # Resultado final
-            branch_scope = f" (sucursal {branch_office_id})" if branch_office_id != 0 else " (todas las sucursales)"
+            if branch_office_id != 0:
+                # Obtener el nombre de la sucursal
+                branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
+                branch_name = branch_office.branch_office if branch_office else f"Sucursal {branch_office_id}"
+                branch_scope = f" ({branch_name})"
+            else:
+                branch_scope = " (todas las sucursales)"
       
             yield {
                 "type": "complete",
