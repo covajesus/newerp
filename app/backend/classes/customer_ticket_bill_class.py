@@ -659,31 +659,45 @@ class CustomerTicketBillClass:
             else:
                 period = datetime.now().strftime('%Y-%m')
 
-            credit_note_dte = DteModel()
-                    
-            # Asignar los valores del formulario a la instancia del modelo
-            credit_note_dte.branch_office_id = dte.branch_office_id
-            credit_note_dte.cashier_id = 0
-            credit_note_dte.dte_type_id = 61
-            credit_note_dte.dte_version_id = 1
-            credit_note_dte.status_id = 14  # Status 14 para supervisores
-            credit_note_dte.chip_id = 0
-            credit_note_dte.rut = customer_data['customer_data']['rut']
-            credit_note_dte.folio = 0  # Sin folio para status 14
-            credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
-            credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
-            credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
-            credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
-            credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
-            credit_note_dte.discount = 0
-            credit_note_dte.total = -abs(int(dte.cash_amount))
-            credit_note_dte.period = period
-            credit_note_dte.added_date = dte.added_date
+            try:
+                credit_note_dte = DteModel()
+                        
+                # Asignar los valores del formulario a la instancia del modelo
+                credit_note_dte.branch_office_id = dte.branch_office_id
+                credit_note_dte.cashier_id = 0
+                credit_note_dte.dte_type_id = 61
+                credit_note_dte.dte_version_id = 1
+                credit_note_dte.status_id = 14  # Status 14 para supervisores
+                credit_note_dte.chip_id = 0
+                credit_note_dte.rut = customer_data['customer_data']['rut']
+                credit_note_dte.folio = 0  # Sin folio para status 14
+                credit_note_dte.denied_folio = original_dte_folio  # Guardar el folio original en denied_folio
+                credit_note_dte.reason_id = form_data.reason_id  # Guardar el motivo de la nota de crédito
+                credit_note_dte.cash_amount = -abs(int(dte.cash_amount))
+                credit_note_dte.card_amount = 0
+                credit_note_dte.subtotal = -abs(round(int(dte.cash_amount)/1.19))
+                credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
+                credit_note_dte.discount = 0
+                credit_note_dte.total = -abs(int(dte.cash_amount))
+                credit_note_dte.period = period
+                credit_note_dte.added_date = dte.added_date
 
-            self.db.add(credit_note_dte)
-            
-            return "Credit note created with status 14"
+                self.db.add(credit_note_dte)
+                self.db.commit()
+                
+                return {
+                    "status": "success",
+                    "message": "Credit note created with status 14",
+                    "credit_note_id": credit_note_dte.id,
+                    "denied_folio": original_dte_folio
+                }
+            except Exception as e:
+                self.db.rollback()
+                return {
+                    "status": "error",
+                    "message": f"Error creating credit note: {str(e)}",
+                    "error_type": type(e).__name__
+                }
 
         # Proceso completo para roles 1 y 2
         elif rol_id == 1 or rol_id == 2:
