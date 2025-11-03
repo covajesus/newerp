@@ -1568,6 +1568,7 @@ class BranchOfficesTransbankStatementsModel(Base):
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
     transbank_code = Column(String(255))
+    status = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
@@ -1937,3 +1938,38 @@ class TotalDtesToBeSentModel(Base):
 
     id = Column(Integer, primary_key=True)
     quantity = Column(Integer)
+
+class BranchOfficeTransbankViewModel(Base):
+    """
+    Modelo para la vista que combina branch_offices_transbanks con QRY_BRANCH_OFFICES
+    Representa el resultado de la consulta:
+    SELECT 
+        QRY_BRANCH_OFFICES.id AS id,
+        branch_offices_transbanks.branch_office_id AS branch_office_id,
+        QRY_BRANCH_OFFICES.branch_office AS branch_office,
+        branch_offices_transbanks.transbank_code AS codigo_comercio,
+        QRY_BRANCH_OFFICES.dte_code AS dte_code,
+        QRY_BRANCH_OFFICES.address AS address,
+        QRY_BRANCH_OFFICES.region AS region,
+        QRY_BRANCH_OFFICES.commune AS commune,
+        (CASE WHEN branch_offices_transbanks.status = 0 THEN 'Activo' 
+              WHEN branch_offices_transbanks.status = 1 THEN 'Baja' END) AS status,
+        QRY_BRANCH_OFFICES.responsable AS responsable,
+        QRY_BRANCH_OFFICES.status_id AS status_id
+    FROM branch_offices_transbanks 
+    LEFT JOIN QRY_BRANCH_OFFICES ON branch_offices_transbanks.branch_office_id = QRY_BRANCH_OFFICES.id
+    WHERE QRY_BRANCH_OFFICES.status_id = 7
+    """
+    __tablename__ = 'branch_office_transbank_view'
+    
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    branch_office = Column(String(255))
+    codigo_comercio = Column(String(255))  # transbank_code
+    dte_code = Column(Integer)
+    address = Column(String(255))
+    region = Column(String(255))
+    commune = Column(String(255))
+    status = Column(String(20))  # 'Activo' o 'Baja'
+    responsable = Column(String(255))
+    status_id = Column(Integer)

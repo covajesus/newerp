@@ -33,13 +33,6 @@ class CustomerCreditNoteClass:
                 # Para notas de crédito, incluir status 14 (supervisor) y status 5 (procesado)
                 filters.append(or_(DteModel.status_id == 14, DteModel.status_id == 5))
 
-                # Usar el período proporcionado o el período actual
-                if period:
-                    filters.append(DteModel.period == period)
-                else:
-                    current_period = datetime.now().strftime('%Y-%m')
-                    filters.append(DteModel.period == current_period)
-
                 # Construir la consulta base con los filtros aplicados
                 query = self.db.query(
                     DteModel.id, 
