@@ -33,7 +33,6 @@ def generate_credit_note(customer_credit_note_ticket_bill_inputs:GenerateCustome
         # Action 2: Delete existing credit note with matching denied_folio
         # First, get the original document to find its folio
 
-        print(customer_credit_note_ticket_bill_inputs.id)
         ticket_bill_json = CustomerTicketBillClass(db).get(customer_credit_note_ticket_bill_inputs.id)
         if ticket_bill_json == "No se encontraron datos para el campo especificado.":
             return {"message": "Document not found"}

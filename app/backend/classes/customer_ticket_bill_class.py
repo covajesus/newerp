@@ -660,6 +660,18 @@ class CustomerTicketBillClass:
                 period = datetime.now().strftime('%Y-%m')
 
             try:
+                validate_credit_note_count = self.db.query(DteModel).filter(
+                    DteModel.dte_type_id == 61,
+                    DteModel.denied_folio == original_dte_folio,
+                    DteModel.status_id == 14
+                ).count()
+
+                if validate_credit_note_count > 0:
+                    return {
+                        "status": "error",
+                        "message": "A credit note with this denied_folio already exists"
+                    }
+                
                 credit_note_dte = DteModel()
                         
                 # Asignar los valores del formulario a la instancia del modelo
