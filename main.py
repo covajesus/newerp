@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from app.backend.routers.branch_offices import branch_offices
+from app.backend.routers.branch_office_transbank import branch_office_transbank
 from app.backend.routers.genders import genders
 from app.backend.routers.nationalities import nationalities
 from app.backend.routers.pentions import pentions
@@ -110,6 +111,7 @@ app.add_middleware(
 )
 
 app.include_router(branch_offices)
+app.include_router(branch_office_transbank)
 app.include_router(genders)
 app.include_router(nationalities)
 app.include_router(pentions)

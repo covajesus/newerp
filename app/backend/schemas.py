@@ -2205,3 +2205,16 @@ class MovementList(BaseModel):
     items_per_page: int = 10
     type_id: Optional[int] = None
     branch_office_id: Optional[int] = None
+
+class SearchBranchOfficeTransbank(BaseModel):
+    branch_office: Optional[str] = None
+    codigo_comercio: Optional[str] = None
+    status: Optional[str] = None
+    branch_office_id: Optional[int] = None
+    page: int = 1
+    items_per_page: int = 10
+
+class BranchOfficeTransbankList(BaseModel):
+    page: int = 1
+    items_per_page: int = 10
+    branch_office_id: Optional[int] = None

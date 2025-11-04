@@ -1572,6 +1572,20 @@ class BranchOfficesTransbankStatementsModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class TransbankDataModel(Base):
+    __tablename__ = 'QRY_DATOS_TRANSBANK'
+
+    id = Column(Integer, primary_key=True)
+    branch_office_id = Column(Integer)
+    branch_office = Column(String(255))
+    codigo_comercio = Column(Integer)
+    dte_code = Column(Integer)
+    address = Column(String(255))
+    region = Column(String(255))
+    commune = Column(String(255))
+    status = Column(String(255))
+    responsable = Column(String(255))
+
 class ComparationPendingDtesBankStatementModel(Base):
     __tablename__ = 'comparation_pending_dtes_bank_statements'
 
