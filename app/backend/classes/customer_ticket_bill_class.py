@@ -653,12 +653,6 @@ class CustomerTicketBillClass:
 
         # Si es rol 4 (supervisor), solo crear la nota de crédito con status 14
         if rol_id == 4:
-            added_date = dte.added_date
-            if added_date:
-                period = added_date.strftime('%Y-%m')
-            else:
-                period = datetime.now().strftime('%Y-%m')
-
             try:
                 validate_credit_note_count = self.db.query(DteModel).filter(
                     DteModel.dte_type_id == 61,
@@ -691,7 +685,7 @@ class CustomerTicketBillClass:
                 credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
                 credit_note_dte.discount = 0
                 credit_note_dte.total = -abs(int(dte.cash_amount))
-                credit_note_dte.period = period
+                credit_note_dte.period = dte.period
                 credit_note_dte.added_date = dte.added_date
 
                 self.db.add(credit_note_dte)
@@ -738,11 +732,6 @@ class CustomerTicketBillClass:
                     DteModel.denied_folio == original_dte_folio
                 ).first()
 
-                added_date = dte_date
-                period = added_date.split(' ')
-                period = period[0].split('-')
-                period = period[0] + '-' + period[1]
-
                 try:
                     if existing_credit_note:
                         # Actualizar la nota de crédito existente
@@ -754,7 +743,7 @@ class CustomerTicketBillClass:
                         existing_credit_note.subtotal = -abs(round(int(dte.cash_amount)/1.19))
                         existing_credit_note.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
                         existing_credit_note.total = -abs(int(dte.cash_amount))
-                        existing_credit_note.period = period
+                        existing_credit_note.period = dte.period
                         existing_credit_note.status_id = 5
 
                         self.db.add(existing_credit_note)
@@ -782,7 +771,7 @@ class CustomerTicketBillClass:
                         credit_note_dte.tax = -abs(int(dte.cash_amount) - round(int(dte.cash_amount)/1.19))
                         credit_note_dte.discount = 0
                         credit_note_dte.total = -abs(int(dte.cash_amount))
-                        credit_note_dte.period = period
+                        credit_note_dte.period = dte.period
                         credit_note_dte.added_date = dte.added_date
 
                         self.db.add(credit_note_dte)

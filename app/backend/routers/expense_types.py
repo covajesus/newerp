@@ -43,6 +43,12 @@ def eerr_visibles(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@expense_types.get("/track_visibles")
+def track_visibles(db: Session = Depends(get_db)):
+    data = ExpenseTypeClass(db).get_all_track_visibles()
+
+    return {"message": data}
+
 @expense_types.post("/store")
 def store(expense_type_inputs: StoreExpenseType, db: Session = Depends(get_db)):
     data = ExpenseTypeClass(db).store(expense_type_inputs)

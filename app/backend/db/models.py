@@ -1220,6 +1220,7 @@ class HonoraryModel(Base):
     start_date = Column(Date())
     end_date = Column(Date())
     amount = Column(Integer)
+    period = Column(String(255))
     observation = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
@@ -1987,3 +1988,22 @@ class BranchOfficeTransbankViewModel(Base):
     status = Column(String(20))  # 'Activo' o 'Baja'
     responsable = Column(String(255))
     status_id = Column(Integer)
+
+class QryBranchOfficesModel(Base):
+    __tablename__ = 'QRY_BRANCH_OFFICES'
+
+    id = Column(Integer, primary_key=True)
+    branch_office = Column(String(255))
+    address = Column(String(255))
+    region = Column(String(255))
+    commune = Column(String(255))
+    zone = Column(String(255))
+    segment = Column(String(255))
+    principal = Column(String(255))
+    dte_code = Column(String(255))
+    principal_supervisor = Column(String(255))
+    full_name = Column(String(255))
+    person_who_receives = Column(String(255))
+    rut_who_receives = Column(String(255))
+    phone_who_receives = Column(String(255))
+

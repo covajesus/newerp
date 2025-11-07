@@ -2140,6 +2140,7 @@ class HonoraryList(BaseModel):
     page: int
     branch_office_id: Optional[int] = None
     rut: Optional[str] = None
+    period: Optional[str] = None
 
 class BankAccountUser(BaseModel):
     page: int

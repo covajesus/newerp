@@ -13,7 +13,7 @@ honoraries = APIRouter(
 @honoraries.post("/")
 def index(honorary: HonoraryList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     print(session_user.rol_id)
-    data = HonoraryClass(db).get_all(honorary.branch_office_id, honorary.rut, session_user.rut, session_user.rol_id, honorary.page)
+    data = HonoraryClass(db).get_all(honorary.branch_office_id, honorary.rut, honorary.period, session_user.rut, session_user.rol_id, honorary.page)
 
     return {"message": data}
 
@@ -55,12 +55,16 @@ def delete(id:int, session_user: UserLogin = Depends(get_current_active_user), d
 
 @honoraries.patch("/update/{id}")
 def update(id: int, honorary: UpdateHonorary, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = HonoraryClass(db).update(id, honorary)
-
-    if data == 1:
-        data = HonoraryClass(db).send(honorary)
-
-    return {"message": data}
+    # Actualizar el honorario
+    result = HonoraryClass(db).update(id, honorary)
+    
+    if result == 1:
+        # Si el update fue exitoso y tiene foreigner_id == 1, emitir boleta
+        if honorary.foreigner_id == 1 and honorary.status_id == 2:
+            send_result = HonoraryClass(db).send(id, honorary)
+            return {"message": send_result}
+    
+    return {"message": result}
 
 @honoraries.get("/get_data_by_rut/{rut}")
 def get_data_by_rut(rut: str, db: Session = Depends(get_db)):

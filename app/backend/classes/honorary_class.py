@@ -9,12 +9,18 @@ from app.backend.classes.helper_class import HelperClass
 import requests
 import json
 from sqlalchemy import func
+import traceback
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 class HonoraryClass:
     def __init__(self, db):
         self.db = db
 
-    def get_all(self, search_branch_office_id=None, search_rut=None, rut=None, rol_id=None, page=1, items_per_page=10):
+    def get_all(self, search_branch_office_id=None, search_rut=None, search_period=None, rut=None, rol_id=None, page=1, items_per_page=10):
 
         try:
             filters = []
@@ -24,10 +30,12 @@ class HonoraryClass:
             if search_rut is not None and search_rut != '':
                 filters.append(HonoraryModel.replacement_employee_rut == search_rut)
 
-            print(rol_id)
+            if search_period is not None and search_period != '':
+                # El periodo viene en formato YYYY-MM, filtramos por mes y año
+                filters.append(HonoraryModel.period == search_period)
 
             if rol_id == 1 or rol_id == 2 or rol_id == 5:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, HonoraryModel.period, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -48,6 +56,7 @@ class HonoraryClass:
                 serialized_data = [{
                     "status_id": honorary.status_id,
                     "id": honorary.id,
+                    "period": honorary.period,
                     "requested_by": honorary.full_name,
                     "honorary_reason": honorary.honorary_reason,
                     "replacement_employee_rut": honorary.replacement_employee_rut,
@@ -56,7 +65,7 @@ class HonoraryClass:
                 } for honorary in data]
 
             else:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, HonoraryModel.period, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -79,6 +88,7 @@ class HonoraryClass:
                 serialized_data = [{
                     "status_id": honorary.status_id,
                     "id": honorary.id,
+                    "period": honorary.period,
                     "requested_by": honorary.full_name,
                     "honorary_reason": honorary.honorary_reason,
                     "replacement_employee_rut": honorary.replacement_employee_rut,
@@ -122,6 +132,7 @@ class HonoraryClass:
                 "start_date": str(data.start_date),
                 "end_date": str(data.end_date),
                 "amount": str(data.amount),
+                "period": str(data.period) if data.period else None,
                 "observation": str(data.observation),
             }
 
@@ -197,7 +208,7 @@ class HonoraryClass:
             self.db.commit()
 
             if honorary_inputs.foreigner_id == 1:
-                self.send(honorary_inputs)
+                self.send(id, honorary_inputs)
 
             return 1
         except Exception as e:
@@ -213,6 +224,65 @@ class HonoraryClass:
                 return 1
             else:
                 return "No data found"
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+    
+    def update(self, id, honorary_inputs):
+        """
+        Actualiza un honorario existente y emite la boleta si foreigner_id == 1
+        """
+        try:
+            honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+            if not honorary:
+                return "Honorary not found"
+            
+            # Actualizar campos si están presentes
+            if honorary_inputs.reason_id is not None:
+                honorary.honorary_reason_id = honorary_inputs.reason_id
+            if honorary_inputs.branch_office_id is not None:
+                honorary.branch_office_id = honorary_inputs.branch_office_id
+            if honorary_inputs.foreigner_id is not None:
+                honorary.foreigner_id = honorary_inputs.foreigner_id
+            if honorary_inputs.bank_id is not None:
+                honorary.bank_id = honorary_inputs.bank_id
+            if honorary_inputs.schedule_id is not None:
+                honorary.schedule_id = honorary_inputs.schedule_id
+            if honorary_inputs.region_id is not None:
+                honorary.region_id = honorary_inputs.region_id
+            if honorary_inputs.commune_id is not None:
+                honorary.commune_id = honorary_inputs.commune_id
+            if honorary_inputs.account_type_id is not None:
+                honorary.account_type_id = honorary_inputs.account_type_id
+            if honorary_inputs.status_id is not None:
+                honorary.status_id = honorary_inputs.status_id
+            if honorary_inputs.employee_to_replace is not None:
+                honorary.employee_to_replace = honorary_inputs.employee_to_replace
+            if honorary_inputs.rut is not None:
+                honorary.replacement_employee_rut = honorary_inputs.rut
+            if honorary_inputs.full_name is not None:
+                honorary.replacement_employee_full_name = honorary_inputs.full_name
+            if honorary_inputs.email is not None:
+                honorary.email = honorary_inputs.email
+            if honorary_inputs.address is not None:
+                honorary.address = honorary_inputs.address
+            if honorary_inputs.account_number is not None:
+                honorary.account_number = honorary_inputs.account_number
+            if honorary_inputs.start_date is not None and honorary_inputs.start_date != 'None':
+                honorary.start_date = honorary_inputs.start_date
+            if honorary_inputs.end_date is not None and honorary_inputs.end_date != 'None':
+                honorary.end_date = honorary_inputs.end_date
+            if honorary_inputs.amount is not None:
+                honorary.amount = honorary_inputs.amount
+            if honorary_inputs.observation is not None:
+                honorary.observation = honorary_inputs.observation
+            
+            honorary.updated_date = datetime.now()
+            
+            self.db.add(honorary)
+            self.db.commit()
+            
+            return 1
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"
@@ -285,6 +355,7 @@ class HonoraryClass:
 
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == form_data.id).first()
         honorary.status_id = 15
+        honorary.period = form_data.period
         honorary.updated_date = datetime.now()
 
         self.db.add(honorary)
@@ -292,78 +363,154 @@ class HonoraryClass:
 
         return "Accounting entry created successfully"
 
-        
-    def send(self, data):
-        settings = SettingClass(self.db).get()
-        commune = CommuneClass(self.db).get('id', data.commune_id)
-        region = RegionClass(self.db).get('id', data.region_id)
-        
-        # Obtener fecha actual en formato DD-MM-YYYY para Simple Factura
-        current_date_y_m_d = HelperClass().get_time_Y_m_d()  # Formato YYYY-MM-DD
-        # Convertir a DD-MM-YYYY
-        date_parts = current_date_y_m_d.split('-')
-        current_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
-        
-        amount = HelperClass().remove_from_string('.', str(data.amount))
-        amount = round(int(amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
-
-        # Verificar y renovar token si es necesario
-        check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
-        if check_token_status == 0:
-            print('El token de Simple Factura está vencido, renovando...')
-            AuthenticationClass(self.db).create_simplefactura_token()
-        
-        # Obtener token actualizado
-        updated_settings = SettingClass(self.db).get()
-        token = updated_settings["setting_data"]["simplefactura_token"]
-
-        url = "https://api.simplefactura.cl/bhe/emitir"
-
-        payload = {
-            "RutEmisor": "76063822-6",
-            "Retencion": 1,
-            "FechaEmision": current_date,
-            "Emisor": {
-                "Direccion": "0"
-            },
-            "Receptor": {
-                "Rut": data.replacement_employee_rut,
-                "Nombre": data.replacement_employee_full_name,
-                "Direccion": data.address,
-                "Region": region.simplefactura_region_code,
-                "Comuna": commune.commune if commune else "No especificada"
-            },
-            "Detalles": [
+    def send(self, id, data):
+        """
+        Emite la boleta de honorarios en el SII mediante API Gateway
+        """
+        try:
+            print(f"=== INICIANDO SEND() ===")
+            print(f"ID: {id}")
+            print(f"Data: {data}")
+            
+            # Obtener datos del honorario
+            honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+            if not honorary:
+                print("ERROR: Honorary not found")
+                return {"error": "Honorary not found"}
+            print(f"Honorary encontrado: ID={honorary.id}, Amount={honorary.amount}")
+            
+            # Extraer commune_id y region_id del data (formulario)
+            commune_id = data.commune_id if hasattr(data, 'commune_id') else honorary.commune_id
+            print(f"Commune ID: {commune_id}")
+            
+            # Obtener datos relacionados
+            commune = self.db.query(CommuneModel).filter(CommuneModel.id == commune_id).first()
+            print(f"Commune encontrada: {commune.commune if commune else 'None'}")
+            
+            # Obtener settings
+            print("Obteniendo settings...")
+            settings = SettingClass(self.db).get()
+            print(f"Settings obtenidos: {settings}")
+            
+            if not settings or "setting_data" not in settings:
+                print("ERROR: Settings no disponibles o sin setting_data")
+                return {"error": "Settings not available"}
+            
+            if "percentage_honorary_bill" not in settings["setting_data"]:
+                print("ERROR: percentage_honorary_bill no encontrado en settings")
+                return {"error": "percentage_honorary_bill not configured"}
+            
+            print(f"Percentage honorary bill: {settings['setting_data']['percentage_honorary_bill']}")
+            
+            sii_rut = "76063822-9"  # RUT emisor (debería venir de settings)
+            sii_password = "JYM1"  # Contraseña SII (debería venir de settings)
+            
+            # Convertir percentage_honorary_bill a float
+            percentage = float(settings["setting_data"]["percentage_honorary_bill"])
+            print(f"Percentage como float: {percentage}")
+            
+            amount = round(honorary.amount / percentage)
+            print(f"Monto calculado: {amount}")
+            
+            # Obtener el nombre completo del receptor
+            recipient_name = data.replacement_employee_full_name if hasattr(data, 'replacement_employee_full_name') else honorary.replacement_employee_full_name
+            
+            # Debug: verificar variables de entorno
+            print(f"Todas las variables de entorno que empiezan con API:")
+            for key, value in os.environ.items():
+                if 'API' in key.upper():
+                    print(f"  {key} = {value[:50]}..." if len(value) > 50 else f"  {key} = {value}")
+            
+            # Obtener token de API Gateway desde .env (nota: la variable tiene typo GETAWAY)
+            api_token = os.getenv("APIGETAWAY_TOKEN", "")
+            print(f"API Token obtenido con APIGETAWAY_TOKEN: {api_token[:50] if api_token else 'VACIO'}")
+            
+            # Intentar también con el nombre correcto por si acaso
+            if not api_token:
+                api_token = os.getenv("APIGATEWAY_TOKEN", "")
+                print(f"API Token obtenido con APIGATEWAY_TOKEN: {api_token[:50] if api_token else 'VACIO'}")
+            
+            # Crear detalle con un solo ítem
+            detail = [
                 {
-                    "Nombre": f"Boleta de Honorarios para {data.replacement_employee_full_name}",
-                    "Valor": amount
+                    "MontoItem": int(amount),
+                    "NmbItem": "HONORARIO"
                 }
             ]
-        }
 
-        print(payload)
-        
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-
-        try:
-            response = requests.post(url, headers=headers, json=payload)
+            print(detail)
             
-            print(f"Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
+            # Preparar payload para API Gateway
+            payload = {
+                "auth": {
+                    "pass": {
+                        "clave": sii_password,
+                        "rut": sii_rut
+                    }
+                },
+                "boleta": {
+                    "Detalle": detail,
+                    "Encabezado": {
+                        "Emisor": {
+                            "RUTEmisor": sii_rut
+                        },
+                        "IdDoc": {
+                            "FchEmis": datetime.now().strftime("%Y-%m-%d")
+                        },
+                        "Receptor": {
+                            "CmnaRecep": commune.commune if commune else "",
+                            "DirRecep": str(honorary.address),
+                            "RUTRecep": str(honorary.replacement_employee_rut),
+                            "RznSocRecep": recipient_name
+                        }
+                    }
+                }
+            }
 
-            if response.status_code == 200:
-                print("Boleta de honorarios emitida exitosamente en Simple Factura")
-                return 1
-            else:
-                print(f"Error al emitir boleta de honorarios: {response.status_code} - {response.text}")
-                return 0
+            print(payload)
+            print(f"API Token: {api_token}")
+            # Enviar request a API Gateway
+            api_url = "https://legacy.apigateway.cl/api/v1/sii/bte/emitidas/emitir"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_token}"
+            }
+            
+            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            print(f"Response Status Code: {response.status_code}")
+            print(response.text)
+            
+            if response.status_code == 200 or response.status_code == 201:
+                response_data = response.json()
                 
+                # Actualizar el honorario
+                honorary.status_id = 16  # Estado: "Boleta Emitida"
+                honorary.updated_date = datetime.now()
+                
+                self.db.add(honorary)
+                self.db.commit()
+                
+                return {
+                    "success": True,
+                    "message": "Boleta emitida exitosamente",
+                    "data": response_data
+                }
+            else:
+                return {
+                    "error": f"Error en API Gateway: {response.status_code}",
+                    "details": response.text
+                }
+                
+        except requests.exceptions.RequestException as e:
+            return {
+                "error": f"Error de conexión con API Gateway: {str(e)}"
+            }
         except Exception as e:
-            print(f"Error de conexión con Simple Factura: {str(e)}")
-            return 0
+            error_detail = traceback.format_exc()
+            return {
+                "error": f"Error al emitir boleta: {str(e)}",
+                "traceback": error_detail
+            }
 
     def get_data_by_rut(self, rut):
         """
