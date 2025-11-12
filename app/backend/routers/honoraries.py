@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.schemas import Honorary, UpdateHonorary, UserLogin, HonoraryList, ValidateHonoraryRut, ImputeHonorary
@@ -26,6 +26,10 @@ def store(form_data: Honorary = Depends(Honorary.as_form), session_user: UserLog
 @honoraries.post("/generate/{id}")
 def generate(id: int, form_data: Honorary = Depends(Honorary.as_form), session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = HonoraryClass(db).generate(id, form_data)
+    
+    # Si el resultado es un dict con success=False, lanzar error HTTP
+    if isinstance(data, dict) and not data.get("success", True):
+        raise HTTPException(status_code=500, detail=data)
 
     return {"message": data}
 
