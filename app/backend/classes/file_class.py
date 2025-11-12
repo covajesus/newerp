@@ -7,7 +7,7 @@ class FileClass:
         self.files_dir = "/var/www/intrajisbackend.com/public_html/files"
         self.base_url = "https://intrajisbackend.com/files"
         # self.files_dir = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
-        # self.base_url = "http://127.0.0.1:8000/files"
+        # self.base_url = "https://intrajisbackend.com/api/files"
 
     def upload(self, file: UploadFile, remote_path: str) -> str:
         try:
