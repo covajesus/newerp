@@ -211,13 +211,11 @@ class HonoraryClass:
                     # NO actualizar el estado ni guardar cambios si falló el send()
                     self.db.rollback()
                     
-                    # Retornar el error del send()
+                    # Retornar TODO el error del endpoint API al frontend
                     return {
                         "success": False,
-                        "error": "Error al emitir la boleta de honorarios",
-                        "send_error": send_result.get("error", "Error desconocido"),
-                        "details": send_result.get("details", ""),
-                        "suggestion": send_result.get("suggestion", "")
+                        "error": "Error al emitir la boleta de honorarios en el SII",
+                        "api_error": send_result  # Toda la respuesta del send() incluyendo api_response
                     }
                 
                 # Si send() fue exitoso, cambiar a estado 2 (o el estado que corresponda después de emitir)
@@ -384,10 +382,9 @@ class HonoraryClass:
 
         return "Accounting entry created successfully"
 
-    def send(self, id, data, max_retries=3):
+    def send(self, id, data):
         """
         Emite la boleta de honorarios en el SII mediante API Gateway
-        Incluye reintentos automáticos en caso de timeout del SII
         """
         try:
             print(f"=== INICIANDO SEND() ===")
@@ -477,7 +474,7 @@ class HonoraryClass:
             print(f"- RUT Receptor: {honorary.replacement_employee_rut}")
             print(f"- Nombre: {recipient_name}")
             
-            # Enviar request a API Gateway con reintentos
+            # Enviar request a API Gateway
             api_url = "https://legacy.apigateway.cl/api/v1/sii/bte/emitidas/emitir"
             headers = {
                 "Content-Type": "application/json",
@@ -493,106 +490,46 @@ class HonoraryClass:
                 }
                 print(f"Usando proxy configurado: {proxy_url.split('@')[1] if '@' in proxy_url else proxy_url}")
             
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    print(f"\n{'='*60}")
-                    print(f"Intento {attempt + 1} de {max_retries}")
-                    print(f"{'='*60}")
-                    print(f"Enviando request a: {api_url}")
-                    
-                    response = requests.post(
-                        api_url, 
-                        json=payload, 
-                        headers=headers, 
-                        proxies=proxies,
-                        timeout=90
-                    )
-                    
-                    print(f"Response Status Code: {response.status_code}")
-                    
-                    if response.status_code == 200 or response.status_code == 201:
-                        response_data = response.json()
-                        
-                        # Actualizar el honorario
-                        honorary.status_id = 16  # Estado: "Boleta Emitida"
-                        honorary.updated_date = datetime.now()
-                        
-                        self.db.add(honorary)
-                        self.db.commit()
-                        
-                        print("✅ Boleta emitida exitosamente")
-                        return {
-                            "success": True,
-                            "message": "Boleta emitida exitosamente",
-                            "data": response_data
-                        }
-                    elif response.status_code == 409:
-                        # Error 409 - Posible timeout del SII
-                        error_data = response.json() if response.text else {}
-                        error_message = error_data.get("message", response.text)
-                        
-                        if "timeout" in error_message.lower() or "curl error 28" in error_message.lower():
-                            print(f"⚠️ Timeout del SII detectado (intento {attempt + 1})")
-                            last_error = {
-                                "error": "Timeout al conectar con el SII",
-                                "details": error_message,
-                                "status_code": response.status_code,
-                                "attempt": attempt + 1
-                            }
-                            
-                            if attempt < max_retries - 1:
-                                import time
-                                wait_time = (attempt + 1) * 5  # Espera incremental: 5, 10, 15 segundos
-                                print(f"Esperando {wait_time} segundos antes de reintentar...")
-                                time.sleep(wait_time)
-                                continue
-                        else:
-                            return {
-                                "success": False,
-                                "error": f"Error en API Gateway: {response.status_code}",
-                                "details": error_message
-                            }
-                    else:
-                        return {
-                            "success": False,
-                            "error": f"Error en API Gateway: {response.status_code}",
-                            "details": response.text
-                        }
-                        
-                except requests.exceptions.Timeout:
-                    print(f"⚠️ Timeout en la petición HTTP (intento {attempt + 1})")
-                    last_error = {
-                        "error": "Timeout en la petición HTTP",
-                        "attempt": attempt + 1
-                    }
-                    if attempt < max_retries - 1:
-                        import time
-                        wait_time = (attempt + 1) * 5
-                        print(f"Esperando {wait_time} segundos antes de reintentar...")
-                        time.sleep(wait_time)
-                        continue
-                except requests.exceptions.RequestException as e:
-                    print(f"⚠️ Error de conexión: {str(e)}")
-                    last_error = {
-                        "error": f"Error de conexión: {str(e)}",
-                        "attempt": attempt + 1
-                    }
-                    if attempt < max_retries - 1:
-                        import time
-                        wait_time = (attempt + 1) * 5
-                        print(f"Esperando {wait_time} segundos antes de reintentar...")
-                        time.sleep(wait_time)
-                        continue
+            print(f"\nEnviando request a: {api_url}")
             
-            # Si llegamos aquí, todos los reintentos fallaron
-            print(f"\n❌ Todos los intentos ({max_retries}) fallaron")
-            return {
-                "success": False,
-                "error": "Máximo de reintentos alcanzado. El SII no está respondiendo.",
-                "last_error": last_error,
-                "suggestion": "Por favor, intente nuevamente en unos minutos. Los servicios del SII pueden estar experimentando alta demanda."
-            }
+            response = requests.post(
+                api_url, 
+                json=payload, 
+                headers=headers, 
+                proxies=proxies
+            )
+            
+            print(f"Response Status Code: {response.status_code}")
+            
+            if response.status_code == 200 or response.status_code == 201:
+                response_data = response.json()
+                
+                # Actualizar el honorario
+                honorary.status_id = 16  # Estado: "Boleta Emitida"
+                honorary.updated_date = datetime.now()
+                
+                self.db.add(honorary)
+                self.db.commit()
+                
+                print("✅ Boleta emitida exitosamente")
+                return {
+                    "success": True,
+                    "message": "Boleta emitida exitosamente",
+                    "data": response_data
+                }
+            else:
+                # Cualquier error HTTP
+                try:
+                    error_data = response.json() if response.text else {}
+                except:
+                    error_data = {"raw_response": response.text}
+                
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "api_response": error_data,  # Respuesta completa del endpoint
+                    "raw_text": response.text
+                }
                 
         except Exception as e:
             error_detail = traceback.format_exc()
