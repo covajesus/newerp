@@ -188,7 +188,6 @@ class HonoraryClass:
             honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
             honorary.account_type_id = honorary_inputs.account_type_id
-            honorary.status_id = 2
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
             honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
@@ -201,17 +200,17 @@ class HonoraryClass:
                 honorary.end_date = honorary_inputs.end_date
             honorary.observation = honorary_inputs.observation
             honorary.amount = honorary_inputs.amount
-            honorary.added_date = datetime.now()
             honorary.updated_date = datetime.now()
 
-            self.db.add(honorary)
-            self.db.commit()
-
+            # Si es extranjero (foreigner_id == 1), intentar emitir la boleta primero
             if honorary_inputs.foreigner_id == 1:
                 send_result = self.send(id, honorary_inputs)
                 
                 # Verificar si send() retornó un error
                 if isinstance(send_result, dict) and not send_result.get("success", False):
+                    # NO actualizar el estado ni guardar cambios si falló el send()
+                    self.db.rollback()
+                    
                     # Retornar el error del send()
                     return {
                         "success": False,
@@ -220,6 +219,17 @@ class HonoraryClass:
                         "details": send_result.get("details", ""),
                         "suggestion": send_result.get("suggestion", "")
                     }
+                
+                # Si send() fue exitoso, cambiar a estado 2 (o el estado que corresponda después de emitir)
+                # Nota: El método send() ya cambia el estado a 16, así que solo confirmamos aquí
+                honorary.status_id = 2
+            else:
+                # Si NO es extranjero, simplemente cambiar a estado 2
+                honorary.status_id = 2
+
+            # Guardar los cambios
+            self.db.add(honorary)
+            self.db.commit()
 
             return 1
         except Exception as e:
