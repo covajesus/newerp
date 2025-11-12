@@ -15,7 +15,7 @@ class FolioClass:
         try:
             if page != 0:
                 data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.billed_status_id, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id, FolioModel.added_date). \
-                        order_by(FolioModel.folio)
+                        order_by(FolioModel.folio.desc())
 
                 total_items = data_query.count()
                 total_pages = (total_items + items_per_page - 1) // items_per_page
@@ -51,7 +51,7 @@ class FolioClass:
                 }
             else:
                 data_query = self.db.query(FolioModel.id, FolioModel.folio, FolioModel.branch_office_id, FolioModel.cashier_id, FolioModel.requested_status_id, FolioModel.used_status_id). \
-                        order_by(FolioModel.folio).all()
+                        order_by(FolioModel.folio.desc()).all()
 
                 serialized_data = [{
                         "id": folio.id,
