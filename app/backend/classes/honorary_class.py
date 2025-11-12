@@ -208,7 +208,18 @@ class HonoraryClass:
             self.db.commit()
 
             if honorary_inputs.foreigner_id == 1:
-                self.send(id, honorary_inputs)
+                send_result = self.send(id, honorary_inputs)
+                
+                # Verificar si send() retornó un error
+                if isinstance(send_result, dict) and not send_result.get("success", False):
+                    # Retornar el error del send()
+                    return {
+                        "success": False,
+                        "error": "Error al emitir la boleta de honorarios",
+                        "send_error": send_result.get("error", "Error desconocido"),
+                        "details": send_result.get("details", ""),
+                        "suggestion": send_result.get("suggestion", "")
+                    }
 
             return 1
         except Exception as e:
