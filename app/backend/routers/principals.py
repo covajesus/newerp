@@ -15,3 +15,9 @@ def index(session_user: UserLogin = Depends(get_current_active_user), db: Sessio
     data = PrincipalClass(db).get_all()
 
     return {"message": data}
+
+@principals.get("/active")
+def get_active_principals(db: Session = Depends(get_db)):
+    data = PrincipalClass(db).get_all_active_principals()
+
+    return {"message": data}

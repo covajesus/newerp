@@ -1,4 +1,4 @@
-from app.backend.db.models import PrincipalModel
+from app.backend.db.models import PrincipalModel, BranchOfficeModel
 
 class PrincipalClass:
     def __init__(self, db):
@@ -14,6 +14,23 @@ class PrincipalClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
+    def get_all_active_principals(self):
+        try:
+            data = self.db.query(PrincipalModel).join(
+                BranchOfficeModel, BranchOfficeModel.principal_id == PrincipalModel.id
+            ).filter(
+                BranchOfficeModel.status_id == 8
+            ).order_by(
+                PrincipalModel.principal
+            ).distinct().all()
+            
+            if not data:
+                return "No data found"
+            return data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+        
     def get(self, field, value):
         try:
             data = self.db.query(PrincipalModel).filter(getattr(PrincipalModel, field) == value).first()
