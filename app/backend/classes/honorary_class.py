@@ -27,7 +27,7 @@ class HonoraryClass:
             print(rol_id)
 
             if rol_id == 1 or rol_id == 2 or rol_id == 5:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.period, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -52,11 +52,12 @@ class HonoraryClass:
                     "honorary_reason": honorary.honorary_reason,
                     "replacement_employee_rut": honorary.replacement_employee_rut,
                     "replacement_employee_full_name": honorary.replacement_employee_full_name,
+                    "period": honorary.period,
                     "added_date": honorary.added_date
                 } for honorary in data]
 
             else:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.added_date). \
+                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.period, HonoraryModel.added_date). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -83,6 +84,7 @@ class HonoraryClass:
                     "honorary_reason": honorary.honorary_reason,
                     "replacement_employee_rut": honorary.replacement_employee_rut,
                     "replacement_employee_full_name": honorary.replacement_employee_full_name,
+                    "period": honorary.period,
                     "added_date": honorary.added_date
                 } for honorary in data]
 

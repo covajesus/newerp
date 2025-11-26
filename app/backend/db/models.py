@@ -1220,6 +1220,7 @@ class HonoraryModel(Base):
     start_date = Column(Date())
     end_date = Column(Date())
     amount = Column(Integer)
+    period = Column(String(255))
     observation = Column(String(255))
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
