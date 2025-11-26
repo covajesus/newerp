@@ -19,7 +19,7 @@ class PrincipalClass:
             data = self.db.query(PrincipalModel).join(
                 BranchOfficeModel, BranchOfficeModel.principal_id == PrincipalModel.id
             ).filter(
-                BranchOfficeModel.status_id == 8
+                BranchOfficeModel.status_id == 7
             ).order_by(
                 PrincipalModel.principal
             ).distinct().all()
