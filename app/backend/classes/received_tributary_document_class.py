@@ -837,7 +837,7 @@ class ReceivedTributaryDocumentClass:
         if dte:
             TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-            url = f"https://libredte.cl/api/dte/dte_recibidos/pdf/"+ str(issuer_rut) +"/33/"+ str(dte.folio) +"/76063822?papelContinuo=0&copias_tributarias=1&copias_cedibles=0&cedible=0&compress=0&base64=0"
+            url = f"https://libredte.cl/api/dte/dte_recibidos/pdf/"+ str(issuer_rut) +"/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822?papelContinuo=0&copias_tributarias=1&copias_cedibles=0&cedible=0&compress=0&base64=0"
 
             response = requests.get(
                 url,
