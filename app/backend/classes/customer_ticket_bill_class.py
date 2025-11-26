@@ -728,8 +728,18 @@ class CustomerTicketBillClass:
                 folio = self.generate_credit_note_ticket(customer_data['customer_data']['rut'], code, dte.dte_type_id)
 
             if folio != None:
-                # Si viene del envío masivo, solo generar la nota de crédito sin guardar DTE
+                # Si viene del envío masivo, actualizar el DTE original y retornar el folio
                 if is_massive_sending:
+                    # Actualizar el DTE original (33 o 39) a status 5
+                    if original_dte_folio and original_dte_folio > 0:
+                        original_dte_to_update = self.db.query(DteModel).filter(
+                            DteModel.folio == original_dte_folio,
+                            or_(DteModel.dte_type_id == 33, DteModel.dte_type_id == 39)
+                        ).first()
+                        if original_dte_to_update:
+                            original_dte_to_update.status_id = 5
+                            self.db.add(original_dte_to_update)
+                            self.db.commit()
                     return folio  # Retornar solo el folio generado
                 
                 # Verificar si ya existe una nota de crédito con este denied_folio

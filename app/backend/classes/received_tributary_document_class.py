@@ -241,7 +241,7 @@ class ReceivedTributaryDocumentClass:
 
             for item in data:
                 # 👉 Filtrar solo DTEs tipo 33 (Facturas) y 39 (Boletas)
-                if item.get('dte') not in [33, 34, 39]:
+                if item.get('dte') not in [33, 34, 39, 61]:
                     continue
                 
                 # 👉 Validar que el emisor exista
