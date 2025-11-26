@@ -144,6 +144,33 @@ class BranchOfficeClass:
             error_message = str(e)
             return f"Error: {error_message}"
     
+    def get_by_principal_id(self, principal_id):
+        try:
+            data = self.db.query(
+                BranchOfficeModel.id,
+                BranchOfficeModel.branch_office,
+                BranchOfficeModel.address
+            ).filter(
+                BranchOfficeModel.principal_id == principal_id
+            ).order_by(
+                BranchOfficeModel.branch_office
+            ).all()
+            
+            if not data:
+                return "No data found"
+            
+            # Serializar los datos
+            serialized_data = [{
+                "id": item.id,
+                "branch_office": item.branch_office,
+                "address": item.address
+            } for item in data]
+            
+            return serialized_data
+        except Exception as e:
+            error_message = str(e)
+            return f"Error: {error_message}"
+    
     def store(self, branch_office_inputs):
         try:
             branch_office = BranchOfficeModel()

@@ -57,3 +57,9 @@ def update(form_data: UpdateBranchOffice = Depends(UpdateBranchOffice.as_form), 
     data = BranchOfficeClass(db).update(form_data)
 
     return {"message": data}
+
+@branch_offices.get("/by_principal/{principal_id}")
+def get_by_principal(principal_id: int, db: Session = Depends(get_db)):
+    data = BranchOfficeClass(db).get_by_principal_id(principal_id)
+
+    return {"message": data}
