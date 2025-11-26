@@ -221,7 +221,7 @@ class ReceivedTributaryDocumentClass:
         data = {
             "fecha_desde": since,
             "fecha_hasta": until,
-            "dte": [33, 34, 39]
+            "dte": [33, 34, 39, 61]
         }
 
         try:

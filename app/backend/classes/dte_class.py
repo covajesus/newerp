@@ -563,7 +563,6 @@ class DteClass:
     def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=0, items_per_page=10):
         try:
             # Inicialización de filtros dinámicos
-            print(folio, branch_office_id, rut, supplier, until, since, amount, supervisor_id, status_id)
             filters = []
             if folio is not None:
                 filters.append(DteModel.folio == folio) 
