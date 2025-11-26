@@ -257,6 +257,11 @@ class ReceivedTributaryDocumentClass:
                     total = item['total'] if item['total'] is not None else 0
                     net = item['neto'] if item['neto'] is not None else 0
 
+                    # Si es NC (tipo 61), los valores deben ser negativos
+                    if item['dte'] == 61:
+                        total = -abs(total)
+                        net = -abs(net)
+
                     validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
                     if validate_supplier_existence == 0:
                         supplier = SupplierModel()
