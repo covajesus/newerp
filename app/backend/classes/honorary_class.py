@@ -287,6 +287,7 @@ class HonoraryClass:
 
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == form_data.id).first()
         honorary.status_id = 15
+        honorary.period = form_data.period
         honorary.updated_date = datetime.now()
 
         self.db.add(honorary)
