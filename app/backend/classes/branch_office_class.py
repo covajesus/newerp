@@ -151,7 +151,8 @@ class BranchOfficeClass:
                 BranchOfficeModel.branch_office,
                 BranchOfficeModel.address
             ).filter(
-                BranchOfficeModel.principal_id == principal_id
+                BranchOfficeModel.principal_id == principal_id,
+                BranchOfficeModel.status_id == 7
             ).order_by(
                 BranchOfficeModel.branch_office
             ).all()
