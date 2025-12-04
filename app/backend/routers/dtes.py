@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte, UploadDteDepositTransfer
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte, UploadDteDepositTransfer, SearchEmittedDtes
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
@@ -802,22 +802,15 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
         try:
             dte_class = DteClass(db)
             
-            # Obtener el período actual y los DTEs
+            # Obtener el período actual
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Construir filtro base con lógica de status según tipo de DTE
+            # Construir filtro base - SOLO status_id = 2 (no procesados)
             base_filter = [
                 DteModel.period == current_period,
+                DteModel.status_id == 2,
                 DteModel.dte_version_id == 1
             ]
-            
-            # Aplicar filtro de status según el tipo de DTE
-            if dte_type_id == 61:
-                # Para notas de crédito, buscar status 2 o 14
-                base_filter.append(DteModel.status_id.in_([2, 14]))
-            else:
-                # Para otros tipos de DTE, buscar status 2
-                base_filter.append(DteModel.status_id == 2)
             
             # Si branch_office_id es 0, procesar todas las sucursales
             if branch_office_id != 0:

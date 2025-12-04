@@ -2,7 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import desc, cast, Date, func, or_
+from sqlalchemy import desc, cast, Date, func, or_, text
 from sqlalchemy.dialects import mysql
 from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel, TotalDtesToBeSentModel
 from app.backend.classes.helper_class import HelperClass
@@ -1867,15 +1867,9 @@ class DteClass:
             current_period = datetime.now().strftime('%Y-%m')
             
             # Construir filtro base
-            # Para tipo 61 (notas de crédito) aceptar tanto status_id = 2 como 14
-            if dte_type_id == 61:
-                status_filter = DteModel.status_id.in_([2, 14])
-            else:
-                # Si no se especifica tipo o es diferente de 61, incluir ambos status
-                if dte_type_id == 0:
-                    status_filter = DteModel.status_id.in_([2, 14])
-                else:
-                    status_filter = DteModel.status_id == 2
+            # SOLO buscar DTEs que NO han sido procesados (excluir status 4 y 5)
+            # TODOS los tipos de DTE buscan SOLO status_id = 2
+            status_filter = DteModel.status_id == 2
             
             base_filter = [
                 DteModel.period == current_period,
@@ -1892,7 +1886,7 @@ class DteClass:
                 base_filter.append(DteModel.dte_type_id == dte_type_id)
             
             # Información de depuración para diagnóstico
-            expected_status = 14 if dte_type_id == 61 else (2 if dte_type_id != 0 else "2 o 14")
+            expected_status = 2
             branch_info = f"sucursal {branch_office_id}" if branch_office_id != 0 else "todas las sucursales"
             type_info = f"tipo {dte_type_id}" if dte_type_id != 0 else "todos los tipos"
             
@@ -1975,33 +1969,57 @@ class DteClass:
                         "message": f"Procesando DTE {i}/{total_dtes}"
                     }
                     
-                    # Validar duplicado
-                    duplicate_filter = [
-                        DteModel.rut == dte.rut,
-                        DteModel.dte_type_id == dte.dte_type_id,
-                        DteModel.period == current_period,
-                        DteModel.id != dte.id
-                    ]
+                    # VERIFICACIÓN 1: Verificar que el DTE no haya sido procesado ya (evita race conditions)
+                    # Refrescar el DTE desde la BD para obtener el status más reciente
+                    self.db.refresh(dte)
                     
-                    # Si branch_office_id no es 0, filtrar por sucursal específica
-                    if branch_office_id != 0:
-                        duplicate_filter.append(DteModel.branch_office_id == branch_office_id)
-                    
-                    existing_dte = self.db.query(DteModel).filter(*duplicate_filter).first()
-                    
-                    if existing_dte:
+                    # Si el status ya es 4 o 5, significa que ya fue procesado (posiblemente por otra instancia)
+                    if dte.status_id in [4, 5]:
                         failed_sends += 1
                         yield {
                             "type": "dte_result",
                             "dte_id": dte.id,
-                            "status": "duplicate_skipped",
-                            "message": f"DTE duplicado - Saltado (existe ID: {existing_dte.id})",
+                            "status": "already_processed",
+                            "message": f"DTE ya fue procesado anteriormente (status: {dte.status_id})",
                             "current": i,
                             "total": total_dtes
                         }
                         continue
                     
-                    # Generar el DTE completo
+                    # VERIFICACIÓN 2: Validar duplicado por RUT, tipo de DTE, periodo y sucursal ANTES de generar
+                    # Buscar DTEs del mismo cliente, tipo, período y sucursal que ya estén procesados (status 4 o 5)
+                    duplicate_filter = [
+                        DteModel.rut == dte.rut,
+                        DteModel.dte_type_id == dte.dte_type_id,
+                        DteModel.period == current_period,
+                        DteModel.dte_version_id == 1,
+                        DteModel.status_id.in_([4, 5]),  # Solo considerar los que ya fueron procesados
+                        DteModel.id != dte.id
+                    ]
+                    
+                    # Siempre filtrar por sucursal específica para evitar duplicados
+                    duplicate_filter.append(DteModel.branch_office_id == dte.branch_office_id)
+                    
+                    existing_dte = self.db.query(DteModel).filter(*duplicate_filter).first()
+                    
+                    if existing_dte:
+                        # Eliminar el DTE duplicado de la BD (no generar en LibreDTE)
+                        print(f"⚠️ DTE duplicado detectado: ID {dte.id} - Cliente {dte.rut} - Ya existe ID {existing_dte.id} (folio {existing_dte.folio})")
+                        self.db.delete(dte)
+                        self.db.commit()
+                        
+                        failed_sends += 1
+                        yield {
+                            "type": "dte_result",
+                            "dte_id": dte.id,
+                            "status": "duplicate_deleted",
+                            "message": f"DTE duplicado eliminado (ya existe folio {existing_dte.folio})",
+                            "current": i,
+                            "total": total_dtes
+                        }
+                        continue
+                    
+                    # Generar el DTE completo SOLO si no hay duplicados
                     generation_result = self._generate_complete_dte(dte)
                     
                     if generation_result.get("status") == "error":
@@ -2058,13 +2076,7 @@ class DteClass:
                     # Obtener contador actualizado desde DteModel
                     try:
                         # Usar la misma lógica de filtro que al inicio
-                        if dte_type_id == 61:
-                            remaining_status_filter = DteModel.status_id.in_([2, 14])
-                        else:
-                            if dte_type_id == 0:
-                                remaining_status_filter = DteModel.status_id.in_([2, 14])
-                            else:
-                                remaining_status_filter = DteModel.status_id == 2
+                        remaining_status_filter = DteModel.status_id == 2
                         
                         remaining_filter = [
                             DteModel.period == current_period,
@@ -2119,13 +2131,7 @@ class DteClass:
                     # Obtener contador actualizado incluso en errores
                     try:
                         # Usar la misma lógica de filtro que al inicio
-                        if dte_type_id == 61:
-                            error_status_filter = DteModel.status_id == 14
-                        else:
-                            if dte_type_id == 0:
-                                error_status_filter = DteModel.status_id.in_([2, 14])
-                            else:
-                                error_status_filter = DteModel.status_id == 2
+                        error_status_filter = DteModel.status_id == 2
                         
                         error_remaining_filter = [
                             DteModel.period == current_period,
@@ -2301,6 +2307,1108 @@ class DteClass:
                     "status": "success",
                     "status_code": response.status_code,
                     "data": data
+                }
+            else:
+                return {
+                    "status": "error",
+                    "status_code": response.status_code,
+                    "message": f"Error al consultar LibreDTE: {response.text}",
+                    "data": None
+                }
+                
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "status_code": None,
+                "message": f"Error de conexión con LibreDTE: {str(e)}",
+                "data": None
+            }
+        except Exception as e:
+            return {
+                "status": "error", 
+                "status_code": None,
+                "message": f"Error inesperado: {str(e)}",
+                "data": None
+            }
+
+    def check_dtes_repetidos(self):
+        """
+        Lee todos los registros de la tabla dtes_repetidos y consulta información
+        detallada de cada uno en LibreDTE
+        """
+        try:
+            # 1. Obtener todos los registros de dtes_repetidos
+            result = self.db.execute(text("SELECT id, folio, razon_social, dte_type_id FROM dtes_repetidos"))
+            dtes_repetidos = result.fetchall()
+            
+            print(f"\n=== MOSTRANDO TODOS LOS REGISTROS DE dtes_repetidos ===")
+            print(f"Total de registros: {len(dtes_repetidos)}\n")
+            
+            for idx, dte_repetido in enumerate(dtes_repetidos, 1):
+                id_db = dte_repetido[0]
+                folio = dte_repetido[1]
+                razon_social = dte_repetido[2]
+                dte_type_id = dte_repetido[3]
+                
+                print(f"Registro #{idx}:")
+                print(f"  ID: {id_db}")
+                print(f"  Folio: {folio}")
+                print(f"  Razón Social: {razon_social}")
+                print(f"  Tipo DTE: {dte_type_id}")
+                print()
+            
+            if not dtes_repetidos:
+                return {
+                    "status": "success",
+                    "message": "No hay DTEs repetidos en la tabla",
+                    "total": 0,
+                    "data": []
+                }
+            
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            issuer = "76063822"
+            
+            headers = {
+                'Accept': '*/*'
+            }
+            
+            results = []
+            
+            print(f"\n=== CONSULTANDO INFORMACIÓN EN LIBREDTE ===")
+            
+            # 2. Consultar cada DTE en LibreDTE
+            for dte_repetido in dtes_repetidos:
+                id_db = dte_repetido[0]
+                folio = dte_repetido[1]
+                razon_social = dte_repetido[2]
+                dte_type_id = dte_repetido[3]
+                
+                # Construir URL del endpoint de cobro
+                url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/{dte_type_id}/{folio}/{issuer}"
+                url += "?getDocumento=0&getDetalle=0&getLinks=0"
+                
+                print(f"\nConsultando folio {folio} (tipo {dte_type_id}): {url}")
+                
+                try:
+                    # Agregar el token en el header de autorización
+                    request_headers = {
+                        'Accept': '*/*',
+                        'Authorization': f'Bearer {token}'
+                    }
+                    
+                    response = requests.get(url, headers=request_headers)
+                    
+                    if response.status_code == 200:
+                        dte_info = response.json()
+                        
+                        # Determinar si está pagado (verificar el campo "pagado" en la respuesta)
+                        pagado = 1 if dte_info.get("pagado") else 0
+                        
+                        # Actualizar el campo pagado en la tabla dtes_repetidos
+                        try:
+                            update_sql = text(f"UPDATE dtes_repetidos SET pagado = {pagado} WHERE id = {id_db}")
+                            self.db.execute(update_sql)
+                            self.db.commit()
+                            print(f"  ✓ Información obtenida para folio {folio} - Pagado: {pagado}")
+                        except Exception as update_error:
+                            print(f"  ⚠ Error al actualizar pagado para folio {folio}: {str(update_error)}")
+                        
+                        # Imprimir la información completa del DTE
+                        print(f"  📄 Datos completos del DTE:")
+                        print(f"     {json.dumps(dte_info, indent=6, ensure_ascii=False)}")
+                        
+                        results.append({
+                            "id": id_db,
+                            "folio": folio,
+                            "razon_social": razon_social,
+                            "dte_type_id": dte_type_id,
+                            "pagado": pagado,
+                            "status": "success",
+                            "libredte_data": dte_info
+                        })
+                    else:
+                        results.append({
+                            "id": id_db,
+                            "folio": folio,
+                            "razon_social": razon_social,
+                            "dte_type_id": dte_type_id,
+                            "status": "error",
+                            "message": f"Error HTTP {response.status_code}: {response.text}"
+                        })
+                        
+                        print(f"  ✗ Error al consultar folio {folio}: {response.status_code}")
+                        
+                except Exception as e:
+                    results.append({
+                        "id": id_db,
+                        "folio": folio,
+                        "razon_social": razon_social,
+                        "dte_type_id": dte_type_id,
+                        "status": "error",
+                        "message": f"Error en la consulta: {str(e)}"
+                    })
+                    
+                    print(f"  ✗ Error al consultar folio {folio}: {str(e)}")
+            
+            print(f"\n=== VERIFICACIÓN COMPLETADA ===")
+            print(f"Total procesados: {len(results)}")
+            
+            return {
+                "status": "success",
+                "total": len(results),
+                "data": results
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Error al verificar DTEs repetidos: {str(e)}",
+                "data": None
+            }
+
+    def dtes_update_repetidos(self):
+        """
+        Actualiza los DTEs repetidos:
+        1. Si hay registros con pagado=1, busca el folio en dtes y actualiza status_id=5 y el folio de los otros registros
+        2. Si todos tienen pagado=0, busca cuál folio existe en dtes y marca existencia=1
+        """
+        try:
+            # Obtener solo los registros donde existencia es NULL
+            result = self.db.execute(text("SELECT id, folio, razon_social, dte_type_id, pagado FROM dtes_repetidos WHERE existencia IS NULL ORDER BY razon_social, folio"))
+            all_dtes = result.fetchall()
+            
+            if not all_dtes:
+                return {
+                    "status": "success",
+                    "message": "No hay DTEs repetidos para procesar",
+                    "total": 0,
+                    "processed": 0
+                }
+            
+            # Agrupar por razón social
+            grouped_by_razon_social = {}
+            for dte_rep in all_dtes:
+                id_db, folio, razon_social, dte_type_id, pagado = dte_rep
+                
+                if razon_social not in grouped_by_razon_social:
+                    grouped_by_razon_social[razon_social] = []
+                
+                grouped_by_razon_social[razon_social].append({
+                    "id": id_db,
+                    "folio": folio,
+                    "dte_type_id": dte_type_id,
+                    "pagado": pagado
+                })
+            
+            print(f"\n=== PROCESANDO {len(grouped_by_razon_social)} RAZONES SOCIALES ===\n")
+            
+            processed_count = 0
+            results = []
+            
+            for razon_social, dtes_list in grouped_by_razon_social.items():
+                print(f"\nProcesando: {razon_social} ({len(dtes_list)} registros)")
+                
+                # Verificar si hay algún registro con pagado = 1
+                pagado_registros = [d for d in dtes_list if d["pagado"] == 1]
+                no_pagado_registros = [d for d in dtes_list if d["pagado"] == 0]
+                
+                # SIEMPRE actualizar existencia para todos los registros
+                for dte_rep in dtes_list:
+                    folio_check = dte_rep["folio"]
+                    id_rep = dte_rep["id"]
+                    
+                    dte_db = self.db.query(DteModel).filter(
+                        DteModel.folio == folio_check,
+                        DteModel.dte_version_id == 1
+                    ).first()
+                    
+                    existencia = 1 if dte_db else 0
+                    update_sql = text(f"UPDATE dtes_repetidos SET existencia = {existencia} WHERE id = {id_rep}")
+                    self.db.execute(update_sql)
+                    self.db.commit()
+                
+                if pagado_registros:
+                    # CASO 1: Hay al menos un registro con pagado = 1
+                    print(f"  ✓ Tiene {len(pagado_registros)} registro(s) pagado(s)")
+                    
+                    for pagado_dte in pagado_registros:
+                        folio_pagado = pagado_dte["folio"]
+                        
+                        # Buscar este folio en la tabla dtes
+                        dte_db = self.db.query(DteModel).filter(
+                            DteModel.folio == folio_pagado,
+                            DteModel.dte_version_id == 1
+                        ).first()
+                        
+                        if not dte_db:
+                            print(f"  ⚠ Folio pagado {folio_pagado} NO existe en dtes, buscando otros folios...")
+                            
+                            # Buscar los otros folios en dtes
+                            for otro_dte in no_pagado_registros:
+                                otro_folio = otro_dte["folio"]
+                                dte_db = self.db.query(DteModel).filter(
+                                    DteModel.folio == otro_folio,
+                                    DteModel.dte_version_id == 1
+                                ).first()
+                                
+                                if dte_db:
+                                    print(f"  ✓ Folio alternativo {otro_folio} ENCONTRADO en dtes")
+                                    # Actualizar este DTE: cambiar status_id a 5 y folio al pagado
+                                    dte_db.status_id = 5
+                                    dte_db.folio = folio_pagado
+                                    self.db.commit()
+                                    
+                                    print(f"  ✓ DTE actualizado: status_id=5, folio={folio_pagado}")
+                                    
+                                    results.append({
+                                        "razon_social": razon_social,
+                                        "folio_original": otro_folio,
+                                        "folio_actualizado": folio_pagado,
+                                        "status": "updated",
+                                        "message": f"DTE actualizado con folio pagado {folio_pagado}"
+                                    })
+                                    processed_count += 1
+                                    break
+                            else:
+                                print(f"  ✗ Ningún folio encontrado en dtes para {razon_social}")
+                                results.append({
+                                    "razon_social": razon_social,
+                                    "status": "not_found",
+                                    "message": "Ningún folio existe en dtes"
+                                })
+                        else:
+                            print(f"  ✓ Folio pagado {folio_pagado} EXISTE en dtes")
+                            # Actualizar status_id a 5
+                            dte_db.status_id = 5
+                            self.db.commit()
+                            
+                            print(f"  ✓ DTE actualizado: status_id=5")
+                            
+                            results.append({
+                                "razon_social": razon_social,
+                                "folio": folio_pagado,
+                                "status": "updated",
+                                "message": f"Status actualizado a 5 para folio {folio_pagado}"
+                            })
+                            processed_count += 1
+                
+                else:
+                    # CASO 2: Todos tienen pagado = 0
+                    print(f"  ⚠ Todos los registros tienen pagado=0 ({len(no_pagado_registros)} registros)")
+                    print(f"  ℹ Campo 'existencia' ya actualizado para todos los registros")
+                    
+                    results.append({
+                        "razon_social": razon_social,
+                        "status": "no_pagado",
+                        "message": f"Todos los registros sin pagar - existencia actualizada"
+                    })
+            
+            print(f"\n=== PROCESAMIENTO COMPLETADO ===")
+            print(f"Total procesados: {processed_count}")
+            
+            return {
+                "status": "success",
+                "total_razon_social": len(grouped_by_razon_social),
+                "processed": processed_count,
+                "results": results
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al actualizar DTEs repetidos: {str(e)}",
+                "data": None
+            }
+
+    def new_create_nc(self, rol_id=1):
+        """
+        Crea notas de crédito para registros de dtes_repetidos donde:
+        - pagado = 0
+        - existencia = 0
+        - nc = 0
+        
+        Genera NC vía LibreDTE y actualiza nc=1 después de cada creación exitosa.
+        """
+        try:
+            print("\n=== NEW CREATE NC - VERSIÓN SIMPLIFICADA ===")
+            
+            # Consultar registros con los criterios especificados
+            query = text("""
+                SELECT id, folio, razon_social, dte_type_id, pagado, existencia, nc
+                FROM dtes_repetidos
+                WHERE pagado = 0 AND existencia = 0 AND nc = 0
+                ORDER BY razon_social, folio
+            """)
+            
+            result = self.db.execute(query)
+            records = result.fetchall()
+            
+            print(f"📊 Total de registros encontrados: {len(records)}")
+            
+            if len(records) == 0:
+                return {
+                    "status": "success",
+                    "message": "No hay registros para procesar",
+                    "nc_created": 0,
+                    "errors": []
+                }
+            
+            # Mostrar resumen
+            print("\n📋 REGISTROS A PROCESAR:")
+            print("=" * 80)
+            for record in records:
+                record_id, folio, razon_social, dte_type_id, pagado, existencia, nc = record
+                print(f"  ID: {record_id} | Folio: {folio} | Cliente: {razon_social} | Tipo: {dte_type_id}")
+            print("=" * 80)
+            
+            # Inicializar contadores
+            nc_created_count = 0
+            errors = []
+            customer_ticket_bill_class = CustomerTicketBillClass(self.db)
+            
+            print("\n🚀 INICIANDO GENERACIÓN DE NCs...\n")
+            import sys
+            sys.stdout.flush()
+            
+            # Procesar cada registro
+            for idx, record in enumerate(records, 1):
+                record_id, folio, razon_social, dte_type_id, pagado, existencia, nc = record
+                
+                print(f"\n[{idx}/{len(records)}] Procesando folio {folio} - {razon_social}")
+                sys.stdout.flush()
+                
+                try:
+                    # Buscar un DTE de referencia del mismo cliente en la tabla dtes
+                    # Primero intentamos encontrar el mismo folio en dtes (aunque existencia=0, puede haber casos edge)
+                    reference_dte = self.db.query(DteModel).filter(
+                        DteModel.folio == folio,
+                        DteModel.dte_type_id == dte_type_id,
+                        DteModel.dte_version_id == 1,
+                        DteModel.period == '2025-12'
+                    ).first()
+                    
+                    # Si no existe, buscar cualquier DTE del mismo tipo para obtener datos del cliente
+                    if not reference_dte:
+                        # Intentar buscar por razón social en dtes_repetidos con existencia=1
+                        ref_query = text("""
+                            SELECT folio, dte_type_id 
+                            FROM dtes_repetidos 
+                            WHERE razon_social = :razon_social AND existencia = 1
+                            LIMIT 1
+                        """)
+                        ref_result = self.db.execute(ref_query, {"razon_social": razon_social}).fetchone()
+                        
+                        if ref_result:
+                            ref_folio, ref_dte_type_id = ref_result
+                            reference_dte = self.db.query(DteModel).filter(
+                                DteModel.folio == ref_folio,
+                                DteModel.dte_type_id == ref_dte_type_id
+                            ).first()
+                    
+                    if not reference_dte:
+                        error_msg = f"No se encontró DTE de referencia para {razon_social} - folio {folio}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓ DTE referencia: RUT={reference_dte.rut}, Total={reference_dte.total}")
+                    
+                    # Obtener datos del cliente
+                    customer = CustomerClass(self.db).get_by_rut(reference_dte.rut)
+                    
+                    try:
+                        customer_data = json.loads(customer)
+                        if not isinstance(customer_data, dict) or 'customer_data' not in customer_data:
+                            error_msg = f"Error: Invalid customer data format for RUT {reference_dte.rut}"
+                            print(f"  ✗ {error_msg}")
+                            errors.append(error_msg)
+                            continue
+                    except json.JSONDecodeError as e:
+                        error_msg = f"Error: Invalid JSON from customer lookup for RUT {reference_dte.rut}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    # Obtener fecha del DTE de referencia
+                    from datetime import datetime
+                    dte_date = reference_dte.added_date.strftime('%Y-%m-%d') if reference_dte.added_date else datetime.now().strftime('%Y-%m-%d')
+                    
+                    # Paso 1: Pre-generar NC
+                    print(f"  Paso 1: Pre-generando NC...")
+                    code = customer_ticket_bill_class.pre_generate_credit_note_ticket(
+                        customer_data=customer_data,
+                        dte_type_id=dte_type_id,
+                        folio=folio,
+                        cash_amount=reference_dte.cash_amount,
+                        added_date=dte_date
+                    )
+                    
+                    if code is None:
+                        error_msg = f"Error al pre-generar NC para folio {folio}: code es None"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    if code == 402:
+                        error_msg = f"LibreDTE payment required para folio {folio}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓ Code: {code}")
+                    
+                    # Paso 2: Generar NC con LibreDTE
+                    print(f"  Paso 2: Generando NC con LibreDTE...")
+                    folio_generated = customer_ticket_bill_class.generate_credit_note_ticket(
+                        customer_rut=reference_dte.rut,
+                        code=code,
+                        dte_type_id=dte_type_id
+                    )
+                    
+                    if folio_generated is None:
+                        error_msg = f"Error al generar NC para folio {folio}: LibreDTE retornó None"
+                        print(f"  ✗✗✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓✓✓ NC CREADA EXITOSAMENTE ✓✓✓")
+                    print(f"  📋 Folio NC generado: {folio_generated}")
+                    print(f"  📋 Folio original: {folio}")
+                    print(f"  📋 Cliente: {razon_social}")
+                    
+                    # Actualizar nc=1 en dtes_repetidos
+                    update_query = text("UPDATE dtes_repetidos SET nc = 1 WHERE id = :record_id")
+                    self.db.execute(update_query, {"record_id": record_id})
+                    self.db.commit()
+                    
+                    print(f"  ✓ Actualizado nc=1 en dtes_repetidos")
+                    
+                    nc_created_count += 1
+                    
+                except Exception as e:
+                    error_msg = f"Error al procesar folio {folio}: {str(e)}"
+                    print(f"  ✗ {error_msg}")
+                    errors.append(error_msg)
+                    self.db.rollback()
+                    continue
+            
+            print(f"\n{'='*80}")
+            print(f"✅ PROCESO COMPLETADO")
+            print(f"{'='*80}")
+            print(f"Total registros procesados: {len(records)}")
+            print(f"NCs creadas: {nc_created_count}")
+            print(f"Errores: {len(errors)}")
+            
+            return {
+                "status": "success",
+                "message": f"Proceso completado: {nc_created_count} NCs creadas",
+                "total_records": len(records),
+                "nc_created": nc_created_count,
+                "errors": errors
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al crear NCs: {str(e)}",
+                "nc_created": 0,
+                "errors": [str(e)]
+            }
+
+    def create_nc_from_existing(self, folio_list=None):
+        """
+        Crea NCs para folios específicos que SÍ existen en la tabla dtes.
+        Usa los datos del propio DTE en dtes (no busca referencia).
+        
+        Args:
+            folio_list: Lista de folios a procesar. Si es None, procesa los nuevos 3 folios.
+        """
+        try:
+            print("\n=== CREATE NC FROM EXISTING DTES ===")
+            
+            # Si no se proporciona lista, usar los 3 nuevos folios
+            if folio_list is None:
+                folio_list = [15807332, 15807330, 15807329]
+            
+            print(f"📊 Folios a procesar: {folio_list}")
+            
+            nc_created_count = 0
+            errors = []
+            customer_ticket_bill_class = CustomerTicketBillClass(self.db)
+            
+            print("\n🚀 INICIANDO GENERACIÓN DE NCs...\n")
+            import sys
+            sys.stdout.flush()
+            
+            for idx, folio in enumerate(folio_list, 1):
+                print(f"\n[{idx}/{len(folio_list)}] Procesando folio {folio}")
+                sys.stdout.flush()
+                
+                try:
+                    # Buscar el DTE directamente en la tabla dtes
+                    # Intentar primero con tipo 39 (boleta)
+                    dte = self.db.query(DteModel).filter(
+                        DteModel.folio == folio,
+                        DteModel.dte_type_id == 39
+                    ).first()
+                    
+                    # Si no se encuentra, intentar con tipo 33 (factura)
+                    if not dte:
+                        dte = self.db.query(DteModel).filter(
+                            DteModel.folio == folio,
+                            DteModel.dte_type_id == 33
+                        ).first()
+                    
+                    if not dte:
+                        error_msg = f"DTE con folio {folio} NO existe en la base de datos"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓ DTE encontrado: RUT={dte.rut}, Tipo={dte.dte_type_id}, Total={dte.total}")
+                    
+                    # Obtener datos del cliente
+                    customer = CustomerClass(self.db).get_by_rut(dte.rut)
+                    
+                    try:
+                        customer_data = json.loads(customer)
+                        if not isinstance(customer_data, dict) or 'customer_data' not in customer_data:
+                            error_msg = f"Error: Invalid customer data format for RUT {dte.rut}"
+                            print(f"  ✗ {error_msg}")
+                            errors.append(error_msg)
+                            continue
+                    except json.JSONDecodeError as e:
+                        error_msg = f"Error: Invalid JSON from customer lookup for RUT {dte.rut}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    # Obtener fecha del DTE
+                    from datetime import datetime
+                    dte_date = dte.added_date.strftime('%Y-%m-%d') if dte.added_date else datetime.now().strftime('%Y-%m-%d')
+                    
+                    # Paso 1: Pre-generar NC
+                    print(f"  Paso 1: Pre-generando NC...")
+                    code = customer_ticket_bill_class.pre_generate_credit_note_ticket(
+                        customer_data=customer_data,
+                        dte_type_id=dte.dte_type_id,
+                        folio=folio,
+                        cash_amount=dte.cash_amount,
+                        added_date=dte_date
+                    )
+                    
+                    if code is None:
+                        error_msg = f"Error al pre-generar NC para folio {folio}: code es None"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    if code == 402:
+                        error_msg = f"LibreDTE payment required para folio {folio}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓ Code: {code}")
+                    
+                    # Paso 2: Generar NC con LibreDTE
+                    print(f"  Paso 2: Generando NC con LibreDTE...")
+                    folio_generated = customer_ticket_bill_class.generate_credit_note_ticket(
+                        customer_rut=dte.rut,
+                        code=code,
+                        dte_type_id=dte.dte_type_id
+                    )
+                    
+                    if folio_generated is None:
+                        error_msg = f"Error al generar NC para folio {folio}: LibreDTE retornó None"
+                        print(f"  ✗✗✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                    
+                    print(f"  ✓✓✓ NC CREADA EXITOSAMENTE ✓✓✓")
+                    print(f"  📋 Folio NC generado: {folio_generated}")
+                    print(f"  📋 Folio original: {folio}")
+                    print(f"  📋 RUT: {dte.rut}")
+                    
+                    # Actualizar nc=1 en dtes_repetidos
+                    update_query = text("""
+                        UPDATE dtes_repetidos 
+                        SET nc = 1 
+                        WHERE folio = :folio AND dte_type_id = :dte_type_id
+                    """)
+                    self.db.execute(update_query, {
+                        "folio": folio,
+                        "dte_type_id": dte.dte_type_id
+                    })
+                    self.db.commit()
+                    
+                    print(f"  ✓ Actualizado nc=1 en dtes_repetidos")
+                    
+                    nc_created_count += 1
+                    
+                except Exception as e:
+                    error_msg = f"Error al procesar folio {folio}: {str(e)}"
+                    print(f"  ✗ {error_msg}")
+                    errors.append(error_msg)
+                    self.db.rollback()
+                    continue
+            
+            print(f"\n{'='*80}")
+            print(f"✅ PROCESO COMPLETADO")
+            print(f"{'='*80}")
+            print(f"Total folios procesados: {len(folio_list)}")
+            print(f"NCs creadas: {nc_created_count}")
+            print(f"Errores: {len(errors)}")
+            
+            return {
+                "status": "success",
+                "message": f"Proceso completado: {nc_created_count} NCs creadas",
+                "total_folios": len(folio_list),
+                "nc_created": nc_created_count,
+                "errors": errors
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al crear NCs: {str(e)}",
+                "nc_created": 0,
+                "errors": [str(e)]
+            }
+
+    def dtes_create_nc(self, rol_id=1):
+        """
+        Crea notas de crédito (NC) para DTEs repetidos llamando al endpoint de LibreDTE.
+        Lógica:
+        - Consulta registros de dtes_repetidos donde nc=0
+        - Agrupa por razon_social
+        - Si hay al menos 1 con existencia=1 y al menos 1 con existencia=0:
+          * Obtiene datos del DTE con existencia=1 de la tabla dtes
+          * Genera NC a través de LibreDTE usando el folio del registro con existencia=0
+        - Marca nc=1 en dtes_repetidos después de crear cada NC exitosamente
+        """
+        try:
+            print("\n=== INICIANDO CREACIÓN DE NOTAS DE CRÉDITO VÍA LIBREDTE ===")
+            
+            # PRODUCCIÓN: Consultar TODOS los registros con nc=0
+            print("🚀 Consultando clientes con mezcla de existencias...")
+            result = self.db.execute(text(
+                "SELECT id, folio, razon_social, dte_type_id, pagado, existencia "
+                "FROM dtes_repetidos "
+                "WHERE nc = 0 AND existencia IS NOT NULL "
+                "ORDER BY razon_social, folio"
+            ))
+            
+            records = result.fetchall()
+            
+            if not records:
+                print("No hay registros para procesar")
+                return {
+                    "status": "success",
+                    "message": "No hay registros pendientes de NC",
+                    "nc_created": 0
+                }
+            
+            print(f"Total de registros para analizar: {len(records)}")
+            
+            # Agrupar por razon_social
+            grouped = {}
+            for record in records:
+                record_id, folio, razon_social, dte_type_id, pagado, existencia = record
+                
+                if razon_social not in grouped:
+                    grouped[razon_social] = []
+                
+                grouped[razon_social].append({
+                    'id': record_id,
+                    'folio': folio,
+                    'dte_type_id': dte_type_id,
+                    'pagado': pagado,
+                    'existencia': existencia
+                })
+            
+            # Filtrar solo grupos que:
+            # 1. Tienen mezcla (existencia=1 Y existencia=0)
+            # 2. TODOS los registros tienen nc=0 (si alguno tiene nc=1, se descarta el grupo completo)
+            print("\n🔍 Filtrando grupos donde TODOS los registros tienen nc=0...")
+            
+            # Primero, obtener todos los registros del mismo razon_social (incluyendo los que tienen nc=1)
+            all_records_check = self.db.execute(text(
+                "SELECT razon_social, COUNT(*) as total, SUM(CASE WHEN nc = 1 THEN 1 ELSE 0 END) as con_nc_1 "
+                "FROM dtes_repetidos "
+                "WHERE existencia IS NOT NULL "
+                "GROUP BY razon_social"
+            )).fetchall()
+            
+            # Crear set de clientes que tienen al menos un registro con nc=1
+            clientes_con_nc_1 = set()
+            for check_record in all_records_check:
+                razon_social_check, total, con_nc_1 = check_record
+                if con_nc_1 > 0:
+                    clientes_con_nc_1.add(razon_social_check)
+                    print(f"  ⏭️ Excluido: {razon_social_check} (tiene {con_nc_1} registro(s) con nc=1)")
+            
+            # Filtrar grupos
+            filtered_grouped = {}
+            for razon_social, group_records in grouped.items():
+                # Excluir si el cliente tiene algún registro con nc=1
+                if razon_social in clientes_con_nc_1:
+                    continue
+                
+                has_existencia_1 = any(r['existencia'] == 1 for r in group_records)
+                has_existencia_0 = any(r['existencia'] == 0 for r in group_records)
+                
+                if has_existencia_1 and has_existencia_0:
+                    filtered_grouped[razon_social] = group_records
+            
+            grouped = filtered_grouped
+            
+            print(f"\n📊 RESUMEN DE CLIENTES CON MEZCLA DE EXISTENCIAS:")
+            print(f"Total de grupos encontrados: {len(grouped)}")
+            print("=" * 80)
+            
+            # Mostrar detalles de cada cliente
+            for razon_social, group_records in grouped.items():
+                existencia_1_records = [r for r in group_records if r['existencia'] == 1]
+                existencia_0_records = [r for r in group_records if r['existencia'] == 0]
+                
+                # Obtener RUT del primer registro con existencia=1
+                reference_folio = existencia_1_records[0]['folio']
+                reference_dte_type_id = existencia_1_records[0]['dte_type_id']
+                reference_dte = self.db.query(DteModel).filter(
+                    DteModel.folio == reference_folio,
+                    DteModel.dte_type_id == reference_dte_type_id
+                ).first()
+                
+                rut = reference_dte.rut if reference_dte else "NO ENCONTRADO"
+                
+                print(f"\n👤 CLIENTE: {razon_social}")
+                print(f"   RUT: {rut}")
+                print(f"   Total registros: {len(group_records)}")
+                print(f"   Con existencia=1: {len(existencia_1_records)} (folios: {[r['folio'] for r in existencia_1_records]})")
+                print(f"   Con existencia=0: {len(existencia_0_records)} (folios: {[r['folio'] for r in existencia_0_records]})")
+                print(f"   NCs a crear: {len(existencia_0_records)}")
+            
+            print("\n" + "=" * 80)
+            print(f"💡 Total de NCs que se crearán: {sum(len([r for r in g if r['existencia'] == 0]) for g in grouped.values())}")
+            print("=" * 80)
+            
+            import sys
+            
+            print("\n" + "🚀" * 40)
+            print("🚀🚀🚀 INICIANDO GENERACIÓN DE NOTAS DE CRÉDITO 🚀🚀🚀")
+            print("🚀" * 40 + "\n")
+            sys.stdout.flush()
+            
+            nc_created_count = 0
+            errors = []
+            customer_ticket_bill_class = CustomerTicketBillClass(self.db)
+            
+            print(f"DEBUG: Cantidad de grupos a procesar: {len(grouped)}")
+            print(f"DEBUG: grouped.items() tiene {len(list(grouped.items()))} elementos")
+            sys.stdout.flush()
+            
+            # Procesar cada grupo
+            iteration = 0
+            for razon_social, group_records in grouped.items():
+                iteration += 1
+                print(f"\n{'='*80}")
+                print(f"ITERACIÓN {iteration}/{len(grouped)}")
+                print(f"{'='*80}")
+                print(f"--- Procesando: {razon_social} ({len(group_records)} registros) ---")
+                print(f"DEBUG: Tipo de group_records: {type(group_records)}")
+                print(f"DEBUG: Contenido: {group_records}")
+                sys.stdout.flush()
+                
+                # Filtrar registros por existencia
+                existencia_1_records = [r for r in group_records if r['existencia'] == 1]
+                existencia_0_records = [r for r in group_records if r['existencia'] == 0]
+                
+                # Verificar condiciones para crear NC
+                if len(existencia_1_records) == 0:
+                    # ESCENARIO 2 CRÍTICO: Todos tienen existencia=0
+                    print(f"  ⚠️⚠️⚠️ ESCENARIO 2 DETECTADO - TODOS LOS REGISTROS CON EXISTENCIA=0 ⚠️⚠️⚠️")
+                    print(f"  ❌ CLIENTE: {razon_social}")
+                    print(f"  ❌ TOTAL REGISTROS: {len(group_records)}")
+                    print(f"  ❌ FOLIOS SIN EXISTENCIA: {[r['folio'] for r in existencia_0_records]}")
+                    errors.append(f"ESCENARIO 2 CRÍTICO: {razon_social} - Todos los {len(existencia_0_records)} registros tienen existencia=0")
+                    continue
+                
+                if len(existencia_0_records) == 0:
+                    print(f"  ℹ️ Todos los registros tienen existencia=1, no se crearán NC")
+                    continue
+                
+                print(f"  Encontrados {len(existencia_0_records)} registros con existencia=0 y {len(existencia_1_records)} con existencia=1")
+                
+                # Obtener datos del primer registro con existencia=1
+                reference_record = existencia_1_records[0]
+                reference_folio = reference_record['folio']
+                reference_dte_type_id = reference_record['dte_type_id']
+                
+                print(f"  Usando como referencia: folio {reference_folio}, tipo {reference_dte_type_id}")
+                
+                # Buscar el DTE de referencia en la tabla dtes
+                reference_dte = self.db.query(DteModel).filter(
+                    DteModel.folio == reference_folio,
+                    DteModel.dte_type_id == reference_dte_type_id
+                ).first()
+                
+                if not reference_dte:
+                    error_msg = f"No se encontró DTE de referencia con folio {reference_folio} tipo {reference_dte_type_id}"
+                    print(f"  ✗ {error_msg}")
+                    errors.append(error_msg)
+                    continue
+                
+                print(f"  DTE de referencia encontrado: RUT={reference_dte.rut}, Total={reference_dte.total}, Branch={reference_dte.branch_office_id}")
+                
+                # Obtener datos del cliente
+                customer = CustomerClass(self.db).get_by_rut(reference_dte.rut)
+                
+                try:
+                    customer_data = json.loads(customer)
+                    if not isinstance(customer_data, dict) or 'customer_data' not in customer_data:
+                        error_msg = f"Error: Invalid customer data format for RUT {reference_dte.rut}"
+                        print(f"  ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+                except json.JSONDecodeError as e:
+                    error_msg = f"Error: Invalid JSON from customer lookup for RUT {reference_dte.rut}: {customer}"
+                    print(f"  ✗ {error_msg}")
+                    errors.append(error_msg)
+                    continue
+                
+                # Crear NC para cada registro con existencia=0
+                for record in existencia_0_records:
+                    folio_nc = record['folio']
+                    record_id = record['id']
+                    dte_type_id_nc = record['dte_type_id']
+                    
+                    print(f"  Creando NC vía LibreDTE para folio {folio_nc} (tipo {dte_type_id_nc})...")
+                    
+                    try:
+                        # Obtener fecha del DTE de referencia
+                        dte_date = reference_dte.added_date.strftime('%Y-%m-%d') if reference_dte.added_date else datetime.now().strftime('%Y-%m-%d')
+                        
+                        # Paso 1: Pre-generar (emitir) la NC
+                        print(f"    Paso 1: Pre-generando NC (emitir)...")
+                        code = customer_ticket_bill_class.pre_generate_credit_note_ticket(
+                            customer_data=customer_data,
+                            dte_type_id=dte_type_id_nc,  # Tipo del DTE original (33 o 39)
+                            folio=folio_nc,  # Folio que NO existe en dtes (existencia=0)
+                            cash_amount=reference_dte.cash_amount,
+                            added_date=dte_date
+                        )
+                        
+                        if code is None:
+                            error_msg = f"Error al pre-generar NC para folio {folio_nc}: code es None"
+                            print(f"    ✗ {error_msg}")
+                            errors.append(error_msg)
+                            continue
+                        
+                        if code == 402:
+                            error_msg = f"LibreDTE payment required para folio {folio_nc}"
+                            print(f"    ✗ {error_msg}")
+                            errors.append(error_msg)
+                            continue
+                        
+                        print(f"    ✓ Code obtenido: {code}")
+                        
+                        # Paso 2: Generar (obtener folio de LibreDTE)
+                        print(f"    Paso 2: Generando NC con LibreDTE (obtener folio)...")
+                        print(f"       RUT: {reference_dte.rut}")
+                        print(f"       Code: {code}")
+                        print(f"       DTE Type: {dte_type_id_nc}")
+                        
+                        folio_generated = customer_ticket_bill_class.generate_credit_note_ticket(
+                            customer_rut=reference_dte.rut,
+                            code=code,
+                            dte_type_id=dte_type_id_nc
+                        )
+                        
+                        print(f"       Respuesta de LibreDTE: {folio_generated}")
+                        
+                        if folio_generated is None:
+                            error_msg = f"Error al generar NC para folio {folio_nc}: LibreDTE retornó None"
+                            print(f"    ✗✗✗ {error_msg}")
+                            errors.append(error_msg)
+                            continue
+                        
+                        print(f"    ✓✓✓ NC CREADA EXITOSAMENTE EN LIBREDTE ✓✓✓")
+                        print(f"    📋 FOLIO NC GENERADO POR LIBREDTE: {folio_generated}")
+                        print(f"    📋 FOLIO DE REFERENCIA (documento anulado): {folio_nc}")
+                        print(f"    📋 CLIENTE: {razon_social}")
+                        print(f"    📋 RUT: {reference_dte.rut}")
+                        
+                        # Actualizar el campo nc a 1 en dtes_repetidos
+                        print(f"    Actualizando nc=1 en dtes_repetidos...")
+                        update_sql = text(f"UPDATE dtes_repetidos SET nc = 1 WHERE id = {record_id}")
+                        self.db.execute(update_sql)
+                        self.db.commit()
+                        print(f"    ✓ Marcado nc=1 en dtes_repetidos (id={record_id})")
+                        
+                        nc_created_count += 1
+                        
+                    except Exception as e:
+                        self.db.rollback()
+                        error_msg = f"Excepción al procesar folio {folio_nc}: {str(e)}"
+                        print(f"    ✗ {error_msg}")
+                        errors.append(error_msg)
+                        continue
+            
+            print(f"\n=== FINALIZACIÓN ===")
+            print(f"Total de NC creadas: {nc_created_count}")
+            if errors:
+                print(f"Errores encontrados: {len(errors)}")
+            
+            return {
+                "status": "success",
+                "nc_created": nc_created_count,
+                "errors": errors if errors else None,
+                "total_groups": len(grouped)
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            error_msg = f"Error inesperado: {str(e)}"
+            print(f"✗ {error_msg}")
+            return {
+                "status": "error",
+                "message": error_msg,
+                "nc_created": 0
+            }
+
+    def search_emitted_dtes(self, fecha_desde: str = None):
+        """
+        Busca DTEs emitidos en LibreDTE filtrando por fecha_desde
+        """
+        try:
+            issuer = "76063822"
+            url = f"https://libredte.cl/api/dte/dte_emitidos/buscar/{issuer}"
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Construir payload con valores en duro y filtros opcionales
+            payload = {
+                "cedido": None,
+                "dte": None,
+                "fecha": None,
+                "folio": None,
+                "periodo": None,
+                "razon_social": None,
+                "receptor": None,
+                "receptor_evento": None,
+                "sucursal_sii": None,
+                "total": None,
+                "total_desde": None,
+                "total_hasta": None,
+                "usuario": None
+            }
+            
+            # Agregar filtro de fecha si se proporciona
+            if fecha_desde:
+                payload["fecha_desde"] = fecha_desde
+            
+            print(f"Consultando LibreDTE: {url}")
+            print(f"Payload: {json.dumps(payload, indent=2)}")
+            
+            response = requests.post(url, headers=headers, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Filtrar DTEs que tengan receptor diferente de 66666666
+                if isinstance(data, list):
+                    filtered_data = [dte for dte in data if dte.get("receptor") != 66666666]
+                    
+                    # Buscar razones sociales repetidas
+                    razon_social_count = {}
+                    for dte in filtered_data:
+                        razon_social = dte.get("razon_social")
+                        if razon_social:
+                            if razon_social in razon_social_count:
+                                razon_social_count[razon_social].append(dte)
+                            else:
+                                razon_social_count[razon_social] = [dte]
+                    
+                    # Filtrar solo las que están repetidas (más de una vez)
+                    repeated_razon_social = {
+                        razon_social: dtes 
+                        for razon_social, dtes in razon_social_count.items() 
+                        if len(dtes) > 1
+                    }
+                    
+                    # Insertar cada DTE repetido en la tabla dtes_repetidos
+                    inserted_count = 0
+                    errors = []
+                    
+                    print(f"\n=== INICIANDO INSERCIÓN DE DTES REPETIDOS ===")
+                    print(f"Total de razones sociales repetidas: {len(repeated_razon_social)}")
+                    
+                    for razon_social, dtes_list in repeated_razon_social.items():
+                        print(f"\nProcesando razon_social: {razon_social} ({len(dtes_list)} DTEs)")
+                        for dte in dtes_list:
+                            folio = dte.get("folio")
+                            dte_type_id = dte.get("dte")  # 33 o 39
+                            
+                            # Validar y convertir dte_type_id a int
+                            print(f"  DEBUG: folio={folio}, dte_type_id={dte_type_id}, tipo={type(dte_type_id)}")
+                            
+                            if dte_type_id is None or dte_type_id == '':
+                                print(f"  ⚠ dte_type_id es NULL o vacío para folio {folio}")
+                                continue
+                            
+                            try:
+                                dte_type_id = int(dte_type_id)
+                            except (ValueError, TypeError) as conv_error:
+                                print(f"  ✗ Error al convertir dte_type_id a int: {conv_error}")
+                                continue
+                            
+                            # Escapar comillas simples en razon_social
+                            razon_social_escaped = razon_social.replace("'", "''")
+                            
+                            try:
+                                sql = text(f"INSERT INTO dtes_repetidos (folio, razon_social, dte_type_id) VALUES ({folio}, '{razon_social_escaped}', {dte_type_id})")
+                                self.db.execute(sql)
+                                self.db.commit()  # Commit inmediato después de cada INSERT
+                                inserted_count += 1
+                                print(f"  ✓ Insertado folio {folio} - DTE tipo {dte_type_id}")
+                            except Exception as e:
+                                self.db.rollback()  # Rollback si falla
+                                error_msg = f"Error folio {folio}: {str(e)}"
+                                errors.append(error_msg)
+                                print(f"  ✗ {error_msg}")
+                    
+                else:
+                    repeated_razon_social = {}
+                    inserted_count = 0
+                    errors = []
+                
+                # Verificación final
+                print(f"\n=== FINALIZANDO INSERCIÓN ===")
+                print(f"Total insertados: {inserted_count}")
+                
+                if inserted_count > 0:
+                    # Verificar que realmente se guardaron
+                    print(f"Verificando registros en BD...")
+                    result = self.db.execute(text("SELECT COUNT(*) as total FROM dtes_repetidos"))
+                    total_en_db = result.fetchone()[0]
+                    print(f"✓ Verificación: Total de registros en dtes_repetidos = {total_en_db}")
+                
+                return {
+                    "status": "success",
+                    "status_code": response.status_code,
+                    "data": repeated_razon_social,
+                    "total_repeated": len(repeated_razon_social),
+                    "inserted_count": inserted_count,
+                    "errors": errors if errors else None
                 }
             else:
                 return {

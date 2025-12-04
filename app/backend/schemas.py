@@ -1380,6 +1380,10 @@ class ReceivedDteList(BaseModel):
 class ImportDte(BaseModel):
     rut: str
 
+class SearchEmittedDtes(BaseModel):
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+
 class CustomerList(BaseModel):
     rut: Optional[str] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0
