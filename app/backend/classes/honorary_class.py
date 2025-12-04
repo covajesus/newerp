@@ -247,7 +247,7 @@ class HonoraryClass:
                 + str(form_data.id)
             )
         gross_amount = HelperClass().remove_from_string('.', str(honorary.amount))
-        gross_amount = round(int(gross_amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
+        gross_amount = round(int(gross_amount) * float(settings["setting_data"]["percentage_honorary_bill"]))
         tax = int(gross_amount) - int(honorary.amount)
         net_amount = round(gross_amount - tax)
         
