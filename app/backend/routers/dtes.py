@@ -871,3 +871,11 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
             "Access-Control-Allow-Headers": "*"
         }
     )
+
+@dtes.get("/check_payments")
+def check_payments(db: Session = Depends(get_db)):
+    """
+    Endpoint unificado para verificar pagos de DTEs tipos 33 (facturas) y 39 (boletas)
+    """
+    data = DteClass(db).check_payments()
+    return {"message": data}

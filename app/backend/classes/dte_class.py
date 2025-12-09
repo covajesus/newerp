@@ -2731,7 +2731,6 @@ class DteClass:
                         continue
                     
                     # Obtener fecha del DTE de referencia
-                    from datetime import datetime
                     dte_date = reference_dte.added_date.strftime('%Y-%m-%d') if reference_dte.added_date else datetime.now().strftime('%Y-%m-%d')
                     
                     # Paso 1: Pre-generar NC
@@ -2886,7 +2885,6 @@ class DteClass:
                         continue
                     
                     # Obtener fecha del DTE
-                    from datetime import datetime
                     dte_date = dte.added_date.strftime('%Y-%m-%d') if dte.added_date else datetime.now().strftime('%Y-%m-%d')
                     
                     # Paso 1: Pre-generar NC
@@ -3431,4 +3429,53 @@ class DteClass:
                 "status_code": None,
                 "message": f"Error inesperado: {str(e)}",
                 "data": None
+            }
+
+    def check_payments(self):
+        """
+        Verifica pagos para DTEs tipo 33 (facturas) y 39 (boletas)
+        Llama a los métodos check_payments de CustomerBillClass y CustomerTicketClass
+        """
+        try:
+            results = {
+                "status": "success",
+                "facturas_33": None,
+                "boletas_39": None,
+                "errors": []
+            }
+            
+            # Verificar pagos para facturas (tipo 33)
+            try:
+                print("📄 Verificando pagos para facturas (tipo 33)...")
+                customer_bill_class = CustomerBillClass(self.db)
+                results["facturas_33"] = customer_bill_class.check_payments()
+                print("✓ Facturas procesadas")
+            except Exception as e:
+                error_msg = f"Error al verificar facturas: {str(e)}"
+                print(f"❌ {error_msg}")
+                results["errors"].append(error_msg)
+            
+            # Verificar pagos para boletas (tipo 39)
+            try:
+                print("🎫 Verificando pagos para boletas (tipo 39)...")
+                customer_ticket_class = CustomerTicketClass(self.db)
+                results["boletas_39"] = customer_ticket_class.check_payments()
+                print("✓ Boletas procesadas")
+            except Exception as e:
+                error_msg = f"Error al verificar boletas: {str(e)}"
+                print(f"❌ {error_msg}")
+                results["errors"].append(error_msg)
+            
+            if results["errors"]:
+                results["status"] = "partial_success" if (results["facturas_33"] or results["boletas_39"]) else "error"
+            
+            return results
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Error general en check_payments: {str(e)}",
+                "facturas_33": None,
+                "boletas_39": None,
+                "errors": [str(e)]
             }

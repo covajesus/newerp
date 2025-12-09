@@ -1278,16 +1278,12 @@ class CustomerBillClass:
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         for dte in dtes:
-            print(dte.folio)
-            data = {
-                "folio": dte.folio,
-            }
+            print(f"Verificando DTE tipo 33 folio: {dte.folio}")
 
-            url = f"https://libredte.cl/api/pagos/cobros/buscar/76063822"
+            url = f"https://libredte.cl/api/dte/dte_emitidos/cobro/33/{dte.folio}/76063822?getDocumento=0&getDetalle=0&getLinks=0"
                 
-            response = requests.post(
+            response = requests.get(
                 url,
-                json=data,
                 headers={
                     "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json",
@@ -1297,37 +1293,48 @@ class CustomerBillClass:
 
             if response.status_code == 200:
                 data = json.loads(response.text)
+                print(data)
 
-                for item in data:
-                    folio = item.get("folio")
-                    payment_date = item.get("fecha")
-                    payment_status = item.get("pagado")
-                    amount = item.get("monto")
+                payment_status = data.get("pagado")
+                payment_date = data.get("pagado")
+                amount = data.get("total")
+                datos_json = data.get("datos")
 
-                    if payment_status != None:
-                        print('Ejecutando paso 1.')
-                        dte = self.db.query(DteModel).filter(DteModel.folio == folio).first()
-                        if not dte:
-                            raise HTTPException(status_code=404, detail="Dte no encontrado")
+                # Verificar si está pagado - puede venir como None, null, "none", "null", o string vacío
+                is_paid = False
+                if payment_status is not None and payment_status != "" and str(payment_status).lower() not in ["none", "null"]:
+                    is_paid = True
 
-                        if dte.status_id == 4:
-                            print('Ejecutando paso 2.')
-                            dte.expense_type_id = 23
-                            dte.payment_type_id = 2
-                            dte.card_amount = amount
-                            dte.payment_date = payment_date
-                            dte.status_id = 5
-                            dte.updated_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                if is_paid:
+                    print('DTE está pagado. Procesando...')
+                    
+                    # Extraer authorizationCode de datos JSON
+                    authorization_code = None
+                    if datos_json:
+                        try:
+                            datos_dict = json.loads(datos_json)
+                            detail_output = datos_dict.get("detailOutput", {})
+                            authorization_code = detail_output.get("authorizationCode")
+                        except:
+                            pass
 
-                            self.db.commit()
-                            self.db.refresh(dte)
+                    if dte.status_id == 4:
+                        print('Actualizando DTE...')
+                        dte.expense_type_id = 25
+                        dte.payment_type_id = 2
+                        dte.card_amount = amount
+                        dte.payment_date = payment_date
+                        dte.status_id = 5
+                        dte.updated_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                        
+                        if authorization_code:
+                            dte.comment = f"Código de autorización: {authorization_code}"
 
-                            # Importación diferida para evitar importación circular
-                            from app.backend.classes.dte_class import DteClass
-                            DteClass(self.db).get_dte_authorization_code(dte.folio)
+                        self.db.commit()
+                        self.db.refresh(dte)
 
-                            print("Dte actualizado correctamente: " + str(dte.folio))
+                        print(f"Dte actualizado correctamente: {dte.folio}")
 
-                            WhatsappClass(self.db).notify_payment(dte.folio)
+                        WhatsappClass(self.db).notify_payment(dte.folio)
 
 
