@@ -27,7 +27,14 @@ class AuthenticationClass:
         return response_data
         
     def verify_password(self, plain_password, hashed_password):
-        return pwd_context.verify(plain_password, hashed_password)
+        # Use bcrypt directly instead of passlib (compatibility issue with Python 3.13)
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode('utf-8'), 
+                hashed_password.encode('utf-8')
+            )
+        except Exception:
+            return False
     
     def create_external_token(self, rut, password):
         url = "https://api.jisreportes.com/login"

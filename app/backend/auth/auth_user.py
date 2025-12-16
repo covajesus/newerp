@@ -37,7 +37,7 @@ def get_user(rut):
                     first()
     
     if not user:
-        return ""
+        return None
     return user
 
 def generate_bcrypt_hash(input_string):
@@ -47,4 +47,5 @@ def generate_bcrypt_hash(input_string):
 
     hashed_string = bcrypt.hashpw(encoded_string, salt)
 
-    return hashed_string
+    # Return as string, not bytes, for passlib compatibility
+    return hashed_string.decode('utf-8')

@@ -152,8 +152,10 @@ class UserClass:
 
     def refresh_password(self, rut):
         user = self.db.query(UserModel).filter(UserModel.rut == rut).first()
-        user.password = 'pbkdf2:sha256:260000$9199IIO4oyzykgL2$721b8c61330f838acd950f8104f364efc05d513efec2c829fcd773ef4402f10e'
-        user.hashed_password = 'pbkdf2:sha256:260000$9199IIO4oyzykgL2$721b8c61330f838acd950f8104f364efc05d513efec2c829fcd773ef4402f10e'
+        # Use bcrypt hash for default password 'jisparking'
+        default_password_hash = generate_bcrypt_hash('jisparking')
+        user.password = default_password_hash
+        user.hashed_password = default_password_hash
         user.status_id = 1
         user.updated_date = datetime.now()
         self.db.add(user)
