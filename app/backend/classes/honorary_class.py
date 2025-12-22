@@ -320,7 +320,7 @@ class HonoraryClass:
         updated_settings = SettingClass(self.db).get()
         token = updated_settings["setting_data"]["simplefactura_token"]
 
-        url = "https://api.simplefactura.cl/bhe/emitir"
+        url = "https://api.simplefactura.cl/bhe/terceros/emitir"
 
         payload = {
             "RutEmisor": "76063822-6",
