@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import Honorary, UpdateHonorary, UserLogin, HonoraryList, ValidateHonoraryRut, ImputeHonorary
+from app.backend.schemas import Honorary, UpdateHonorary, GenerateHonorary, UserLogin, HonoraryList, ValidateHonoraryRut, ImputeHonorary
 from app.backend.classes.honorary_class import HonoraryClass
 from app.backend.auth.auth_user import get_current_active_user
 
@@ -24,7 +24,7 @@ def store(form_data: Honorary = Depends(Honorary.as_form), session_user: UserLog
     return {"message": data}
 
 @honoraries.post("/generate/{id}")
-def generate(id: int, form_data: Honorary = Depends(Honorary.as_form), session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def generate(id: int, form_data: GenerateHonorary = Depends(GenerateHonorary.as_form), session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = HonoraryClass(db).generate(id, form_data)
 
     return {"message": data}
