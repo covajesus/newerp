@@ -441,8 +441,6 @@ class Honorary(BaseModel):
     start_date: Union[str, None]
     end_date: Union[str, None]
     observation: str
-    amount: int
-    observation: str
 
     @classmethod
     def as_form(cls,
@@ -462,11 +460,10 @@ class Honorary(BaseModel):
                 account_number: str = Form(),
                 start_date: str = Form(None),
                 end_date: str = Form(None),
-                amount: int = Form(),
                 observation: str = Form()
                 ):
         
-        return cls(honorary_reason_id=honorary_reason_id, account_type_id=account_type_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, email=email, address=address, account_number=account_number, start_date=start_date, end_date=end_date, amount=amount, observation=observation)
+        return cls(honorary_reason_id=honorary_reason_id, account_type_id=account_type_id, branch_office_id=branch_office_id, foreigner_id=foreigner_id, bank_id=bank_id, schedule_id=schedule_id, region_id=region_id, commune_id=commune_id, employee_to_replace=employee_to_replace, replacement_employee_rut=replacement_employee_rut, replacement_employee_full_name=replacement_employee_full_name, email=email, address=address, account_number=account_number, start_date=start_date, end_date=end_date, observation=observation)
 
 class ValidateHonoraryRut(BaseModel):
     replacement_employee_rut: str

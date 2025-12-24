@@ -157,7 +157,6 @@ class HonoraryClass:
             if honorary_inputs.end_date != 'None' and honorary_inputs.end_date != None:
                 honorary.end_date = honorary_inputs.end_date
             honorary.observation = honorary_inputs.observation
-            honorary.amount = honorary_inputs.amount
             honorary.added_date = datetime.now()
             honorary.updated_date = datetime.now()
 
@@ -327,6 +326,7 @@ class HonoraryClass:
             "Retencion": 1,
             "FechaEmision": current_date,
             "Emisor": {
+                "Rut": data.replacement_employee_rut,
                 "Direccion": "0"
             },
             "Receptor": {
