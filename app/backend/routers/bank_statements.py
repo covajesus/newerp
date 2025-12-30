@@ -57,7 +57,7 @@ def store(
         file_url = FileClass(db).get(remote_path)
 
         if file_extension == "xlsx":
-            excel_data = BankStatementClass(db).read_store_bank_statement(file_url, form_data.period)
+            excel_data = BankStatementClass(db).read_store_bank_statement(remote_path, form_data.period)
         else:
             raise HTTPException(status_code=400, detail="Formato no compatible")
 

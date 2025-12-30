@@ -2,9 +2,9 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import BankStatementModel, ComparationPendingDtesBankStatementModel, DteModel, ComparationPendingDepositsBankStatementModel, DepositModel
 from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
 from sqlalchemy import text
-import requests
 from io import BytesIO
 import pandas as pd
 import re
@@ -211,18 +211,19 @@ class BankStatementClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
-    def read_store_bank_statement(self, file_url, period):
+    def read_store_bank_statement(self, remote_path, period):
         try:
             self.db.execute(text("TRUNCATE TABLE bank_statements"))
-            self.db.commit()  # Si es necesario hacer un commit
+            self.db.commit()
 
-            response = requests.get(file_url)
-            response.raise_for_status()
+            # Usar FileClass para leer el archivo del sistema de archivos local
+            file_class = FileClass(self.db)
+            file_content = file_class.download(remote_path)
 
-            excel_file = BytesIO(response.content)
+            excel_file = BytesIO(file_content)
 
             xls = pd.ExcelFile(excel_file, engine="openpyxl")
-            sheet_names = xls.sheet_names  # Ver qué hojas tiene el Excel
+            sheet_names = xls.sheet_names
             if not sheet_names:
                 raise HTTPException(status_code=500, detail="El archivo Excel no tiene hojas.")
 
@@ -230,11 +231,18 @@ class BankStatementClass:
 
             df = df.fillna("")
 
-            data = []
+            batch_size = 500  # Tamaño del lote para commits
+            batch_count = 0
+            total_rows = len(df)
+            saved_count = 0
+            skipped_count = 0
+
+            fixed_period = HelperClass.fix_current_dte_period(period)
+
             for index, row in df.iterrows():
                 # Verificar si la fila contiene "Saldos diarios" y omitirla
                 if any("Saldos diarios" in str(value) for value in row.values):
-                    print(f"Omitiendo fila {index}: contiene 'Saldos diarios'")
+                    skipped_count += 1
                     continue
                 
                 # Inicializar variables para esta fila
@@ -245,74 +253,87 @@ class BankStatementClass:
                 rut = None
                 valid_row = True
                 
-                # Procesar cada columna
-                for col in df.columns:
-                    if col == "N° DOCUMENTO":
-                        deposit_number = row[col]
-                    elif col == "MONTO":
-                        amount = row[col]
-                    elif col == "FECHA":
-                        raw_date = row[col]
-                        
-                        # Verificar que sea una fecha válida antes de parsear
-                        if str(raw_date).strip() == "" or "Saldos diarios" in str(raw_date):
-                            print(f"Omitiendo fila {index}: fecha inválida '{raw_date}'")
-                            valid_row = False
-                            break
+                try:
+                    # Procesar cada columna
+                    for col in df.columns:
+                        if col == "N° DOCUMENTO":
+                            deposit_number = row[col]
+                        elif col == "MONTO":
+                            amount = row[col]
+                        elif col == "FECHA":
+                            raw_date = row[col]
                             
-                        try:
-                            deposit_date = datetime.strptime(str(raw_date), "%d/%m/%Y").strftime("%Y-%m-%d")
-                        except (ValueError, TypeError) as e:
-                            print(f"Error parseando fecha en fila {index}: {raw_date} - {str(e)}")
-                            valid_row = False
-                            break
-                            
-                    elif col == "DESCRIPCIÓN MOVIMIENTO":
-                        words = ["DeposDoctoMBanco", "DeposDoctoOBancos", "Depósito", "Dep", "Pago Remuneraciones", "Trabajo"]
-                        pattern = "|".join(words)
+                            # Verificar que sea una fecha válida antes de parsear
+                            if str(raw_date).strip() == "" or "Saldos diarios" in str(raw_date):
+                                valid_row = False
+                                break
+                                
+                            try:
+                                deposit_date = datetime.strptime(str(raw_date), "%d/%m/%Y").strftime("%Y-%m-%d")
+                            except (ValueError, TypeError) as e:
+                                valid_row = False
+                                break
+                                
+                        elif col == "DESCRIPCIÓN MOVIMIENTO":
+                            # Palabras clave que identifican depósitos propios (tipo 1)
+                            words = ["DeposDoctoMBanco", "DeposDoctoOBancos", "Depósito", "Dep Efect", "Dep", "Pago Remuneraciones", "Remuneracion", "Rem.", "Trabajo"]
+                            pattern = "|".join(words)
 
-                        if re.search(pattern, row[col]):
-                            bank_statement_type_id = 1
-                            rut = "76063822-6"
-                        else:
-                            bank_statement_type_id = 2
-                            
-                            raw = row[col]
-                            cleaned = re.sub(r'[^\dkK]', '', raw)
-
-                            match = re.fullmatch(r'\d{8,9}[\dkK]', cleaned)
-                            if match:
-                                cuerpo = cleaned[:-1].lstrip("0")
-                                dv = cleaned[-1].upper()
-                                rut = f"{cuerpo}-{dv}"
-                                print("Match:", rut)
+                            if re.search(pattern, str(row[col])):
+                                bank_statement_type_id = 1
+                                rut = "76063822-6"
                             else:
-                                rut = 0
-                                print("No es un RUT válido en formato")
-                
-                # Solo guardar si la fila es válida y tiene todos los datos necesarios
-                if valid_row and deposit_number is not None and amount is not None and deposit_date is not None:
-                    fixed_period = HelperClass.fix_current_dte_period(period)
+                                bank_statement_type_id = 2
+                                
+                                raw = str(row[col])
+                                # Buscar RUT al inicio de la descripción (8-9 dígitos + dígito verificador)
+                                # Permite espacios y otros caracteres después del RUT
+                                match = re.search(r'^(\d{8,9}[\dkK])', raw, re.IGNORECASE)
+                                if match:
+                                    cleaned = match.group(1)
+                                    cuerpo = cleaned[:-1].lstrip("0")
+                                    dv = cleaned[-1].upper()
+                                    rut = f"{cuerpo}-{dv}"
+                                else:
+                                    rut = 0
+                    
+                    # Solo guardar si la fila es válida y tiene todos los datos necesarios
+                    if valid_row and deposit_number is not None and amount is not None and deposit_date is not None:
+                        bank_statement = BankStatementModel()
+                        bank_statement.bank_statement_type_id = bank_statement_type_id
+                        bank_statement.rut = rut
+                        bank_statement.deposit_number = deposit_number
+                        bank_statement.amount = amount
+                        bank_statement.period = fixed_period
+                        bank_statement.deposit_date = deposit_date
 
-                    bank_statement = BankStatementModel()
-                    bank_statement.bank_statement_type_id = bank_statement_type_id
-                    bank_statement.rut = rut
-                    bank_statement.deposit_number = deposit_number
-                    bank_statement.amount = amount
-                    bank_statement.period = fixed_period
-                    bank_statement.deposit_date = deposit_date
-
-                    self.db.add(bank_statement)
-                    self.db.commit()
-                else:
-                    if not valid_row:
-                        print(f"Fila {index} omitida por datos inválidos")
+                        self.db.add(bank_statement)
+                        batch_count += 1
+                        saved_count += 1
+                        
+                        # Commit en lotes para mejorar performance
+                        if batch_count >= batch_size:
+                            self.db.commit()
+                            batch_count = 0
+                            print(f"Guardado lote: {saved_count} registros procesados de {total_rows} filas")
                     else:
-                        print(f"Fila {index} omitida por datos faltantes: documento={deposit_number}, monto={amount}, fecha={deposit_date}")
+                        skipped_count += 1
+                        
+                except Exception as row_error:
+                    skipped_count += 1
+                    print(f"Error procesando fila {index}: {str(row_error)}")
+                    continue
 
-            return "Procesamiento completado"
+            # Commit final para cualquier transacción restante
+            if batch_count > 0:
+                self.db.commit()
+                print(f"Guardado lote final: {batch_count} registros")
+
+            print(f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas de {total_rows} totales")
+            return f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas"
 
         except Exception as e:
+            self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
             
     def customer_accept(self, id, payment_date):
