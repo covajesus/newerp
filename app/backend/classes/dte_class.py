@@ -1867,9 +1867,12 @@ class DteClass:
             current_period = datetime.now().strftime('%Y-%m')
             
             # Construir filtro base
-            # SOLO buscar DTEs que NO han sido procesados (excluir status 4 y 5)
-            # TODOS los tipos de DTE buscan SOLO status_id = 2
-            status_filter = DteModel.status_id == 2
+            # Para notas de crédito (dte_type_id=61), buscar status 2 o 14
+            # Para otros tipos de DTE, buscar solo status 2
+            if dte_type_id == 61:
+                status_filter = DteModel.status_id.in_([2, 14])
+            else:
+                status_filter = DteModel.status_id == 2
             
             base_filter = [
                 DteModel.period == current_period,
@@ -1917,7 +1920,6 @@ class DteClass:
                 total_in_period = self.db.query(DteModel).filter(*debug_filter).count()
                 
                 # Obtener información de status de DTEs existentes para diagnóstico
-                
                 status_counts = {}
                 if total_in_period > 0:
                     # Contar DTEs por status_id
@@ -1925,8 +1927,31 @@ class DteClass:
                     for status_id, count in status_query:
                         status_counts[status_id] = count
                 
-                debug_message = f"No hay DTEs para procesar en {branch_info} de {type_info}. "
-                debug_message += f"Total en período: {total_in_period}. "
+                # Buscar DTEs sin filtro de dte_version_id para ver si hay con version_id diferente
+                debug_filter_no_version = [
+                    DteModel.period == current_period
+                ]
+                if branch_office_id != 0:
+                    debug_filter_no_version.append(DteModel.branch_office_id == branch_office_id)
+                if dte_type_id > 0:
+                    debug_filter_no_version.append(DteModel.dte_type_id == dte_type_id)
+                
+                total_no_version_filter = self.db.query(DteModel).filter(*debug_filter_no_version).count()
+                
+                # Contar por dte_version_id
+                version_counts = {}
+                if total_no_version_filter > 0:
+                    version_query = self.db.query(DteModel.dte_version_id, func.count(DteModel.id)).filter(*debug_filter_no_version).group_by(DteModel.dte_version_id).all()
+                    for version_id, count in version_query:
+                        version_counts[version_id] = count
+                
+                debug_message = f"No hay DTEs para procesar en {branch_info} de {type_info} del período {current_period}. "
+                debug_message += f"Total con dte_version_id=1: {total_in_period}. "
+                if total_no_version_filter > total_in_period:
+                    debug_message += f"Total sin filtro de versión: {total_no_version_filter}. "
+                    if version_counts:
+                        version_info = ", ".join([f"version {v}: {c} DTEs" for v, c in version_counts.items()])
+                        debug_message += f"Versiones encontradas: [{version_info}]. "
                 if status_counts:
                     status_info = ", ".join([f"status {s}: {c} DTEs" for s, c in status_counts.items()])
                     debug_message += f"Status encontrados: [{status_info}]"

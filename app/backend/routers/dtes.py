@@ -805,10 +805,17 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
             # Obtener el período actual
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Construir filtro base - SOLO status_id = 2 (no procesados)
+            # Construir filtro base
+            # Para notas de crédito (dte_type_id=61), buscar status 2 o 14
+            # Para otros tipos de DTE, buscar solo status 2
+            if dte_type_id == 61:
+                status_filter = DteModel.status_id.in_([2, 14])
+            else:
+                status_filter = DteModel.status_id == 2
+            
             base_filter = [
                 DteModel.period == current_period,
-                DteModel.status_id == 2,
+                status_filter,
                 DteModel.dte_version_id == 1
             ]
             
