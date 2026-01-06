@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # 🔵 Conexión a la base principal
-SQLALCHEMY_DATABASE_URI = "mysql+pymysql://admin:Chile2025!@intrajisbackend.com:3306/jisparking"
+SQLALCHEMY_DATABASE_URI = "mysql+pymysql://admin:ChileSUR2026Admin!@intrajisbackend.com:3306/jisparking"
 engine = create_engine(SQLALCHEMY_DATABASE_URI, pool_size=20, max_overflow=0, echo=False)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()

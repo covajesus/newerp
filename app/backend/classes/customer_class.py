@@ -247,7 +247,6 @@ class CustomerClass:
         """
         Actualiza los datos de la patente en la base de datos.
         """
-        print(id)
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == rut).first()
         if not customer:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")

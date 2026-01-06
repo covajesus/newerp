@@ -838,6 +838,10 @@ class Dte(BaseModel):
     entrance_hour: str
     exit_hour: str
     added_date: str
+    shopping_order_status_id: Optional[int] = None
+    shopping_order_reference: Optional[str] = None
+    shopping_order_date: Optional[str] = None
+    shopping_order_description: Optional[str] = None
 
 class ProvisionalIndicator(BaseModel):
     period: str
@@ -2040,6 +2044,10 @@ class ToBeAcceptedCustomerBill(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     will_save: Optional[int] = 0
+    shopping_order_status_id: Optional[int] = None
+    shopping_order_reference: Optional[str] = None
+    shopping_order_date: Optional[str] = None
+    shopping_order_description: Optional[str] = None
 
 class ToBeAcceptedCustomerTicket(BaseModel):
     id: Optional[int] = 0
@@ -2167,6 +2175,10 @@ class GenerateCustomerBill(BaseModel):
     phone: Optional[str] = None
     activity: Optional[str] = None
     address: Optional[str] = None
+    shopping_order_status_id: Optional[int] = None
+    shopping_order_reference: Optional[str] = None
+    shopping_order_date: Optional[str] = None
+    shopping_order_description: Optional[str] = None
 
 class FolioList(BaseModel):
     page: int

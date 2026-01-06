@@ -26,17 +26,22 @@ def search(customer_bills:CustomerBillSearch, session_user: UserLogin = Depends(
 
 @customer_bills.post("/store")
 def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+    try:
+        existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
-    if customer_ticket_inputs.will_save == 1:
-        if existence_data == 'Customer does not exist':
-            CustomerClass(db).store(customer_ticket_inputs)
-        else:
-            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+        if customer_ticket_inputs.will_save == 1:
+            if existence_data == 'Customer does not exist':
+                CustomerClass(db).store(customer_ticket_inputs)
+            else:
+                CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
-    data = CustomerBillClass(db).store(customer_ticket_inputs, session_user.rol_id)
+        data = CustomerBillClass(db).store(customer_ticket_inputs, session_user.rol_id)
 
-    return {"message": data}
+        return {"message": data}
+    except Exception as e:
+        print(f"Error en store: {str(e)}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
 @customer_bills.post("/generate_bill")
 def generate_bill(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):

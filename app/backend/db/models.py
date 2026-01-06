@@ -473,6 +473,10 @@ class DteModel(Base):
     payment_comment = Column(String)
     payment_number = Column(String)
     support = Column(String)
+    shopping_order_status_id = Column(Integer)
+    shopping_order_reference = Column(String)
+    shopping_order_date = Column(String)
+    shopping_order_description = Column(String)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

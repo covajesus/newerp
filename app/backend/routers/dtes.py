@@ -721,8 +721,9 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar DTEs: {str(e)}")
 
+@dtes.get("/total_dtes_to_be_sent/{branch_office_id}")
 @dtes.get("/total_dtes_to_be_sent/{branch_office_id}/{dte_type_id}")
-def total_dtes_to_be_sent(branch_office_id: int, dte_type_id: int, db: Session = Depends(get_db)):
+def total_dtes_to_be_sent(branch_office_id: int, dte_type_id: int = 0, db: Session = Depends(get_db)):
     """
     Endpoint para obtener la cantidad total de DTEs que deben ser enviados masivamente por sucursal y tipo
     

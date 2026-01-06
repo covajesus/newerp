@@ -547,6 +547,16 @@ class CustomerBillClass:
         dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
         dte.chip_id = form_data.chip_id
         dte.status_id = 2
+        
+        # Actualizar campos de Orden de Compra si están presentes
+        if hasattr(form_data, 'shopping_order_status_id'):
+            dte.shopping_order_status_id = form_data.shopping_order_status_id
+        if hasattr(form_data, 'shopping_order_reference'):
+            dte.shopping_order_reference = form_data.shopping_order_reference
+        if hasattr(form_data, 'shopping_order_date'):
+            dte.shopping_order_date = form_data.shopping_order_date
+        if hasattr(form_data, 'shopping_order_description'):
+            dte.shopping_order_description = form_data.shopping_order_description
 
         self.db.commit()
         self.db.refresh(dte)
@@ -858,6 +868,16 @@ class CustomerBillClass:
             dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Guardar campos de Orden de Compra si están presentes
+            if hasattr(form_data, 'shopping_order_status_id'):
+                dte.shopping_order_status_id = form_data.shopping_order_status_id
+            if hasattr(form_data, 'shopping_order_reference'):
+                dte.shopping_order_reference = form_data.shopping_order_reference
+            if hasattr(form_data, 'shopping_order_date'):
+                dte.shopping_order_date = form_data.shopping_order_date
+            if hasattr(form_data, 'shopping_order_description'):
+                dte.shopping_order_description = form_data.shopping_order_description
 
             self.db.add(dte)
 
@@ -868,7 +888,7 @@ class CustomerBillClass:
                 self.db.rollback()
                 return {"status": "error", "message": f"Error: {str(e)}"}
         else:
-            return 'error'
+            return {"status": "error", "message": "will_save debe ser 1 para guardar el DTE"}
 
     def store_credit_note(self, form_data):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
@@ -1003,6 +1023,26 @@ class CustomerBillClass:
                     }
                 ]
             }
+        
+        # Agregar referencia de Orden de Compra si está presente (solo para facturas tipo 33)
+        # shopping_order_status_id == 1 indica que la factura tiene OC (Orden de Compra)
+        if hasattr(form_data, 'shopping_order_status_id') and form_data.shopping_order_status_id == 1:
+            if "Referencia" not in data:
+                data["Referencia"] = []
+            
+            # Obtener los valores de OC del form_data
+            oc_reference = getattr(form_data, 'shopping_order_reference', None)
+            oc_reference = int(oc_reference) if oc_reference else 0
+            oc_date = getattr(form_data, 'shopping_order_date', None) or datetime.now().strftime('%Y-%m-%d')
+            oc_description = getattr(form_data, 'shopping_order_description', None) or "Orden de Compra"
+            
+            data["Referencia"].append({
+                "NroLinRef": 1,  # Número de línea de referencia
+                "TpoDocRef": 801,  # 801 = Orden de Compra
+                "FolioRef": oc_reference,
+                "FchRef": oc_date,
+                "RazonRef": oc_description
+            })
 
         try:
             # Endpoint para generar un DTE temporal
