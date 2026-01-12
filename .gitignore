@@ -3,3 +3,8 @@ __pycache__/
 jisbackend/
 .jisbackend.com/
 files/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local

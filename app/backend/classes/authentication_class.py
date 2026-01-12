@@ -19,31 +19,17 @@ class AuthenticationClass:
     def authenticate_user(self, rut, password):
         user = UserClass(self.db).get('rut', rut)
         
-        # Debug: ver qué devuelve user
-        print(f"DEBUG - Tipo de user: {type(user)}")
-        print(f"DEBUG - Valor de user: {user}")
-        print(f"DEBUG - user es None: {user is None}")
-        if user:
-            print(f"DEBUG - Longitud de user: {len(str(user))}")
-            print(f"DEBUG - Primeros 100 caracteres: {str(user)[:100]}")
-        
         # Verificar si user es None o un mensaje de error
         if not user or user == "No se encontraron datos para el campo especificado." or (isinstance(user, str) and user.startswith("Error:")):
-            print(f"DEBUG - Usuario no encontrado o error: {user}")
+            # No exponer detalles específicos del error por seguridad
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
         
         # Intentar parsear el JSON
         try:
             response_data = json.loads(user)
-        except json.JSONDecodeError as e:
-            print(f"DEBUG - Error al parsear JSON: {str(e)}")
-            print(f"DEBUG - Contenido que falló: {user}")
+        except json.JSONDecodeError:
+            # No exponer detalles del error de parsing por seguridad
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
-
-        # Debug: imprimir información útil
-        print(f"Verificando contraseña para RUT: {rut}")
-        print(f"Tipo de hashed_password: {type(response_data['user_data']['hashed_password'])}")
-        print(f"Longitud de hashed_password: {len(response_data['user_data']['hashed_password']) if response_data['user_data']['hashed_password'] else 0}")
 
         if not self.verify_password(password, response_data["user_data"]["hashed_password"]):
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
@@ -52,19 +38,12 @@ class AuthenticationClass:
     def verify_password(self, plain_password, hashed_password):
         # Use bcrypt directly instead of passlib (compatibility issue with Python 3.13)
         try:
-            # Debug: información de la contraseña
-            print(f"DEBUG verify_password - Contraseña recibida (longitud): {len(str(plain_password))}")
-            print(f"DEBUG verify_password - Hash recibido (primeros 30 chars): {hashed_password[:30] if hashed_password else 'None'}...")
-            print(f"DEBUG verify_password - Hash completo (longitud): {len(str(hashed_password)) if hashed_password else 0}")
-            
             # Verificar que hashed_password no esté vacío
             if not hashed_password:
-                print("Error: hashed_password está vacío")
                 return False
             
             # Verificar formato del hash bcrypt (debe empezar con $2a$, $2b$, o $2y$)
             if isinstance(hashed_password, str) and not hashed_password.startswith(('$2a$', '$2b$', '$2y$')):
-                print(f"Error: Formato de hash inválido. Hash recibido: {hashed_password[:20]}...")
                 return False
             
             # Asegurarse de que plain_password esté en bytes
@@ -77,22 +56,10 @@ class AuthenticationClass:
             else:
                 hashed_password_bytes = hashed_password
             
-            print(f"DEBUG verify_password - Comparando contraseña con hash bcrypt...")
             result = bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
-            print(f"Resultado de verificación de contraseña: {result}")
-            
-            # Si falla, intentar verificar si el hash está correctamente formateado
-            if not result:
-                print(f"DEBUG verify_password - La verificación falló. Hash completo: {hashed_password}")
-                print(f"DEBUG verify_password - ¿El hash tiene 60 caracteres? {len(hashed_password) == 60}")
-                print(f"DEBUG verify_password - ¿El hash termina correctamente? {hashed_password[-1] if len(hashed_password) > 0 else 'N/A'}")
-            
             return result
-        except Exception as e:
-            print(f"Error al verificar contraseña: {str(e)}")
-            print(f"Tipo de error: {type(e).__name__}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            # No exponer detalles del error por seguridad
             return False
     
     def create_external_token(self, rut, password):
@@ -101,34 +68,26 @@ class AuthenticationClass:
             "rut": rut,
             "password": password
         }
-        print(f"DEBUG - Intentando obtener token externo para RUT: {rut}")
 
         try:
             response = requests.post(url, json=data, timeout=10)
             
-            # Debug: información de la respuesta
-            print(f"DEBUG - Status code de API externa: {response.status_code}")
-            print(f"DEBUG - Headers de respuesta: {response.headers}")
-            print(f"DEBUG - Contenido de respuesta (primeros 200 chars): {response.text[:200]}")
-            
             # Verificar si la respuesta es exitosa
             if response.status_code != 200:
-                print(f"DEBUG - Error en API externa. Status: {response.status_code}, Text: {response.text}")
+                # No exponer detalles de la respuesta de error por seguridad
                 return None
             
             # Intentar parsear JSON
             try:
                 json_data = response.json()
                 token = json_data.get("access_token")
-                print(f"DEBUG - Token externo obtenido: {token is not None}")
                 return token
-            except json.JSONDecodeError as e:
-                print(f"DEBUG - Error al parsear JSON de API externa: {str(e)}")
-                print(f"DEBUG - Respuesta completa: {response.text}")
+            except json.JSONDecodeError:
+                # No exponer detalles del error de parsing por seguridad
                 return None
                 
-        except requests.exceptions.RequestException as e:
-            print(f"DEBUG - Error de conexión con API externa: {str(e)}")
+        except requests.exceptions.RequestException:
+            # No exponer detalles del error de conexión por seguridad
             return None
     
     def create_token(self, data: dict, time_expire: Union[datetime, None] = None):
@@ -199,11 +158,10 @@ class AuthenticationClass:
         if response.status_code == 200:
             data = response.json()
             access_token = data.get("accessToken")
-            print("Access Token:", access_token)
             SettingClass(self.db).update_token(access_token)
             return access_token
         else:
-            print("Error al obtener el token:", response.status_code, response.text)
+            # No exponer detalles del error por seguridad
             return None
             
     def check_simplefactura_token(self):
@@ -219,8 +177,6 @@ class AuthenticationClass:
 
         response = requests.get(url, headers=headers)
 
-        print(f"Status Code: {response.status_code}")
-
         if response.status_code == 401:
             return 0
 
@@ -230,7 +186,6 @@ class AuthenticationClass:
         try:
             return response.json()
         except requests.exceptions.JSONDecodeError:
-            print("No se pudo decodificar la respuesta JSON.")
-            print(response.text)
+            # No exponer detalles de la respuesta por seguridad
             return 3
 

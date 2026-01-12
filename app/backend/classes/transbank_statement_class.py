@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, TransbankTotalModel, CollectionModel, CashierModel
 from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
 from sqlalchemy import text
 import requests
@@ -126,12 +127,37 @@ class TransbankStatementClass:
             self.db.commit()
 
             if progress_callback:
-                progress_callback(15, "Descargando archivo...")
+                progress_callback(15, "Leyendo archivo...")
 
-            response = requests.get(file_url)
-
-            response.raise_for_status()
-            content = response.content.decode('latin1')
+            # Verificar si la URL es del servidor local y leer directamente del filesystem
+            base_url = "https://intrajisbackend.com/files"
+            local_urls = [
+                "https://intrajisbackend.com/files",
+                "http://127.0.0.1:8000/files",
+                "http://localhost:8000/files"
+            ]
+            
+            # Si es una URL local, leer directamente del filesystem
+            is_local_url = any(file_url.startswith(url) for url in local_urls)
+            
+            if is_local_url:
+                # Extraer el remote_path de la URL
+                # Formato esperado: https://intrajisbackend.com/files/transbank_statements_xxx.dat
+                for url_prefix in local_urls:
+                    if file_url.startswith(url_prefix):
+                        remote_path = file_url[len(url_prefix):].lstrip('/')
+                        break
+                
+                # Leer el archivo directamente del filesystem usando FileClass
+                file_class = FileClass(self.db)
+                file_content = file_class.download(remote_path)
+                content = file_content.decode('latin1')
+            else:
+                # Si es una URL externa, usar requests
+                response = requests.get(file_url)
+                response.raise_for_status()
+                content = response.content.decode('latin1')
+            
             lines = content.splitlines()
             
             if progress_callback:

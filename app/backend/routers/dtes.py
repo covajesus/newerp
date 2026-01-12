@@ -206,7 +206,6 @@ def get_dte_info(dte_type_id: int, folio: int, issuer: str = "76063822", db: Ses
         raise HTTPException(status_code=500, detail=f"Error al obtener información del DTE: {str(e)}")
 
 async def auth_check(request: Request, user: str, password: str) -> bool:
-    print(user, password)
     # Leer cabeceras HTTP
     auth_header = request.headers.get("Authorization")
     if not auth_header:
@@ -220,7 +219,7 @@ async def auth_check(request: Request, user: str, password: str) -> bool:
         u, p = decoded.split(":", 1)
     except Exception:
         return False
-    print(u, p)
+    # No exponer credenciales en logs por seguridad
     return u == user and p == password
 
 @dtes.get("/dte_pay/{folio}")

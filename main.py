@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde archivo .env
+load_dotenv()
 from app.backend.routers.branch_offices import branch_offices
 from app.backend.routers.branch_office_transbank import branch_office_transbank
 from app.backend.routers.genders import genders
@@ -93,8 +97,19 @@ application = app
 # Montar como directorio estático
 # app.mount("/files", StaticFiles(directory=FILES_DIR), name="files")
 
-os.environ['SECRET_KEY'] = '7de4c36b48fce8dcb3a4bb527ba62d789ebf3d3a7582472ee49d430b01a7f868'
-os.environ['ALGORITHM'] = 'HS256'
+# Configurar variables de seguridad desde variables de entorno
+# IMPORTANTE: Crear un archivo .env en la raíz del proyecto con estas variables
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = os.getenv('ALGORITHM', 'HS256')  # Default a HS256 si no está definido
+
+if not SECRET_KEY:
+    raise ValueError(
+        "SECRET_KEY no encontrada en variables de entorno. "
+        "Por favor, crea un archivo .env con SECRET_KEY definida."
+    )
+
+os.environ['SECRET_KEY'] = SECRET_KEY
+os.environ['ALGORITHM'] = ALGORITHM
 
 origins = [
     "*",
