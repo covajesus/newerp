@@ -17,7 +17,13 @@ authentications = APIRouter(
 
 @authentications.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)
+    print(f"🔐 [LOGIN] Intentando login para usuario: {form_data.username}")
+    try:
+        user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)
+        print(f"✅ [LOGIN] Usuario autenticado exitosamente: {form_data.username}")
+    except Exception as e:
+        print(f"❌ [LOGIN] Error en autenticación para {form_data.username}: {str(e)}")
+        raise
 
     rol = RolClass(db).get('id', user["user_data"]["rol_id"])
     token_expires = timedelta(minutes=1000000)

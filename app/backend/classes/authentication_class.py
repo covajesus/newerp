@@ -17,22 +17,34 @@ class AuthenticationClass:
         self.db = db
 
     def authenticate_user(self, rut, password):
+        print(f"🔍 [AUTH] Buscando usuario con RUT: {rut}")
         user = UserClass(self.db).get('rut', rut)
+        print(f"📦 [AUTH] Resultado de búsqueda de usuario: {type(user).__name__}, valor: {str(user)[:100] if user else 'None'}")
         
         # Verificar si user es None o un mensaje de error
         if not user or user == "No se encontraron datos para el campo especificado." or (isinstance(user, str) and user.startswith("Error:")):
+            print(f"❌ [AUTH] Usuario no encontrado o error: {user}")
             # No exponer detalles específicos del error por seguridad
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
         
         # Intentar parsear el JSON
         try:
             response_data = json.loads(user)
-        except json.JSONDecodeError:
+            print(f"✅ [AUTH] JSON parseado correctamente para usuario: {rut}")
+        except json.JSONDecodeError as e:
+            print(f"❌ [AUTH] Error al parsear JSON: {str(e)}")
             # No exponer detalles del error de parsing por seguridad
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
 
-        if not self.verify_password(password, response_data["user_data"]["hashed_password"]):
+        print(f"🔑 [AUTH] Verificando contraseña para usuario: {rut}")
+        password_valid = self.verify_password(password, response_data["user_data"]["hashed_password"])
+        print(f"🔑 [AUTH] Resultado verificación contraseña: {password_valid}")
+        
+        if not password_valid:
+            print(f"❌ [AUTH] Contraseña incorrecta para usuario: {rut}")
             raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+        
+        print(f"✅ [AUTH] Autenticación exitosa para usuario: {rut}")
         return response_data
         
     def verify_password(self, plain_password, hashed_password):

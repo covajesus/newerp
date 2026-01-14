@@ -80,7 +80,9 @@ class UserClass:
     
     def get(self, field, value):
         try:
+            print(f"🔎 [USER_CLASS] Buscando usuario con campo: {field}, valor: {value}")
             data_query = self.db.query(UserModel).filter(getattr(UserModel, field) == value).first()
+            print(f"📊 [USER_CLASS] Resultado de query: {'Usuario encontrado' if data_query else 'Usuario NO encontrado'}")
 
             if data_query:
                 user_data = {
@@ -99,14 +101,17 @@ class UserClass:
                 }
 
                 serialized_result = json.dumps(result)
+                print(f"✅ [USER_CLASS] Usuario encontrado y serializado: {data_query.rut}")
 
                 return serialized_result
 
             else:
+                print(f"❌ [USER_CLASS] No se encontraron datos para campo: {field}, valor: {value}")
                 return "No se encontraron datos para el campo especificado."
 
         except Exception as e:
             error_message = str(e)
+            print(f"❌ [USER_CLASS] Error en get: {error_message}")
             return f"Error: {error_message}"
         
     def get_supervisors(self):
