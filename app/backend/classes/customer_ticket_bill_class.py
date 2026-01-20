@@ -747,7 +747,11 @@ class CustomerTicketBillClass:
                 dte_date = dte.added_date.strftime('%Y-%m-%d') if dte.added_date else datetime.now().strftime('%Y-%m-%d')
             else:
                 dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
-            code = self.pre_generate_credit_note_ticket(customer_data, original_dte_type_id, original_dte_folio, dte.cash_amount, dte_date)
+            # Obtener el dte_code de la sucursal para incluir en la nota de crédito
+            branch_office_for_dte = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id_to_use).first()
+            dte_code = branch_office_for_dte.dte_code if branch_office_for_dte else None
+            
+            code = self.pre_generate_credit_note_ticket(customer_data, original_dte_type_id, original_dte_folio, dte.cash_amount, dte_date, dte_code)
             folio = None
 
             if code is not None:
@@ -894,7 +898,7 @@ class CustomerTicketBillClass:
 
         return response_data['fecha']
 
-    def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date):  # Added self as the first argument
+    def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date, dte_code=None):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         amount = round(abs(int(cash_amount))/1.19)
@@ -904,6 +908,13 @@ class CustomerTicketBillClass:
         except Exception as e:
             print(f"ERROR accediendo a customer_data: {str(e)}")
             print(f"customer_data keys: {list(customer_data.keys()) if hasattr(customer_data, 'keys') else 'No keys method'}")
+        
+        # Construir el objeto Emisor con o sin sucursal
+        emisor_data = {
+            "RUTEmisor": "76063822-6"
+        }
+        if dte_code:
+            emisor_data['CdgSIISucur'] = dte_code
             
         data = {
                 "Encabezado": {
@@ -913,9 +924,7 @@ class CustomerTicketBillClass:
                         "TpoTranVenta": 1,
                         "FmaPago": "1",
                     },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6"
-                    },
+                    "Emisor": emisor_data,
                     "Receptor": {
                         "RUTRecep": customer_data['customer_data']['rut'],
                         "RznSocRecep": customer_data['customer_data']['customer'],
