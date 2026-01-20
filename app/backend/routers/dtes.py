@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte, UploadDteDepositTransfer, SearchEmittedDtes
+from app.backend.schemas import UserLogin, GetDte, Dte, DteList, ReceivedDteList, ImportDte, UploadDteDepositTransfer, SearchEmittedDtes, DteDateRange
 from app.backend.classes.dte_class import DteClass
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.whatsapp_class import WhatsappClass
@@ -886,3 +886,200 @@ def check_payments(db: Session = Depends(get_db)):
     """
     data = DteClass(db).check_payments()
     return {"message": data}
+
+@dtes.get("/compare_dtes_with_dtes2")
+def compare_dtes_with_dtes2(
+    period: str = "2026-01",
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para comparar DTEs de la tabla dtes con dtes2 para un período específico.
+    Retorna los DTEs que existen en dtes2 pero NO en dtes.
+    
+    Parámetros:
+    - period: Período en formato YYYY-MM (por defecto: "2026-01")
+    
+    Ejemplo de uso:
+    GET /dtes/compare_dtes_with_dtes2?period=2026-01
+    """
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.compare_dtes_with_dtes2(period)
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al comparar DTEs"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al comparar DTEs: {str(e)}")
+
+@dtes.get("/save_dtes2_to_dtes")
+def save_dtes2_to_dtes(
+    period: str = "2026-01",
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para guardar los DTEs que están en dtes2 pero NO en dtes directamente en la tabla dtes.
+    Los DTEs se guardan con:
+    - comment: en blanco
+    - expense_type_id: 25
+    - chip_id: 0
+    - status_id: 4
+    - Todos los demás valores se copian de dtes2
+    
+    Parámetros:
+    - period: Período en formato YYYY-MM (por defecto: "2026-01")
+    
+    Ejemplo de uso:
+    GET /dtes/save_dtes2_to_dtes?period=2026-01
+    """
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.save_dtes2_to_dtes(period)
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al guardar DTEs"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar DTEs: {str(e)}")
+
+@dtes.get("/without_customer")
+def get_dtes_without_customer(
+    period: str = "2026-01",
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para buscar DTEs del período especificado que NO tienen un cliente asociado en la tabla customers.
+    Compara los RUTs normalizados para evitar diferencias por formato (k/K, ceros a la izquierda).
+    
+    Parámetros:
+    - period: Período en formato YYYY-MM (por defecto: "2026-01")
+    
+    Ejemplo de uso:
+    GET /dtes/without_customer?period=2026-01
+    """
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.get_dtes_without_customer(period)
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al buscar DTEs sin cliente"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al buscar DTEs sin cliente: {str(e)}")
+
+@dtes.get("/by_date_range")
+def get_dtes_by_date_range(
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para buscar todos los DTEs emitidos en LibreDTE por rango de fechas
+    Las fechas se configuran manualmente en el código del router
+    
+    Modifica las variables fecha_desde y fecha_hasta directamente en el código
+    """
+
+    fecha_desde = "2026-01-01"
+    fecha_hasta = "2026-01-31"
+
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.get_dtes_by_date_range(fecha_desde, fecha_hasta)
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al buscar DTEs"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al buscar DTEs por rango de fechas: {str(e)}")
+
+@dtes.post("/by_date_range")
+def get_dtes_by_date_range_post(
+    date_range: DteDateRange,
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint POST para buscar todos los DTEs en un rango de fechas
+    Permite enviar las fechas manualmente en el body de la petición
+    
+    Body JSON:
+    {
+        "fecha_desde": "2025-01-01",
+        "fecha_hasta": "2025-01-31",
+        "page": 0,
+        "items_per_page": 10
+    }
+    
+    Ejemplo de uso:
+    POST /dtes/by_date_range
+    {
+        "fecha_desde": "2025-01-01",
+        "fecha_hasta": "2025-01-31"
+    }
+    """
+    try:
+        dte_class = DteClass(db)
+        result = dte_class.get_dtes_by_date_range(
+            date_range.fecha_desde, 
+            date_range.fecha_hasta, 
+            date_range.page, 
+            date_range.items_per_page
+        )
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al buscar DTEs"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al buscar DTEs por rango de fechas: {str(e)}")
+
+@dtes.get("/by_date_range_manual")
+def get_dtes_by_date_range_manual(db: Session = Depends(get_db)):
+    """
+    Endpoint GET para buscar DTEs por rango de fechas con fechas manuales
+    Modifica las variables fecha_desde y fecha_hasta directamente en el código
+    """
+    try:
+        # ============================================
+        # COLOCA AQUÍ LAS FECHAS MANUALMENTE
+        # ============================================
+        fecha_desde = "2025-01-01"  # Cambia esta fecha según necesites
+        fecha_hasta = "2025-01-31"   # Cambia esta fecha según necesites
+        page = 0                      # 0 para traer todos, o número de página
+        items_per_page = 10           # Items por página
+        # ============================================
+        
+        dte_class = DteClass(db)
+        result = dte_class.get_dtes_by_date_range(
+            fecha_desde, 
+            fecha_hasta, 
+            page, 
+            items_per_page
+        )
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result.get("message", "Error al buscar DTEs"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al buscar DTEs por rango de fechas: {str(e)}")

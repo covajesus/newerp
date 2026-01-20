@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import desc, cast, Date, func, or_, text
 from sqlalchemy.dialects import mysql
-from app.backend.db.models import DteModel, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel, TotalDtesToBeSentModel
+from app.backend.db.models import DteModel, Dte2Model, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel, TotalDtesToBeSentModel
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
@@ -3301,6 +3301,578 @@ class DteClass:
                 "status": "error",
                 "message": error_msg,
                 "nc_created": 0
+            }
+
+    def get_dtes_by_date_range(self, fecha_desde: str, fecha_hasta: str):
+        """
+        Busca DTEs emitidos en LibreDTE por rango de fechas y los guarda directamente en la tabla dtes2.
+        No hace comparaciones, simplemente guarda todos los DTEs encontrados.
+        """
+        try:
+            issuer = "76063822"
+            url = f"https://libredte.cl/api/dte/dte_emitidos/buscar/{issuer}"
+            token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+
+            # Construir payload con filtros de fecha
+            payload = {
+                "cedido": None,
+                "dte": None,
+                "fecha": None,
+                "folio": None,
+                "periodo": None,
+                "razon_social": None,
+                "receptor": None,
+                "receptor_evento": None,
+                "sucursal_sii": None,
+                "total": None,
+                "total_desde": None,
+                "total_hasta": None,
+                "usuario": None,
+                "fecha_desde": fecha_desde,
+                "fecha_hasta": fecha_hasta
+            }
+
+            print(f"🔍 Consultando LibreDTE: {url}")
+            print(f"📅 Rango de fechas: {fecha_desde} a {fecha_hasta}")
+
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+            if response.status_code != 200:
+                error_message = f"Error al consultar LibreDTE: Status {response.status_code}"
+                try:
+                    error_detail = response.json()
+                    error_message += f" - {error_detail}"
+                except Exception:
+                    error_message += f" - {response.text}"
+
+                return {
+                    "status": "error",
+                    "message": error_message,
+                    "status_code": response.status_code
+                }
+
+            data = response.json()
+
+            if not isinstance(data, list):
+                return {
+                    "status": "error",
+                    "message": f"Respuesta inesperada de LibreDTE: {type(data).__name__}",
+                    "data": data
+                }
+
+            # Filtrar DTEs válidos (receptor distinto de 66666666)
+            filtered_data = [
+                dte for dte in data
+                if dte.get("receptor") != 66666666
+            ]
+
+            helper = HelperClass()
+            saved_count = 0
+            error_count = 0
+            errors = []
+
+            print(f"📊 Total de DTEs encontrados: {len(filtered_data)}")
+            print(f"💾 Iniciando guardado en dtes2...")
+
+            for dte in filtered_data:
+                try:
+                    folio = dte.get("folio")
+                    dte_type_id = dte.get("dte")
+                    fecha = dte.get("fecha")
+                    receptor = dte.get("receptor")
+                    total = dte.get("total", 0)
+                    razon_social = dte.get("razon_social", "")
+                    sucursal_sii = dte.get("sucursal_sii")  # Código de sucursal de LibreDTE
+
+                    if not fecha or not receptor or not dte_type_id or not folio:
+                        continue
+
+                    # Calcular período YYYY-MM
+                    period = fecha[:7]
+
+                    # Construir RUT con dígito verificador y formatear con ceros a la izquierda
+                    try:
+                        numeric_rut = str(receptor)
+                        verificator_digit = HelperClass.verificator_digit(numeric_rut)
+                        # Formatear RUT con ceros a la izquierda (8 dígitos)
+                        numeric_rut_formatted = numeric_rut.zfill(8)
+                        full_rut = f"{numeric_rut_formatted}-{verificator_digit}"
+                    except Exception as e:
+                        print(f"⚠️ Error calculando RUT para receptor {receptor}: {str(e)}")
+                        continue
+
+                    # Buscar branch_office_id usando sucursal_sii (dte_code)
+                    branch_office_id = None
+                    if sucursal_sii:
+                        branch_office = self.db.query(BranchOfficeModel).filter(
+                            BranchOfficeModel.dte_code == sucursal_sii
+                        ).first()
+                        if branch_office:
+                            branch_office_id = branch_office.id
+
+                    # Verificar si ya existe este DTE en dtes2 (evitar duplicados)
+                    existing = self.db.query(Dte2Model).filter(
+                        Dte2Model.folio == folio,
+                        Dte2Model.rut == full_rut,
+                        Dte2Model.dte_type_id == dte_type_id,
+                        Dte2Model.period == period
+                    ).first()
+
+                    if existing:
+                        continue  # Ya existe, saltar
+
+                    # Crear nuevo registro en dtes2
+                    new_dte = Dte2Model()
+                    new_dte.folio = folio
+                    new_dte.dte_type_id = dte_type_id
+                    new_dte.rut = full_rut
+                    new_dte.period = period
+                    new_dte.total = total
+                    new_dte.dte_version_id = 1  # Asumir versión 1
+                    new_dte.cashier_id = 0  # Establecer cashier_id = 0
+                    new_dte.branch_office_id = branch_office_id  # Asignar branch_office_id si se encontró
+                    new_dte.added_date = datetime.strptime(fecha, '%Y-%m-%d') if fecha else datetime.now()
+                    new_dte.updated_date = datetime.now()
+                    
+                    # Campos opcionales que pueden venir de LibreDTE
+                    new_dte.comment = razon_social if razon_social else None
+                    
+                    # Calcular subtotal y tax si es necesario (asumiendo IVA 19%)
+                    if dte_type_id in [33, 39]:  # Facturas y boletas con IVA
+                        new_dte.subtotal = int(total / 1.19) if total else 0
+                        new_dte.tax = total - new_dte.subtotal if total else 0
+                    else:
+                        new_dte.subtotal = total if total else 0
+                        new_dte.tax = 0
+
+                    self.db.add(new_dte)
+                    saved_count += 1
+
+                    # Commit cada 50 registros para mejor performance
+                    if saved_count % 50 == 0:
+                        self.db.commit()
+                        print(f"💾 Guardados {saved_count} DTEs...")
+
+                except Exception as e:
+                    error_count += 1
+                    error_msg = f"Error guardando DTE folio {folio}: {str(e)}"
+                    errors.append(error_msg)
+                    print(f"❌ {error_msg}")
+                    self.db.rollback()
+                    continue
+
+            # Commit final
+            try:
+                self.db.commit()
+                print(f"✅ Guardado completado: {saved_count} DTEs guardados")
+            except Exception as e:
+                self.db.rollback()
+                return {
+                    "status": "error",
+                    "message": f"Error en commit final: {str(e)}"
+                }
+
+            return {
+                "status": "success",
+                "total_dtes_from_libredte": len(filtered_data),
+                "saved_count": saved_count,
+                "error_count": error_count,
+                "fecha_desde": fecha_desde,
+                "fecha_hasta": fecha_hasta,
+                "errors": errors if errors else None,
+                "message": f"Se guardaron {saved_count} DTEs en dtes2"
+            }
+
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "message": f"Error de conexión con LibreDTE: {str(e)}"
+            }
+        except ValueError as e:
+            return {
+                "status": "error",
+                "message": f"Formato de fecha inválido. Use formato YYYY-MM-DD: {str(e)}"
+            }
+        except Exception as e:
+            error_message = str(e)
+            return {
+                "status": "error",
+                "message": f"Error al buscar y guardar DTEs: {error_message}"
+            }
+
+    def normalize_rut_for_comparison(self, rut):
+        """
+        Normaliza el RUT para comparación, extrayendo solo la parte numérica y el dígito verificador.
+        Elimina ceros a la izquierda y convierte 'k'/'K' a mayúscula para comparación consistente.
+        Ejemplo: "010259441-K" -> "10259441-K", "10259441-k" -> "10259441-K", "10259441-K" -> "10259441-K"
+        """
+        if not rut:
+            return None
+        try:
+            rut_str = str(rut).strip()
+            if not rut_str:
+                return None
+                
+            # Separar número y dígito verificador
+            if '-' in rut_str:
+                parts = rut_str.split('-')
+                if len(parts) != 2:
+                    return rut_str
+                numeric_part = parts[0].lstrip('0') or '0'  # Eliminar ceros a la izquierda, pero mantener '0' si todo es cero
+                dv = parts[1].strip().upper()  # Dígito verificador en mayúscula (k -> K)
+                return f"{numeric_part}-{dv}"
+            else:
+                # Si no tiene guion, intentar extraer el último carácter como DV
+                if len(rut_str) > 1:
+                    numeric_part = rut_str[:-1].lstrip('0') or '0'
+                    dv = rut_str[-1].upper()  # Convertir k a K
+                    return f"{numeric_part}-{dv}"
+                return rut_str.upper() if rut_str else None
+        except Exception as e:
+            # Si hay error, retornar el RUT original en mayúscula
+            return str(rut).upper() if rut else None
+
+    def compare_dtes_with_dtes2(self, period: str = "2026-01"):
+        """
+        Compara los DTEs de la tabla dtes con los de dtes2 para un período específico.
+        Normaliza los RUTs antes de comparar para evitar diferencias por formato.
+        
+        Args:
+            period: Período en formato YYYY-MM (ejemplo: "2026-01")
+        
+        Returns:
+            Diccionario con la comparación de ambas tablas
+        """
+        try:
+            # Obtener DTEs de la tabla dtes para el período
+            dtes_from_dtes = self.db.query(DteModel).filter(
+                DteModel.period == period
+            ).all()
+            
+            # Obtener DTEs de la tabla dtes2 para el período
+            dtes_from_dtes2 = self.db.query(Dte2Model).filter(
+                Dte2Model.period == period
+            ).all()
+            
+            # Crear sets para comparación rápida usando (folio, rut_normalizado, dte_type_id)
+            # Normalizar RUTs antes de comparar
+            dtes_set = {
+                (dte.folio, self.normalize_rut_for_comparison(dte.rut), dte.dte_type_id) 
+                for dte in dtes_from_dtes
+                if dte.rut  # Solo incluir si tiene RUT
+            }
+            
+            dtes2_set = {
+                (dte.folio, self.normalize_rut_for_comparison(dte.rut), dte.dte_type_id) 
+                for dte in dtes_from_dtes2
+                if dte.rut  # Solo incluir si tiene RUT
+            }
+            
+            # DTEs que están en dtes pero NO en dtes2
+            only_in_dtes = dtes_set - dtes2_set
+            
+            # DTEs que están en dtes2 pero NO en dtes
+            only_in_dtes2 = dtes2_set - dtes_set
+            
+            # DTEs que están en ambas tablas
+            in_both = dtes_set & dtes2_set
+            
+            # Obtener detalles de los DTEs que solo están en dtes
+            only_in_dtes_details = []
+            for folio, rut_normalized, dte_type_id in only_in_dtes:
+                # Buscar usando RUT normalizado para comparación
+                dte = next((
+                    d for d in dtes_from_dtes 
+                    if d.folio == folio 
+                    and self.normalize_rut_for_comparison(d.rut) == rut_normalized 
+                    and d.dte_type_id == dte_type_id
+                ), None)
+                if dte:
+                    only_in_dtes_details.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "rut_normalized": rut_normalized,  # Mostrar RUT normalizado usado en comparación
+                        "dte_type_id": dte.dte_type_id,
+                        "total": dte.total,
+                        "branch_office_id": dte.branch_office_id,
+                        "period": dte.period,
+                        "added_date": dte.added_date.strftime('%Y-%m-%d %H:%M:%S') if dte.added_date else None
+                    })
+            
+            # Obtener detalles de los DTEs que solo están en dtes2
+            only_in_dtes2_details = []
+            for folio, rut_normalized, dte_type_id in only_in_dtes2:
+                # Buscar usando RUT normalizado para comparación
+                dte = next((
+                    d for d in dtes_from_dtes2 
+                    if d.folio == folio 
+                    and self.normalize_rut_for_comparison(d.rut) == rut_normalized 
+                    and d.dte_type_id == dte_type_id
+                ), None)
+                if dte:
+                    only_in_dtes2_details.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "rut_normalized": rut_normalized,  # Mostrar RUT normalizado usado en comparación
+                        "dte_type_id": dte.dte_type_id,
+                        "total": dte.total,
+                        "branch_office_id": dte.branch_office_id,
+                        "period": dte.period,
+                        "added_date": dte.added_date.strftime('%Y-%m-%d %H:%M:%S') if dte.added_date else None
+                    })
+            
+            return {
+                "status": "success",
+                "period": period,
+                "summary": {
+                    "total_in_dtes": len(dtes_from_dtes),
+                    "total_in_dtes2": len(dtes_from_dtes2),
+                    "only_in_dtes": len(only_in_dtes),
+                    "only_in_dtes2": len(only_in_dtes2),  # DTEs en dtes2 que NO están en dtes
+                    "in_both": len(in_both)
+                },
+                "dtes_only_in_dtes2": only_in_dtes2_details,  # Lista de DTEs que están en dtes2 pero NO en dtes
+                "only_in_dtes": only_in_dtes_details,  # DTEs que están en dtes pero NO en dtes2
+                "message": f"Comparación completada para período {period}. Se encontraron {len(only_in_dtes2)} DTEs en dtes2 que NO existen en dtes."
+            }
+            
+        except Exception as e:
+            error_message = str(e)
+            return {
+                "status": "error",
+                "message": f"Error al comparar DTEs: {error_message}"
+            }
+
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "message": f"Error de conexión con LibreDTE: {str(e)}"
+            }
+        except ValueError as e:
+            return {
+                "status": "error",
+                "message": f"Formato de fecha inválido. Use formato YYYY-MM-DD: {str(e)}"
+            }
+        except Exception as e:
+            error_message = str(e)
+            return {
+                "status": "error",
+                "message": f"Error al buscar DTEs en LibreDTE: {error_message}"
+            }
+
+    def save_dtes2_to_dtes(self, period: str = "2026-01"):
+        """
+        Guarda los DTEs que están en dtes2 pero NO en dtes directamente en la tabla dtes.
+        Los DTEs se guardan con:
+        - comment: en blanco
+        - expense_type_id: 25
+        - chip_id: 0
+        - status_id: 4
+        - Todos los demás valores se copian de dtes2
+        
+        Args:
+            period: Período en formato YYYY-MM (ejemplo: "2026-01")
+        
+        Returns:
+            Diccionario con el resultado de la operación
+        """
+        try:
+            # Obtener DTEs de la tabla dtes para el período
+            dtes_from_dtes = self.db.query(DteModel).filter(
+                DteModel.period == period
+            ).all()
+            
+            # Obtener DTEs de la tabla dtes2 para el período
+            dtes_from_dtes2 = self.db.query(Dte2Model).filter(
+                Dte2Model.period == period
+            ).all()
+            
+            # Crear sets para comparación rápida usando (folio, rut_normalizado, dte_type_id)
+            dtes_set = {
+                (dte.folio, self.normalize_rut_for_comparison(dte.rut), dte.dte_type_id) 
+                for dte in dtes_from_dtes
+                if dte.rut  # Solo incluir si tiene RUT
+            }
+            
+            dtes2_set = {
+                (dte.folio, self.normalize_rut_for_comparison(dte.rut), dte.dte_type_id) 
+                for dte in dtes_from_dtes2
+                if dte.rut  # Solo incluir si tiene RUT
+            }
+            
+            # DTEs que están en dtes2 pero NO en dtes
+            only_in_dtes2 = dtes2_set - dtes_set
+            
+            # Obtener los DTEs completos de dtes2 que no están en dtes
+            dtes_to_save = []
+            for folio, rut_normalized, dte_type_id in only_in_dtes2:
+                dte2 = next((
+                    d for d in dtes_from_dtes2 
+                    if d.folio == folio 
+                    and self.normalize_rut_for_comparison(d.rut) == rut_normalized 
+                    and d.dte_type_id == dte_type_id
+                ), None)
+                if dte2:
+                    dtes_to_save.append(dte2)
+            
+            # Guardar cada DTE en la tabla dtes
+            saved_count = 0
+            errors = []
+            
+            for dte2 in dtes_to_save:
+                try:
+                    # Crear nuevo DTE en la tabla dtes
+                    new_dte = DteModel(
+                        branch_office_id=dte2.branch_office_id,
+                        dte_version_id=dte2.dte_version_id,
+                        cashier_id=dte2.cashier_id,
+                        dte_type_id=dte2.dte_type_id,
+                        chip_id=0,  # Valor fijo
+                        status_id=4,  # Valor fijo
+                        expense_type_id=25,  # Valor fijo
+                        payment_type_id=dte2.payment_type_id,
+                        reason_id=dte2.reason_id,
+                        payment_date=dte2.payment_date,
+                        rut=dte2.rut,
+                        folio=dte2.folio,
+                        denied_folio=dte2.denied_folio,
+                        cash_amount=dte2.cash_amount,
+                        card_amount=dte2.card_amount,
+                        subtotal=dte2.subtotal,
+                        tax=dte2.tax,
+                        discount=dte2.discount,
+                        payment_amount=dte2.payment_amount,
+                        total=dte2.total,
+                        ticket_serial_number=dte2.ticket_serial_number,
+                        ticket_hour=dte2.ticket_hour,
+                        ticket_transaction_number=dte2.ticket_transaction_number,
+                        ticket_dispenser_number=dte2.ticket_dispenser_number,
+                        ticket_number=dte2.ticket_number,
+                        ticket_station_number=dte2.ticket_station_number,
+                        ticket_sa=dte2.ticket_sa,
+                        ticket_correlative=dte2.ticket_correlative,
+                        entrance_hour=dte2.entrance_hour,
+                        exit_hour=dte2.exit_hour,
+                        period=dte2.period,
+                        comment="",  # En blanco
+                        payment_comment=dte2.payment_comment,
+                        payment_number=dte2.payment_number,
+                        support=dte2.support,
+                        shopping_order_status_id=dte2.shopping_order_status_id,
+                        shopping_order_reference=dte2.shopping_order_reference,
+                        shopping_order_date=dte2.shopping_order_date,
+                        shopping_order_description=dte2.shopping_order_description,
+                        added_date=dte2.added_date if dte2.added_date else datetime.now(),
+                        updated_date=datetime.now()
+                    )
+                    
+                    self.db.add(new_dte)
+                    saved_count += 1
+                    
+                    # Commit cada 50 registros para mejor rendimiento
+                    if saved_count % 50 == 0:
+                        self.db.commit()
+                        
+                except Exception as e:
+                    errors.append({
+                        "folio": dte2.folio,
+                        "rut": dte2.rut,
+                        "error": str(e)
+                    })
+            
+            # Commit final para los registros restantes
+            self.db.commit()
+            
+            return {
+                "status": "success",
+                "period": period,
+                "saved_count": saved_count,
+                "total_found": len(only_in_dtes2),
+                "errors": errors if errors else None,
+                "message": f"Se guardaron {saved_count} DTEs de dtes2 en dtes para el período {period}."
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            error_message = str(e)
+            return {
+                "status": "error",
+                "message": f"Error al guardar DTEs: {error_message}"
+            }
+
+    def get_dtes_without_customer(self, period: str = "2026-01"):
+        """
+        Busca los DTEs del período especificado que NO tienen un cliente asociado en la tabla customers.
+        Compara los RUTs normalizados para evitar diferencias por formato.
+        
+        Args:
+            period: Período en formato YYYY-MM (ejemplo: "2026-01")
+        
+        Returns:
+            Diccionario con la lista de DTEs sin cliente asociado
+        """
+        try:
+            # Obtener todos los DTEs del período
+            dtes = self.db.query(DteModel).filter(
+                DteModel.period == period,
+                DteModel.rut.isnot(None),  # Solo DTEs con RUT
+                DteModel.rut != ""  # RUT no vacío
+            ).all()
+            
+            # Obtener todos los RUTs de customers normalizados
+            customers = self.db.query(CustomerModel.rut).filter(
+                CustomerModel.rut.isnot(None),
+                CustomerModel.rut != ""
+            ).all()
+            
+            # Crear un set de RUTs normalizados de customers para búsqueda rápida
+            customer_ruts_normalized = set()
+            for customer in customers:
+                normalized_rut = self.normalize_rut_for_comparison(customer.rut)
+                if normalized_rut:
+                    customer_ruts_normalized.add(normalized_rut)
+            
+            # Filtrar DTEs que no tienen cliente asociado
+            dtes_without_customer = []
+            for dte in dtes:
+                dte_rut_normalized = self.normalize_rut_for_comparison(dte.rut)
+                if dte_rut_normalized and dte_rut_normalized not in customer_ruts_normalized:
+                    dtes_without_customer.append({
+                        "id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "rut_normalized": dte_rut_normalized,
+                        "dte_type_id": dte.dte_type_id,
+                        "total": dte.total,
+                        "branch_office_id": dte.branch_office_id,
+                        "period": dte.period,
+                        "added_date": dte.added_date.strftime('%Y-%m-%d %H:%M:%S') if dte.added_date else None,
+                        "status_id": dte.status_id,
+                        "expense_type_id": dte.expense_type_id
+                    })
+            
+            return {
+                "status": "success",
+                "period": period,
+                "total_dtes": len(dtes),
+                "dtes_without_customer_count": len(dtes_without_customer),
+                "dtes_without_customer": dtes_without_customer,
+                "message": f"Se encontraron {len(dtes_without_customer)} DTEs sin cliente asociado para el período {period}."
+            }
+            
+        except Exception as e:
+            error_message = str(e)
+            return {
+                "status": "error",
+                "message": f"Error al buscar DTEs sin cliente: {error_message}"
             }
 
     def search_emitted_dtes(self, fecha_desde: str = None):

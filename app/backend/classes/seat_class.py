@@ -80,6 +80,7 @@ class SeatClass:
         }
     
     def build_api_payload(self, since: str, until: str) -> Dict[str, str]:
+        print(since, until)
         """Construye el payload para la API de LibreDTE"""
         return {
             "periodo": "",
@@ -112,6 +113,7 @@ class SeatClass:
         try:
             payload = self.build_api_payload(since, until)
             headers = self.get_api_headers()
+            print(payload)
             
             response = requests.post(
                 self.LIBREDTE_API_URL,
@@ -170,6 +172,7 @@ class SeatClass:
             return None
         
         search_term = description_parts[0]
+  
         search_normalized = self.normalize_text(search_term)
         
         print(f"Buscando sucursal para: '{search_term}' (normalizado: '{search_normalized}')")
@@ -330,7 +333,7 @@ class SeatClass:
             ProcessingStats con estadísticas del procesamiento
         """
         stats = ProcessingStats()
-        
+        print(results)
         for seat_data in results:
             try:
                 # Obtener descripción y parsear sucursal

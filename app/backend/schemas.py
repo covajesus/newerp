@@ -1425,6 +1425,12 @@ class ReceivedDteList(BaseModel):
 class ImportDte(BaseModel):
     rut: str
 
+class DteDateRange(BaseModel):
+    fecha_desde: str = Field(..., description="Fecha inicial en formato YYYY-MM-DD (ejemplo: 2025-01-01)")
+    fecha_hasta: str = Field(..., description="Fecha final en formato YYYY-MM-DD (ejemplo: 2025-01-31)")
+    page: int = Field(0, description="Número de página (0 para traer todos los resultados)")
+    items_per_page: int = Field(10, description="Cantidad de items por página")
+
 class SearchEmittedDtes(BaseModel):
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
