@@ -641,14 +641,43 @@ class CustomerTicketBillClass:
         # Obtener el folio del DTE consultado (común para ambos roles)
         original_dte_folio = None
         original_dte_type_id = None
-        if dte.id:
-            original_dte_query = self.db.query(DteModel).filter(DteModel.folio == dte.denied_folio).first()
+        original_dte = None  # DTE original (factura/boleta) para obtener su sucursal
+        
+        # Si el DTE consultado es una factura/boleta (33 o 39), usarlo directamente como original
+        if dte.dte_type_id in [33, 39] and dte.folio and dte.folio > 0:
+            original_dte_folio = dte.folio
+            original_dte_type_id = dte.dte_type_id
+            original_dte = dte
+        elif dte.denied_folio:
+            # Si tiene denied_folio, buscar el DTE original (factura/boleta)
+            original_dte_query = self.db.query(DteModel).filter(
+                DteModel.folio == dte.denied_folio,
+                DteModel.dte_type_id.in_([33, 39])
+            ).first()
             if original_dte_query and original_dte_query.folio:
                 original_dte_folio = original_dte_query.folio
                 original_dte_type_id = original_dte_query.dte_type_id
+                original_dte = original_dte_query
             else:
+                # Si no se encuentra, usar el denied_folio como original_dte_folio
+                original_dte_folio = dte.denied_folio
+                original_dte_type_id = dte.dte_type_id
+        elif dte.folio and dte.folio > 0:
+            # Si tiene folio pero no es 33/39 ni tiene denied_folio, buscar el DTE original por folio
+            original_dte = self.db.query(DteModel).filter(
+                DteModel.folio == dte.folio,
+                DteModel.dte_type_id.in_([33, 39])
+            ).first()
+            if original_dte:
+                original_dte_folio = original_dte.folio
+                original_dte_type_id = original_dte.dte_type_id
+            else:
+                # Si no se encuentra, usar el folio del DTE consultado
                 original_dte_folio = dte.folio
                 original_dte_type_id = dte.dte_type_id
+        
+        # Determinar la sucursal: usar la del DTE original si existe, sino la del DTE consultado
+        branch_office_id_to_use = original_dte.branch_office_id if original_dte else dte.branch_office_id
 
 
         # Si es rol 4 (supervisor), solo crear la nota de crédito con status 14
@@ -675,7 +704,7 @@ class CustomerTicketBillClass:
                 credit_note_dte = DteModel()
                         
                 # Asignar los valores del formulario a la instancia del modelo
-                credit_note_dte.branch_office_id = dte.branch_office_id
+                credit_note_dte.branch_office_id = branch_office_id_to_use
                 credit_note_dte.cashier_id = 0
                 credit_note_dte.dte_type_id = 61
                 credit_note_dte.dte_version_id = 1
@@ -756,7 +785,7 @@ class CustomerTicketBillClass:
                 try:
                     if existing_credit_note:
                         # Actualizar la nota de crédito existente
-                        existing_credit_note.branch_office_id = dte.branch_office_id
+                        existing_credit_note.branch_office_id = branch_office_id_to_use
                         existing_credit_note.rut = customer_data['customer_data']['rut']
                         existing_credit_note.folio = folio
                         existing_credit_note.reason_id = form_data.reason_id
@@ -776,7 +805,7 @@ class CustomerTicketBillClass:
                         credit_note_dte = DteModel()
                                 
                         # Asignar los valores del formulario a la instancia del modelo
-                        credit_note_dte.branch_office_id = dte.branch_office_id
+                        credit_note_dte.branch_office_id = branch_office_id_to_use
                         credit_note_dte.cashier_id = 0
                         credit_note_dte.dte_type_id = 61
                         credit_note_dte.dte_version_id = 1
