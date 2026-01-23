@@ -595,3 +595,334 @@ class CapitulationClass:
         self.db.commit()
         self.db.refresh(capitulation)
 
+    def massive_accountability(self):
+        """
+        Crea asientos contables masivos para todas las capitulaciones con document_date
+        entre 2025-12-01 y 2025-12-31.
+        Recorre toda la tabla capitulations y genera un asiento contable para cada una,
+        similar al método impute pero procesando todos los registros de una vez.
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Buscar todas las capitulaciones con document_date entre 2025-12-01 y 2025-12-31
+        from datetime import date
+        start_date = date(2025, 12, 1)
+        end_date = date(2025, 12, 31)
+        
+        capitulations = self.db.query(CapitulationModel).filter(
+            CapitulationModel.document_date >= start_date.strftime('%Y-%m-%d'),
+            CapitulationModel.document_date <= end_date.strftime('%Y-%m-%d')
+        ).all()
+        
+        if not capitulations:
+            return {
+                "status": "success",
+                "message": "No se encontraron capitulaciones con document_date entre 2025-12-01 y 2025-12-31",
+                "processed": 0,
+                "errors": []
+            }
+        
+        processed = 0
+        errors = []
+        period = "2025-12"
+        utf8_date = '01-12-2025'
+        
+        for capitulation in capitulations:
+            try:
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == capitulation.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                expense_type = self.db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == capitulation.expense_type_id
+                ).first()
+                
+                if not expense_type:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se encontró el tipo de gasto asociado"
+                    })
+                    continue
+                
+                # Solo crear asiento contable si document_type_id == 39
+                if capitulation.document_type_id == 39:
+                    gloss = (
+                        branch_office.branch_office
+                        + "_"
+                        + str(expense_type.accounting_account)
+                        + "_"
+                        + utf8_date
+                        + "_Rendicion_"
+                        + str(capitulation.id)
+                    )
+                    
+                    data = {
+                        "fecha": period + "-01",
+                        "glosa": gloss,
+                        "detalle": {
+                            'debe': {
+                                str(expense_type.accounting_account): capitulation.amount,
+                            },
+                            'haber': {
+                                '111000101': capitulation.amount,
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": '',
+                                    "folio": 0,
+                                }
+                            ]
+                        },
+                    }
+                    
+                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                    
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {TOKEN}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    
+                    # Verificar si la respuesta fue exitosa
+                    if response.status_code not in [200, 201]:
+                        errors.append({
+                            "capitulation_id": capitulation.id,
+                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        })
+                        continue
+                
+                # Actualizar la capitulación: status_id = 5 y period = "2025-12"
+                capitulation.status_id = 5
+                capitulation.period = period
+                capitulation.updated_date = datetime.now()
+                
+                self.db.add(capitulation)
+                processed += 1
+                
+            except Exception as e:
+                errors.append({
+                    "capitulation_id": capitulation.id,
+                    "error": f"Error al procesar capitulación: {str(e)}"
+                })
+                continue
+        
+        # Hacer commit de todos los cambios
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al guardar cambios en la base de datos: {str(e)}",
+                "processed": processed,
+                "errors": errors
+            }
+        
+        return {
+            "status": "success",
+            "message": f"Procesamiento masivo completado. {processed} capitulaciones procesadas exitosamente.",
+            "processed": processed,
+            "total_found": len(capitulations),
+            "errors": errors
+        }
+
+    def massive_impute_status_13(self):
+        """
+        Crea asientos contables masivos para todas las capitulaciones con status_id = 13.
+        El periodo se extrae del document_date de cada capitulación.
+        Recorre toda la tabla capitulations y genera un asiento contable para cada una,
+        similar al proceso de imputación individual pero procesando todos los registros de una vez.
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Buscar todas las capitulaciones con status_id = 13
+        capitulations = self.db.query(CapitulationModel).filter(
+            CapitulationModel.status_id == 13
+        ).all()
+        
+        if not capitulations:
+            return {
+                "status": "success",
+                "message": "No se encontraron capitulaciones con status_id = 13 para procesar",
+                "processed": 0,
+                "errors": []
+            }
+        
+        processed = 0
+        errors = []
+        
+        for capitulation in capitulations:
+            try:
+                # Validar que tenga los datos necesarios
+                if not capitulation.branch_office_id:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No tiene branch_office_id asignado"
+                    })
+                    continue
+                
+                if not capitulation.expense_type_id:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No tiene expense_type_id asignado"
+                    })
+                    continue
+                
+                if not capitulation.document_date:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No tiene document_date asignado"
+                    })
+                    continue
+                
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == capitulation.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                expense_type = self.db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == capitulation.expense_type_id
+                ).first()
+                
+                if not expense_type:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se encontró el tipo de gasto asociado"
+                    })
+                    continue
+                
+                # Extraer el periodo del document_date
+                if isinstance(capitulation.document_date, datetime):
+                    period = capitulation.document_date.strftime('%Y-%m')
+                elif isinstance(capitulation.document_date, str):
+                    # Si es string, intentar parsearlo
+                    try:
+                        date_obj = datetime.strptime(capitulation.document_date, '%Y-%m-%d')
+                        period = date_obj.strftime('%Y-%m')
+                    except ValueError:
+                        try:
+                            date_obj = datetime.strptime(capitulation.document_date, '%Y-%m-%d %H:%M:%S')
+                            period = date_obj.strftime('%Y-%m')
+                        except ValueError:
+                            errors.append({
+                                "capitulation_id": capitulation.id,
+                                "error": f"Formato de fecha inválido: {capitulation.document_date}"
+                            })
+                            continue
+                else:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": f"Tipo de fecha no soportado: {type(capitulation.document_date)}"
+                    })
+                    continue
+                
+                # Convertir periodo para utf8_date (formato DD-MM-YYYY)
+                period_parts = period.split('-')
+                utf8_date = '01-' + period_parts[1] + '-' + period_parts[0]
+                
+                # Solo crear asiento contable si document_type_id == 39
+                if capitulation.document_type_id == 39:
+                    gloss = (
+                        branch_office.branch_office
+                        + "_"
+                        + str(expense_type.accounting_account)
+                        + "_"
+                        + utf8_date
+                        + "_Rendicion_"
+                        + str(capitulation.id)
+                    )
+                    
+                    data = {
+                        "fecha": period + "-01",
+                        "glosa": gloss,
+                        "detalle": {
+                            'debe': {
+                                str(expense_type.accounting_account): capitulation.amount,
+                            },
+                            'haber': {
+                                '111000101': capitulation.amount,
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": '',
+                                    "folio": 0,
+                                }
+                            ]
+                        },
+                    }
+                    
+                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                    
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {TOKEN}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    
+                    # Verificar si la respuesta fue exitosa
+                    if response.status_code not in [200, 201]:
+                        errors.append({
+                            "capitulation_id": capitulation.id,
+                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        })
+                        continue
+                
+                # Actualizar la capitulación: status_id = 5 y period extraído del document_date
+                capitulation.status_id = 5
+                capitulation.period = period_parts[1] + '-' + period_parts[0]  # Formato MM-YYYY
+                capitulation.updated_date = datetime.now()
+                
+                self.db.add(capitulation)
+                processed += 1
+                
+            except Exception as e:
+                errors.append({
+                    "capitulation_id": capitulation.id,
+                    "error": f"Error al procesar capitulación: {str(e)}"
+                })
+                continue
+        
+        # Hacer commit de todos los cambios
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al guardar cambios en la base de datos: {str(e)}",
+                "processed": processed,
+                "errors": errors
+            }
+        
+        return {
+            "status": "success",
+            "message": f"Procesamiento masivo completado. {processed} capitulaciones procesadas exitosamente.",
+            "processed": processed,
+            "total_found": len(capitulations),
+            "errors": errors
+        }

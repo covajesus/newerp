@@ -889,3 +889,197 @@ class ReceivedTributaryDocumentClass:
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
+
+    def received_dte_massive_accountability(self):
+        """
+        Crea asientos contables masivos para todos los DTEs recibidos con:
+        - period = "2025-12"
+        - dte_version_id = 2
+        - status_id = 4 o 5
+        
+        Recorre toda la tabla dtes y genera un asiento contable para cada uno,
+        similar al método change_status pero procesando todos los registros de una vez.
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Buscar todos los DTEs con los criterios especificados
+        period = "2025-12"
+        
+        dtes = self.db.query(DteModel).filter(
+            DteModel.period == period,
+            DteModel.dte_version_id == 2,
+            DteModel.status_id.in_([4, 5])
+        ).all()
+        
+        if not dtes:
+            return {
+                "status": "success",
+                "message": f"No se encontraron DTEs recibidos con period={period}, dte_version_id=2 y status_id IN (4, 5)",
+                "processed": 0,
+                "errors": []
+            }
+        
+        processed = 0
+        errors = []
+        american_date = period + '-01'
+        utf8_date = HelperClass.convert_to_utf8(american_date)
+        
+        for dte in dtes:
+            try:
+                # Validar que tenga expense_type_id y branch_office_id
+                if not dte.expense_type_id:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No tiene expense_type_id asignado"
+                    })
+                    continue
+                
+                if not dte.branch_office_id:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No tiene branch_office_id asignado"
+                    })
+                    continue
+                
+                expense_type = self.db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == dte.expense_type_id
+                ).first()
+                
+                if not expense_type:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No se encontró el tipo de gasto asociado"
+                    })
+                    continue
+                
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == dte.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                gloss = (
+                    branch_office.branch_office
+                    + "_"
+                    + expense_type.accounting_account
+                    + "_"
+                    + utf8_date
+                    + "_FacturaCompra_"
+                    + str(dte.id)
+                    + "_"
+                    + str(dte.folio)
+                )
+                
+                amount = dte.total
+                
+                # Si es DTE tipo 34 (factura exenta), no calcular IVA
+                if dte.dte_type_id == 34:
+                    data = {
+                        "fecha": american_date,
+                        "glosa": gloss,
+                        "detalle": {
+                            "debe": {
+                                expense_type.accounting_account.strip(): amount,
+                            },
+                            "haber": {
+                                "111000102": amount,
+                            },
+                        },
+                        "operacion": "E",
+                        "documentos": {
+                            "recibidos": [
+                                {
+                                    "dte": dte.dte_type_id,
+                                    "folio": dte.folio,
+                                }
+                            ]
+                        },
+                    }
+                else:
+                    # Para DTEs con IVA (33, 39, etc.)
+                    data = {
+                        "fecha": american_date,
+                        "glosa": gloss,
+                        "detalle": {
+                            "debe": {
+                                expense_type.accounting_account.strip(): round(amount / 1.19),
+                                "111000122": round(amount - (amount / 1.19)),
+                            },
+                            "haber": {
+                                "111000102": amount,
+                            },
+                        },
+                        "operacion": "E",
+                        "documentos": {
+                            "recibidos": [
+                                {
+                                    "dte": dte.dte_type_id,
+                                    "folio": dte.folio,
+                                }
+                            ]
+                        },
+                    }
+                
+                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                # Verificar si la respuesta fue exitosa
+                if response.status_code not in [200, 201]:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                    })
+                    continue
+                
+                # Actualizar el DTE: asegurar que status_id = 5 (imputado)
+                dte.status_id = 5
+                dte.updated_date = datetime.now()
+                
+                self.db.add(dte)
+                processed += 1
+                
+            except Exception as e:
+                errors.append({
+                    "dte_id": dte.id,
+                    "folio": dte.folio if dte else None,
+                    "error": f"Error al procesar DTE: {str(e)}"
+                })
+                continue
+        
+        # Hacer commit de todos los cambios
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al guardar cambios en la base de datos: {str(e)}",
+                "processed": processed,
+                "errors": errors
+            }
+        
+        return {
+            "status": "success",
+            "message": f"Procesamiento masivo completado. {processed} DTEs recibidos procesados exitosamente.",
+            "processed": processed,
+            "total_found": len(dtes),
+            "errors": errors
+        }

@@ -294,6 +294,139 @@ class HonoraryClass:
 
         return "Accounting entry created successfully"
 
+    def massive_accountability(self):
+        """
+        Crea asientos contables masivos para todos los honorarios con status_id = 2.
+        Recorre toda la tabla honoraries y genera un asiento contable para cada uno,
+        similar al método impute pero procesando todos los registros de una vez.
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Buscar todos los honorarios con status_id = 2
+        honoraries = self.db.query(HonoraryModel).filter(HonoraryModel.status_id == 2).all()
+        
+        if not honoraries:
+            return {
+                "status": "success",
+                "message": "No se encontraron honorarios con status_id = 2 para procesar",
+                "processed": 0,
+                "errors": []
+            }
+        
+        settings = SettingClass(self.db).get()
+        processed = 0
+        errors = []
+        
+        for honorary in honoraries:
+            try:
+                # Usar el periodo fijo 2025-12 para todos los honorarios
+                period = "2025-12"
+                american_date = period + '-01'
+                utf8_date = HelperClass.convert_to_utf8(american_date)
+                expense_type = '443000344'
+                
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == honorary.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "honorary_id": honorary.id,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                gloss = (
+                    branch_office.branch_office
+                    + "_"
+                    + expense_type
+                    + "_"
+                    + utf8_date
+                    + "_Honorario_"
+                    + str(honorary.id)
+                )
+                
+                gross_amount = HelperClass().remove_from_string('.', str(honorary.amount))
+                gross_amount = round(int(gross_amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
+                tax = int(gross_amount) - int(honorary.amount)
+                net_amount = round(gross_amount - tax)
+                
+                data = {
+                    "fecha": american_date,
+                    "glosa": gloss,
+                    "detalle": {
+                        "debe": {
+                            111000102: gross_amount
+                        },
+                        "haber": {
+                            expense_type: net_amount,
+                            "221000223": tax,
+                        }
+                    },
+                    "operacion": "I",
+                    "documentos": {
+                        "emitidos": [
+                            {
+                                "dte": '',
+                                "folio": '',
+                            }
+                        ]
+                    },
+                }
+                
+                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                # Verificar si la respuesta fue exitosa
+                if response.status_code not in [200, 201]:
+                    errors.append({
+                        "honorary_id": honorary.id,
+                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                    })
+                    continue
+                
+                # Actualizar el honorario: status_id = 15 y period = "2025-12"
+                honorary.status_id = 15
+                honorary.period = "2025-12"
+                honorary.updated_date = datetime.now()
+                
+                self.db.add(honorary)
+                processed += 1
+                
+            except Exception as e:
+                errors.append({
+                    "honorary_id": honorary.id,
+                    "error": f"Error al procesar honorario: {str(e)}"
+                })
+                continue
+        
+        # Hacer commit de todos los cambios
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al guardar cambios en la base de datos: {str(e)}",
+                "processed": processed,
+                "errors": errors
+            }
+        
+        return {
+            "status": "success",
+            "message": f"Procesamiento masivo completado. {processed} honorarios procesados exitosamente.",
+            "processed": processed,
+            "total_found": len(honoraries),
+            "errors": errors
+        }
         
     def send(self, data):
         settings = SettingClass(self.db).get()

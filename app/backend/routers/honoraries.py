@@ -70,3 +70,17 @@ def get_data_by_rut(rut: str, db: Session = Depends(get_db)):
     """
     data = HonoraryClass(db).get_data_by_rut(rut)
     return {"message": data}
+
+@honoraries.get("/massive_accountability")
+def massive_accountability(db: Session = Depends(get_db)):
+    """
+    Endpoint GET para crear asientos contables masivos para todos los honorarios con status_id = 2.
+    Recorre toda la tabla honoraries y genera un asiento contable para cada uno,
+    similar al proceso de imputación individual pero procesando todos los registros de una vez.
+    """
+    try:
+        result = HonoraryClass(db).massive_accountability()
+        return result
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Error al procesar honorarios masivamente: {str(e)}")

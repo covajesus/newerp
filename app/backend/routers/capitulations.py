@@ -195,6 +195,36 @@ def total_accepted_capitulations(rut: str = None, db: Session = Depends(get_db))
 
     return {"message": capitulations}
 
+@capitulations.get("/massive_accountability")
+def massive_accountability(db: Session = Depends(get_db)):
+    """
+    Endpoint GET para crear asientos contables masivos para todas las capitulaciones 
+    con document_date entre 2025-12-01 y 2025-12-31.
+    Recorre toda la tabla capitulations y genera un asiento contable para cada una,
+    similar al proceso de imputación individual pero procesando todos los registros de una vez.
+    """
+    try:
+        result = CapitulationClass(db).massive_accountability()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar capitulaciones masivamente: {str(e)}")
+
+@capitulations.get("/massive_impute")
+def massive_impute(db: Session = Depends(get_db)):
+    """
+    Endpoint GET para crear asientos contables masivos para todas las capitulaciones 
+    con status_id = 13.
+    El periodo se extrae automáticamente del document_date de cada capitulación.
+    Recorre toda la tabla capitulations y genera un asiento contable para cada una,
+    similar al proceso de imputación individual pero procesando todos los registros de una vez.
+    Actualiza el status_id a 5 y el period basado en el document_date.
+    """
+    try:
+        result = CapitulationClass(db).massive_impute_status_13()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar capitulaciones masivamente: {str(e)}")
+
 @capitulations.get("/old_capitulations")
 def old_dtes(db: Session = Depends(get_db)):
     conn = pymysql.connect(

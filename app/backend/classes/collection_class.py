@@ -69,10 +69,34 @@ class CollectionClass:
                 self.db.commit()
 
 
-    def get_all_collections(self):
-        limit_date = date.today() - timedelta(days=10)
+    def get_all_collections(self, branch_office_id=None, since=None, until=None):
+        """
+        Obtiene todas las colecciones con filtros opcionales.
+        
+        Parámetros:
+        - branch_office_id: ID de la sucursal (opcional)
+        - since: Fecha desde en formato 'YYYY-MM-DD' (opcional, por defecto últimos 10 días)
+        - until: Fecha hasta en formato 'YYYY-MM-DD' (opcional, por defecto hoy)
+        """
+        # Si no se proporciona since, usar los últimos 10 días por defecto
+        if since is None:
+            limit_date = date.today() - timedelta(days=10)
+        else:
+            try:
+                limit_date = datetime.strptime(since, '%Y-%m-%d').date()
+            except ValueError:
+                limit_date = date.today() - timedelta(days=10)
+        
+        # Si no se proporciona until, usar hoy
+        if until is None:
+            until_date = date.today()
+        else:
+            try:
+                until_date = datetime.strptime(until, '%Y-%m-%d').date()
+            except ValueError:
+                until_date = date.today()
 
-        data = (
+        query = (
             self.db.query(
                 CashierModel.cashier,
                 CollectionModel.id,
@@ -88,8 +112,14 @@ class CollectionClass:
             )
             .outerjoin(CollectionModel, CollectionModel.cashier_id == CashierModel.id)
             .filter(CollectionModel.added_date >= limit_date)
-            .all()
+            .filter(CollectionModel.added_date <= until_date)
         )
+        
+        # Aplicar filtro de branch_office_id si se proporciona
+        if branch_office_id is not None:
+            query = query.filter(CollectionModel.branch_office_id == branch_office_id)
+        
+        data = query.all()
 
         return data
     

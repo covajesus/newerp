@@ -86,10 +86,41 @@ def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
 
     return {"message": data}
 
-@collections.get("/cron")
-def cron(db: Session = Depends(get_db), db2: Session = Depends(get_db2)):
-    data = CollectionClass(db2).get_all_collections()
+@collections.get("/cron/{branch_office_id}/{since}/{until}")
+def cron(
+    branch_office_id: int,
+    since: str,
+    until: str,
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2)
+):
+    """
+    Endpoint GET para actualizar colecciones desde la segunda base de datos.
+    
+    Parámetros en la URL:
+    - branch_office_id: ID de la sucursal (usar 0 para todas las sucursales)
+    - since: Fecha desde en formato 'YYYY-MM-DD'
+    - until: Fecha hasta en formato 'YYYY-MM-DD'
+    
+    Ejemplo de uso:
+    GET /collections/cron/1/2025-01-01/2025-01-31
+    GET /collections/cron/0/2025-01-01/2025-01-31  (0 = todas las sucursales)
+    """
+    # Convertir branch_office_id = 0 a None para el método
+    branch_office_id_param = None if branch_office_id == 0 else branch_office_id
+    
+    data = CollectionClass(db2).get_all_collections(
+        branch_office_id=branch_office_id_param,
+        since=since,
+        until=until
+    )
 
     CollectionClass(db).update_all_collections(data)
 
-    return {"message": 'Updated o inserted collections in the second database.'}
+    return {
+        "message": "Updated or inserted collections in the second database.",
+        "branch_office_id": branch_office_id,
+        "since": since,
+        "until": until,
+        "records_processed": len(data) if data else 0
+    }

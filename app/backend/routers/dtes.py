@@ -1083,3 +1083,22 @@ def get_dtes_by_date_range_manual(db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al buscar DTEs por rango de fechas: {str(e)}")
+
+@dtes.get("/received_dte_massive_accountability")
+def received_dte_massive_accountability(db: Session = Depends(get_db)):
+    """
+    Endpoint GET para crear asientos contables masivos para todos los DTEs recibidos con:
+    - period = "2025-12"
+    - dte_version_id = 2
+    - status_id = 4 o 5
+    
+    Recorre toda la tabla dtes y genera un asiento contable para cada uno,
+    similar al proceso de imputación individual pero procesando todos los registros de una vez.
+    """
+    try:
+        from app.backend.classes.received_tributary_document_class import ReceivedTributaryDocumentClass
+        
+        result = ReceivedTributaryDocumentClass(db).received_dte_massive_accountability()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar DTEs recibidos masivamente: {str(e)}")
