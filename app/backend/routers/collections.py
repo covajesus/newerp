@@ -86,6 +86,41 @@ def post(update_collection: UpdateCollection, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@collections.get("/cron")
+def cron_default(
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2)
+):
+    """
+    Endpoint GET para actualizar colecciones desde la segunda base de datos.
+    Sin parámetros: trae todas las sucursales y desde 10 días atrás hasta hoy.
+    
+    Ejemplo de uso:
+    GET /collections/cron
+    """
+    from datetime import date, timedelta
+    
+    # Valores por defecto: todas las sucursales, últimos 10 días
+    branch_office_id_param = None
+    since = (date.today() - timedelta(days=10)).strftime('%Y-%m-%d')
+    until = date.today().strftime('%Y-%m-%d')
+    
+    data = CollectionClass(db2).get_all_collections(
+        branch_office_id=branch_office_id_param,
+        since=since,
+        until=until
+    )
+
+    CollectionClass(db).update_all_collections(data)
+
+    return {
+        "message": "Updated or inserted collections in the second database.",
+        "branch_office_id": None,
+        "since": since,
+        "until": until,
+        "records_processed": len(data) if data else 0
+    }
+
 @collections.get("/cron/{branch_office_id}/{since}/{until}")
 def cron(
     branch_office_id: int,
