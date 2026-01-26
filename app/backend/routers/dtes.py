@@ -1102,3 +1102,32 @@ def received_dte_massive_accountability(db: Session = Depends(get_db)):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar DTEs recibidos masivamente: {str(e)}")
+
+@dtes.get("/received_credit_note_massive_accountability/{period}")
+def received_credit_note_massive_accountability(
+    period: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para crear asientos contables masivos para Notas de Crédito recibidas.
+    Busca NCs con:
+    - period = período especificado (formato YYYY-MM)
+    - dte_version_id = 2
+    - dte_type_id = 61 (solo notas de crédito)
+    - status_id = 5
+    
+    Crea asientos contables en LibreDTE con lógica invertida para notas de crédito.
+    
+    Parámetros:
+    - period: Período en formato YYYY-MM (ejemplo: "2025-12")
+    
+    Ejemplo de uso:
+    GET /dtes/received_credit_note_massive_accountability/2025-12
+    """
+    try:
+        from app.backend.classes.received_tributary_document_class import ReceivedTributaryDocumentClass
+        
+        result = ReceivedTributaryDocumentClass(db).received_credit_note_massive_accountability(period)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar Notas de Crédito masivamente: {str(e)}")

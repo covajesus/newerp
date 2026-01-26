@@ -376,21 +376,56 @@ class ReceivedTributaryDocumentClass:
             BranchOfficeModel.id == form_data.branch_office_id
         ).first()
 
+        # Determinar el texto de la glosa según el tipo de DTE
+        if dte.dte_type_id == 61:
+            doc_type_text = "NotaCreditoCompra_"
+        else:
+            doc_type_text = "FacturaCompra_"
+        
         gloss = (
             branch_office.branch_office
             + "_"
             + expense_type.accounting_account
             + "_"
             + utf8_date
-            + "_FacturaCompra_"
+            + "_"
+            + doc_type_text
             + str(dte.id)
             + "_"
             + str(dte.folio)
         )
         amount = dte.total
        
+        # Si es Nota de Crédito (tipo 61), el asiento debe ser invertido
+        if dte.dte_type_id == 61:
+            # Para NC: invertir debe/haber y usar valores absolutos
+            # Las NC tienen valores negativos, así que invertimos el asiento
+            abs_amount = abs(amount)
+            # NC con IVA: invertir debe/haber (Banco en debe, Gasto e IVA en haber)
+            data = {
+                "fecha": american_date,
+                "glosa": gloss,
+                "detalle": {
+                    "debe": {
+                        "111000102": abs_amount,  # Banco en debe (invertido)
+                    },
+                    "haber": {
+                        expense_type.accounting_account.strip(): round(abs_amount / 1.19),  # Gasto en haber (invertido)
+                        "111000122": round(abs_amount - (abs_amount / 1.19)),  # IVA crédito en haber (invertido)
+                    },
+                },
+                "operacion": "E",
+                "documentos": {
+                    "recibidos": [
+                        {
+                            "dte": dte.dte_type_id,
+                            "folio": dte.folio,
+                        }
+                    ]
+                },
+            }
         # Si es DTE tipo 34 (factura exenta), no calcular IVA
-        if dte.dte_type_id == 34:
+        elif dte.dte_type_id == 34:
             data = {
                 "fecha": american_date,
                 "glosa": gloss,
@@ -967,13 +1002,20 @@ class ReceivedTributaryDocumentClass:
                     })
                     continue
                 
+                # Determinar el texto de la glosa según el tipo de DTE
+                if dte.dte_type_id == 61:
+                    doc_type_text = "NotaCreditoCompra_"
+                else:
+                    doc_type_text = "FacturaCompra_"
+                
                 gloss = (
                     branch_office.branch_office
                     + "_"
                     + expense_type.accounting_account
                     + "_"
                     + utf8_date
-                    + "_FacturaCompra_"
+                    + "_"
+                    + doc_type_text
                     + str(dte.id)
                     + "_"
                     + str(dte.folio)
@@ -981,8 +1023,36 @@ class ReceivedTributaryDocumentClass:
                 
                 amount = dte.total
                 
+                # Si es Nota de Crédito (tipo 61), el asiento debe ser invertido
+                if dte.dte_type_id == 61:
+                    # Para NC: invertir debe/haber y usar valores absolutos
+                    # Las NC tienen valores negativos, así que invertimos el asiento
+                    abs_amount = abs(amount)
+                    # NC con IVA: invertir debe/haber (Banco en debe, Gasto e IVA en haber)
+                    data = {
+                        "fecha": american_date,
+                        "glosa": gloss,
+                        "detalle": {
+                            "debe": {
+                                "111000102": abs_amount,  # Banco en debe (invertido)
+                            },
+                            "haber": {
+                                expense_type.accounting_account.strip(): round(abs_amount / 1.19),  # Gasto en haber (invertido)
+                                "111000122": round(abs_amount - (abs_amount / 1.19)),  # IVA crédito en haber (invertido)
+                            },
+                        },
+                        "operacion": "E",
+                        "documentos": {
+                            "recibidos": [
+                                {
+                                    "dte": dte.dte_type_id,
+                                    "folio": dte.folio,
+                                }
+                            ]
+                        },
+                    }
                 # Si es DTE tipo 34 (factura exenta), no calcular IVA
-                if dte.dte_type_id == 34:
+                elif dte.dte_type_id == 34:
                     data = {
                         "fecha": american_date,
                         "glosa": gloss,
@@ -1079,6 +1149,178 @@ class ReceivedTributaryDocumentClass:
         return {
             "status": "success",
             "message": f"Procesamiento masivo completado. {processed} DTEs recibidos procesados exitosamente.",
+            "processed": processed,
+            "total_found": len(dtes),
+            "errors": errors
+        }
+    
+    def received_credit_note_massive_accountability(self, period):
+        """
+        Crea asientos contables masivos para Notas de Crédito recibidas (tipo 61) con:
+        - period = período especificado
+        - dte_version_id = 2
+        - dte_type_id = 61 (solo notas de crédito)
+        - status_id = 5
+        
+        Recorre toda la tabla dtes y genera un asiento contable para cada NC,
+        usando la lógica invertida para notas de crédito.
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        # Buscar todas las Notas de Crédito con los criterios especificados
+        dtes = self.db.query(DteModel).filter(
+            DteModel.period == period,
+            DteModel.dte_version_id == 2,
+            DteModel.dte_type_id == 61,  # Solo notas de crédito
+            DteModel.status_id == 5  # Solo las que están en status 5
+        ).all()
+        
+        if not dtes:
+            return {
+                "status": "success",
+                "message": f"No se encontraron Notas de Crédito recibidas con period={period}, dte_version_id=2, dte_type_id=61 y status_id=5",
+                "processed": 0,
+                "errors": []
+            }
+        
+        processed = 0
+        errors = []
+        american_date = period + '-01'
+        utf8_date = HelperClass.convert_to_utf8(american_date)
+        
+        for dte in dtes:
+            try:
+                # Validar que tenga expense_type_id y branch_office_id
+                if not dte.expense_type_id:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No tiene expense_type_id asignado"
+                    })
+                    continue
+                
+                if not dte.branch_office_id:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No tiene branch_office_id asignado"
+                    })
+                    continue
+                
+                expense_type = self.db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == dte.expense_type_id
+                ).first()
+                
+                if not expense_type:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No se encontró el tipo de gasto asociado"
+                    })
+                    continue
+                
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == dte.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                # Glosa específica para Nota de Crédito
+                gloss = (
+                    branch_office.branch_office
+                    + "_"
+                    + expense_type.accounting_account
+                    + "_"
+                    + utf8_date
+                    + "_NotaCreditoCompra_"
+                    + str(dte.id)
+                    + "_"
+                    + str(dte.folio)
+                )
+                
+                amount = dte.total
+                # Para NC: invertir debe/haber y usar valores absolutos
+                abs_amount = abs(amount)
+                
+                # NC con IVA: invertir debe/haber (Banco en debe, Gasto e IVA en haber)
+                data = {
+                    "fecha": american_date,
+                    "glosa": gloss,
+                    "detalle": {
+                        "debe": {
+                            "111000102": abs_amount,  # Banco en debe (invertido)
+                        },
+                        "haber": {
+                            expense_type.accounting_account.strip(): round(abs_amount / 1.19),  # Gasto en haber (invertido)
+                            "111000122": round(abs_amount - (abs_amount / 1.19)),  # IVA crédito en haber (invertido)
+                        },
+                    },
+                    "operacion": "E",
+                    "documentos": {
+                        "recibidos": [
+                            {
+                                "dte": dte.dte_type_id,
+                                "folio": dte.folio,
+                            }
+                        ]
+                    },
+                }
+                
+                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                
+                response = requests.post(
+                    url,
+                    json=data,
+                    headers={
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                
+                # Verificar si la respuesta fue exitosa
+                if response.status_code not in [200, 201]:
+                    errors.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                    })
+                    continue
+                
+                # Actualizar el DTE: mantener status_id = 5 (ya está imputado)
+                dte.updated_date = datetime.now()
+                
+                self.db.add(dte)
+                processed += 1
+                
+            except Exception as e:
+                errors.append({
+                    "dte_id": dte.id,
+                    "folio": dte.folio if dte else None,
+                    "error": f"Error al procesar Nota de Crédito: {str(e)}"
+                })
+                continue
+        
+        # Hacer commit de todos los cambios
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            return {
+                "status": "error",
+                "message": f"Error al guardar cambios en la base de datos: {str(e)}",
+                "processed": processed,
+                "errors": errors
+            }
+        
+        return {
+            "status": "success",
+            "message": f"Procesamiento masivo completado. {processed} Notas de Crédito recibidas procesadas exitosamente.",
             "processed": processed,
             "total_found": len(dtes),
             "errors": errors

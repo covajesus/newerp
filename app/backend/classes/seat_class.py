@@ -255,11 +255,11 @@ class SeatClass:
         # Aplicar lógicas especiales para notas de crédito
         if 'NotaCredito' in detail_description:
             if 'NotaCreditoCompra' in detail_description:
-                # Nota de crédito de compra: multiplicar por positive_negative_id al cuadrado y por -1
-                return base_amount * multiplier * multiplier * -1
+                # Nota de crédito de compra: multiplicar por positive_negative_id al cuadrado (positiva)
+                return base_amount * multiplier * multiplier
             else:
-                # Nota de crédito normal: solo por -1
-                return base_amount * -1
+                # Nota de crédito normal: mantener positiva
+                return base_amount
         else:
             # Caso normal: multiplicar por positive_negative_id
             return base_amount * multiplier
@@ -333,7 +333,7 @@ class SeatClass:
             ProcessingStats con estadísticas del procesamiento
         """
         stats = ProcessingStats()
-        print(results)
+
         for seat_data in results:
             try:
                 # Obtener descripción y parsear sucursal
