@@ -1730,7 +1730,7 @@ class DteClass:
             # Obtener el período actual en formato YYYY-MM
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Buscar DTEs que cumplan los criterios (limitado a 1 para pruebas)
+            # Buscar DTEs que cumplan los criterios
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.dte_type_id.in_([33, 39]),
@@ -1740,7 +1740,7 @@ class DteClass:
                     DteModel.massive_resend_status_id != 1,
                     DteModel.massive_resend_status_id.is_(None)
                 )
-            ).limit(1).all()
+            ).all()
             
             whatsapp_class = WhatsappClass(self.db)
             successful_sends = 0
