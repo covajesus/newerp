@@ -901,6 +901,8 @@ class CustomerTicketBillClass:
     def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date, dte_code=None):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
+        print(cash_amount)
+
         amount = round(abs(int(cash_amount))/1.19)
 
         try:

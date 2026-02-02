@@ -1717,6 +1717,130 @@ class DteClass:
                 "message": f"Error en envío masivo: {str(e)}"
             }
 
+    def massive_resend_whatsapp(self):
+        """
+        Reenvía WhatsApp masivamente para DTEs del período actual que cumplan:
+        - period = período actual
+        - dte_type_id = 33 o 39
+        - dte_version_id = 1
+        - status_id = 4
+        - massive_resend_status_id != 1 (o NULL)
+        """
+        try:
+            # Obtener el período actual en formato YYYY-MM
+            current_period = datetime.now().strftime('%Y-%m')
+            
+            # Buscar DTEs que cumplan los criterios (limitado a 1 para pruebas)
+            dtes = self.db.query(DteModel).filter(
+                DteModel.period == current_period,
+                DteModel.dte_type_id.in_([33, 39]),
+                DteModel.dte_version_id == 1,
+                DteModel.status_id == 4,
+                or_(
+                    DteModel.massive_resend_status_id != 1,
+                    DteModel.massive_resend_status_id.is_(None)
+                )
+            ).limit(1).all()
+            
+            whatsapp_class = WhatsappClass(self.db)
+            successful_sends = 0
+            failed_sends = 0
+            results = []
+            
+            print(f"Reenviando WhatsApp masivo para {len(dtes)} DTEs del período {current_period}")
+            
+            for dte in dtes:
+                whatsapp_response = None
+                customer_name = "No disponible"
+                customer_phone = "No disponible"
+                
+                try:
+                    # Verificar que el DTE tenga folio
+                    if not dte.folio:
+                        print(f"⚠️ DTE ID {dte.id} no tiene folio, se omite")
+                        failed_sends += 1
+                        results.append({
+                            "dte_id": dte.id,
+                            "folio": dte.folio,
+                            "rut": dte.rut,
+                            "status": "skipped",
+                            "message": "DTE sin folio"
+                        })
+                        continue
+                    
+                    # Obtener datos del cliente
+                    customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+                    if customer:
+                        customer_name = customer.name if hasattr(customer, 'name') else "No disponible"
+                        customer_phone = customer.phone if hasattr(customer, 'phone') else "No disponible"
+                    
+                    # Reenviar WhatsApp
+                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
+                    
+                    # Verificar respuesta
+                    if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
+                        # Actualizar massive_resend_status_id a 1 después de envío exitoso
+                        dte.massive_resend_status_id = 1
+                        self.db.commit()
+                        self.db.refresh(dte)
+                        
+                        successful_sends += 1
+                        results.append({
+                            "dte_id": dte.id,
+                            "folio": dte.folio,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "status": "success",
+                            "message": "WhatsApp reenviado exitosamente",
+                            "whatsapp_response": whatsapp_response
+                        })
+                        print(f"✅ WhatsApp reenviado para DTE ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
+                    else:
+                        failed_sends += 1
+                        results.append({
+                            "dte_id": dte.id,
+                            "folio": dte.folio,
+                            "rut": dte.rut,
+                            "customer_name": customer_name,
+                            "customer_phone": customer_phone,
+                            "status": "failed",
+                            "message": "Error al reenviar WhatsApp",
+                            "whatsapp_response": whatsapp_response
+                        })
+                        print(f"❌ Error al reenviar WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}")
+                        
+                except Exception as e:
+                    failed_sends += 1
+                    error_msg = str(e)
+                    results.append({
+                        "dte_id": dte.id,
+                        "folio": dte.folio,
+                        "rut": dte.rut,
+                        "customer_name": customer_name,
+                        "customer_phone": customer_phone,
+                        "status": "error",
+                        "message": f"Error: {error_msg}",
+                        "whatsapp_response": None
+                    })
+                    print(f"❌ Excepción al reenviar WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}: {error_msg}")
+            
+            return {
+                "status": "success",
+                "period": current_period,
+                "total_dtes": len(dtes),
+                "successful_sends": successful_sends,
+                "failed_sends": failed_sends,
+                "results": results
+            }
+            
+        except Exception as e:
+            print(f"Error en reenvío masivo de WhatsApp: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Error en reenvío masivo: {str(e)}"
+            }
+
     def _generate_complete_dte(self, dte):
         """
         Método auxiliar para generar un DTE completo (folio, PDF, etc.)

@@ -477,6 +477,7 @@ class DteModel(Base):
     shopping_order_reference = Column(String)
     shopping_order_date = Column(String)
     shopping_order_description = Column(String)
+    massive_resend_status_id = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
