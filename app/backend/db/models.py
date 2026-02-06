@@ -2039,3 +2039,43 @@ class BranchOfficeTransbankViewModel(Base):
     status = Column(String(20))  # 'Activo' o 'Baja'
     responsable = Column(String(255))
     status_id = Column(Integer)
+
+class SurveyModel(Base):
+    __tablename__ = 'surveys'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SurveyQuestionModel(Base):
+    __tablename__ = 'survey_questions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    question = Column(Text, nullable=False)
+    field_type = Column(String(20), nullable=False, default='text')  # 'text', 'select', 'radio', 'checkbox'
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SurveyQuestionOptionModel(Base):
+    __tablename__ = 'survey_question_options'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    question_id = Column(Integer, ForeignKey('survey_questions.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    option_text = Column(String(255), nullable=False)
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SurveyResponseAnswerModel(Base):
+    __tablename__ = 'survey_response_answers'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    survey_id = Column(Integer, ForeignKey('surveys.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    question_id = Column(Integer, ForeignKey('survey_questions.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    answer_text = Column(Text)
+    option_id = Column(Integer, ForeignKey('survey_question_options.id', ondelete='SET NULL', onupdate='CASCADE'))
+    created_at = Column(DateTime, default=datetime.utcnow)

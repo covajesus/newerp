@@ -88,6 +88,7 @@ from app.backend.routers.movement_products import movement_products
 from app.backend.routers.kardex import kardex_values
 from app.backend.routers.products import products
 from app.backend.routers.product_categories import product_categories
+from app.backend.routers.surveys import surveys
 
 app = FastAPI(root_path="/api")
 application = app
@@ -205,6 +206,7 @@ app.include_router(movement_products)
 app.include_router(kardex_values)
 app.include_router(products)
 app.include_router(product_categories)
+app.include_router(surveys)
 app.include_router(sinister_types)
 
 if __name__ == "__main__":

@@ -2281,3 +2281,44 @@ class BranchOfficeTransbankList(BaseModel):
     page: int = 1
     items_per_page: int = 10
     branch_office_id: Optional[int] = None
+
+# Survey Schemas
+class SurveyQuestionOption(BaseModel):
+    option_text: str
+    order: int = 0
+
+class SurveyQuestion(BaseModel):
+    question: str
+    field_type: str = "text"  # 'text', 'select', 'radio', 'checkbox'
+    order: int = 0
+    options: Optional[List[SurveyQuestionOption]] = []
+
+class SurveyCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    questions: List[SurveyQuestion] = []
+
+class SurveyUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class SurveyQuestionCreate(BaseModel):
+    question: str
+    field_type: str = "text"
+    order: int = 0
+    options: Optional[List[SurveyQuestionOption]] = []
+
+class SurveyQuestionUpdate(BaseModel):
+    question: Optional[str] = None
+    field_type: Optional[str] = None
+    order: Optional[int] = None
+    options: Optional[List[SurveyQuestionOption]] = None
+
+class SurveyResponseItem(BaseModel):
+    question_id: int
+    answer_text: Optional[str] = None
+    option_id: Optional[int] = None
+
+class SurveyResponse(BaseModel):
+    survey_id: int
+    responses: List[SurveyResponseItem]

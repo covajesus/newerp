@@ -141,6 +141,141 @@ class WhatsappClass:
                 "whatsapp_accepted": "rejected"
             }
 
+    def check_whatsapp_balance(self):
+        """
+        Valida si WhatsApp tiene crédito disponible haciendo una verificación.
+        Retorna True si tiene crédito, False si no tiene (error de pago).
+        """
+        try:
+            token = os.getenv('LIBREDTE_TOKEN')
+            url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Intentar enviar un mensaje de prueba usando template al número del administrador
+            # Esto nos permite detectar el error de pago sin procesar DTEs reales
+            test_phone = "56976357193"
+            
+            # Usar template simple (asumiendo que existe un template de texto simple)
+            # Si no existe, se puede crear uno o usar otro template existente
+            whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
+            
+            if not whatsapp_template:
+                print("⚠️ No se encontró template de WhatsApp para validación")
+                return False
+            
+            # Usar template con mensaje "Test"
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": test_phone,
+                "type": "template",
+                "template": {
+                    "name": whatsapp_template.title,
+                    "language": {"code": "es"},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": "Test"}
+                            ]
+                        }
+                    ]
+                }
+            }
+            
+            response = requests.post(url, json=payload, headers=headers)
+            response_data = response.json()
+            
+            print(f"Respuesta de validación de balance: {response_data}")
+            
+            # Verificar si hay error de pago
+            if "error" in response_data:
+                error_code = response_data.get("error", {}).get("code")
+                error_message = response_data.get("error", {}).get("message", "")
+                
+                print(f"Error detectado - Código: {error_code}, Mensaje: {error_message}")
+                
+                if error_code == 131042 or "Payment required" in error_message or "(#131042)" in str(error_message):
+                    print("⚠️ Error de pago detectado: WhatsApp no tiene crédito")
+                    return False
+            
+            # Si el status code es 200, tiene crédito
+            if response.status_code == 200:
+                print("✅ WhatsApp tiene crédito disponible")
+                return True
+            
+            # Si hay otro error, asumimos que no tiene crédito para ser conservadores
+            print(f"⚠️ Respuesta inesperada: {response.status_code}")
+            return False
+            
+        except Exception as e:
+            print(f"Error al validar balance de WhatsApp: {str(e)}")
+            # En caso de error, asumimos que no tiene crédito para ser conservadores
+            return False
+
+    def send_notification_to_admin(self, message):
+        """
+        Envía un mensaje de notificación al número de administrador (976357193) usando template.
+        """
+        try:
+            token = os.getenv('LIBREDTE_TOKEN')
+            url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            admin_phone = "56976357193"
+            
+            # Obtener template (usar template 1 como base, o el que sea apropiado)
+            whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
+            
+            if not whatsapp_template:
+                print("⚠️ No se encontró template de WhatsApp para notificación")
+                return {
+                    "status": "error",
+                    "error": "Template no encontrado"
+                }
+            
+            # Usar template con el mensaje (usando "Test" como parámetro)
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": admin_phone,
+                "type": "template",
+                "template": {
+                    "name": whatsapp_template.title,
+                    "language": {"code": "es"},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": "Test"}
+                            ]
+                        }
+                    ]
+                }
+            }
+            
+            response = requests.post(url, json=payload, headers=headers)
+            response_data = response.json()
+            
+            print(f"Notificación enviada a administrador: {response_data}")
+            return {
+                "status": "success" if response.status_code == 200 else "error",
+                "response": response_data
+            }
+            
+        except Exception as e:
+            print(f"Error al enviar notificación a administrador: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
     def movements(self, movement_id):
         movement = self.db.query(MovementModel).filter(MovementModel.id == movement_id).first()
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == movement.branch_office_id).first()
