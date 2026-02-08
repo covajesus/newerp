@@ -803,32 +803,6 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
             dte_class = DteClass(db)
             whatsapp_class = WhatsappClass(db)
             
-            # VALIDACIÓN PREVIA: Verificar si WhatsApp tiene crédito antes de empezar
-            print("Validando balance de WhatsApp antes de iniciar envío masivo...")
-            has_balance = whatsapp_class.check_whatsapp_balance()
-            
-            if not has_balance:
-                error_message = "⚠️ ALERTA: WhatsApp no tiene crédito disponible. El proceso de envío masivo se ha detenido. Por favor, recargue su cuenta de WhatsApp."
-                print(error_message)
-                
-                # Enviar notificación al administrador
-                try:
-                    whatsapp_class.send_notification_to_admin(error_message)
-                except Exception as notify_error:
-                    print(f"Error al enviar notificación al administrador: {str(notify_error)}")
-                
-                # Enviar error al stream
-                error_data = {
-                    "type": "error",
-                    "message": error_message,
-                    "error_code": "WHATSAPP_PAYMENT_REQUIRED",
-                    "error_details": "WhatsApp retornó error (#131042) Payment required"
-                }
-                yield f"data: {json.dumps(error_data)}\n\n"
-                return
-            
-            print("✅ WhatsApp tiene crédito disponible. Iniciando envío masivo...")
-            
             # Obtener el período actual
             current_period = datetime.now().strftime('%Y-%m')
             

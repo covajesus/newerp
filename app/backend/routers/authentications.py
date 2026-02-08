@@ -19,7 +19,7 @@ authentications = APIRouter(
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     print(f"🔐 [LOGIN] Intentando login para usuario: {form_data.username}")
     try:
-        user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)
+    user = AuthenticationClass(db).authenticate_user(form_data.username, form_data.password)
         print(f"✅ [LOGIN] Usuario autenticado exitosamente: {form_data.username}")
     except Exception as e:
         print(f"❌ [LOGIN] Error en autenticación para {form_data.username}: {str(e)}")
