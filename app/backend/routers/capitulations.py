@@ -3,7 +3,7 @@ from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.capitulation_class import CapitulationClass
-from app.backend.schemas import Capitulation, CapitulationList, UpdateCapitulation, PayCapitulation, ImputeCapitulation
+from app.backend.schemas import Capitulation, CapitulationList, UpdateCapitulation, PayCapitulation, ImputeCapitulation, MassiveImputeCapitulation
 from app.backend.db.models import CapitulationModel
 from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
@@ -117,7 +117,6 @@ def impute(
 ):
     try:
         response = CapitulationClass(db).impute(form_data)
-        print(response)
 
         return {"message": "Rendición imputada exitosamente"}
 
@@ -168,7 +167,6 @@ def pay(
 def support(id: int, db: Session = Depends(get_db)):
 
     capitulation = CapitulationClass(db).get(id)
-    print(capitulation)
 
     capitulation_data = json.loads(capitulation)
     remote_path = capitulation_data["capitulation_data"]["support"]
@@ -225,6 +223,59 @@ def massive_impute(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar capitulaciones masivamente: {str(e)}")
 
+@capitulations.post("/massive_impute_all")
+def massive_impute_all(
+    form_data: MassiveImputeCapitulation,
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint POST para imputar masivamente las capitulaciones seleccionadas.
+    Recibe una lista de capitulaciones con sus expense_type_id actualizados.
+    Body esperado:
+    {
+        "items": [
+            {"id": 28169, "expense_type_id": 13},
+            {"id": 28170, "expense_type_id": 14},
+            ...
+        ]
+    }
+    Para cada capitulación:
+    1. Actualiza el expense_type_id
+    2. Calcula el periodo desde el document_date
+    3. Envía a LibreDTE (conta) si document_type_id == 39
+    4. Actualiza status_id = 5 y period
+    """
+    try:
+        # Convertir los items del schema a diccionarios para el método
+        items_list = [{"id": item.id, "expense_type_id": item.expense_type_id} for item in form_data.items]
+        result = CapitulationClass(db).massive_impute(form_data.period, items_list)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al imputar capitulaciones masivamente: {str(e)}")
+
+@capitulations.get("/list/{status_id}")
+def list_capitulations(
+    status_id: int,
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint GET para listar todas las capitulaciones filtradas por status_id sin paginación.
+    Recibe el status_id como parámetro de URL.
+    """
+    try:
+        data = CapitulationClass(db).get_all(
+            rol_id=session_user.rol_id,
+            rut=session_user.rut,
+            page=0,  # page=0 retorna todos los registros sin paginación
+            items_per_page=10,
+            branch_office_id=None,
+            status_id=status_id
+        )
+        return {"message": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener las capitulaciones: {str(e)}")
+
 @capitulations.get("/old_capitulations")
 def old_dtes(db: Session = Depends(get_db)):
     conn = pymysql.connect(
@@ -244,7 +295,6 @@ def old_dtes(db: Session = Depends(get_db)):
         result = cursor.fetchall()
 
         for row in result:
-            print(row)
             if row['status_id'] == 7:
                 status_id = 2
             

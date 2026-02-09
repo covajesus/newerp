@@ -2322,3 +2322,12 @@ class SurveyResponseItem(BaseModel):
 class SurveyResponse(BaseModel):
     survey_id: int
     responses: List[SurveyResponseItem]
+
+# Massive Impute Capitulation Schema
+class MassiveImputeCapitulationItem(BaseModel):
+    id: int
+    expense_type_id: int
+
+class MassiveImputeCapitulation(BaseModel):
+    period: str
+    items: List[MassiveImputeCapitulationItem]

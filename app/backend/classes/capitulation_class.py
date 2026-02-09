@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import requests
 import json
-from sqlalchemy import cast, String, case
+from sqlalchemy import cast, String, case, or_
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -542,8 +542,6 @@ class CapitulationClass:
                     },
                 }
 
-                print(data)
-
                 url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
 
                 response = requests.post(
@@ -554,8 +552,6 @@ class CapitulationClass:
                         "Content-Type": "application/json",
                     },
                 )
-
-                print(response.text)
 
                 if response.status_code == 200:
                     return {"status": "success", "message": "Capitulation imputed successfully"}
@@ -922,6 +918,225 @@ class CapitulationClass:
         return {
             "status": "success",
             "message": f"Procesamiento masivo completado. {processed} capitulaciones procesadas exitosamente.",
+            "processed": processed,
+            "total_found": len(capitulations),
+            "errors": errors
+        }
+
+    def massive_impute(self, period, items):
+        """
+        Imputa masivamente las capitulaciones seleccionadas.
+        Recibe un periodo y una lista de items con id y expense_type_id.
+        Para cada capitulación:
+        1. Actualiza el expense_type_id
+        2. Usa el periodo proporcionado
+        3. Envía a LibreDTE (conta) si document_type_id == 39
+        4. Actualiza status_id = 5 y period
+        
+        Args:
+            period: String con el periodo en formato 'YYYY-MM'
+            items: Lista de diccionarios con 'id' y 'expense_type_id'
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        
+        if not items:
+            return {
+                "status": "error",
+                "message": "No se proporcionaron capitulaciones para procesar",
+                "processed": 0,
+                "errors": []
+            }
+        
+        # Extraer los IDs de las capitulaciones
+        capitulation_ids = [item['id'] if isinstance(item, dict) else item.id for item in items]
+        
+        # Buscar las capitulaciones por sus IDs
+        capitulations = self.db.query(CapitulationModel).filter(
+            CapitulationModel.id.in_(capitulation_ids)
+        ).all()
+        
+        if not capitulations:
+            return {
+                "status": "error",
+                "message": "No se encontraron las capitulaciones especificadas",
+                "processed": 0,
+                "errors": []
+            }
+        
+        # Crear un diccionario para mapear id -> expense_type_id
+        expense_type_map = {}
+        for item in items:
+            item_id = item['id'] if isinstance(item, dict) else item.id
+            expense_type_id = item['expense_type_id'] if isinstance(item, dict) else item.expense_type_id
+            expense_type_map[item_id] = expense_type_id
+        
+        processed = 0
+        errors = []
+        
+        for capitulation in capitulations:
+            try:
+                # Obtener el nuevo expense_type_id del mapa
+                new_expense_type_id = expense_type_map.get(capitulation.id)
+                if not new_expense_type_id:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se proporcionó expense_type_id para esta capitulación"
+                    })
+                    continue
+                
+                # Actualizar el expense_type_id
+                capitulation.expense_type_id = new_expense_type_id
+                
+                # Validar que tenga los datos necesarios
+                if not capitulation.branch_office_id:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No tiene branch_office_id asignado"
+                    })
+                    continue
+                
+                if not capitulation.document_date:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No tiene document_date asignado"
+                    })
+                    continue
+                
+                branch_office = self.db.query(BranchOfficeModel).filter(
+                    BranchOfficeModel.id == capitulation.branch_office_id
+                ).first()
+                
+                if not branch_office:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": "No se encontró la sucursal asociada"
+                    })
+                    continue
+                
+                expense_type = self.db.query(ExpenseTypeModel).filter(
+                    ExpenseTypeModel.id == new_expense_type_id
+                ).first()
+                
+                if not expense_type:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": f"No se encontró el tipo de gasto con id {new_expense_type_id}"
+                    })
+                    continue
+                
+                # Verificar que el expense_type tenga accounting_account
+                if not expense_type.accounting_account:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": f"El tipo de gasto {new_expense_type_id} no tiene accounting_account asignado"
+                    })
+                    continue
+                
+                # Usar el periodo proporcionado desde el frontend
+                # Validar formato del periodo (debe ser YYYY-MM)
+                try:
+                    period_parts = period.split('-')
+                    if len(period_parts) != 2 or len(period_parts[0]) != 4 or len(period_parts[1]) != 2:
+                        raise ValueError("Formato de periodo inválido")
+                    # Validar que sea un periodo válido
+                    year = int(period_parts[0])
+                    month = int(period_parts[1])
+                    if month < 1 or month > 12:
+                        raise ValueError("Mes inválido")
+                except (ValueError, IndexError) as e:
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": f"Formato de periodo inválido: {period}. Debe ser YYYY-MM"
+                    })
+                    continue
+                
+                # Convertir periodo para utf8_date (formato DD-MM-YYYY)
+                utf8_date = '01-' + period_parts[1] + '-' + period_parts[0]
+                
+                # Solo crear asiento contable si document_type_id == 39
+                if capitulation.document_type_id == 39:
+                    gloss = (
+                        branch_office.branch_office
+                        + "_"
+                        + str(expense_type.accounting_account)
+                        + "_"
+                        + utf8_date
+                        + "_Rendicion_"
+                        + str(capitulation.id)
+                    )
+                    
+                    data = {
+                        "fecha": period + "-01",
+                        "glosa": gloss,
+                        "detalle": {
+                            'debe': {
+                                str(expense_type.accounting_account): capitulation.amount,
+                            },
+                            'haber': {
+                                '111000101': capitulation.amount,
+                            }
+                        },
+                        "operacion": "I",
+                        "documentos": {
+                            "emitidos": [
+                                {
+                                    "dte": '',
+                                    "folio": 0,
+                                }
+                            ]
+                        },
+                    }
+                    
+                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                    
+                    response = requests.post(
+                        url,
+                        json=data,
+                        headers={
+                            "Authorization": f"Bearer {TOKEN}",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    
+                    # Verificar si la respuesta fue exitosa
+                    if response.status_code not in [200, 201]:
+                        errors.append({
+                            "capitulation_id": capitulation.id,
+                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        })
+                        # Continuar para actualizar el status aunque falle el envío a LibreDTE
+                
+                # Actualizar la capitulación: status_id = 5 y period extraído del document_date
+                # Esto se hace siempre, independientemente del document_type_id o si falló el envío a LibreDTE
+                capitulation.status_id = 5
+                capitulation.period = period_parts[1] + '-' + period_parts[0]  # Formato MM-YYYY
+                capitulation.updated_date = datetime.now()
+                
+                self.db.add(capitulation)
+                
+                # Hacer commit individual para cada capitulación para asegurar que se guarde
+                try:
+                    self.db.commit()
+                    processed += 1
+                except Exception as e:
+                    self.db.rollback()
+                    errors.append({
+                        "capitulation_id": capitulation.id,
+                        "error": f"Error al guardar cambios en la base de datos: {str(e)}"
+                    })
+                    continue
+                
+            except Exception as e:
+                errors.append({
+                    "capitulation_id": capitulation.id,
+                    "error": f"Error al procesar capitulación: {str(e)}"
+                })
+                self.db.rollback()
+                continue
+        
+        return {
+            "status": "success",
+            "message": f"Imputación masiva completada. {processed} capitulaciones imputadas exitosamente.",
             "processed": processed,
             "total_found": len(capitulations),
             "errors": errors
