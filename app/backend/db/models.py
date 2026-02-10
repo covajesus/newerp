@@ -1655,7 +1655,7 @@ class ComparationPendingDtesBankStatementModel(Base):
     deposit_date = Column(String(255))
 
 class ComparationPendingDepositsBankStatementModel(Base):
-    __tablename__ = 'comparation_pending_deposits_bank_statements'
+    __tablename__ = 'comparation_pending_deposits_bank_statements2'
 
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
