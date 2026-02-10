@@ -1660,7 +1660,6 @@ class ComparationPendingDepositsBankStatementModel(Base):
     id = Column(Integer, primary_key=True)
     branch_office_id = Column(Integer)
     payment_type_id = Column(Integer)
-    collection_id = Column(Integer)
     deposit_id = Column(Integer)
     branch_office = Column(String(255))
     status_id = Column(Integer)
