@@ -1672,47 +1672,6 @@ class ComparationPendingDepositsBankStatementModel(Base):
     bank_statement_rut = Column(String(255))
     deposit_number = Column(String(255))
 
-class AiDepositMatchModel(Base):
-    __tablename__ = 'ai_deposit_matches'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    bank_statement_id = Column(Integer, ForeignKey('bank_statements.id', ondelete='SET NULL', onupdate='CASCADE'), nullable=True)
-    transbank_statement_id = Column(Integer, ForeignKey('transbank_statements.id', ondelete='SET NULL', onupdate='CASCADE'), nullable=True)
-    deposit_id = Column(Integer, ForeignKey('deposits.id', ondelete='SET NULL', onupdate='CASCADE'), nullable=True)
-    
-    # Datos del Excel (Bank Statement)
-    excel_deposit_number = Column(String(255), nullable=True)
-    excel_branch_office = Column(String(255), nullable=True)
-    excel_amount = Column(Integer, nullable=True)
-    excel_date = Column(String(255), nullable=True)
-    
-    # Datos del Depósito en BD
-    db_deposit_id = Column(Integer, nullable=True)
-    db_branch_office_id = Column(Integer, nullable=True)
-    db_branch_office_name = Column(String(255), nullable=True)
-    db_payment_number = Column(Integer, nullable=True)
-    db_collection_amount = Column(Integer, nullable=True)
-    db_deposited_amount = Column(Integer, nullable=True)
-    db_collection_date = Column(String(255), nullable=True)
-    
-    # Información del matching
-    match_confidence = Column(Numeric(5, 2), nullable=True)  # 0-100
-    match_reason = Column(Text, nullable=True)
-    match_type = Column(String(20), default='ai_suggested')  # 'exact', 'ai_suggested', 'manual'
-    is_confirmed = Column(Boolean, default=False)
-    is_rejected = Column(Boolean, default=False)
-    
-    # Metadata
-    ai_model_used = Column(String(100), nullable=True)
-    ai_prompt_tokens = Column(Integer, nullable=True)
-    ai_completion_tokens = Column(Integer, nullable=True)
-    processing_time_ms = Column(Integer, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by_user_id = Column(Integer, nullable=True)
-    confirmed_by_user_id = Column(Integer, nullable=True)
-
 class SinisterModel(Base):
     __tablename__ = 'sinisters'
 

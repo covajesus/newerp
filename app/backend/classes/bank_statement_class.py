@@ -209,7 +209,6 @@ class BankStatementClass:
     def read_store_bank_statement(self, remote_path, period):
         try:
             # Usar DELETE en lugar de TRUNCATE para respetar las claves foráneas
-            # Las claves foráneas en ai_deposit_matches tienen ON DELETE SET NULL
             self.db.execute(text("DELETE FROM bank_statements"))
             self.db.commit()
 

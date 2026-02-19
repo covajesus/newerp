@@ -69,4 +69,3 @@ openpyxl==3.1.5
 azure-storage-file-share==12.20.0
 lxml==5.2.2
 rut-chile==0.9.3
-openai==1.12.0

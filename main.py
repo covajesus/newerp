@@ -90,7 +90,6 @@ from app.backend.routers.products import products
 from app.backend.routers.product_categories import product_categories
 from app.backend.routers.surveys import surveys
 from app.backend.routers.preventive_maintenances import preventive_maintenances
-from app.backend.routers.ai_deposit_matches import ai_deposit_matches
 
 app = FastAPI(root_path="/api")
 application = app
@@ -210,7 +209,6 @@ app.include_router(products)
 app.include_router(product_categories)
 app.include_router(surveys)
 app.include_router(preventive_maintenances)
-app.include_router(ai_deposit_matches)
 app.include_router(sinister_types)
 
 if __name__ == "__main__":
