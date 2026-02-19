@@ -2078,3 +2078,53 @@ class SurveyResponseAnswerModel(Base):
     answer_text = Column(Text)
     option_id = Column(Integer, ForeignKey('survey_question_options.id', ondelete='SET NULL', onupdate='CASCADE'))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class PreventiveMaintenanceModel(Base):
+    __tablename__ = 'preventive_maintenances'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer, ForeignKey('branch_offices.id', ondelete='RESTRICT', onupdate='CASCADE'), nullable=False)
+    address = Column(String(255))
+    maintenance_date = Column(Date, nullable=False)
+    technician_name = Column(String(255), nullable=False)
+    manager_name = Column(String(255), nullable=False)
+    detected_failures = Column(Text)
+    corrective_actions = Column(Text)
+    technician_signature = Column(Text, comment='Base64 encoded signature image')
+    manager_signature = Column(Text, comment='Base64 encoded signature image')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PreventiveMaintenanceSectionModel(Base):
+    __tablename__ = 'preventive_maintenance_sections'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    section_number = Column(Integer, nullable=False, unique=True)
+    section_name = Column(String(255), nullable=False)
+    section_name_es = Column(String(255), nullable=False, comment='Nombre en español para referencia')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PreventiveMaintenanceItemModel(Base):
+    __tablename__ = 'preventive_maintenance_items'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    section_id = Column(Integer, ForeignKey('preventive_maintenance_sections.id', ondelete='RESTRICT', onupdate='CASCADE'), nullable=False)
+    item_key = Column(String(100), nullable=False, comment='Clave única del item (ej: external_cleaning)')
+    item_name = Column(String(255), nullable=False, comment='Nombre del item en español')
+    item_order = Column(Integer, default=0, comment='Orden de visualización')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PreventiveMaintenanceResponseModel(Base):
+    __tablename__ = 'preventive_maintenance_responses'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    preventive_maintenance_id = Column(Integer, ForeignKey('preventive_maintenances.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    item_id = Column(Integer, ForeignKey('preventive_maintenance_items.id', ondelete='RESTRICT', onupdate='CASCADE'), nullable=False)
+    response_value = Column(Integer, comment='1=Sí, 2=No, 3=N/A')
+    observation = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

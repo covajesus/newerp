@@ -2331,3 +2331,94 @@ class MassiveImputeCapitulationItem(BaseModel):
 class MassiveImputeCapitulation(BaseModel):
     period: str
     items: List[MassiveImputeCapitulationItem]
+
+# Preventive Maintenance Schemas
+class PreventiveMaintenanceList(BaseModel):
+    page: int = 0
+    branch_office_id: Optional[int] = None
+
+class PreventiveMaintenanceResponseItem(BaseModel):
+    item_id: int
+    response_value: Optional[int] = None  # 1=Sí, 2=No, 3=N/A
+    observation: Optional[str] = None
+
+class PreventiveMaintenanceCreate(BaseModel):
+    branch_office_id: int
+    address: Optional[str] = None
+    maintenance_date: str  # YYYY-MM-DD format
+    technician_name: str
+    manager_name: str
+    detected_failures: Optional[str] = None
+    corrective_actions: Optional[str] = None
+    technician_signature: Optional[str] = None
+    manager_signature: Optional[str] = None
+    responses: List[PreventiveMaintenanceResponseItem] = []
+
+class PreventiveMaintenanceUpdate(BaseModel):
+    branch_office_id: Optional[int] = None
+    address: Optional[str] = None
+    maintenance_date: Optional[str] = None
+    technician_name: Optional[str] = None
+    manager_name: Optional[str] = None
+    detected_failures: Optional[str] = None
+    corrective_actions: Optional[str] = None
+    technician_signature: Optional[str] = None
+    manager_signature: Optional[str] = None
+    responses: Optional[List[PreventiveMaintenanceResponseItem]] = None
+
+class PreventiveMaintenanceResponse(BaseModel):
+    id: int
+    branch_office_id: int
+    address: Optional[str]
+    maintenance_date: str
+    technician_name: str
+    manager_name: str
+    detected_failures: Optional[str]
+    corrective_actions: Optional[str]
+    technician_signature: Optional[str]
+    manager_signature: Optional[str]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+class PreventiveMaintenanceSectionResponse(BaseModel):
+    id: int
+    section_number: int
+    section_name: str
+    section_name_es: str
+    is_active: bool
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+class PreventiveMaintenanceItemResponse(BaseModel):
+    id: int
+    section_id: int
+    item_key: str
+    item_name: str
+    item_order: int
+    is_active: bool
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+class PreventiveMaintenanceResponseDetail(BaseModel):
+    id: int
+    preventive_maintenance_id: int
+    item_id: int
+    response_value: Optional[int]
+    observation: Optional[str]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+class PreventiveMaintenanceWithDetails(PreventiveMaintenanceResponse):
+    responses: List[PreventiveMaintenanceResponseDetail] = []
