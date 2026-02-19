@@ -122,8 +122,10 @@ class TransbankStatementClass:
             if progress_callback:
                 progress_callback(10, "Limpiando tabla anterior...")
 
-            # TRUNCATE completo de la tabla antes de cargar el Transbank
-            self.db.execute(text("TRUNCATE TABLE transbank_statements"))
+            # DELETE completo de la tabla antes de cargar el Transbank
+            # Usar DELETE en lugar de TRUNCATE para respetar las claves foráneas
+            # Las claves foráneas en ai_deposit_matches tienen ON DELETE SET NULL
+            self.db.execute(text("DELETE FROM transbank_statements"))
             self.db.commit()
 
             if progress_callback:
@@ -339,6 +341,9 @@ class TransbankStatementClass:
                     self.db.add(collection)
                     self.db.commit()
 
+            if progress_callback:
+                progress_callback(100, "Procesamiento completado exitosamente")
+            
             if progress_callback:
                 progress_callback(100, "Procesamiento completado exitosamente")
 

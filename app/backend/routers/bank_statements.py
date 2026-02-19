@@ -38,12 +38,13 @@ def get_comparation_pending_deposits_bank_statements(
     return {"message": bank_statements}
 
 @bank_statements.post("/store")
-def store(
+async def store(
     form_data: BankStatement = Depends(BankStatement.as_form),
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
     try:
+        print(f"\n📥 [STORE] Iniciando carga de Excel...")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         unique_id = uuid.uuid4().hex[:8]
         file_extension = support.filename.split('.')[-1] if '.' in support.filename else ''
@@ -53,17 +54,20 @@ def store(
         remote_path = f"{file_category_name}_{unique_filename}"
 
         message = FileClass(db).upload(support, remote_path)
-
         file_url = FileClass(db).get(remote_path)
 
         if file_extension == "xlsx":
+            # Guardar Excel
+            print(f"📊 [STORE] Procesando Excel...")
             excel_data = BankStatementClass(db).read_store_bank_statement(remote_path, form_data.period)
+            print(f"✅ [STORE] Excel guardado correctamente\n")
         else:
             raise HTTPException(status_code=400, detail="Formato no compatible")
 
         return {"message": message, "file_url": file_url, "data": excel_data}
 
     except Exception as e:
+        print(f"❌ [STORE] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
 @bank_statements.get("/customer/accept/{id}/{payment_date}")

@@ -208,7 +208,9 @@ class BankStatementClass:
 
     def read_store_bank_statement(self, remote_path, period):
         try:
-            self.db.execute(text("TRUNCATE TABLE bank_statements"))
+            # Usar DELETE en lugar de TRUNCATE para respetar las claves foráneas
+            # Las claves foráneas en ai_deposit_matches tienen ON DELETE SET NULL
+            self.db.execute(text("DELETE FROM bank_statements"))
             self.db.commit()
 
             # Usar FileClass para leer el archivo del sistema de archivos local
@@ -325,7 +327,12 @@ class BankStatementClass:
                 print(f"Guardado lote final: {batch_count} registros")
 
             print(f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas de {total_rows} totales")
-            return f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas"
+            
+            # Retornar mensaje de éxito
+            # El procesamiento de IA se hará en background tasks (no bloquea)
+            result_message = f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas"
+            
+            return result_message
 
         except Exception as e:
             self.db.rollback()
