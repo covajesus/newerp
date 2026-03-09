@@ -18,8 +18,10 @@ class FormDataSimulator:
     def __init__(self, dte):
         self.branch_office_id = dte.branch_office_id
         self.rut = dte.rut
-        self.amount = dte.cash_amount if dte.chip_id != 1 else dte.cash_amount - 5000
-        self.chip_id = dte.chip_id
+        # chip_id viene de la tabla dtes: 1 = con chip, 0 = sin chip. pre_generate usa esto para la línea de $5000.
+        # amount = total (en BD con chip ya es base+5000, sin chip es el monto único).
+        self.amount = dte.cash_amount
+        self.chip_id = dte.chip_id  # 1 con chip, 0 sin chip (campo en dtes)
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
 

@@ -754,6 +754,14 @@ class CustomerTicketBillClass:
             code = self.pre_generate_credit_note_ticket(customer_data, original_dte_type_id, original_dte_folio, dte.cash_amount, dte_date, dte_code)
             folio = None
 
+            # Error devuelto por LibreDTE (ej. 400 validación)
+            if isinstance(code, dict) and code.get("error"):
+                return {
+                    "status": "error",
+                    "message": code.get("mensaje", "Error al pre-generar nota de crédito en LibreDTE"),
+                    "error_type": "LibreDTEError",
+                    "codigo": code.get("codigo"),
+                }
             if code is not None:
                 if code == 402:
                     return "LibreDTE payment required"
@@ -903,7 +911,9 @@ class CustomerTicketBillClass:
 
         print(cash_amount)
 
-        amount = round(abs(int(cash_amount))/1.19)
+        amount = round(abs(int(cash_amount)) / 1.19)
+        total_nc = abs(int(cash_amount))
+        iva_nc = total_nc - amount
 
         try:
             pass
@@ -933,6 +943,12 @@ class CustomerTicketBillClass:
                         "GiroRecep": customer_data['customer_data']['activity'],
                         "DirRecep": customer_data['customer_data']['region'],
                         "CmnaRecep": customer_data['customer_data']['commune'],
+                    },
+                    "Totales": {
+                        "MntNeto": amount,
+                        "TasaIVA": 19,
+                        "IVA": iva_nc,
+                        "MntTotal": total_nc,
                     }
                 },
                 "Detalle": [
@@ -972,10 +988,19 @@ class CustomerTicketBillClass:
             if response.status_code == 200:
                 dte_data = response.json()
                 code = dte_data.get("codigo")
-
+                # 400/404/500 son códigos de error de LibreDTE, no el código temporal del documento
+                if code in (400, 404, 500):
+                    msg = dte_data.get("mensaje") or dte_data.get("message") or str(dte_data)
+                    print("LibreDTE emitir devolvió error:", code, msg)
+                    return {"error": True, "codigo": code, "mensaje": msg}
                 return code
             else:
-                return response.status_code
+                try:
+                    err_body = response.json()
+                    msg = err_body.get("mensaje") or err_body.get("message") or response.text
+                except Exception:
+                    msg = response.text or f"HTTP {response.status_code}"
+                return {"error": True, "codigo": response.status_code, "mensaje": msg}
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
@@ -1009,12 +1034,12 @@ class CustomerTicketBillClass:
 
             if response.status_code == 200:
                 dte_data = response.json()
-                folio = dte_data.get("folio")
-
+                # LibreDTE puede devolver "folio" o "Folio"
+                folio = dte_data.get("folio") or dte_data.get("Folio")
                 return folio
             else:
-                print("Error al generar el DTE:")
-                print(response.status_code, response.json())
+                body = response.json() if response.text else {}
+                print("Error al generar el DTE:", response.status_code, body)
                 return None
 
         except Exception as e:
