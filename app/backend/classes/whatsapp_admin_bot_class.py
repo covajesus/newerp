@@ -185,37 +185,49 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
     process_incoming_text(db, wa_id, "")
 
 
+def _iter_messages_from_payload(payload: dict):
+    """
+    Formato estándar: object + entry[].changes[].value.messages[]
+    Algunas pruebas de Meta envían solo el fragmento con value.messages.
+    """
+    out = []
+    for entry in payload.get("entry") or []:
+        for change in entry.get("changes") or []:
+            value = change.get("value") or {}
+            for msg in value.get("messages") or []:
+                out.append(msg)
+    if not out and isinstance(payload.get("value"), dict):
+        for msg in payload["value"].get("messages") or []:
+            out.append(msg)
+    return out
+
+
 def handle_webhook_payload(db: Session, payload: dict) -> None:
     """
-    Recorre el payload estándar de Meta WhatsApp Cloud API.
+    Recorre el payload estándar de Meta WhatsApp Cloud API (field messages, v25).
     """
     try:
-        entries = payload.get("entry") or []
-        for entry in entries:
-            changes = entry.get("changes") or []
-            for change in changes:
-                value = change.get("value") or {}
-                messages = value.get("messages") or []
-                for msg in messages:
-                    msg_type = msg.get("type")
-                    if msg_type != "text":
-                        continue
-                    wa_id = msg.get("from")
-                    body = (msg.get("text") or {}).get("body") or ""
-                    if not wa_id:
-                        continue
+        messages = _iter_messages_from_payload(payload)
+        for msg in messages:
+            msg_type = msg.get("type")
+            if msg_type != "text":
+                continue
+            wa_id = msg.get("from")
+            body = (msg.get("text") or {}).get("body") or ""
+            if not wa_id:
+                continue
 
-                    # Primera vez: si envía RUT directo, validar sin pedir dos pasos
-                    if wa_id not in _conversations:
-                        rut_num, _ = _normalize_rut_input(body.strip())
-                        if rut_num is not None:
-                            _conversations[wa_id] = {"step": "waiting_rut"}
-                            process_incoming_text(db, wa_id, body.strip())
-                            continue
-                        _conversations[wa_id] = {"step": "ask_rut"}
-                        process_incoming_text(db, wa_id, "")
-                        continue
+            # Primera vez: si envía RUT directo, validar sin pedir dos pasos
+            if wa_id not in _conversations:
+                rut_num, _ = _normalize_rut_input(body.strip())
+                if rut_num is not None:
+                    _conversations[wa_id] = {"step": "waiting_rut"}
+                    process_incoming_text(db, wa_id, body.strip())
+                    continue
+                _conversations[wa_id] = {"step": "ask_rut"}
+                process_incoming_text(db, wa_id, "")
+                continue
 
-                    process_incoming_text(db, wa_id, body)
+            process_incoming_text(db, wa_id, body)
     except Exception as e:
         print(f"[whatsapp_admin_bot] Error procesando webhook: {e}")
