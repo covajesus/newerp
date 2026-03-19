@@ -90,6 +90,7 @@ from app.backend.routers.products import products
 from app.backend.routers.product_categories import product_categories
 from app.backend.routers.surveys import surveys
 from app.backend.routers.preventive_maintenances import preventive_maintenances
+from app.backend.routers.whatsapp_webhook import whatsapp_webhook
 
 app = FastAPI(root_path="/api")
 application = app
@@ -210,6 +211,7 @@ app.include_router(product_categories)
 app.include_router(surveys)
 app.include_router(preventive_maintenances)
 app.include_router(sinister_types)
+app.include_router(whatsapp_webhook)
 
 if __name__ == "__main__":
     uvicorn.run(

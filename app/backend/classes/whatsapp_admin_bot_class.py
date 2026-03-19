@@ -1,0 +1,221 @@
+"""
+Bot de WhatsApp (Meta Cloud API) para administradores: RUT → menú → venta del día por sucursal.
+Envío de mensajes vía WhatsappClass (mismo token Graph que DTEs). Estado en memoria.
+"""
+import re
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
+
+import pytz
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.backend.classes.whatsapp_class import WhatsappClass
+from app.backend.db.models import BranchOfficeModel, CollectionModel, UserModel
+
+# phone (wa_id) -> estado de conversación
+_conversations: Dict[str, Dict[str, Any]] = {}
+
+
+def _normalize_rut_input(text: str) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Devuelve (rut_numérico_sin_dv, texto_original_limpio) para comparar con users.rut (Integer).
+    Acepta 12345678-9, 12.345.678-9, 12345678, etc.
+    """
+    if not text:
+        return None, None
+    s = text.strip().upper().replace(".", "").replace(" ", "")
+    m = re.match(r"^(\d{1,8})(?:-([0-9K]))?$", s)
+    if not m:
+        return None, None
+    try:
+        num = int(m.group(1))
+        return num, s
+    except ValueError:
+        return None, None
+
+
+def _find_admin_user(db: Session, rut_number: int) -> Optional[UserModel]:
+    return (
+        db.query(UserModel)
+        .filter(UserModel.rut == rut_number, UserModel.rol_id.in_([1, 2]))
+        .first()
+    )
+
+
+def _find_branch_by_name(db: Session, name: str) -> Optional[BranchOfficeModel]:
+    if not name or len(name.strip()) < 2:
+        return None
+    q = name.strip()
+    # Coincidencia parcial, insensible a mayúsculas
+    return (
+        db.query(BranchOfficeModel)
+        .filter(BranchOfficeModel.branch_office.ilike(f"%{q}%"))
+        .first()
+    )
+
+
+def _daily_sales_for_branch(db: Session, branch_office_id: int) -> Dict[str, Any]:
+    tz = pytz.timezone("America/Santiago")
+    today = datetime.now(tz).date()
+
+    row = (
+        db.query(
+            func.coalesce(func.sum(CollectionModel.cash_gross_amount), 0),
+            func.coalesce(func.sum(CollectionModel.card_gross_amount), 0),
+            func.coalesce(func.sum(CollectionModel.total_tickets), 0),
+        )
+        .filter(
+            CollectionModel.branch_office_id == branch_office_id,
+            CollectionModel.added_date == today,
+        )
+        .first()
+    )
+    cash, card, tickets = row if row else (0, 0, 0)
+    total_estimado = int(cash or 0) + int(card or 0)
+    return {
+        "fecha": today.strftime("%d/%m/%Y"),
+        "efectivo_bruto": int(cash or 0),
+        "tarjeta_bruto": int(card or 0),
+        "total_aprox": total_estimado,
+        "tickets": int(tickets or 0),
+    }
+
+
+def _send_text(db: Session, wa_id: str, body: str) -> None:
+    WhatsappClass(db).send_text_message(wa_id, body)
+
+
+def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
+    """
+    Procesa un mensaje de texto entrante (número WhatsApp sin + en wa_id).
+    """
+    text = (text or "").strip()
+    state = _conversations.get(wa_id, {})
+
+    step = state.get("step", "waiting_rut")
+
+    if step == "ask_rut":
+        _send_text(
+            db,
+            wa_id,
+            "👋 Bienvenido. Para continuar ingrese su *RUT* (ejemplo: 12345678-9).",
+        )
+        _conversations[wa_id] = {"step": "waiting_rut"}
+        return
+
+    if step == "waiting_rut":
+        rut_num, _ = _normalize_rut_input(text)
+        if rut_num is None:
+            _send_text(
+                db,
+                wa_id,
+                "❌ RUT no válido. Envíe solo números y guión, ej: *12345678-9*",
+            )
+            return
+
+        user = _find_admin_user(db, rut_num)
+        if not user:
+            _send_text(
+                db,
+                wa_id,
+                "⛔ No tiene permisos de administrador o el RUT no está registrado (solo roles 1 y 2).",
+            )
+            _conversations.pop(wa_id, None)
+            return
+
+        _conversations[wa_id] = {
+            "step": "waiting_menu",
+            "user_id": user.id,
+            "rut": rut_num,
+            "full_name": user.full_name or "",
+        }
+        _send_text(
+            db,
+            wa_id,
+            f"✅ Hola {user.full_name or 'admin'}.\n\n"
+            "*Marque la opción:*\n"
+            "1️⃣ Conocer la venta del día (WhatsApp)\n\n"
+            "Responda con el *número* de la opción.",
+        )
+        return
+
+    if step == "waiting_menu":
+        if text.strip() == "1":
+            _conversations[wa_id]["step"] = "waiting_branch"
+            _send_text(
+                db,
+                wa_id,
+                "📍 Escriba el *nombre de la sucursal* (puede ser parte del nombre).",
+            )
+        else:
+            _send_text(
+                db,
+                wa_id,
+                "Opción no válida. Responda *1* para conocer la venta del día.",
+            )
+        return
+
+    if step == "waiting_branch":
+        branch = _find_branch_by_name(db, text)
+        if not branch:
+            _send_text(
+                db,
+                wa_id,
+                "❌ No se encontró una sucursal con ese nombre. Intente de nuevo.",
+            )
+            return
+
+        sales = _daily_sales_for_branch(db, branch.id)
+        msg = (
+            f"📊 *Venta del día* — {branch.branch_office}\n"
+            f"Fecha: {sales['fecha']}\n\n"
+            f"• Efectivo (bruto): ${sales['efectivo_bruto']:,}\n"
+            f"• Tarjeta (bruto): ${sales['tarjeta_bruto']:,}\n"
+            f"• Total aprox. (efectivo+tarjeta): ${sales['total_aprox']:,}\n"
+            f"• Tickets: {sales['tickets']}\n\n"
+            "Para otra consulta envíe *hola* o cualquier mensaje para reiniciar."
+        )
+        _send_text(db, wa_id, msg)
+        _conversations.pop(wa_id, None)
+        return
+
+    # Estado desconocido: reiniciar
+    _conversations[wa_id] = {"step": "ask_rut"}
+    process_incoming_text(db, wa_id, "")
+
+
+def handle_webhook_payload(db: Session, payload: dict) -> None:
+    """
+    Recorre el payload estándar de Meta WhatsApp Cloud API.
+    """
+    try:
+        entries = payload.get("entry") or []
+        for entry in entries:
+            changes = entry.get("changes") or []
+            for change in changes:
+                value = change.get("value") or {}
+                messages = value.get("messages") or []
+                for msg in messages:
+                    msg_type = msg.get("type")
+                    if msg_type != "text":
+                        continue
+                    wa_id = msg.get("from")
+                    body = (msg.get("text") or {}).get("body") or ""
+                    if not wa_id:
+                        continue
+
+                    # Primera vez: si envía RUT directo, validar sin pedir dos pasos
+                    if wa_id not in _conversations:
+                        rut_num, _ = _normalize_rut_input(body.strip())
+                        if rut_num is not None:
+                            _conversations[wa_id] = {"step": "waiting_rut"}
+                            process_incoming_text(db, wa_id, body.strip())
+                            continue
+                        _conversations[wa_id] = {"step": "ask_rut"}
+                        process_incoming_text(db, wa_id, "")
+                        continue
+
+                    process_incoming_text(db, wa_id, body)
+    except Exception as e:
+        print(f"[whatsapp_admin_bot] Error procesando webhook: {e}")

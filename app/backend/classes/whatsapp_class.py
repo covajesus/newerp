@@ -10,6 +10,47 @@ class WhatsappClass:
     def __init__(self, db):
         self.db = db
 
+    def send_text_message(self, to_phone: str, body: str):
+        """
+        Envía un mensaje de texto por la API Graph (mismo token y phone_number_id que el resto del proyecto).
+        Útil para respuestas del webhook (conversación dentro de la ventana de 24h).
+        """
+        try:
+            token = os.getenv("LIBREDTE_TOKEN")
+            url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+            phone_str = str(to_phone).strip()
+            if not phone_str.startswith("56"):
+                customer_phone = "56" + phone_str.lstrip("0")
+            else:
+                customer_phone = phone_str
+
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": customer_phone,
+                "type": "text",
+                "text": {"preview_url": False, "body": (body or "")[:4096]},
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            try:
+                response_data = response.json()
+            except Exception:
+                response_data = {"raw": response.text}
+            ok = response.status_code == 200
+            if not ok:
+                print(f"[WhatsappClass.send_text_message] {response.status_code} {response_data}")
+            return {
+                "status": "success" if ok else "error",
+                "status_code": response.status_code,
+                "response": response_data,
+            }
+        except Exception as e:
+            print(f"[WhatsappClass.send_text_message] {e}")
+            return {"status": "error", "error": str(e)}
+
     def send(self, dte_data, customer_rut): 
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == customer_rut).first()
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
