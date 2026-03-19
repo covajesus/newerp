@@ -3,7 +3,7 @@ Webhook WhatsApp Cloud API (Meta).
 
 Configuración en Meta Developer:
 1. Crear app → WhatsApp → API de prueba o producción.
-2. URL de devolución de llamada: https://TU_DOMINIO/api/whatsapp/webhook
+2. URL de devolución de llamada: https://TU_DOMINIO/api/whatsapp/webhook (un solo /api/ si el backend ya va bajo /api)
 3. Token de verificación: el mismo valor que WHATSAPP_VERIFY_TOKEN en .env
 4. Suscribirse a messages
 
@@ -20,8 +20,9 @@ from sqlalchemy.orm import Session
 from app.backend.db.database import get_db
 from app.backend.classes.whatsapp_admin_bot_class import handle_webhook_payload
 
-# Ruta final: GET/POST /api/whatsapp/webhook (coincide con la URL que pide Meta)
-whatsapp_webhook = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp Webhook"])
+# Ruta en la app: /whatsapp/webhook. El dominio público suele ser .../api/whatsapp/webhook
+# (un solo "api": el proxy o el despliegue añade /api; no duplicar aquí).
+whatsapp_webhook = APIRouter(prefix="/whatsapp", tags=["WhatsApp Webhook"])
 
 
 @whatsapp_webhook.get("/webhook")
