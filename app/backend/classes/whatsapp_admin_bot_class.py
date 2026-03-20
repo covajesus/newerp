@@ -3,10 +3,14 @@ Bot de WhatsApp (Meta Cloud API) para administradores: RUT → menú → venta d
 Envío de mensajes vía WhatsappClass (mismo token Graph que DTEs). Estado en memoria.
 """
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 
 import pytz
+
+_TZ_CL = pytz.timezone("America/Santiago")
+# Tras login con RUT, no volver a pedirlo hasta pasar este tiempo
+_SESSION_MAX = timedelta(days=1)
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,6 +19,28 @@ from app.backend.db.models import BranchOfficeModel, CollectionModel, UserModel
 
 # phone (wa_id) -> estado de conversación
 _conversations: Dict[str, Dict[str, Any]] = {}
+
+
+def _session_valid(state: dict) -> bool:
+    """Sesión válida si hay authenticated_at y no pasó 1 día desde el login."""
+    ts = state.get("authenticated_at")
+    if ts is None:
+        return False
+    if isinstance(ts, str):
+        ts = datetime.fromisoformat(ts)
+    now = datetime.now(_TZ_CL)
+    if ts.tzinfo is None:
+        ts = _TZ_CL.localize(ts)
+    return (now - ts) < _SESSION_MAX
+
+
+def _expire_session_if_needed(wa_id: str) -> None:
+    """Si el login tiene más de 1 día, borrar sesión para pedir RUT de nuevo."""
+    st = _conversations.get(wa_id)
+    if not st:
+        return
+    if st.get("authenticated_at") and not _session_valid(st):
+        _conversations.pop(wa_id, None)
 
 
 def _normalize_rut_input(text: str) -> Tuple[Optional[int], Optional[str]]:
@@ -90,6 +116,7 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
     """
     Procesa un mensaje de texto entrante (número WhatsApp sin + en wa_id).
     """
+    _expire_session_if_needed(wa_id)
     text = (text or "").strip()
     state = _conversations.get(wa_id, {})
 
@@ -129,6 +156,7 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
             "user_id": user.id,
             "rut": rut_num,
             "full_name": user.full_name or "",
+            "authenticated_at": datetime.now(_TZ_CL),
         }
         _send_text(
             db,
@@ -141,6 +169,16 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
         return
 
     if step == "waiting_menu":
+        low = text.strip().lower()
+        if low in ("hola", "menu", "menú", "opciones", "inicio"):
+            _send_text(
+                db,
+                wa_id,
+                "*Marque la opción:*\n"
+                "1️⃣ Conocer la venta del día\n\n"
+                "Responda con el *número* de la opción.",
+            )
+            return
         if text.strip() == "1":
             _conversations[wa_id]["step"] = "waiting_branch"
             _send_text(
@@ -174,10 +212,46 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
             f"• Tarjeta (bruto): ${sales['tarjeta_bruto']:,}\n"
             f"• Total aprox. (efectivo+tarjeta): ${sales['total_aprox']:,}\n"
             f"• Tickets: {sales['tickets']}\n\n"
-            "Para otra consulta envíe *hola* o cualquier mensaje para reiniciar."
+            "¿Desea buscar *otra sucursal*? Marque *1*.\n"
+            "(Sesión activa 24 h desde su ingreso con RUT; *hola* = menú principal.)"
         )
         _send_text(db, wa_id, msg)
-        _conversations.pop(wa_id, None)
+        auth_at = state.get("authenticated_at")
+        _conversations[wa_id] = {
+            "step": "waiting_after_sale",
+            "user_id": state.get("user_id"),
+            "rut": state.get("rut"),
+            "full_name": state.get("full_name") or "",
+            "authenticated_at": auth_at,
+        }
+        return
+
+    if step == "waiting_after_sale":
+        low = text.strip().lower()
+        if low in ("hola", "menu", "menú", "opciones", "inicio"):
+            _conversations[wa_id]["step"] = "waiting_menu"
+            _send_text(
+                db,
+                wa_id,
+                "*Marque la opción:*\n"
+                "1️⃣ Conocer la venta del día\n\n"
+                "Responda con el *número* de la opción.",
+            )
+            return
+        if text.strip() == "1":
+            _conversations[wa_id]["step"] = "waiting_branch"
+            _send_text(
+                db,
+                wa_id,
+                "📍 Escriba el *nombre de la sucursal* que desea consultar.",
+            )
+            return
+        _send_text(
+            db,
+            wa_id,
+            "Para buscar *otra sucursal* marque *1*. "
+            "Para el menú principal escriba *hola*.",
+        )
         return
 
     # Estado desconocido: reiniciar
@@ -216,6 +290,8 @@ def handle_webhook_payload(db: Session, payload: dict) -> None:
             body = (msg.get("text") or {}).get("body") or ""
             if not wa_id:
                 continue
+
+            _expire_session_if_needed(wa_id)
 
             # Primera vez: si envía RUT directo, validar sin pedir dos pasos
             if wa_id not in _conversations:
