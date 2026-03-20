@@ -10,6 +10,44 @@ import json
 from datetime import date, timedelta
 from sqlalchemy import and_
 from sqlalchemy import func, cast, Date
+from typing import Any, Dict, Optional
+
+
+def sync_collections_from_db2_to_main(
+    db_main,
+    db2,
+    branch_office_id: Optional[int],
+    since: str,
+    until: str,
+) -> Dict[str, Any]:
+    """
+    Misma lógica que GET /collections/cron: lee collections en DB2 (cajas) y upsert en ERP principal.
+    """
+    try:
+        data = CollectionClass(db2).get_all_collections(
+            branch_office_id=branch_office_id,
+            since=since,
+            until=until,
+        )
+        CollectionClass(db_main).update_all_collections(data)
+        n = len(data) if data else 0
+        return {
+            "ok": True,
+            "records_processed": n,
+            "since": since,
+            "until": until,
+            "branch_office_id": branch_office_id,
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "records_processed": 0,
+            "since": since,
+            "until": until,
+            "branch_office_id": branch_office_id,
+        }
+
 
 class CollectionClass:
     def __init__(self, db):

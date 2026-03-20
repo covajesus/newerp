@@ -4,16 +4,84 @@ Notificaciones por WhatsApp al administrador que solicitó la sync.
 """
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import pytz
 from sqlalchemy.orm import Session
 
+from app.backend.classes.collection_class import sync_collections_from_db2_to_main
 from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.db.models import BranchOfficeModel, CashierModel, CashierSyncCommandModel
+from app.backend.db.database import SessionLocalDB2
+from app.backend.db.models import CashierModel, CashierSyncCommandModel, CollectionModel
 
 _TZ = pytz.timezone("America/Santiago")
+
+
+def _post_sync_collections_refresh(db: Session, branch_office_id: int, cashier_id: int) -> str:
+    """
+    Tras subir ventas desde la caja: ejecuta el mismo flujo que GET /collections/cron
+    (DB2 → collections en ERP) para esa sucursal y devuelve texto para WhatsApp/result_text.
+    """
+    if os.getenv("CASHIER_SYNC_SKIP_COLLECTIONS_CRON", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "si",
+    ):
+        return "⏭ Refresco collections omitido (CASHIER_SYNC_SKIP_COLLECTIONS_CRON)."
+
+    if SessionLocalDB2 is None:
+        return (
+            "⚠️ *Refresco ERP* no ejecutado: DB2 no configurada (.env).\n"
+            "Cuando suba ventas, ejecute el cron: GET /api/collections/cron/{sucursal}/{desde}/{hasta}"
+        )
+
+    today = datetime.now(_TZ).date()
+    since = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    until = today.strftime("%Y-%m-%d")
+
+    db2 = SessionLocalDB2()
+    try:
+        res = sync_collections_from_db2_to_main(
+            db,
+            db2,
+            branch_office_id,
+            since,
+            until,
+        )
+        if res.get("ok"):
+            lines = [
+                f"📥 *Cron collections* (DB2→ERP): {res['records_processed']} filas "
+                f"({res['since']} … {res['until']}, sucursal {branch_office_id})."
+            ]
+        else:
+            lines = [f"⚠️ Cron collections falló: {res.get('error', '?')}"]
+    finally:
+        db2.close()
+
+    db.expire_all()
+    snap = (
+        db.query(CollectionModel)
+        .filter(
+            CollectionModel.branch_office_id == branch_office_id,
+            CollectionModel.cashier_id == cashier_id,
+            CollectionModel.added_date == today,
+        )
+        .first()
+    )
+    if snap:
+        lines.append(
+            f"📊 *Collections hoy* (caja {cashier_id}): tickets={snap.total_tickets}, "
+            f"efectivo=${snap.cash_gross_amount or 0}, tarjeta=${snap.card_gross_amount or 0}"
+        )
+    else:
+        lines.append(
+            f"📊 *Collections hoy*: sin fila para caja {cashier_id} en fecha {until} "
+            "(revisar que la caja haya subido a DB2 o la fecha del movimiento)."
+        )
+    return "\n".join(lines)
+
 
 # Mismos filtros que CashierClass.get_list (cajas operativas)
 _SYNC_FILTERS = (
@@ -131,10 +199,16 @@ def complete_command(
 
     now = datetime.now(_TZ)
     row.completed_at = now
-    row.result_text = result_text
     row.error_text = error_text
     row.duration_ms = duration_ms
     row.status = "completado" if final_status == "completado" else "error"
+
+    if row.status == "completado":
+        verify_block = _post_sync_collections_refresh(db, row.branch_office_id, cashier_id)
+        base = (result_text or "").strip()
+        row.result_text = (base + "\n---\n" if base else "") + verify_block
+    else:
+        row.result_text = result_text
 
     db.commit()
 
@@ -149,8 +223,8 @@ def complete_command(
                 )
                 if duration_ms is not None:
                     body += f"\n⏱ Duración: {duration_ms} ms"
-                if result_text:
-                    body += f"\n_{result_text[:500]}_"
+                if row.result_text:
+                    body += f"\n{row.result_text[:1200]}"
             else:
                 body = (
                     f"❌ *Caja {cashier_id}* error al sincronizar.\n"
@@ -164,7 +238,12 @@ def complete_command(
         except Exception as e:
             print(f"[cashier_sync] notify whatsapp: {e}")
 
-    return {"ok": True, "command_id": command_id, "status": row.status}
+    return {
+        "ok": True,
+        "command_id": command_id,
+        "status": row.status,
+        "result_text": row.result_text,
+    }
 
 
 def verify_sync_token(token_header: Optional[str]) -> bool:

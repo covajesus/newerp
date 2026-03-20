@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
-from app.backend.classes.collection_class import CollectionClass
+from app.backend.classes.collection_class import CollectionClass, sync_collections_from_db2_to_main
 from app.backend.schemas import StoreCollection, CollectionList, CollectionSearch, ManualStoreCollection, UpdateCollection
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.auth.auth_user import get_current_active_user
@@ -109,21 +109,24 @@ def cron_with_all_params(
     """
     # Convertir branch_office_id = 0 a None para el método
     branch_office_id_param = None if branch_office_id == 0 else branch_office_id
-    
-    data = CollectionClass(db2).get_all_collections(
-        branch_office_id=branch_office_id_param,
-        since=since,
-        until=until
-    )
 
-    CollectionClass(db).update_all_collections(data)
+    out = sync_collections_from_db2_to_main(db, db2, branch_office_id_param, since, until)
+    if not out.get("ok"):
+        return {
+            "message": "Error al sincronizar collections desde DB2.",
+            "error": out.get("error"),
+            "branch_office_id": branch_office_id,
+            "since": since,
+            "until": until,
+            "records_processed": 0,
+        }
 
     return {
         "message": "Updated or inserted collections in the second database.",
         "branch_office_id": branch_office_id,
         "since": since,
         "until": until,
-        "records_processed": len(data) if data else 0
+        "records_processed": out.get("records_processed", 0),
     }
 
 @collections.get("/cron/{since}/{until}")
@@ -144,20 +147,23 @@ def cron_with_dates_only(
     Ejemplo de uso:
     GET /collections/cron/2025-01-01/2025-01-31
     """
-    data = CollectionClass(db2).get_all_collections(
-        branch_office_id=None,
-        since=since,
-        until=until
-    )
-
-    CollectionClass(db).update_all_collections(data)
+    out = sync_collections_from_db2_to_main(db, db2, None, since, until)
+    if not out.get("ok"):
+        return {
+            "message": "Error al sincronizar collections desde DB2.",
+            "error": out.get("error"),
+            "branch_office_id": None,
+            "since": since,
+            "until": until,
+            "records_processed": 0,
+        }
 
     return {
         "message": "Updated or inserted collections in the second database.",
         "branch_office_id": None,
         "since": since,
         "until": until,
-        "records_processed": len(data) if data else 0
+        "records_processed": out.get("records_processed", 0),
     }
 
 @collections.get("/cron/{branch_office_id}")
@@ -184,20 +190,23 @@ def cron_with_branch_only(
     since = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
     until = date.today().strftime('%Y-%m-%d')
     
-    data = CollectionClass(db2).get_all_collections(
-        branch_office_id=branch_office_id_param,
-        since=since,
-        until=until
-    )
-
-    CollectionClass(db).update_all_collections(data)
+    out = sync_collections_from_db2_to_main(db, db2, branch_office_id_param, since, until)
+    if not out.get("ok"):
+        return {
+            "message": "Error al sincronizar collections desde DB2.",
+            "error": out.get("error"),
+            "branch_office_id": branch_office_id,
+            "since": since,
+            "until": until,
+            "records_processed": 0,
+        }
 
     return {
         "message": "Updated or inserted collections in the second database.",
         "branch_office_id": branch_office_id,
         "since": since,
         "until": until,
-        "records_processed": len(data) if data else 0
+        "records_processed": out.get("records_processed", 0),
     }
 
 @collections.get("/cron")
@@ -219,18 +228,21 @@ def cron_default(
     since = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
     until = date.today().strftime('%Y-%m-%d')
     
-    data = CollectionClass(db2).get_all_collections(
-        branch_office_id=branch_office_id_param,
-        since=since,
-        until=until
-    )
-
-    CollectionClass(db).update_all_collections(data)
+    out = sync_collections_from_db2_to_main(db, db2, branch_office_id_param, since, until)
+    if not out.get("ok"):
+        return {
+            "message": "Error al sincronizar collections desde DB2.",
+            "error": out.get("error"),
+            "branch_office_id": None,
+            "since": since,
+            "until": until,
+            "records_processed": 0,
+        }
 
     return {
         "message": "Updated or inserted collections in the second database.",
         "branch_office_id": None,
         "since": since,
         "until": until,
-        "records_processed": len(data) if data else 0
+        "records_processed": out.get("records_processed", 0),
     }
