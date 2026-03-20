@@ -212,10 +212,21 @@ def complete_command(
 
     db.commit()
 
-    # Notificar por WhatsApp al solicitante
-    wa = row.requester_wa_id
-    if wa:
+    # Notificar solo al número que creó la orden (requester_wa_id en la fila del comando).
+    # Si eliges *TODAS* las cajas, recibirás un mensaje por cada caja al terminar (siempre a tu número).
+    wa = (row.requester_wa_id or "").strip()
+    notify = os.getenv("CASHIER_SYNC_NOTIFY_COMPLETION", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+    if wa and notify:
         try:
+            print(
+                f"[cashier_sync] WhatsApp fin de sync → wa_id={wa} "
+                f"command_id={command_id} cashier_id={cashier_id} status={row.status}"
+            )
             if row.status == "completado":
                 body = (
                     f"✅ *Caja {cashier_id}* sincronizada correctamente.\n"

@@ -690,7 +690,11 @@ class CollectionClass:
                     self.db.commit()
                     return "Collection updated successfully"
                 else:
-                    return "Collection already exists with same values"
+                    # No es error: el ERP ya tenía los mismos montos (venta al día)
+                    return (
+                        "Recaudación ya está al día (mismos valores en el servidor). "
+                        "Collection already exists with same values"
+                    )
                     
         except Exception as e:
             self.db.rollback()

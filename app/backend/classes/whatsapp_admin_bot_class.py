@@ -284,11 +284,23 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
         parts = []
         for _row_id, cid, cname in res.get("created", []):
             parts.append(f"✅ Orden enviada a caja *{cid}* ({cname or '—'})")
+        n_ordenes = len(parts)
+        if scope_all and n_ordenes > 1:
+            aviso_fin = (
+                f"_Lote {res.get('batch_id', '')[:8]}…_\n"
+                "⚠️ Elegiste *TODAS* las cajas: recibirás *un mensaje por cada caja* "
+                "cuando termine (solo en *este* chat / tu número).\n"
+            )
+        else:
+            aviso_fin = (
+                f"_Lote {res.get('batch_id', '')[:8]}…_\n"
+                "Cuando la caja termine, el aviso llegará *solo a este número* (quien pidió la sync).\n"
+            )
         msg = (
             "\n".join(parts)
-            + f"\n\n_Lote {res.get('batch_id', '')[:8]}…_\n"
-            "Las cajas deben consultar el API (pull). "
-            "Cuando terminen, recibirá aviso por aquí.\n\n"
+            + "\n\n"
+            + aviso_fin
+            + "Las cajas deben tener el agente pull o la tarea programada.\n\n"
             + _MENU
         )
         _send_text(db, wa_id, msg)

@@ -53,6 +53,22 @@ SUBIR_VENTAS = os.getenv(
 # Carpeta de trabajo (necesaria si tu script hace "import sql" y sql.py está ahí)
 SUBIR_VENTAS_CWD = os.getenv("CAJA_SUBIR_VENTAS_CWD", "").strip() or None
 
+# Si el script de subida termina con código ≠ 0 pero el ERP respondió OK / "ya al día",
+# igual marcamos completado (evita WhatsApp en rojo cuando no había nada que actualizar).
+_STRICT_EXIT = os.getenv("CAJA_SYNC_STRICT_EXITCODE", "").strip().lower() in ("1", "true", "yes", "si")
+
+# Textos que indican que la recaudación llegó bien o ya estaba sincronizada (no es fallo)
+_SYNC_OK_MARKERS = (
+    "Collection already exists with same values",
+    "Recaudación ya está al día",
+    "Collection stored successfully",
+    "Collection updated successfully",
+)
+_SYNC_FAIL_MARKERS = (
+    "Traceback (most recent call last)",
+    "Error in store method",
+)
+
 
 def _headers() -> dict[str, str]:
     h: dict[str, str] = {}
@@ -80,6 +96,27 @@ def ejecutar_subida_ventas() -> tuple[int, str]:
     return proc.returncode, out[:4000]
 
 
+def _normalize_sync_result(code: int, log_text: str) -> tuple[int, str]:
+    """
+    Muchos scripts de caja devuelven código ≠ 0 aunque el POST fue correcto y el servidor
+    dice que la recaudación ya estaba al día. Eso no debe marcarse como error en WhatsApp.
+    """
+    if _STRICT_EXIT:
+        return code, log_text
+    if code == 0:
+        return code, log_text
+    t = log_text or ""
+    if any(bad in t for bad in _SYNC_FAIL_MARKERS):
+        return code, log_text
+    if any(ok in t for ok in _SYNC_OK_MARKERS):
+        note = (
+            "\n---\n[caja-pull] OK: el servidor confirmó recaudación guardada o *al día* "
+            "(se ignoró código de salida del script)."
+        )
+        return 0, (t + note)[:4000]
+    return code, log_text
+
+
 def main() -> None:
     if CAJA_ID <= 0:
         print("Configura CAJA_ID (entero > 0) en variables de entorno o en el script.", file=sys.stderr)
@@ -87,6 +124,9 @@ def main() -> None:
 
     next_url = f"{BASE_URL}/cashier_sync/{CAJA_ID}/next"
     print(f"[caja-pull] CAJA_ID={CAJA_ID} poll={POLL_SECONDS}s URL={next_url}")
+    print("[caja-pull] OK. Esperando comandos del servidor (Ctrl+C para detener).")
+    heartbeat_sec = float(os.getenv("CAJA_SYNC_HEARTBEAT_SECONDS", "120"))
+    last_beat = time.monotonic()
 
     while True:
         try:
@@ -95,6 +135,9 @@ def main() -> None:
             data: dict[str, Any] = r.json()
             cmd = data.get("command")
             if not cmd:
+                if heartbeat_sec > 0 and (time.monotonic() - last_beat) >= heartbeat_sec:
+                    print(f"[caja-pull] Sigo vivo — consultando API cada {POLL_SECONDS}s…")
+                    last_beat = time.monotonic()
                 time.sleep(POLL_SECONDS)
                 continue
 
@@ -103,7 +146,12 @@ def main() -> None:
             print(f"[caja-pull] Comando recibido id={command_id} action={action}")
 
             t0 = time.perf_counter()
-            code, log_text = ejecutar_subida_ventas()
+            raw_code, log_text = ejecutar_subida_ventas()
+            code, log_text = _normalize_sync_result(raw_code, log_text)
+            if raw_code != code:
+                print(f"[caja-pull] Código salida script={raw_code} → tratado como éxito (recaudación OK / al día).")
+            else:
+                print(f"[caja-pull] Código salida script={code}")
             ms = int((time.perf_counter() - t0) * 1000)
 
             complete_url = f"{BASE_URL}/cashier_sync/{CAJA_ID}/commands/{command_id}/complete"
