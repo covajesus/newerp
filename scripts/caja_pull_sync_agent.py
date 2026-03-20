@@ -59,14 +59,15 @@ _STRICT_EXIT = os.getenv("CAJA_SYNC_STRICT_EXITCODE", "").strip().lower() in ("1
 
 # Textos que indican que la recaudación llegó bien o ya estaba sincronizada (no es fallo)
 _SYNC_OK_MARKERS = (
-    "Collection already exists with same values",
-    "Recaudación ya está al día",
-    "Collection stored successfully",
-    "Collection updated successfully",
+    "collection already exists with same values",  # minúsculas: match insensible
+    "recaudación ya está al día",
+    "collection stored successfully",
+    "collection updated successfully",
+    "already exists with same values",
 )
 _SYNC_FAIL_MARKERS = (
-    "Traceback (most recent call last)",
-    "Error in store method",
+    "traceback (most recent call last)",
+    "error in store method",
 )
 
 
@@ -92,8 +93,9 @@ def ejecutar_subida_ventas() -> tuple[int, str]:
         timeout=3600,
         cwd=SUBIR_VENTAS_CWD,
     )
+    # NO truncar aquí: si el log es largo, los marcadores "already exists" podrían quedar fuera del corte.
     out = (proc.stdout or "") + (proc.stderr or "")
-    return proc.returncode, out[:4000]
+    return proc.returncode, out
 
 
 def _normalize_sync_result(code: int, log_text: str) -> tuple[int, str]:
@@ -101,20 +103,24 @@ def _normalize_sync_result(code: int, log_text: str) -> tuple[int, str]:
     Muchos scripts de caja devuelven código ≠ 0 aunque el POST fue correcto y el servidor
     dice que la recaudación ya estaba al día. Eso no debe marcarse como error en WhatsApp.
     """
+    max_len = int(os.getenv("CAJA_SYNC_LOG_MAX_CHARS", "24000"))
     if _STRICT_EXIT:
-        return code, log_text
+        return code, (log_text or "")[:max_len]
     if code == 0:
-        return code, log_text
+        t0 = log_text or ""
+        return code, t0[:max_len] if len(t0) > max_len else t0
     t = log_text or ""
-    if any(bad in t for bad in _SYNC_FAIL_MARKERS):
-        return code, log_text
-    if any(ok in t for ok in _SYNC_OK_MARKERS):
+    tl = t.lower()
+    if any(bad in tl for bad in _SYNC_FAIL_MARKERS):
+        return code, t[:max_len] if len(t) > max_len else t
+    if any(ok in tl for ok in _SYNC_OK_MARKERS):
         note = (
             "\n---\n[caja-pull] OK: el servidor confirmó recaudación guardada o *al día* "
             "(se ignoró código de salida del script)."
         )
-        return 0, (t + note)[:4000]
-    return code, log_text
+        combined = t + note
+        return 0, combined[:max_len] if len(combined) > max_len else combined
+    return code, t[:max_len] if len(t) > max_len else t
 
 
 def main() -> None:
@@ -157,8 +163,8 @@ def main() -> None:
             complete_url = f"{BASE_URL}/cashier_sync/{CAJA_ID}/commands/{command_id}/complete"
             body: dict[str, Any] = {
                 "status": "completado" if code == 0 else "error",
-                "resultado": log_text[:2000] if code == 0 else None,
-                "error": None if code == 0 else (log_text[:2000] or f"exit {code}"),
+                "resultado": log_text[:12000] if code == 0 else None,
+                "error": None if code == 0 else (log_text[:12000] or f"exit {code}"),
                 "duration_ms": ms,
             }
             if code != 0:

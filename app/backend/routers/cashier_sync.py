@@ -58,13 +58,14 @@ def post_complete(
     La caja ejecuta el script y reporta. cashier_id debe coincidir con el comando.
     """
     _check_token(authorization)
-    if body.status not in ("completado", "error"):
+    st = (body.status or "").strip().lower()
+    if st not in ("completado", "error"):
         raise HTTPException(status_code=400, detail="status debe ser completado o error")
     res = complete_command(
         db,
         command_id,
         cashier_id,
-        body.status,
+        st,
         body.resultado,
         body.error,
         body.duration_ms,

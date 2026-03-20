@@ -197,11 +197,15 @@ def complete_command(
     if row.status not in ("pendiente", "ejecutando"):
         return {"ok": False, "message": "Comando ya finalizado"}
 
+    st = (final_status or "").strip().lower()
+    if st not in ("completado", "error"):
+        st = "error"
+
     now = datetime.now(_TZ)
     row.completed_at = now
     row.error_text = error_text
     row.duration_ms = duration_ms
-    row.status = "completado" if final_status == "completado" else "error"
+    row.status = "completado" if st == "completado" else "error"
 
     if row.status == "completado":
         verify_block = _post_sync_collections_refresh(db, row.branch_office_id, cashier_id)
@@ -211,6 +215,8 @@ def complete_command(
         row.result_text = result_text
 
     db.commit()
+    # Tras commit, refrescar fila para que status/result_text coincidan con BD (evita status stale "ejecutando").
+    db.refresh(row)
 
     # Notificar solo al número que creó la orden (requester_wa_id en la fila del comando).
     # Si eliges *TODAS* las cajas, recibirás un mensaje por cada caja al terminar (siempre a tu número).
@@ -252,7 +258,7 @@ def complete_command(
     return {
         "ok": True,
         "command_id": command_id,
-        "status": row.status,
+        "status": str(row.status or ""),
         "result_text": row.result_text,
     }
 
