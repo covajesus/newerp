@@ -21,11 +21,13 @@ from app.backend.db.models import BranchOfficeModel, CollectionModel, UserModel
 # phone (wa_id) -> estado de conversación
 _conversations: Dict[str, Dict[str, Any]] = {}
 
+# Texto explícito *1* / *2* por si el cliente no muestra bien los emojis
 _MENU = (
-    "*Marque la opción:*\n"
-    "1️⃣ Conocer la venta del día\n"
-    "2️⃣ Refrescar ventas (sincronizar cajas vía API)\n\n"
-    "Responda con el *número*."
+    "*Menú principal*\n\n"
+    "*1* — Conocer la venta del día (por sucursal)\n"
+    "*2* — Refrescar ventas / sincronizar cajas (cola API)\n\n"
+    "Responda solo con *1* o *2*.\n"
+    "_(1️⃣ venta · 2️⃣ sync cajas)_"
 )
 
 
