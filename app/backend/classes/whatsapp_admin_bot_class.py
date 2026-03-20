@@ -15,10 +15,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.backend.classes.whatsapp_class import WhatsappClass
+from app.backend.classes.cashier_sync_command_class import create_sync_commands, get_syncable_cashiers
 from app.backend.db.models import BranchOfficeModel, CollectionModel, UserModel
 
 # phone (wa_id) -> estado de conversación
 _conversations: Dict[str, Dict[str, Any]] = {}
+
+_MENU = (
+    "*Marque la opción:*\n"
+    "1️⃣ Conocer la venta del día\n"
+    "2️⃣ Refrescar ventas (sincronizar cajas vía API)\n\n"
+    "Responda con el *número*."
+)
 
 
 def _session_valid(state: dict) -> bool:
@@ -161,23 +169,14 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
         _send_text(
             db,
             wa_id,
-            f"✅ Hola {user.full_name or 'admin'}.\n\n"
-            "*Marque la opción:*\n"
-            "1️⃣ Conocer la venta del día (WhatsApp)\n\n"
-            "Responda con el *número* de la opción.",
+            f"✅ Hola {user.full_name or 'admin'}.\n\n{_MENU}",
         )
         return
 
     if step == "waiting_menu":
         low = text.strip().lower()
         if low in ("hola", "menu", "menú", "opciones", "inicio"):
-            _send_text(
-                db,
-                wa_id,
-                "*Marque la opción:*\n"
-                "1️⃣ Conocer la venta del día\n\n"
-                "Responda con el *número* de la opción.",
-            )
+            _send_text(db, wa_id, _MENU)
             return
         if text.strip() == "1":
             _conversations[wa_id]["step"] = "waiting_branch"
@@ -186,12 +185,112 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
                 wa_id,
                 "📍 Escriba el *nombre de la sucursal* (puede ser parte del nombre).",
             )
+        elif text.strip() == "2":
+            _conversations[wa_id]["step"] = "waiting_sync_branch"
+            _send_text(
+                db,
+                wa_id,
+                "🔄 *Sincronizar cajas*\n\n"
+                "📍 Escriba el *nombre de la sucursal* (puede ser parte del nombre).",
+            )
         else:
             _send_text(
                 db,
                 wa_id,
-                "Opción no válida. Responda *1* para conocer la venta del día.",
+                "Opción no válida. Responda *1* o *2*.\n\n" + _MENU,
             )
+        return
+
+    if step == "waiting_sync_branch":
+        branch = _find_branch_by_name(db, text)
+        if not branch:
+            _send_text(
+                db,
+                wa_id,
+                "❌ No se encontró sucursal. Intente de nuevo.",
+            )
+            return
+        cashiers = get_syncable_cashiers(db, branch.id)
+        if not cashiers:
+            _send_text(
+                db,
+                wa_id,
+                "❌ No hay cajas activas registradas para esa sucursal.",
+            )
+            return
+        lines = [f"• ID *{c.id}* — {c.cashier or 'sin nombre'}" for c in cashiers]
+        lista = "\n".join(lines[:40])
+        if len(cashiers) > 40:
+            lista += "\n…"
+        auth_at = state.get("authenticated_at")
+        _conversations[wa_id] = {
+            "step": "waiting_sync_scope",
+            "user_id": state.get("user_id"),
+            "rut": state.get("rut"),
+            "full_name": state.get("full_name") or "",
+            "authenticated_at": auth_at,
+            "sync_branch_id": branch.id,
+            "sync_branch_name": branch.branch_office or "",
+        }
+        _send_text(
+            db,
+            wa_id,
+            f"📂 *{branch.branch_office}*\n\nCajas disponibles:\n{lista}\n\n"
+            "Escriba *TODAS* para sincronizar *todas* las cajas, "
+            "o solo el *número de ID* de una caja.",
+        )
+        return
+
+    if step == "waiting_sync_scope":
+        branch_id = state.get("sync_branch_id")
+        if not branch_id:
+            _conversations[wa_id]["step"] = "waiting_menu"
+            _send_text(db, wa_id, "Sesión incompleta. " + _MENU)
+            return
+        raw = text.strip().upper()
+        scope_all = raw == "TODAS" or raw == "TODA"
+        single_id: Optional[int] = None
+        if not scope_all:
+            try:
+                single_id = int(text.strip())
+            except ValueError:
+                _send_text(
+                    db,
+                    wa_id,
+                    "❌ Escriba *TODAS* o el *ID numérico* de la caja.",
+                )
+                return
+        res = create_sync_commands(
+            db,
+            branch_office_id=branch_id,
+            requester_wa_id=wa_id,
+            scope_all=scope_all,
+            single_cashier_id=single_id,
+        )
+        auth_at = state.get("authenticated_at")
+        base_state = {
+            "step": "waiting_menu",
+            "user_id": state.get("user_id"),
+            "rut": state.get("rut"),
+            "full_name": state.get("full_name") or "",
+            "authenticated_at": auth_at,
+        }
+        if not res.get("ok"):
+            _send_text(db, wa_id, f"❌ {res.get('message', 'Error')}")
+            _conversations[wa_id] = {**base_state, "step": "waiting_sync_scope"}
+            return
+        parts = []
+        for _row_id, cid, cname in res.get("created", []):
+            parts.append(f"✅ Orden enviada a caja *{cid}* ({cname or '—'})")
+        msg = (
+            "\n".join(parts)
+            + f"\n\n_Lote {res.get('batch_id', '')[:8]}…_\n"
+            "Las cajas deben consultar el API (pull). "
+            "Cuando terminen, recibirá aviso por aquí.\n\n"
+            + _MENU
+        )
+        _send_text(db, wa_id, msg)
+        _conversations[wa_id] = base_state
         return
 
     if step == "waiting_branch":
@@ -213,7 +312,8 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
             f"• Total aprox. (efectivo+tarjeta): ${sales['total_aprox']:,}\n"
             f"• Tickets: {sales['tickets']}\n\n"
             "¿Desea buscar *otra sucursal*? Marque *1*.\n"
-            "(Sesión activa 24 h desde su ingreso con RUT; *hola* = menú principal.)"
+            "¿Sincronizar cajas? Marque *2*.\n"
+            "(Sesión activa 24 h; *hola* = menú principal.)"
         )
         _send_text(db, wa_id, msg)
         auth_at = state.get("authenticated_at")
@@ -230,13 +330,7 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
         low = text.strip().lower()
         if low in ("hola", "menu", "menú", "opciones", "inicio"):
             _conversations[wa_id]["step"] = "waiting_menu"
-            _send_text(
-                db,
-                wa_id,
-                "*Marque la opción:*\n"
-                "1️⃣ Conocer la venta del día\n\n"
-                "Responda con el *número* de la opción.",
-            )
+            _send_text(db, wa_id, _MENU)
             return
         if text.strip() == "1":
             _conversations[wa_id]["step"] = "waiting_branch"
@@ -246,11 +340,20 @@ def process_incoming_text(db: Session, wa_id: str, text: str) -> None:
                 "📍 Escriba el *nombre de la sucursal* que desea consultar.",
             )
             return
+        if text.strip() == "2":
+            _conversations[wa_id]["step"] = "waiting_sync_branch"
+            _send_text(
+                db,
+                wa_id,
+                "🔄 *Sincronizar cajas*\n\n"
+                "📍 Escriba el *nombre de la sucursal* (puede ser parte del nombre).",
+            )
+            return
         _send_text(
             db,
             wa_id,
-            "Para buscar *otra sucursal* marque *1*. "
-            "Para el menú principal escriba *hola*.",
+            "Para *otra sucursal* marque *1*, para *sincronizar cajas* *2*. "
+            "Menú: escriba *hola*.",
         )
         return
 

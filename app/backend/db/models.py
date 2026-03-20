@@ -2128,3 +2128,25 @@ class PreventiveMaintenanceResponseModel(Base):
     observation = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CashierSyncCommandModel(Base):
+    """
+    Cola pull-based: la caja consulta API /next y reporta /complete.
+    Estados: pendiente, ejecutando, completado, error
+    """
+    __tablename__ = "cashier_sync_commands"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer, nullable=False)
+    cashier_id = Column(Integer, nullable=False)
+    batch_id = Column(String(36), nullable=True)
+    status = Column(String(20), nullable=False, default="pendiente")
+    requester_wa_id = Column(String(32), nullable=False)
+    action = Column(String(50), nullable=False, default="sync_sales")
+    created_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    result_text = Column(Text, nullable=True)
+    error_text = Column(Text, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
