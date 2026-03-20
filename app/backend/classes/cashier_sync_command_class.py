@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.backend.classes.collection_class import sync_collections_from_db2_to_main
 from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.db.database import SessionLocalDB2
+from app.backend.db.database import SessionLocal, SessionLocalDB2
 from app.backend.db.models import CashierModel, CashierSyncCommandModel, CollectionModel
 
 _TZ = pytz.timezone("America/Santiago")
@@ -41,26 +41,38 @@ def _post_sync_collections_refresh(db: Session, branch_office_id: int, cashier_i
     since = (today - timedelta(days=7)).strftime("%Y-%m-%d")
     until = today.strftime("%Y-%m-%d")
 
+    # Sesión aparte para DB principal: update_all_collections hace commit() por fila.
+    # Si usamos la misma sesión que cashier_sync_commands, esos commits mezclan/expiran
+    # el objeto del comando y el status puede quedar mal (ej. sigue "ejecutando" en respuesta/WhatsApp).
+    inner = SessionLocal()
     db2 = SessionLocalDB2()
     try:
         res = sync_collections_from_db2_to_main(
-            db,
+            inner,
             db2,
             branch_office_id,
             since,
             until,
         )
-        if res.get("ok"):
-            lines = [
-                f"📥 *Cron collections* (DB2→ERP): {res['records_processed']} filas "
-                f"({res['since']} … {res['until']}, sucursal {branch_office_id})."
-            ]
-        else:
-            lines = [f"⚠️ Cron collections falló: {res.get('error', '?')}"]
     finally:
-        db2.close()
+        try:
+            db2.close()
+        except Exception:
+            pass
+        try:
+            inner.close()
+        except Exception:
+            pass
 
-    db.expire_all()
+    if res.get("ok"):
+        lines = [
+            f"📥 *Cron collections* (DB2→ERP): {res['records_processed']} filas "
+            f"({res['since']} … {res['until']}, sucursal {branch_office_id})."
+        ]
+    else:
+        lines = [f"⚠️ Cron collections falló: {res.get('error', '?')}"]
+
+    # Lectura de snapshot en la sesión del request (sin expire_all: rompe el row del comando).
     snap = (
         db.query(CollectionModel)
         .filter(
@@ -215,8 +227,19 @@ def complete_command(
         row.result_text = result_text
 
     db.commit()
-    # Tras commit, refrescar fila para que status/result_text coincidan con BD (evita status stale "ejecutando").
     db.refresh(row)
+    # Si el ORM quedara desincronizado, releer desde BD (no debe pasar tras sesión aparte en cron).
+    expected = "completado" if st == "completado" else "error"
+    if row.status != expected:
+        print(
+            f"[cashier_sync] WARN: status en DB={row.status!r} esperado={expected!r} "
+            f"cmd={command_id}, requery"
+        )
+        row = (
+            db.query(CashierSyncCommandModel)
+            .filter(CashierSyncCommandModel.id == command_id)
+            .first()
+        ) or row
 
     # Notificar solo al número que creó la orden (requester_wa_id en la fila del comando).
     # Si eliges *TODAS* las cajas, recibirás un mensaje por cada caja al terminar (siempre a tu número).
@@ -231,15 +254,19 @@ def complete_command(
         try:
             print(
                 f"[cashier_sync] WhatsApp fin de sync → wa_id={wa} "
-                f"command_id={command_id} cashier_id={cashier_id} status={row.status}"
+                f"command_id={command_id} cashier_id={cashier_id} status={row.status} expected={st}"
             )
-            if row.status == "completado":
+            # Usar `st` (lo que reportó la caja): si la venta ya estaba al día, igual es éxito.
+            if st == "completado":
                 body = (
                     f"✅ *Caja {cashier_id}* sincronizada correctamente.\n"
                     f"Comando #{command_id}"
                 )
                 if duration_ms is not None:
                     body += f"\n⏱ Duración: {duration_ms} ms"
+                rt = (row.result_text or "").lower()
+                if "already exists" in rt or "ya está al día" in rt or "ya estaba al día" in rt:
+                    body += "\nℹ️ _Recaudación al día (sin cambios nuevos en servidor)._"
                 if row.result_text:
                     body += f"\n{row.result_text[:1200]}"
             else:
@@ -258,7 +285,9 @@ def complete_command(
     return {
         "ok": True,
         "command_id": command_id,
-        "status": str(row.status or ""),
+        # sync_status = estado final del comando (evita colisiones con "status" HTTP en algunos clientes)
+        "sync_status": str(row.status or expected),
+        "status": str(row.status or expected),
         "result_text": row.result_text,
     }
 
