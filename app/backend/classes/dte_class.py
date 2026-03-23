@@ -1538,7 +1538,7 @@ class DteClass:
                             check_dte_existence = self.db.query(DteModel).filter(
                                 DteModel.branch_office_id == dte.branch_office_id,
                                 DteModel.rut == dte.rut,
-                                DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                                DteModel.total == dte.total,
                                 DteModel.dte_type_id == 39,
                                 DteModel.dte_version_id == 1,
                                 DteModel.status_id == 4,
@@ -1580,7 +1580,7 @@ class DteClass:
                             check_dte_existence = self.db.query(DteModel).filter(
                                 DteModel.branch_office_id == dte.branch_office_id,
                                 DteModel.rut == dte.rut,
-                                DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                                DteModel.total == dte.total,
                                 DteModel.dte_type_id == 33,
                                 DteModel.dte_version_id == 1,
                                 DteModel.status_id == 4,
@@ -1876,7 +1876,7 @@ class DteClass:
                 check_dte_existence = self.db.query(DteModel).filter(
                     DteModel.branch_office_id == dte.branch_office_id,
                     DteModel.rut == dte.rut,
-                    DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                    DteModel.total == dte.total,
                     DteModel.dte_type_id == 39,
                     DteModel.dte_version_id == 1,
                     DteModel.status_id == 4,
@@ -1916,7 +1916,7 @@ class DteClass:
                 check_dte_existence = self.db.query(DteModel).filter(
                     DteModel.branch_office_id == dte.branch_office_id,
                     DteModel.rut == dte.rut,
-                    DteModel.total == (dte.cash_amount + 5000 if dte.chip_id == 1 else dte.cash_amount),
+                    DteModel.total == dte.total,
                     DteModel.dte_type_id == 33,
                     DteModel.dte_version_id == 1,
                     DteModel.status_id == 4,

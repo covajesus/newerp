@@ -39,12 +39,18 @@ def _dte_rut_sql_or_bill(rut_column, rut_value):
     return or_(*[rut_column == v for v in clean])
 
 
+def _bill_total_from_form(form_data):
+    """Igual que boleta: pre_generate_bill usa will_save para interpretar amount con chip."""
+    if getattr(form_data, "chip_id", None) != 1:
+        return int(form_data.amount)
+    if getattr(form_data, "will_save", 0) == 1:
+        return int(form_data.amount) + 5000
+    return int(form_data.amount)
+
+
 def _sync_bill_dte_amounts_from_form(dte, form_data):
     """Misma lógica que boleta: al emitir folio, fijar montos desde el formulario."""
-    if form_data.chip_id == 1:
-        base = form_data.amount + 5000
-    else:
-        base = form_data.amount
+    base = _bill_total_from_form(form_data)
     dte.chip_id = form_data.chip_id
     dte.cash_amount = base
     dte.subtotal = round(base / 1.19)
@@ -109,9 +115,7 @@ class CustomerBillClass:
         Sirve para leer OC en pre_generate cuando el front no manda id (no masivo).
         """
         period_str = datetime.now().strftime("%Y-%m")
-        expected_total = (
-            form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-        )
+        expected_total = _bill_total_from_form(form_data)
         rut_clause = _dte_rut_sql_or_bill(DteModel.rut, form_data.rut)
 
         def _q(require_total: bool):
@@ -913,10 +917,11 @@ class CustomerBillClass:
             print(f'PDF guardado como {folio}.pdf')
 
     def generate(self, form_data):
+        expected_total_doc = _bill_total_from_form(form_data)
         check_dte_existence = self.db.query(DteModel).filter(
             DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
-            DteModel.total == (form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount),
+            DteModel.total == expected_total_doc,
             DteModel.dte_type_id == 33,
             DteModel.dte_version_id == 1,
             DteModel.status_id == 4,
