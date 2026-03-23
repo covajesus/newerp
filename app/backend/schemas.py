@@ -2026,7 +2026,6 @@ class GenerateCustomerTicket(BaseModel):
     amount: int
     chip_id: int
     will_save: Optional[int] = 0
-    rut: Optional[str] = None
     region_id: Optional[int] = None
     commune_id: Optional[int] = None
     customer: Optional[str] = None
@@ -2041,7 +2040,6 @@ class ToBeAcceptedCustomerBill(BaseModel):
     rut: str
     amount: int
     chip_id: int
-    rut: Optional[str] = None
     region_id: Optional[int] = None
     commune_id: Optional[int] = None
     customer: Optional[str] = None
@@ -2173,7 +2171,6 @@ class GenerateCustomerBill(BaseModel):
     amount: int
     chip_id: int
     will_save: Optional[int] = 0
-    rut: Optional[str] = None
     region_id: Optional[int] = None
     commune_id: Optional[int] = None
     customer: Optional[str] = None

@@ -21,6 +21,14 @@ dtes = APIRouter(
     tags=["Dtes"]
 )
 
+
+def _path_param_is_absent(value) -> bool:
+    """True si el front manda null/undefined en la URL como texto o no hay valor."""
+    if value is None:
+        return True
+    s = str(value).strip().lower()
+    return s in ("", "null", "undefined", "none")
+
 @dtes.post("/")
 def index(dte: DteList, db: Session = Depends(get_db)):
     data = DteClass(db).get_all(dte.branch_office_id, dte.dte_type_id, dte.dte_version_id, dte.since, dte.until, dte.subscriber, dte.page)
@@ -140,13 +148,20 @@ def existence(period:str, db: Session = Depends(get_db)):
 
 @dtes.get("/resend/{dte_id}/{phone}/{email}")
 def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
-    if phone != 0 and phone is not None and phone != "":
-        data = WhatsappClass(db).resend(dte_id, phone)
+    # El front suele armar .../976357193/null → no enviar correo a la cadena "null" (LibreDTE: Invalid address)
+    parts = []
+    if phone != 0:
+        WhatsappClass(db).resend(dte_id, phone)
+        parts.append("WhatsApp: envío solicitado (si falla, revisar token Meta en .env).")
 
-    if email != "" and email is not None:
+    if not _path_param_is_absent(email):
         data = DteClass(db).resend(dte_id, email)
+        parts.append("Correo: envío solicitado." if data is None else str(data))
 
-    return {"message": data}
+    if not parts:
+        return {"message": "Sin acción: teléfono en 0 y correo vacío o 'null' en la URL."}
+
+    return {"message": " ".join(parts)}
 
 @dtes.get("/massive_resend")
 def massive_resend(db: Session = Depends(get_db)):

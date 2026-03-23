@@ -59,7 +59,7 @@ class WhatsappClass:
 
         image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -188,7 +188,7 @@ class WhatsappClass:
         Retorna True si tiene crédito, False si no tiene (error de pago).
         """
         try:
-            token = os.getenv('LIBREDTE_TOKEN')
+            token = os.getenv("LIBREDTE_TOKEN")
             url = "https://graph.facebook.com/v20.0/101066132689690/messages"
             
             headers = {
@@ -262,7 +262,7 @@ class WhatsappClass:
         Envía un mensaje de notificación al número de administrador (976357193) usando template.
         """
         try:
-            token = os.getenv('LIBREDTE_TOKEN')
+            token = os.getenv("LIBREDTE_TOKEN")
             url = "https://graph.facebook.com/v20.0/101066132689690/messages"
             
             headers = {
@@ -338,7 +338,7 @@ class WhatsappClass:
         # URL de la API
         url = 'https://graph.facebook.com/v20.0/101066132689690/messages'
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
 
         # Cabeceras
         headers = {
@@ -400,7 +400,7 @@ class WhatsappClass:
         # URL de la API
         url = 'https://graph.facebook.com/v20.0/101066132689690/messages'
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
 
         # Cabeceras
         headers = {
@@ -453,7 +453,7 @@ class WhatsappClass:
 
         image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
@@ -786,7 +786,7 @@ class WhatsappClass:
         phone = user.phone
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 2).first()
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
 
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
@@ -838,7 +838,7 @@ class WhatsappClass:
         phone = user.phone
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 5).first()
 
-        token = os.getenv('LIBREDTE_TOKEN')
+        token = os.getenv("LIBREDTE_TOKEN")
 
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
@@ -906,7 +906,7 @@ class WhatsappClass:
                 return
 
             # Token de WhatsApp
-            token = os.getenv('LIBREDTE_TOKEN')
+            token = os.getenv("LIBREDTE_TOKEN")
             url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
             headers = {

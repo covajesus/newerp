@@ -15,6 +15,52 @@ import base64
 import uuid
 from sqlalchemy.sql import func
 
+
+def _dte_rut_sql_or(rut_column, rut_value):
+    """
+    El RUT en `dtes.rut` (string) puede guardarse como 27141399-8, 271413998, etc.
+    Evita que generate() no encuentre el borrador por formato distinto al del formulario.
+    """
+    if rut_value is None:
+        return rut_column.is_(None)
+    raw = str(rut_value).strip()
+    if not raw:
+        return rut_column == ""
+    variants = {raw, raw.upper().replace(".", "").replace(" ", "")}
+    s = raw.upper().replace(".", "").replace(" ", "")
+    if "-" in s:
+        left, right = s.split("-", 1)
+        body = "".join(c for c in left if c.isdigit())
+        dv = right.strip().upper()[:1] if right else ""
+        if body and dv:
+            variants.add(f"{body}-{dv}")
+            variants.add(f"{body}{dv}")
+    digits = "".join(c for c in s if c.isdigit())
+    if len(digits) >= 7:
+        variants.add(digits)
+    clean = [v for v in variants if v is not None and str(v).strip()]
+    if len(clean) == 1:
+        return rut_column == clean[0]
+    return or_(*[rut_column == v for v in clean])
+
+
+def _sync_ticket_dte_amounts_from_form(dte, form_data):
+    """
+    Al asignar folio (emitir), alinear cash_amount/total/subtotal/IVA con el formulario.
+    Si generate() enlaza el borrador por fallback (RUT sin coincidencia de total), el registro
+    podía quedar con cash_amount NULL o montos viejos; LibreDTE sí timbra el monto correcto.
+    """
+    if form_data.chip_id == 1:
+        base = form_data.amount + 5000
+    else:
+        base = form_data.amount
+    dte.chip_id = form_data.chip_id
+    dte.cash_amount = base
+    dte.subtotal = round(base / 1.19)
+    dte.tax = base - round(base / 1.19)
+    dte.total = base
+
+
 class CustomerTicketClass:
     def __init__(self, db: Session):
         self.db = db
@@ -603,30 +649,65 @@ class CustomerTicketClass:
             customer_data = json.loads(customer)
 
             code = self.pre_generate_ticket(customer_data, form_data)
+            folio = None
 
             if code is not None:
                 if code == 402:
                     return "LibreDTE payment required"
-                
+
                 folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
 
-                self.save_pdf_ticket(folio)
+                if folio is not None:
+                    self.save_pdf_ticket(folio)
 
+            # store() usa status_id=2 (admin/supervisor) o 1 (rol cajero). Borrador folio=0.
+            # 1) Match estricto con total; 2) mismo RUT/sucursal/periodo sin total (chip/monto redondeo).
+            if folio is not None:
+                period_str = datetime.now().strftime("%Y-%m")
+                expected_total = (
+                    form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+                )
+                rut_clause = _dte_rut_sql_or(DteModel.rut, form_data.rut)
 
-            if folio != None:
-                dte = self.db.query(DteModel).filter(
+                def _find_draft(require_total: bool):
+                    q = (
+                        self.db.query(DteModel)
+                        .filter(
                             DteModel.branch_office_id == form_data.branch_office_id,
-                            DteModel.rut == form_data.rut,
-                            DteModel.total == (form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount),
+                            rut_clause,
                             DteModel.dte_type_id == 39,
                             DteModel.dte_version_id == 1,
-                            DteModel.status_id == 2,
-                            DteModel.period == datetime.now().strftime('%Y-%m')
-                    ).first()
+                            DteModel.status_id.in_((1, 2)),
+                            DteModel.period == period_str,
+                            DteModel.folio == 0,
+                        )
+                    )
+                    if require_total:
+                        q = q.filter(DteModel.total == expected_total)
+                    return q.order_by(DteModel.id.desc()).first()
+
+                dte = _find_draft(True)
+                if dte is None:
+                    dte = _find_draft(False)
+                if dte is None:
+                    dte = (
+                        self.db.query(DteModel)
+                        .filter(
+                            DteModel.branch_office_id == form_data.branch_office_id,
+                            rut_clause,
+                            DteModel.dte_type_id == 39,
+                            DteModel.dte_version_id == 1,
+                            DteModel.status_id.in_((1, 2)),
+                            DteModel.period == period_str,
+                        )
+                        .order_by(DteModel.id.desc())
+                        .first()
+                    )
 
                 if dte:
                     dte.folio = folio
                     dte.status_id = 4
+                    _sync_ticket_dte_amounts_from_form(dte, form_data)
 
                     try:
                         self.db.commit()
@@ -641,9 +722,12 @@ class CustomerTicketClass:
                         self.db.rollback()
                         return {"status": "error", "message": f"Error: {str(e)}"}
                 else:
-                    return {"status": "error", "message": "Dte not found after generation"}
+                    return {
+                        "status": "error",
+                        "message": "Dte not found after generation (no hay borrador tipo 39 para este RUT/monto/sucursal o el total no coincide).",
+                    }
             else:
-                return 'error'
+                return {"status": "error", "message": "No se pudo obtener folio desde LibreDTE"}
         else:
             return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
         
