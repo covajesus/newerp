@@ -24,6 +24,11 @@ class FormDataSimulator:
         self.chip_id = dte.chip_id  # 1 con chip, 0 sin chip (campo en dtes)
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
+        # Orden de compra (factura 33): pre_generate_bill necesita los mismos datos que store/generate
+        self.shopping_order_status_id = getattr(dte, "shopping_order_status_id", None)
+        self.shopping_order_reference = getattr(dte, "shopping_order_reference", None)
+        self.shopping_order_date = getattr(dte, "shopping_order_date", None)
+        self.shopping_order_description = getattr(dte, "shopping_order_description", None)
 
 class CreditNoteFormDataSimulator:
     def __init__(self, dte_id, reason_id=1):

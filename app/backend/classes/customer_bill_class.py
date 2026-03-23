@@ -50,12 +50,105 @@ def _sync_bill_dte_amounts_from_form(dte, form_data):
     dte.subtotal = round(base / 1.19)
     dte.tax = base - round(base / 1.19)
     dte.total = base
+    # Si el cliente reenvía OC al generar, persistir; si no vienen, no pisar lo guardado en store()
+    sid = getattr(form_data, "shopping_order_status_id", None)
+    if sid is not None:
+        dte.shopping_order_status_id = sid
+    for attr in (
+        "shopping_order_reference",
+        "shopping_order_date",
+        "shopping_order_description",
+    ):
+        val = getattr(form_data, attr, None)
+        if val is not None and str(val).strip() not in ("", "null", "None"):
+            setattr(dte, attr, val)
+
+
+def _merge_shopping_order_for_bill(form_data, dte_row):
+    """
+    Estado OC: formulario (generate) o borrador en BD (store / envío masivo con FormDataSimulator).
+    """
+    oc_status = getattr(form_data, "shopping_order_status_id", None)
+    if oc_status is None and dte_row is not None:
+        oc_status = getattr(dte_row, "shopping_order_status_id", None)
+
+    def _coalesce_str(attr, default=None):
+        v = getattr(form_data, attr, None)
+        if v is not None and str(v).strip() not in ("", "null", "None"):
+            return str(v).strip()
+        if dte_row is not None:
+            v2 = getattr(dte_row, attr, None)
+            if v2 is not None and str(v2).strip() != "":
+                return str(v2).strip()
+        return default
+
+    return oc_status, _coalesce_str
+
+
+def _folio_ref_for_oc(oc_reference_str):
+    """FolioRef SII: numérico si aplica; si no, cadena."""
+    if not oc_reference_str:
+        return 0
+    s = str(oc_reference_str).strip()
+    if not s:
+        return 0
+    try:
+        return int(s)
+    except ValueError:
+        return s
 
 
 class CustomerBillClass:
     def __init__(self, db: Session):
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
+
+    def _find_open_bill_draft(self, form_data):
+        """
+        Borrador factura 33 (folio 0, status 1/2) mismo criterio que generate() tras timbrar.
+        Sirve para leer OC en pre_generate cuando el front no manda id (no masivo).
+        """
+        period_str = datetime.now().strftime("%Y-%m")
+        expected_total = (
+            form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        )
+        rut_clause = _dte_rut_sql_or_bill(DteModel.rut, form_data.rut)
+
+        def _q(require_total: bool):
+            q = (
+                self.db.query(DteModel)
+                .filter(
+                    DteModel.branch_office_id == form_data.branch_office_id,
+                    rut_clause,
+                    DteModel.dte_type_id == 33,
+                    DteModel.dte_version_id == 1,
+                    DteModel.status_id.in_((1, 2)),
+                    DteModel.period == period_str,
+                    DteModel.folio == 0,
+                )
+            )
+            if require_total:
+                q = q.filter(DteModel.total == expected_total)
+            return q.order_by(DteModel.id.desc()).first()
+
+        dte = _q(True)
+        if dte is None:
+            dte = _q(False)
+        if dte is None:
+            dte = (
+                self.db.query(DteModel)
+                .filter(
+                    DteModel.branch_office_id == form_data.branch_office_id,
+                    rut_clause,
+                    DteModel.dte_type_id == 33,
+                    DteModel.dte_version_id == 1,
+                    DteModel.status_id.in_((1, 2)),
+                    DteModel.period == period_str,
+                )
+                .order_by(DteModel.id.desc())
+                .first()
+            )
+        return dte
 
     def get_all(self, rol_id = None, rut = None, group = 1, page=0, items_per_page=10):
         try:
@@ -848,46 +941,7 @@ class CustomerBillClass:
 
             # store(): status_id=2 admin/supervisor, 1 cajero (rol 4)
             if folio is not None:
-                period_str = datetime.now().strftime("%Y-%m")
-                expected_total = (
-                    form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-                )
-                rut_clause = _dte_rut_sql_or_bill(DteModel.rut, form_data.rut)
-
-                def _find_draft(require_total: bool):
-                    q = (
-                        self.db.query(DteModel)
-                        .filter(
-                            DteModel.branch_office_id == form_data.branch_office_id,
-                            rut_clause,
-                            DteModel.dte_type_id == 33,
-                            DteModel.dte_version_id == 1,
-                            DteModel.status_id.in_((1, 2)),
-                            DteModel.period == period_str,
-                            DteModel.folio == 0,
-                        )
-                    )
-                    if require_total:
-                        q = q.filter(DteModel.total == expected_total)
-                    return q.order_by(DteModel.id.desc()).first()
-
-                dte = _find_draft(True)
-                if dte is None:
-                    dte = _find_draft(False)
-                if dte is None:
-                    dte = (
-                        self.db.query(DteModel)
-                        .filter(
-                            DteModel.branch_office_id == form_data.branch_office_id,
-                            rut_clause,
-                            DteModel.dte_type_id == 33,
-                            DteModel.dte_version_id == 1,
-                            DteModel.status_id.in_((1, 2)),
-                            DteModel.period == period_str,
-                        )
-                        .order_by(DteModel.id.desc())
-                        .first()
-                    )
+                dte = self._find_open_bill_draft(form_data)
 
                 if dte:
                     dte.folio = folio
@@ -1027,7 +1081,13 @@ class CustomerBillClass:
     def pre_generate_bill(self, customer_data, form_data):  # Added self as the first argument
         branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
 
-        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        dte_row = None
+        _fid = getattr(form_data, "id", None)
+        if _fid not in (None, 0):
+            dte_row = self.db.query(DteModel).filter(DteModel.id == _fid).first()
+        # No masivo: muchas veces generate_bill no envía id (queda 0); la OC está en el borrador
+        if dte_row is None:
+            dte_row = self._find_open_bill_draft(form_data)
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -1100,25 +1160,26 @@ class CustomerBillClass:
                 ]
             }
         
-        # Agregar referencia de Orden de Compra si está presente (solo para facturas tipo 33)
-        # shopping_order_status_id == 1 indica que la factura tiene OC (Orden de Compra)
-        if hasattr(form_data, 'shopping_order_status_id') and form_data.shopping_order_status_id == 1:
+        # Referencia OC (801): formulario al generar y/o borrador guardado en BD (incl. envío masivo vía FormDataSimulator)
+        oc_status, _coalesce_str = _merge_shopping_order_for_bill(form_data, dte_row)
+        if oc_status == 1:
             if "Referencia" not in data:
                 data["Referencia"] = []
-            
-            # Obtener los valores de OC del form_data
-            oc_reference = getattr(form_data, 'shopping_order_reference', None)
-            oc_reference = int(oc_reference) if oc_reference else 0
-            oc_date = getattr(form_data, 'shopping_order_date', None) or datetime.now().strftime('%Y-%m-%d')
-            oc_description = getattr(form_data, 'shopping_order_description', None) or "Orden de Compra"
-            
-            data["Referencia"].append({
-                "NroLinRef": 1,  # Número de línea de referencia
-                "TpoDocRef": 801,  # 801 = Orden de Compra
-                "FolioRef": oc_reference,
-                "FchRef": oc_date,
-                "RazonRef": oc_description
-            })
+
+            oc_reference_raw = _coalesce_str("shopping_order_reference", None)
+            folio_ref = _folio_ref_for_oc(oc_reference_raw)
+            oc_date = _coalesce_str("shopping_order_date", None) or datetime.now().strftime("%Y-%m-%d")
+            oc_description = _coalesce_str("shopping_order_description", None) or "Orden de Compra"
+
+            data["Referencia"].append(
+                {
+                    "NroLinRef": 1,
+                    "TpoDocRef": 801,
+                    "FolioRef": folio_ref,
+                    "FchRef": oc_date,
+                    "RazonRef": oc_description,
+                }
+            )
 
         try:
             # Endpoint para generar un DTE temporal
