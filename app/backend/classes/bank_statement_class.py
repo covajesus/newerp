@@ -1,6 +1,13 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import BankStatementModel, ComparationPendingDtesBankStatementModel, DteModel, ComparationPendingDepositsBankStatementModel, DepositModel
+from app.backend.db.models import (
+    BankStatementModel,
+    BankStatementDteApplicationModel,
+    ComparationPendingDtesBankStatementModel,
+    DteModel,
+    ComparationPendingDepositsBankStatementModel,
+    DepositModel,
+)
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
@@ -337,13 +344,66 @@ class BankStatementClass:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
             
-    def customer_accept(self, id, payment_date):
-        dte = self.db.query(DteModel).filter(DteModel.folio == id).filter(DteModel.dte_version_id == 1).first()
+    def customer_accept(self, bank_statement_id: int, folio: int, payment_date: str):
+        """
+        Registra la aplicación del movimiento de cartola al DTE (clave natural única).
+        Evita reutilizar el mismo depósito al volver a cargar la cartola.
+        """
+        bs = self.db.query(BankStatementModel).filter(BankStatementModel.id == bank_statement_id).first()
+        if not bs:
+            raise HTTPException(status_code=404, detail="Movimiento de cartola no encontrado")
+
+        dte = self.db.query(DteModel).filter(DteModel.folio == folio).filter(DteModel.dte_version_id == 1).first()
+        if not dte:
+            raise HTTPException(status_code=404, detail="DTE no encontrado")
+
+        if str(bs.rut or "").strip() != str(dte.rut or "").strip():
+            raise HTTPException(status_code=400, detail="El RUT de la cartola no coincide con el DTE")
+
+        if int(bs.amount or 0) != int(dte.total or 0):
+            raise HTTPException(status_code=400, detail="El monto de la cartola no coincide con el DTE")
+
+        dep_num = str(bs.deposit_number)
+        dep_date = str(bs.deposit_date)
+        amt = int(bs.amount or 0)
+        rut = str(bs.rut)
+        per = str(bs.period or "")
+
+        existing = (
+            self.db.query(BankStatementDteApplicationModel)
+            .filter(BankStatementDteApplicationModel.deposit_number == dep_num)
+            .filter(BankStatementDteApplicationModel.deposit_date == dep_date)
+            .filter(BankStatementDteApplicationModel.amount == amt)
+            .filter(BankStatementDteApplicationModel.rut == rut)
+            .filter(BankStatementDteApplicationModel.period == per)
+            .first()
+        )
+
+        if existing:
+            if existing.dte_id == dte.id:
+                return "success"
+            raise HTTPException(
+                status_code=400,
+                detail=f"Este movimiento de cartola ya fue aplicado al folio {existing.folio}",
+            )
+
+        rec = BankStatementDteApplicationModel(
+            dte_id=dte.id,
+            folio=dte.folio,
+            deposit_number=dep_num,
+            deposit_date=dep_date,
+            amount=amt,
+            rut=rut,
+            period=per,
+            applied_at=datetime.now(),
+        )
+        self.db.add(rec)
+
         dte.status_id = 5
         dte.payment_date = payment_date
-
         self.db.add(dte)
         self.db.commit()
+        return "success"
 
     def deposit_accept(self, id):
         print(id)

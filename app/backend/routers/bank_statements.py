@@ -70,13 +70,14 @@ async def store(
         print(f"❌ [STORE] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
-@bank_statements.get("/customer/accept/{id}/{payment_date}")
+@bank_statements.get("/customer/accept/{bank_statement_id}/{folio}/{payment_date}")
 def customer_accept(
-    id: int,
+    bank_statement_id: int,
+    folio: int,
     payment_date: str,
     db: Session = Depends(get_db)
 ):
-    message = BankStatementClass(db).customer_accept(id, payment_date)
+    message = BankStatementClass(db).customer_accept(bank_statement_id, folio, payment_date)
 
     return {"message": message}
 

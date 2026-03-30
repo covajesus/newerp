@@ -1595,6 +1595,26 @@ class BankStatementModel(Base):
     period = Column(String(255))
     deposit_date = Column(String(255))
 
+
+class BankStatementDteApplicationModel(Base):
+    """
+    Un movimiento de cartola (clave natural) solo puede aplicarse una vez a un DTE.
+    Evita que al re-subir la cartola el mismo depósito vuelva a emparejar otro folio.
+    """
+
+    __tablename__ = 'bank_statement_dte_applications'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dte_id = Column(Integer, nullable=False)
+    folio = Column(Integer)
+    deposit_number = Column(String(255), nullable=False)
+    deposit_date = Column(String(255), nullable=False)
+    amount = Column(Integer, nullable=False)
+    rut = Column(String(255), nullable=False)
+    period = Column(String(255), nullable=False)
+    applied_at = Column(DateTime())
+
+
 class TransbankStatementModel(Base):
     __tablename__ = 'transbank_statements'
 
