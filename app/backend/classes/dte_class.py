@@ -592,6 +592,8 @@ class DteClass:
                 filters.append(DteModel.supervisor_id == supervisor_id)
             if status_id is not None:
                 filters.append(DteModel.status_id == status_id)
+            if dte_type_id is not None:
+                filters.append(DteModel.dte_type_id == dte_type_id)
 
             filters.append(DteModel.rut != None)
             filters.append(DteModel.dte_version_id == dte_version_id)
@@ -605,6 +607,8 @@ class DteClass:
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
                 DteModel.status_id,
+                DteModel.payment_date,
+                DteModel.period,
                 SupplierModel.rut,
                 SupplierModel.supplier,
                 DteModel.added_date,
@@ -649,7 +653,15 @@ class DteClass:
             print(f"Mostrando resultados del {start_item} al {end_item} de {total_items}")
 
 
-            # Serializar los resultados
+            # Serializar los resultados (payment_date / period para historial de pagos por proveedor)
+            def _serialize_payment_date(raw):
+                if raw is None:
+                    return None
+                if hasattr(raw, "strftime"):
+                    return raw.strftime("%Y-%m-%d")
+                s = str(raw).strip()
+                return s if s else None
+
             serialized_data = [{
                 "id": dte.id,
                 "branch_office_id": dte.branch_office_id,
@@ -660,6 +672,8 @@ class DteClass:
                 "entrance_hour": dte.entrance_hour,
                 "status_id": dte.status_id,
                 "exit_hour": dte.exit_hour,
+                "payment_date": _serialize_payment_date(dte.payment_date),
+                "period": dte.period if dte.period else None,
                 "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                 "branch_office": dte.branch_office
             } for dte in data]
