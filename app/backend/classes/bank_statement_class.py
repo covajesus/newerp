@@ -343,7 +343,17 @@ class BankStatementClass:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Error al leer el Excel: {str(e)}")
-            
+
+    def resolve_bank_statement_id_for_pending_folio(self, folio: int):
+        """Id de línea de cartola (vista pendiente) para un folio; None si no hay fila."""
+        row = (
+            self.db.query(ComparationPendingDtesBankStatementModel.id)
+            .filter(ComparationPendingDtesBankStatementModel.folio == folio)
+            .order_by(ComparationPendingDtesBankStatementModel.id)
+            .first()
+        )
+        return row.id if row else None
+
     def customer_accept(self, bank_statement_id: int, folio: int, payment_date: str):
         """
         Registra la aplicación del movimiento de cartola al DTE (clave natural única).

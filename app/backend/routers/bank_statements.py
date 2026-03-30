@@ -81,6 +81,29 @@ def customer_accept(
 
     return {"message": message}
 
+
+@bank_statements.get("/customer/accept/{folio}/{payment_date}")
+def customer_accept_legacy_folio_date(
+    folio: int,
+    payment_date: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Compatibilidad: URL antigua con solo folio + fecha (2 segmentos tras /accept/).
+    Resuelve bank_statement_id desde la vista de pendientes.
+    La ruta de 3 segmentos va arriba; ésta solo coincide cuando hay exactamente 2 valores.
+    """
+    bsc = BankStatementClass(db)
+    bs_id = bsc.resolve_bank_statement_id_for_pending_folio(folio)
+    if bs_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No hay cartola pendiente para este folio o ya fue aplicada",
+        )
+    message = bsc.customer_accept(bs_id, folio, payment_date)
+    return {"message": message}
+
+
 @bank_statements.get("/deposit/accept/{id}")
 def deposit_accept(
     id: int,
