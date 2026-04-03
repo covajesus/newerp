@@ -29,6 +29,7 @@ def sync_collections_from_db2_to_main(
             since=since,
             until=until,
         )
+        print(data)
         CollectionClass(db_main).update_all_collections(data)
         n = len(data) if data else 0
         return {

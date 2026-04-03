@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
@@ -268,70 +268,49 @@ class CustomerTicketClass:
     def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
         try:
             if rol_id == 1 or rol_id == 2:
-                # Inicialización de filtros dinámicos
+                # Filtros: borradores boleta (39), período mes actual. 0 en sucursal = todas.
                 filters = []
 
-                if branch_office_id != None and branch_office_id != "":
+                if branch_office_id is not None and branch_office_id != "" and branch_office_id != 0:
                     filters.append(DteModel.branch_office_id == branch_office_id)
-                if rut != None and rut != "" and rut != "":
-                    filters.append(DteModel.rut == rut)
+                if rut is not None and str(rut).strip() != "":
+                    filters.append(_dte_rut_sql_or(DteModel.rut, rut))
                 if customer is not None and customer != "":
                     filters.append(CustomerModel.customer.like(f"%{customer}%"))
-                if status_id != None and status_id != "":
+                # Evitar mezclar status_id explícito con status_id < 4 a la vez (contradicciones).
+                if status_id is not None and status_id != "":
                     filters.append(DteModel.status_id == status_id)
+                else:
+                    filters.append(DteModel.status_id < 4)
 
                 filters.append(DteModel.dte_version_id == 1)
-                filters.append(DteModel.status_id < 4)
                 filters.append(DteModel.dte_type_id == 39)
                 filters.append(DteModel.rut != None)
                 filters.append(DteModel.period == datetime.now().strftime('%Y-%m'))
-                
-                if supervisor_id != None:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        DteModel.folio.desc()
-                    )
-                else:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        DteModel.folio.desc()
-                    )
+
+                if supervisor_id is not None and supervisor_id != "":
+                    filters.append(BranchOfficeModel.principal_supervisor == supervisor_id)
+
+                query = self.db.query(
+                    DteModel.id,
+                    DteModel.branch_office_id,
+                    DteModel.folio,
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    DteModel.folio.desc()
+                )
 
                 # Si se solicita paginación
                 if page > 0:
@@ -394,74 +373,46 @@ class CustomerTicketClass:
                         "data": serialized_data
                     }
             elif rol_id == 4:
-                # Inicialización de filtros dinámicos
                 filters = []
 
-                if branch_office_id != None and branch_office_id != "":
+                if branch_office_id is not None and branch_office_id != "" and branch_office_id != 0:
                     filters.append(DteModel.branch_office_id == branch_office_id)
-                if rut != None and rut != "" and rut != "":
-                    filters.append(DteModel.rut == rut)
+                if rut is not None and str(rut).strip() != "":
+                    filters.append(_dte_rut_sql_or(DteModel.rut, rut))
                 if customer is not None and customer != "":
                     filters.append(CustomerModel.customer.like(f"%{customer}%"))
-                if status_id != None and status_id != "":
+                if status_id is not None and status_id != "":
                     filters.append(DteModel.status_id == status_id)
+                else:
+                    filters.append(DteModel.status_id < 4)
 
                 filters.append(DteModel.dte_version_id == 1)
-                filters.append(DteModel.status_id < 4)
                 filters.append(DteModel.dte_type_id == 39)
                 filters.append(DteModel.rut != None)
                 filters.append(DteModel.period == datetime.now().strftime('%Y-%m'))
-                
-                if supervisor_id != None:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        UserModel, UserModel.rut == BranchOfficeModel.principal_supervisor
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        BranchOfficeModel.principal_supervisor == supervisor_rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        DteModel.folio.desc()
-                    )
-                else:
-                    # Construir la consulta base con los filtros aplicados
-                    query = self.db.query(
-                        DteModel.id, 
-                        DteModel.branch_office_id, 
-                        DteModel.folio, 
-                        DteModel.total,
-                        DteModel.added_date,
-                        DteModel.rut,
-                        DteModel.status_id,
-                        DteModel.chip_id,
-                        CustomerModel.customer,
-                        BranchOfficeModel.branch_office
-                    ).outerjoin(
-                        BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
-                    ).outerjoin(
-                        CustomerModel, CustomerModel.rut == DteModel.rut
-                    ).filter(
-                        BranchOfficeModel.principal_supervisor == supervisor_rut
-                    ).filter(
-                        *filters
-                    ).order_by(
-                        DteModel.folio.desc()
-                    )
+
+                query = self.db.query(
+                    DteModel.id,
+                    DteModel.branch_office_id,
+                    DteModel.folio,
+                    DteModel.total,
+                    DteModel.added_date,
+                    DteModel.rut,
+                    DteModel.status_id,
+                    DteModel.chip_id,
+                    CustomerModel.customer,
+                    BranchOfficeModel.branch_office
+                ).outerjoin(
+                    BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                ).outerjoin(
+                    CustomerModel, CustomerModel.rut == DteModel.rut
+                ).filter(
+                    BranchOfficeModel.principal_supervisor == supervisor_rut
+                ).filter(
+                    *filters
+                ).order_by(
+                    DteModel.folio.desc()
+                )
 
                 # Si se solicita paginación
                 if page > 0:

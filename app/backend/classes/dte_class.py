@@ -279,8 +279,8 @@ class DteClass:
                 if dte_version_id is not None:
                     filters.append(DteModel.dte_version_id == dte_version_id)
 
-                # Condición fija: status_id IN (4, 5)
-                filters.append(DteModel.status_id.in_([4, 5]))
+                # Condición fija: incluir emitidos, pagados y con comprobante en revisión
+                filters.append(DteModel.status_id.in_([4, 5, 16]))
 
                 # Construcción de la consulta
                 query = self.db.query(
@@ -332,8 +332,8 @@ class DteClass:
                 if dte_version_id is not None:
                     filters.append(DteModel.dte_version_id == dte_version_id)
 
-                # Condición fija: status_id IN (4, 5)
-                filters.append(DteModel.status_id.in_([4, 5]))
+                # Condición fija: incluir emitidos, pagados y con comprobante en revisión
+                filters.append(DteModel.status_id.in_([4, 5, 16]))
 
                 # Construcción de la consulta
                 query = self.db.query(
