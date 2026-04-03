@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from sqlalchemy import and_
 from sqlalchemy import func, cast, Date
 from typing import Any, Dict, Optional
+from sqlalchemy.dialects import mysql
 
 
 def sync_collections_from_db2_to_main(
@@ -154,6 +155,9 @@ class CollectionClass:
             .filter(CollectionModel.added_date >= limit_date)
             .filter(CollectionModel.added_date <= until_date)
         )
+
+        print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+        print("POR ACA ESTA EL PROBELMA 2")
         
         # Aplicar filtro de branch_office_id si se proporciona
         if branch_office_id is not None:
