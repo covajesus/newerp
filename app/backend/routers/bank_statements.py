@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
@@ -20,6 +22,34 @@ def compare_update_deposits(
     BankStatementClass(db).compare_update_deposits()
 
     return {"message": 'Uploaded successfully'}
+
+@bank_statements.get("/history/list")
+def list_bank_statement_histories(
+    rut: Optional[str] = Query(None, description="RUT (coincidencia exacta normalizada)"),
+    deposit_number: Optional[str] = Query(
+        None, description="N° documento / depósito (exacto normalizado)"
+    ),
+    deposit_date: Optional[str] = Query(
+        None, description="Fecha depósito YYYY-MM-DD (exacta)"
+    ),
+    amount: Optional[int] = Query(None, description="Monto (exacto)"),
+    page: int = Query(1, ge=1),
+    items_per_page: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """
+    Historial de cartolas (`bank_statement_histories`). `added_date` es cuándo se archivó la fila.
+    Filtros opcionales por rut, deposit_number, deposit_date, amount.
+    """
+    return BankStatementClass(db).list_bank_statement_histories(
+        rut=rut,
+        deposit_number=deposit_number,
+        deposit_date=deposit_date,
+        amount=amount,
+        page=page,
+        items_per_page=items_per_page,
+    )
+
 
 @bank_statements.post("/get_comparation_pending_dtes_bank_statements")
 def get_comparation_pending_dtes_bank_statements(

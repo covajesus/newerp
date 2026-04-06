@@ -1596,6 +1596,21 @@ class BankStatementModel(Base):
     deposit_date = Column(String(255))
 
 
+class BankStatementHistoryModel(Base):
+    """Copia de respaldo de movimientos de cartola antes de borrar bank_statements."""
+
+    __tablename__ = 'bank_statement_histories'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bank_statement_type_id = Column(Integer)
+    rut = Column(String(255))
+    deposit_number = Column(String(255))
+    amount = Column(Integer)
+    period = Column(String(255))
+    deposit_date = Column(String(255))
+    added_date = Column(DateTime())
+
+
 class BankStatementDteApplicationModel(Base):
     """
     Un movimiento de cartola (clave natural) solo puede aplicarse una vez a un DTE.

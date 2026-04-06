@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.backend.db.models import (
     BankStatementModel,
+    BankStatementHistoryModel,
     BankStatementDteApplicationModel,
     ComparationPendingDtesBankStatementModel,
     DteModel,
@@ -11,7 +12,8 @@ from app.backend.db.models import (
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
-from sqlalchemy import text
+from sqlalchemy import text, desc
+from sqlalchemy.exc import IntegrityError
 from io import BytesIO
 import pandas as pd
 import re
@@ -19,6 +21,190 @@ import re
 class BankStatementClass:
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def _normalize_period(period):
+        if period is None or str(period).strip() == "":
+            return ""
+        parts = str(period).strip().split("-")
+        if len(parts) >= 2:
+            try:
+                return f"{int(parts[0]):04d}-{int(parts[1]):02d}"
+            except (ValueError, TypeError):
+                pass
+        return str(period).strip()
+
+    @staticmethod
+    def _normalize_deposit_number(dn):
+        if dn is None or dn == "":
+            return ""
+        s = str(dn).strip()
+        try:
+            if "." in s and s.replace(".", "", 1).replace("-", "").isdigit():
+                return str(int(float(s)))
+        except (ValueError, TypeError):
+            pass
+        return s
+
+    @staticmethod
+    def _normalize_amount(amount):
+        if amount is None or amount == "":
+            return None
+        try:
+            return int(round(float(amount)))
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _normalize_rut(rut):
+        if rut is None:
+            return ""
+        if rut == 0 or rut == "0":
+            return "0"
+        return str(rut).strip()
+
+    def _history_row_exists(self, period, bank_statement_type_id, rut, deposit_number, deposit_date, amount):
+        p = self._normalize_period(period)
+        if not p:
+            return False
+        amt = self._normalize_amount(amount)
+        dep = self._normalize_deposit_number(deposit_number)
+        rut_s = self._normalize_rut(rut)
+        row = (
+            self.db.query(BankStatementHistoryModel)
+            .filter(BankStatementHistoryModel.period == p)
+            .filter(BankStatementHistoryModel.bank_statement_type_id == bank_statement_type_id)
+            .filter(BankStatementHistoryModel.deposit_date == deposit_date)
+            .filter(BankStatementHistoryModel.amount == amt)
+            .filter(BankStatementHistoryModel.deposit_number == dep)
+            .filter(BankStatementHistoryModel.rut == rut_s)
+            .first()
+        )
+        return row is not None
+
+    def _archive_bank_statements_to_history(self):
+        """Antes del DELETE masivo, copia movimientos a historial sin duplicar por mes + clave natural."""
+        rows = self.db.query(BankStatementModel).all()
+        archived = 0
+        skipped_dup = 0
+        for bs in rows:
+            if self._history_row_exists(
+                bs.period,
+                bs.bank_statement_type_id,
+                bs.rut,
+                bs.deposit_number,
+                bs.deposit_date,
+                bs.amount,
+            ):
+                skipped_dup += 1
+                continue
+            p = self._normalize_period(bs.period)
+            if not p:
+                skipped_dup += 1
+                continue
+            h = BankStatementHistoryModel(
+                bank_statement_type_id=bs.bank_statement_type_id,
+                rut=self._normalize_rut(bs.rut),
+                deposit_number=self._normalize_deposit_number(bs.deposit_number),
+                amount=self._normalize_amount(bs.amount),
+                period=p,
+                deposit_date=bs.deposit_date,
+                added_date=datetime.now(),
+            )
+            self.db.add(h)
+            archived += 1
+        try:
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Conflicto al guardar historial de cartola (movimiento duplicado).",
+            )
+        return archived, skipped_dup
+
+    def list_bank_statement_histories(
+        self,
+        rut=None,
+        deposit_number=None,
+        deposit_date=None,
+        amount=None,
+        page=1,
+        items_per_page=50,
+    ):
+        """
+        Lista historial de cartolas. Filtros opcionales: rut, deposit_number, deposit_date, amount (coincidencia exacta tras normalizar).
+        """
+        try:
+            q = self.db.query(BankStatementHistoryModel)
+            if rut is not None and str(rut).strip() != "":
+                r = self._normalize_rut(rut)
+                q = q.filter(BankStatementHistoryModel.rut == r)
+            if deposit_number is not None and str(deposit_number).strip() != "":
+                d = self._normalize_deposit_number(deposit_number)
+                q = q.filter(BankStatementHistoryModel.deposit_number == d)
+            if deposit_date is not None and str(deposit_date).strip() != "":
+                q = q.filter(
+                    BankStatementHistoryModel.deposit_date == str(deposit_date).strip()
+                )
+            if amount is not None:
+                amt = self._normalize_amount(amount)
+                if amt is not None:
+                    q = q.filter(BankStatementHistoryModel.amount == amt)
+
+            total_items = q.count()
+            if total_items == 0:
+                return {
+                    "status": "success",
+                    "total_items": 0,
+                    "total_pages": 0,
+                    "current_page": page,
+                    "items_per_page": items_per_page,
+                    "data": [],
+                }
+            total_pages = (total_items + items_per_page - 1) // items_per_page
+            if page < 1 or page > total_pages:
+                return {
+                    "status": "error",
+                    "message": "Invalid page number",
+                }
+
+            data = (
+                q.order_by(
+                    desc(BankStatementHistoryModel.added_date),
+                    desc(BankStatementHistoryModel.id),
+                )
+                .offset((page - 1) * items_per_page)
+                .limit(items_per_page)
+                .all()
+            )
+
+            serialized = [
+                {
+                    "id": row.id,
+                    "bank_statement_type_id": row.bank_statement_type_id,
+                    "rut": row.rut,
+                    "deposit_number": row.deposit_number,
+                    "amount": row.amount,
+                    "period": row.period,
+                    "deposit_date": row.deposit_date,
+                    "added_date": row.added_date.strftime("%Y-%m-%d %H:%M:%S")
+                    if row.added_date
+                    else None,
+                }
+                for row in data
+            ]
+
+            return {
+                "status": "success",
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "data": serialized,
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     def compare_update_deposits(self):
         try:
@@ -215,6 +401,14 @@ class BankStatementClass:
 
     def read_store_bank_statement(self, remote_path, period):
         try:
+            fixed_period = HelperClass.fix_current_dte_period(period)
+
+            archived_n, skipped_hist = self._archive_bank_statements_to_history()
+            print(
+                f"Historial cartola: {archived_n} archivados, "
+                f"{skipped_hist} omitidos (ya existían en ese mes)"
+            )
+
             # Usar DELETE en lugar de TRUNCATE para respetar las claves foráneas
             self.db.execute(text("DELETE FROM bank_statements"))
             self.db.commit()
@@ -239,8 +433,6 @@ class BankStatementClass:
             total_rows = len(df)
             saved_count = 0
             skipped_count = 0
-
-            fixed_period = HelperClass.fix_current_dte_period(period)
 
             for index, row in df.iterrows():
                 # Verificar si la fila contiene "Saldos diarios" y omitirla
@@ -336,8 +528,11 @@ class BankStatementClass:
             
             # Retornar mensaje de éxito
             # El procesamiento de IA se hará en background tasks (no bloquea)
-            result_message = f"Procesamiento completado: {saved_count} registros guardados, {skipped_count} filas omitidas"
-            
+            result_message = (
+                f"Historial: {archived_n} movimientos archivados, {skipped_hist} ya existían en historial (mismo mes/clave). "
+                f"Procesamiento: {saved_count} registros guardados, {skipped_count} filas omitidas."
+            )
+
             return result_message
 
         except Exception as e:
