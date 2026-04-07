@@ -640,10 +640,7 @@ class DteClass:
                 DteModel.rut.label("issuer_rut"),
                 SupplierModel.rut,
                 SupplierModel.supplier,
-                DteModel.added_date,
-                BranchOfficeModel.branch_office
-            ).outerjoin(
-                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
+                DteModel.added_date
             ).outerjoin(
                 SupplierModel, SupplierModel.rut == DteModel.rut
             ).filter(
