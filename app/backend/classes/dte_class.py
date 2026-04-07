@@ -616,7 +616,7 @@ class DteClass:
                 filters.append(DteModel.dte_type_id == dte_type_id)
             else:
                 # Mismo criterio que ReceivedTributaryDocumentClass.get_all (facturas/boletas recibidas)
-                filters.append(DteModel.dte_type_id.in_([33, 34, 39]))
+                filters.append(DteModel.dte_type_id.in_([33, 34, 39, 61]))
 
             filters.append(DteModel.rut != None)
             # Recibidos: misma versión que el resto del módulo (2). Si no viene, no usar IS NULL.
