@@ -570,33 +570,58 @@ class DteClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=0, items_per_page=10):
+    def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=1, items_per_page=10):
         try:
+            # page=0 desde el front invalidaba siempre la paginación (page < 1)
+            if page is None or page < 1:
+                page = 1
+
+            def _filled(val):
+                if val is None:
+                    return False
+                if isinstance(val, str) and val.strip() == "":
+                    return False
+                return True
+
             # Inicialización de filtros dinámicos
             filters = []
-            if folio is not None:
-                filters.append(DteModel.folio == folio) 
+            if _filled(folio):
+                try:
+                    filters.append(DteModel.folio == int(str(folio).strip()))
+                except (ValueError, TypeError):
+                    filters.append(DteModel.folio == folio)
             if branch_office_id is not None:
                 filters.append(DteModel.branch_office_id == branch_office_id)
-            if rut is not None:
-                filters.append(DteModel.rut == rut)
-            if supplier is not None:
-                filters.append(SupplierModel.supplier.like(f"%{supplier}%"))
-            if until is not None:
-                filters.append(DteModel.added_date <= until)
-            if since is not None:
-                filters.append(DteModel.added_date >= since)
-            if amount is not None:
-                filters.append(DteModel.total == amount)
-            if supervisor_id is not None:
-                filters.append(DteModel.supervisor_id == supervisor_id)
+            if _filled(rut):
+                filters.append(DteModel.rut == str(rut).strip())
+            if _filled(supplier):
+                filters.append(SupplierModel.supplier.like(f"%{str(supplier).strip()}%"))
+            if _filled(until):
+                filters.append(DteModel.added_date <= str(until).strip())
+            if _filled(since):
+                filters.append(DteModel.added_date >= str(since).strip())
+            if _filled(amount):
+                try:
+                    filters.append(DteModel.total == int(str(amount).strip()))
+                except (ValueError, TypeError):
+                    filters.append(DteModel.total == amount)
+            if _filled(supervisor_id):
+                try:
+                    filters.append(DteModel.supervisor_id == int(str(supervisor_id).strip()))
+                except (ValueError, TypeError):
+                    filters.append(DteModel.supervisor_id == supervisor_id)
             if status_id is not None:
                 filters.append(DteModel.status_id == status_id)
             if dte_type_id is not None:
                 filters.append(DteModel.dte_type_id == dte_type_id)
+            else:
+                # Mismo criterio que ReceivedTributaryDocumentClass.get_all (facturas/boletas recibidas)
+                filters.append(DteModel.dte_type_id.in_([33, 34, 39]))
 
             filters.append(DteModel.rut != None)
-            filters.append(DteModel.dte_version_id == dte_version_id)
+            # Recibidos: misma versión que el resto del módulo (2). Si no viene, no usar IS NULL.
+            effective_version = 2 if dte_version_id is None else dte_version_id
+            filters.append(DteModel.dte_version_id == effective_version)
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
@@ -612,6 +637,7 @@ class DteClass:
                 DteModel.payment_comment,
                 DteModel.payment_number,
                 DteModel.period,
+                DteModel.rut.label("issuer_rut"),
                 SupplierModel.rut,
                 SupplierModel.supplier,
                 DteModel.added_date,
@@ -671,7 +697,7 @@ class DteClass:
                 "folio": dte.folio,
                 "total": dte.total,
                 "supplier": dte.supplier,
-                "rut": dte.rut,
+                "rut": dte.issuer_rut,
                 "entrance_hour": dte.entrance_hour,
                 "status_id": dte.status_id,
                 "exit_hour": dte.exit_hour,

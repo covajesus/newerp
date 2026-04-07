@@ -1420,7 +1420,7 @@ class ReceivedDteList(BaseModel):
     status_id: Optional[int] = None  # Opcional con valor predeterminado None
     dte_version_id: Optional[int] = None  # Opcional con valor predeterminado None
     dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
-    page: int = 0  # Opcional con valor predeterminado 0
+    page: int = 1  # Paginación coherente con get_received_tributary_documents (antes 0 invalidaba la búsqueda)
 
 class ImportDte(BaseModel):
     rut: str
