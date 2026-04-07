@@ -95,12 +95,14 @@ class BankStatementClass:
         return row is not None
 
     def _archive_bank_statements_to_history(self):
-        """Antes del DELETE masivo, copia movimientos a historial sin duplicar por mes + clave natural."""
+        """Antes del DELETE masivo, copia solo movimientos tipo 2 (terceros) al historial; tipo 1 no se archiva."""
         rows = self.db.query(BankStatementModel).all()
         archived = 0
         skipped_dup = 0
         seen_keys = set()
         for bs in rows:
+            if bs.bank_statement_type_id != 2:
+                continue
             key = self._natural_key_bank_statement(bs)
             p = key[0]
             if not p:
