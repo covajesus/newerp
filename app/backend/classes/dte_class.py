@@ -625,10 +625,10 @@ class DteClass:
 
             # Construir la consulta base con los filtros aplicados
             query = self.db.query(
-                DteModel.id, 
-                DteModel.branch_office_id, 
-                DteModel.folio, 
-                DteModel.total, 
+                DteModel.id,
+                DteModel.branch_office_id,
+                DteModel.folio,
+                DteModel.total,
                 DteModel.entrance_hour,
                 DteModel.exit_hour,
                 DteModel.status_id,
@@ -640,7 +640,10 @@ class DteClass:
                 DteModel.rut.label("issuer_rut"),
                 SupplierModel.rut,
                 SupplierModel.supplier,
-                DteModel.added_date
+                DteModel.added_date,
+                BranchOfficeModel.branch_office,
+            ).outerjoin(
+                BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id
             ).outerjoin(
                 SupplierModel, SupplierModel.rut == DteModel.rut
             ).filter(
@@ -648,6 +651,14 @@ class DteClass:
             ).order_by(
                 DteModel.id.desc()
             )
+
+            def _mysql_sql(statement):
+                return str(
+                    statement.compile(
+                        dialect=mysql.dialect(),
+                        compile_kwargs={"literal_binds": True},
+                    )
+                )
 
             # Paginación
             total_items = query.count()
@@ -660,6 +671,7 @@ class DteClass:
                     "total_items": 0,
                     "total_pages": 0,
                     "current_page": page,
+                    "mysql_base": _mysql_sql(query.statement),
                 }
 
             total_pages = (total_items + items_per_page - 1) // items_per_page
@@ -668,12 +680,13 @@ class DteClass:
                 return {"status": "error", "message": "Invalid page number"}
 
             offset = (page - 1) * items_per_page
-            data = query.offset(offset).limit(items_per_page).all()
+            paged = query.offset(offset).limit(items_per_page)
+            data = paged.all()
 
-            # Mostrar consulta generada
-            print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+            mysql_base = _mysql_sql(query.statement)
+            mysql_paged = _mysql_sql(paged.statement)
+            print(mysql_paged)
 
-            # Mostrar rango de elementos
             start_item = offset + 1
             end_item = min(offset + items_per_page, total_items)
             print(f"Mostrando resultados del {start_item} al {end_item} de {total_items}")
@@ -712,7 +725,9 @@ class DteClass:
                 "total_pages": total_pages,
                 "current_page": page,
                 "items_per_page": items_per_page,
-                "data": serialized_data
+                "data": serialized_data,
+                "mysql_base": mysql_base,
+                "mysql_paged": mysql_paged,
             }
 
         except Exception as e:
