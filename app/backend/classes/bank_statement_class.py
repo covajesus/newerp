@@ -63,21 +63,33 @@ class BankStatementClass:
             return "0"
         return str(rut).strip()
 
-    def _history_row_exists(self, period, bank_statement_type_id, rut, deposit_number, deposit_date, amount):
-        p = self._normalize_period(period)
+    @staticmethod
+    def _normalize_deposit_date_str(deposit_date):
+        if deposit_date is None or str(deposit_date).strip() == "":
+            return ""
+        return str(deposit_date).strip()
+
+    def _natural_key_bank_statement(self, bs):
+        """Clave alineada al UNIQUE de bank_statement_histories (misma lógica que al insertar)."""
+        p = self._normalize_period(bs.period)
+        amt = self._normalize_amount(bs.amount)
+        dep = self._normalize_deposit_number(bs.deposit_number)
+        rut_s = self._normalize_rut(bs.rut)
+        dd = self._normalize_deposit_date_str(bs.deposit_date)
+        return (p, bs.bank_statement_type_id, dep, rut_s, dd, amt)
+
+    def _history_row_exists_for_key(self, key):
+        p, type_id, dep, rut_s, dd, amt = key
         if not p:
             return False
-        amt = self._normalize_amount(amount)
-        dep = self._normalize_deposit_number(deposit_number)
-        rut_s = self._normalize_rut(rut)
         row = (
             self.db.query(BankStatementHistoryModel)
             .filter(BankStatementHistoryModel.period == p)
-            .filter(BankStatementHistoryModel.bank_statement_type_id == bank_statement_type_id)
-            .filter(BankStatementHistoryModel.deposit_date == deposit_date)
-            .filter(BankStatementHistoryModel.amount == amt)
+            .filter(BankStatementHistoryModel.bank_statement_type_id == type_id)
             .filter(BankStatementHistoryModel.deposit_number == dep)
             .filter(BankStatementHistoryModel.rut == rut_s)
+            .filter(BankStatementHistoryModel.deposit_date == dd)
+            .filter(BankStatementHistoryModel.amount == amt)
             .first()
         )
         return row is not None
@@ -87,40 +99,39 @@ class BankStatementClass:
         rows = self.db.query(BankStatementModel).all()
         archived = 0
         skipped_dup = 0
+        seen_keys = set()
         for bs in rows:
-            if self._history_row_exists(
-                bs.period,
-                bs.bank_statement_type_id,
-                bs.rut,
-                bs.deposit_number,
-                bs.deposit_date,
-                bs.amount,
-            ):
-                skipped_dup += 1
-                continue
-            p = self._normalize_period(bs.period)
+            key = self._natural_key_bank_statement(bs)
+            p = key[0]
             if not p:
                 skipped_dup += 1
                 continue
+            if key in seen_keys:
+                skipped_dup += 1
+                continue
+            seen_keys.add(key)
+            if self._history_row_exists_for_key(key):
+                skipped_dup += 1
+                continue
+            _, type_id, dep, rut_s, dd, amt = key
             h = BankStatementHistoryModel(
-                bank_statement_type_id=bs.bank_statement_type_id,
-                rut=self._normalize_rut(bs.rut),
-                deposit_number=self._normalize_deposit_number(bs.deposit_number),
-                amount=self._normalize_amount(bs.amount),
+                bank_statement_type_id=type_id,
+                rut=rut_s,
+                deposit_number=dep,
+                amount=amt,
                 period=p,
-                deposit_date=bs.deposit_date,
+                deposit_date=dd,
                 added_date=datetime.now(),
             )
-            self.db.add(h)
-            archived += 1
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Conflicto al guardar historial de cartola (movimiento duplicado).",
-            )
+            try:
+                with self.db.begin_nested():
+                    self.db.add(h)
+                    self.db.flush()
+                archived += 1
+            except IntegrityError:
+                skipped_dup += 1
+                continue
+        self.db.commit()
         return archived, skipped_dup
 
     def list_bank_statement_histories(
