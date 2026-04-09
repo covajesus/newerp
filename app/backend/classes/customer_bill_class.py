@@ -57,8 +57,7 @@ def _sync_bill_dte_amounts_from_form(dte, form_data):
     dte.tax = base - round(base / 1.19)
     dte.total = base
     cid = getattr(form_data, "category_id", None)
-    if cid is not None:
-        dte.category_id = cid
+    dte.category_id = cid if cid is not None else 1
 
 
 def _bill_category_id(form_data, dte_row):
@@ -735,9 +734,10 @@ class CustomerBillClass:
         dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
         dte.chip_id = form_data.chip_id
         dte.status_id = 2
-        
-        if hasattr(form_data, 'category_id') and form_data.category_id is not None:
-            dte.category_id = form_data.category_id
+
+        cid = getattr(form_data, "category_id", None)
+        dte.category_id = cid if cid is not None else 1
+        dte.quantity = None
 
         refs = getattr(form_data, "references", None)
         if refs is not None:
@@ -1091,9 +1091,10 @@ class CustomerBillClass:
             dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            
-            if hasattr(form_data, 'category_id') and form_data.category_id is not None:
-                dte.category_id = form_data.category_id
+
+            cid = getattr(form_data, "category_id", None)
+            dte.category_id = cid if cid is not None else 1
+            dte.quantity = None
 
             ref_dicts = []
             refs = getattr(form_data, "references", None)
@@ -1163,6 +1164,8 @@ class CustomerBillClass:
             credit_note_dte.total = -abs(dte.cash_amount)
             credit_note_dte.period = datetime.now().strftime('%Y-%m')
             credit_note_dte.added_date = dte.added_date
+            credit_note_dte.category_id = 1
+            credit_note_dte.quantity = None
 
             self.db.add(credit_note_dte)
             

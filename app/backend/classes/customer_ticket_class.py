@@ -500,6 +500,17 @@ class CustomerTicketClass:
         dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
         dte.chip_id = form_data.chip_id
         dte.status_id = 2
+        cid = getattr(form_data, "category_id", None)
+        if cid is not None:
+            dte.category_id = cid
+            qty = getattr(form_data, "quantity", None)
+            if cid == 3 and qty is not None:
+                dte.quantity = int(qty)
+            else:
+                dte.quantity = None
+        else:
+            dte.category_id = 1
+            dte.quantity = None
 
         self.db.commit()
         self.db.refresh(dte)
@@ -906,6 +917,8 @@ class CustomerTicketClass:
             credit_note_dte.discount = 0
             credit_note_dte.total = dte.cash_amount
             credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            credit_note_dte.category_id = 1
+            credit_note_dte.quantity = None
 
             self.db.add(credit_note_dte)
             

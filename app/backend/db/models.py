@@ -925,6 +925,26 @@ class CommuneModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+
+class DeliveryAddressTagModel(Base):
+    __tablename__ = 'delivery_address_tags'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    region_id = Column(Integer, ForeignKey('regions.id'), nullable=False)
+    commune_id = Column(Integer, ForeignKey('communes.id'), nullable=False)
+    branch_office = Column(String(512), nullable=False)
+    address = Column(String(1024), nullable=False)
+    supervisor_rut = Column(String(32), nullable=False)
+    supervisor = Column(String(512), nullable=False)
+    phone = Column(String(64), nullable=True)
+    company_name = Column(String(512), nullable=False)
+    company_rut = Column(String(64), nullable=False)
+    company_phone = Column(String(64), nullable=False)
+    company_address = Column(String(1024), nullable=False)
+    added_date = Column(DateTime(), nullable=True)
+    updated_date = Column(DateTime(), nullable=True)
+
+
 class AlertTypeModel(Base):
     __tablename__ = 'alert_types'
 

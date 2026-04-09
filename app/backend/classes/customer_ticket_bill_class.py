@@ -722,6 +722,8 @@ class CustomerTicketBillClass:
                 credit_note_dte.total = -abs(int(dte.cash_amount))
                 credit_note_dte.period = period
                 credit_note_dte.added_date = dte.added_date
+                credit_note_dte.category_id = 1
+                credit_note_dte.quantity = None
 
                 self.db.add(credit_note_dte)
                 self.db.commit()
@@ -807,6 +809,8 @@ class CustomerTicketBillClass:
                         existing_credit_note.total = -abs(int(dte.cash_amount))
                         existing_credit_note.period = period
                         existing_credit_note.status_id = 5
+                        existing_credit_note.category_id = 1
+                        existing_credit_note.quantity = None
 
                         self.db.add(existing_credit_note)
                         
@@ -835,6 +839,8 @@ class CustomerTicketBillClass:
                         credit_note_dte.total = -abs(int(dte.cash_amount))
                         credit_note_dte.period = period
                         credit_note_dte.added_date = dte.added_date
+                        credit_note_dte.category_id = 1
+                        credit_note_dte.quantity = None
 
                         self.db.add(credit_note_dte)
                         

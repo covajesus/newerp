@@ -368,6 +368,8 @@ class MachineTicketClass:
                 credit_note_dte.discount = 0
                 credit_note_dte.total = -abs(int(amount))
                 credit_note_dte.added_date = dte_date_detail
+                credit_note_dte.category_id = 1
+                credit_note_dte.quantity = None
             else:
                 credit_note_dte = DteModel()
                 credit_note_dte.branch_office_id = dte.branch_office_id
@@ -386,6 +388,8 @@ class MachineTicketClass:
                 credit_note_dte.discount = 0
                 credit_note_dte.total = -abs(int(amount))
                 credit_note_dte.added_date = dte_date_detail
+                credit_note_dte.category_id = 1
+                credit_note_dte.quantity = None
 
             self.db.add(credit_note_dte)
             

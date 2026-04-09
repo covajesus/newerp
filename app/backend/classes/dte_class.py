@@ -15,7 +15,7 @@ from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillCla
 
 # Clases auxiliares para simulación de datos de formulario
 class FormDataSimulator:
-    def __init__(self, dte):
+    def __init__(self, dte, massive_emit: bool = False):
         self.branch_office_id = dte.branch_office_id
         self.rut = dte.rut
         # chip_id viene de la tabla dtes: 1 = con chip, 0 = sin chip. pre_generate usa esto para la línea de $5000.
@@ -24,8 +24,14 @@ class FormDataSimulator:
         self.chip_id = dte.chip_id  # 1 con chip, 0 sin chip (campo en dtes)
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
-        # Orden de compra (factura 33): pre_generate_bill necesita los mismos datos que store/generate
-        self.category_id = getattr(dte, "category_id", None)
+        # Emisión masiva: boleta/factura/NC siempre categoría estándar (1), sin cantidad grupal.
+        if massive_emit:
+            self.category_id = 1
+            self.quantity = None
+        else:
+            # Orden de compra (factura 33): pre_generate_bill necesita los mismos datos que store/generate
+            self.category_id = getattr(dte, "category_id", None)
+            self.quantity = getattr(dte, "quantity", None)
 
 class CreditNoteFormDataSimulator:
     def __init__(self, dte_id, reason_id=1):
@@ -35,6 +41,14 @@ class CreditNoteFormDataSimulator:
 class DteClass:
     def __init__(self, db):
         self.db = db
+
+    def _pin_massive_standard_category(self, dte):
+        """Emisión masiva: boleta, factura y NC van como category_id=1 (sin quantity grupal)."""
+        dte.category_id = 1
+        dte.quantity = None
+        self.db.add(dte)
+        self.db.commit()
+        self.db.refresh(dte)
 
     def validate_old_dte(self, folio, rut, dte_version_id):
         try:
@@ -1517,6 +1531,9 @@ class DteClass:
             # Si dte_type_id es mayor que 0, filtrar por tipo de DTE
             if dte_type_id > 0:
                 base_filter.append(DteModel.dte_type_id == dte_type_id)
+
+            # Alineado con envío masivo: solo category_id estándar (1) o legacy NULL
+            base_filter.append(or_(DteModel.category_id == 1, DteModel.category_id.is_(None)))
             
             quantity = self.db.query(DteModel).filter(*base_filter).count()
             
@@ -1553,11 +1570,12 @@ class DteClass:
             # Obtener el período actual en formato YYYY-MM
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Buscar DTEs del período actual con status_id = 2
+            # Solo categoría estándar (1) o sin categoría; no boleta grupal (3) ni factura con refs (2) por masivo
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
-                DteModel.branch_office_id == 32
+                DteModel.branch_office_id == 32,
+                or_(DteModel.category_id == 1, DteModel.category_id.is_(None)),
             ).all()
             
             whatsapp_class = WhatsappClass(self.db)
@@ -1586,9 +1604,9 @@ class DteClass:
                     # Aplicar el mismo proceso que en generate_ticket/generate_bill según el tipo
                     # Si el DTE no tiene folio, necesita generarlo primero
                     if not dte.folio or dte.folio == 0:
-                        
+                        self._pin_massive_standard_category(dte)
                         # Crear un objeto form_data simulado
-                        form_data_sim = FormDataSimulator(dte)
+                        form_data_sim = FormDataSimulator(dte, massive_emit=True)
                         
                         # Verificar el tipo de DTE para usar la clase correcta
                         if dte.dte_type_id == 39:  # Boleta electrónica
@@ -1678,6 +1696,7 @@ class DteClass:
                             raise Exception(f"Tipo de DTE no soportado: {dte.dte_type_id}")
                             
                     else:
+                        self._pin_massive_standard_category(dte)
                         # Si ya tiene folio, solo actualizar status y enviar WhatsApp
                         dte.status_id = 4
                         self.db.commit()
@@ -1924,9 +1943,10 @@ class DteClass:
                     "message": "DTE ya generado",
                     "pdf_url": pdf_url
                 }
-            
+
+            self._pin_massive_standard_category(dte)
             # Crear un objeto form_data simulado
-            form_data_sim = FormDataSimulator(dte)
+            form_data_sim = FormDataSimulator(dte, massive_emit=True)
             
             # Generar según el tipo de DTE
             if dte.dte_type_id == 39:  # Boleta electrónica
@@ -2066,7 +2086,8 @@ class DteClass:
             base_filter = [
                 DteModel.period == current_period,
                 status_filter,
-                DteModel.dte_version_id == 1
+                DteModel.dte_version_id == 1,
+                or_(DteModel.category_id == 1, DteModel.category_id.is_(None)),
             ]
             
             # Si branch_office_id es 0, procesar todas las sucursales

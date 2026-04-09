@@ -2421,3 +2421,27 @@ class PreventiveMaintenanceResponseDetail(BaseModel):
 
 class PreventiveMaintenanceWithDetails(PreventiveMaintenanceResponse):
     responses: List[PreventiveMaintenanceResponseDetail] = []
+
+
+class DeliveryAddressTagResponse(BaseModel):
+    """Etiquetas de envío: sucursal, dirección, supervisor y datos de empresa."""
+
+    id: int
+    region_id: int
+    commune_id: int
+    branch_office: str
+    address: str
+    supervisor_rut: str
+    supervisor: str
+    phone: Optional[str] = None
+    company_name: str
+    company_rut: str
+    company_phone: str
+    company_address: str
+    region_name: Optional[str] = None
+    commune_name: Optional[str] = None
+    added_date: Optional[str] = None
+    updated_date: Optional[str] = None
+
+    class Config:
+        from_attributes = True
