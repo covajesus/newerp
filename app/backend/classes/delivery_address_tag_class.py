@@ -1,7 +1,15 @@
+import os
+import tempfile
+import urllib.request
+from io import BytesIO
+
 from sqlalchemy.orm import Session
 from fpdf import FPDF
 
 from app.backend.db.models import DeliveryAddressTagModel, RegionModel, CommuneModel
+
+TAG_LOGO_URL = "https://intrajis.com/assets/logo-1jO0MaUN.png"
+TAG_LOGO_USER_AGENT = "Mozilla/5.0 (compatible; JISParking-ERP/1.0)"
 
 
 def _title_case_words(s: str) -> str:
@@ -20,6 +28,37 @@ def _company_rut_line(company_rut: str) -> str:
     if r.lower().startswith("rut "):
         return r
     return f"Rut {r}"
+
+
+def _add_logo_mm(pdf: FPDF, x: float, y: float, w_mm: float) -> bool:
+    """Descarga el logo y lo dibuja; compatible con fpdf clásico (solo ruta a archivo)."""
+    try:
+        req = urllib.request.Request(
+            TAG_LOGO_URL,
+            headers={"User-Agent": TAG_LOGO_USER_AGENT},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read()
+        if not raw:
+            return False
+        try:
+            pdf.image(BytesIO(raw), x=x, y=y, w=w_mm)
+            return True
+        except Exception:
+            pass
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(raw)
+            path = tmp.name
+        try:
+            pdf.image(path, x=x, y=y, w=w_mm)
+            return True
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+    except Exception:
+        return False
 
 
 def _draw_double_rect(pdf: FPDF, x: float, y: float, w: float, h: float, gap: float) -> None:
@@ -153,19 +192,26 @@ class DeliveryAddressTagClass:
         x = pad_x
         y = M + 4.0
 
+        logo_w = 16.0
+        x_logo = W - pad_x - logo_w
+        y_logo = M + 3.0
+        _add_logo_mm(pdf, x_logo, y_logo, logo_w)
+        inner_w_top = max(20.0, inner_w - logo_w - 2.0)
+
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Helvetica", "B", 10)
         line_h_top = 4.6
         for line in top_lines:
             pdf.set_xy(x, y)
-            pdf.multi_cell(inner_w, line_h_top, line, align="L", new_x="LMARGIN", new_y="NEXT")
+            # Sin new_x/new_y: compatible con fpdf antiguo (p. ej. servidor sin fpdf2 completo).
+            pdf.multi_cell(inner_w_top, line_h_top, line, align="L")
             y = pdf.get_y()
 
         y += gap_blocks
 
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_xy(x, y)
-        pdf.multi_cell(inner_w, 4.0, "Remite :", align="L", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(inner_w, 4.0, "Remite :", align="L")
         y = pdf.get_y()
 
         pdf.set_font("Helvetica", "", 8.5)
@@ -178,7 +224,7 @@ class DeliveryAddressTagClass:
         line_h_bot = 4.0
         for line in bottom_lines:
             pdf.set_xy(x, y)
-            pdf.multi_cell(inner_w, line_h_bot, line, align="L", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(inner_w, line_h_bot, line, align="L")
             y = pdf.get_y()
 
         return bytes(pdf.output())
