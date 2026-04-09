@@ -10,6 +10,19 @@ from sqlalchemy.orm import Session
 from app.backend.db.models import DeliveryAddressTagModel, RegionModel, CommuneModel
 
 
+def _fpdf_output_bytes(pdf: FPDF) -> bytes:
+    """fpdf2: dest='S'; fpdf antiguo: str → latin-1. Evita TypeError con bytes(str)."""
+    try:
+        out = pdf.output(dest="S")
+    except TypeError:
+        out = pdf.output()
+    if isinstance(out, (bytes, bytearray, memoryview)):
+        return bytes(out)
+    if isinstance(out, str):
+        return out.encode("latin-1")
+    raise TypeError(f"pdf.output() tipo inesperado: {type(out)}")
+
+
 def _title_case_words(s: str) -> str:
     t = (s or "").strip()
     if not t:
@@ -333,4 +346,4 @@ class DeliveryAddressTagClass:
         pdf.set_xy(M + 15, y)
         pdf.multi_cell(inner_w - 16, 3, obs, align="L")
 
-        return bytes(pdf.output())
+        return _fpdf_output_bytes(pdf)
