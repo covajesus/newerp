@@ -70,3 +70,4 @@ azure-storage-file-share==12.20.0
 lxml==5.2.2
 rut-chile==0.9.3
 fpdf2==2.8.2
+qrcode[pil]==7.4.2
