@@ -263,6 +263,16 @@ class RegionModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+
+class ReferenceTypeModel(Base):
+    __tablename__ = 'reference_types'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(32), nullable=False, unique=True)
+    description = Column(String(512), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+
 class TotalVacationDaysModel(Base):
     __tablename__ = 'total_vacation_days'
 
@@ -450,7 +460,7 @@ class DteModel(Base):
     payment_date = Column(String)
     rut = Column(String)
     folio = Column(Integer)
-    denied_folio = Column(Integer)
+    denied_folio = Column(String(255))
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
     subtotal = Column(Integer)
@@ -473,13 +483,24 @@ class DteModel(Base):
     payment_comment = Column(String)
     payment_number = Column(String)
     support = Column(String)
-    shopping_order_status_id = Column(Integer)
-    shopping_order_reference = Column(String)
-    shopping_order_date = Column(String)
-    shopping_order_description = Column(String)
+    category_id = Column(Integer)
+    quantity = Column(Integer)
     massive_resend_status_id = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+
+class DteReferenceModel(Base):
+    __tablename__ = 'dte_references'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dte_id = Column(Integer, ForeignKey('dtes.id', ondelete='CASCADE'), nullable=False)
+    reference_type_id = Column(String(16))
+    reference_date_id = Column(String(255))
+    reference_code = Column(String(64))
+    reference_description = Column(String(512))
+    added_date = Column(DateTime())
+
 
 class Dte2Model(Base):
     __tablename__ = 'dtes2'
@@ -497,7 +518,7 @@ class Dte2Model(Base):
     payment_date = Column(String)
     rut = Column(String)
     folio = Column(Integer)
-    denied_folio = Column(Integer)
+    denied_folio = Column(String(255))
     cash_amount = Column(Integer)
     card_amount = Column(Integer)
     subtotal = Column(Integer)
@@ -520,10 +541,6 @@ class Dte2Model(Base):
     payment_comment = Column(String)
     payment_number = Column(String)
     support = Column(String)
-    shopping_order_status_id = Column(Integer)
-    shopping_order_reference = Column(String)
-    shopping_order_date = Column(String)
-    shopping_order_description = Column(String)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

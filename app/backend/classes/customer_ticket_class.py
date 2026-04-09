@@ -70,6 +70,14 @@ def _sync_ticket_dte_amounts_from_form(dte, form_data):
     dte.subtotal = round(base / 1.19)
     dte.tax = base - round(base / 1.19)
     dte.total = base
+    cid = getattr(form_data, "category_id", None)
+    if cid is not None:
+        dte.category_id = cid
+    qty = getattr(form_data, "quantity", None)
+    if getattr(dte, "category_id", None) == 3 and qty is not None:
+        dte.quantity = int(qty)
+    else:
+        dte.quantity = None
 
 
 class CustomerTicketClass:
@@ -720,6 +728,13 @@ class CustomerTicketClass:
             dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            cid = getattr(form_data, "category_id", None)
+            dte.category_id = cid if cid is not None else 1
+            qty = getattr(form_data, "quantity", None)
+            if dte.category_id == 3 and qty is not None:
+                dte.quantity = int(qty)
+            else:
+                dte.quantity = None
 
             self.db.add(dte)
 
@@ -909,7 +924,40 @@ class CustomerTicketClass:
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        if form_data.chip_id == 1:
+        category_id = getattr(form_data, "category_id", None) or 1
+        qty = getattr(form_data, "quantity", None)
+
+        if category_id == 3 and qty is not None and int(qty) >= 1:
+            q = int(qty)
+            unit_price = round(int(form_data.amount) / q)
+            data = {
+                "Encabezado": {
+                    "IdDoc": {
+                        "TipoDTE": 39
+                    },
+                    "Emisor": {
+                        "RUTEmisor": "76063822-6",
+                        'CdgSIISucur': branch_office_data.dte_code,
+                    },
+                    "Receptor": {
+                        "RUTRecep": customer_data['customer_data']['rut'],
+                        "RznSocRecep": customer_data['customer_data']['customer'],
+                        "GiroRecep": customer_data['customer_data']['activity'],
+                        "DirRecep": customer_data['customer_data']['region'],
+                        "CmnaRecep": customer_data['customer_data']['commune'],
+                        'Contacto': customer_data['customer_data']['email'],
+                        'CorreoRecep': customer_data['customer_data']['email'],
+                    }
+                },
+                "Detalle": [
+                    {
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "QtyItem": q,
+                        "PrcItem": unit_price,
+                    }
+                ]
+            }
+        elif form_data.chip_id == 1:
             if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":
                 amount = form_data.amount - 5000
             else:

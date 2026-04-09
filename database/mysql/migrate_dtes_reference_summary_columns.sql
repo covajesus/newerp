@@ -1,0 +1,6 @@
+-- Referencias SII: solo en tabla `dte_references`. En `dtes` no deben quedar columnas de detalle de referencia.
+-- Si las agregaste antes, eliminar:
+-- ALTER TABLE `dtes` DROP COLUMN `reference_type_id`;
+-- ALTER TABLE `dtes` DROP COLUMN `reference_date_id`;
+-- ALTER TABLE `dtes` DROP COLUMN `reference_code`;
+-- ALTER TABLE `dtes` DROP COLUMN `reference_description`;

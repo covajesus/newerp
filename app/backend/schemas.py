@@ -838,10 +838,6 @@ class Dte(BaseModel):
     entrance_hour: str
     exit_hour: str
     added_date: str
-    shopping_order_status_id: Optional[int] = None
-    shopping_order_reference: Optional[str] = None
-    shopping_order_date: Optional[str] = None
-    shopping_order_description: Optional[str] = None
 
 class ProvisionalIndicator(BaseModel):
     period: str
@@ -2033,6 +2029,16 @@ class GenerateCustomerTicket(BaseModel):
     phone: Optional[str] = None
     activity: Optional[str] = None
     address: Optional[str] = None
+    category_id: Optional[int] = 1
+    quantity: Optional[int] = None
+
+
+class CustomerBillReferenceLine(BaseModel):
+    reference_type_id: Optional[str] = None
+    reference_date_id: Optional[str] = None
+    reference_code: Optional[str] = None
+    reference_description: Optional[str] = None
+
 
 class ToBeAcceptedCustomerBill(BaseModel):
     id: Optional[int] = 0
@@ -2048,10 +2054,8 @@ class ToBeAcceptedCustomerBill(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     will_save: Optional[int] = 0
-    shopping_order_status_id: Optional[int] = None
-    shopping_order_reference: Optional[str] = None
-    shopping_order_date: Optional[str] = None
-    shopping_order_description: Optional[str] = None
+    category_id: Optional[int] = None
+    references: List[CustomerBillReferenceLine] = Field(default_factory=list)
 
 class ToBeAcceptedCustomerTicket(BaseModel):
     id: Optional[int] = 0
@@ -2178,10 +2182,8 @@ class GenerateCustomerBill(BaseModel):
     phone: Optional[str] = None
     activity: Optional[str] = None
     address: Optional[str] = None
-    shopping_order_status_id: Optional[int] = None
-    shopping_order_reference: Optional[str] = None
-    shopping_order_date: Optional[str] = None
-    shopping_order_description: Optional[str] = None
+    category_id: Optional[int] = None
+    references: List[CustomerBillReferenceLine] = Field(default_factory=list)
 
 class FolioList(BaseModel):
     page: int

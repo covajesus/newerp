@@ -14,6 +14,7 @@ from app.backend.routers.pentions import pentions
 from app.backend.routers.banks import banks
 from app.backend.routers.account_types import account_types
 from app.backend.routers.regions import regions
+from app.backend.routers.reference_types import reference_types
 from app.backend.routers.employees import employees
 from app.backend.routers.slider import slider
 from app.backend.routers.logo import logo
@@ -137,6 +138,7 @@ app.include_router(pentions)
 app.include_router(banks)
 app.include_router(account_types)
 app.include_router(regions)
+app.include_router(reference_types)
 app.include_router(employees)
 app.include_router(slider)
 app.include_router(logo)

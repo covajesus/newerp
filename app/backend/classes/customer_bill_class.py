@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
+from app.backend.db.models import DteModel, DteReferenceModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
@@ -56,39 +56,17 @@ def _sync_bill_dte_amounts_from_form(dte, form_data):
     dte.subtotal = round(base / 1.19)
     dte.tax = base - round(base / 1.19)
     dte.total = base
-    # Si el cliente reenvía OC al generar, persistir; si no vienen, no pisar lo guardado en store()
-    sid = getattr(form_data, "shopping_order_status_id", None)
-    if sid is not None:
-        dte.shopping_order_status_id = sid
-    for attr in (
-        "shopping_order_reference",
-        "shopping_order_date",
-        "shopping_order_description",
-    ):
-        val = getattr(form_data, attr, None)
-        if val is not None and str(val).strip() not in ("", "null", "None"):
-            setattr(dte, attr, val)
+    cid = getattr(form_data, "category_id", None)
+    if cid is not None:
+        dte.category_id = cid
 
 
-def _merge_shopping_order_for_bill(form_data, dte_row):
-    """
-    Estado OC: formulario (generate) o borrador en BD (store / envío masivo con FormDataSimulator).
-    """
-    oc_status = getattr(form_data, "shopping_order_status_id", None)
-    if oc_status is None and dte_row is not None:
-        oc_status = getattr(dte_row, "shopping_order_status_id", None)
-
-    def _coalesce_str(attr, default=None):
-        v = getattr(form_data, attr, None)
-        if v is not None and str(v).strip() not in ("", "null", "None"):
-            return str(v).strip()
-        if dte_row is not None:
-            v2 = getattr(dte_row, attr, None)
-            if v2 is not None and str(v2).strip() != "":
-                return str(v2).strip()
-        return default
-
-    return oc_status, _coalesce_str
+def _bill_category_id(form_data, dte_row):
+    """Factura con referencias SII: category_id = 2 (front y BD)."""
+    cid = getattr(form_data, "category_id", None)
+    if cid is None and dte_row is not None:
+        cid = getattr(dte_row, "category_id", None)
+    return cid
 
 
 def _folio_ref_for_oc(oc_reference_str):
@@ -104,10 +82,85 @@ def _folio_ref_for_oc(oc_reference_str):
         return s
 
 
+def _reference_line_to_dict(line):
+    if line is None:
+        return {}
+    if hasattr(line, "model_dump"):
+        return line.model_dump()
+    return dict(line)
+
+
+def _reference_line_nonempty(d):
+    if not d:
+        return False
+    for k in ("reference_type_id", "reference_date_id", "reference_code", "reference_description"):
+        v = d.get(k)
+        if v is not None and str(v).strip() not in ("", "null", "None"):
+            return True
+    return False
+
+
+def _tpo_doc_ref_from_line_dict(rd):
+    t = rd.get("reference_type_id")
+    if t is not None and str(t).strip() not in ("", "null", "None"):
+        try:
+            return int(str(t).strip())
+        except ValueError:
+            pass
+    return 801
+
+
 class CustomerBillClass:
     def __init__(self, db: Session):
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
+
+    def _collect_bill_reference_lines(self, form_data, dte_row):
+        """Líneas si category_id=2: body del request o filas en dte_references (no hay resumen en dtes)."""
+        lines = []
+        refs = getattr(form_data, "references", None)
+        if refs:
+            for r in refs:
+                d = _reference_line_to_dict(r)
+                if _reference_line_nonempty(d):
+                    lines.append(d)
+            if lines:
+                return lines
+        if dte_row is not None and _bill_category_id(form_data, dte_row) == 2:
+            q = (
+                self.db.query(DteReferenceModel)
+                .filter(DteReferenceModel.dte_id == dte_row.id)
+                .order_by(DteReferenceModel.id)
+                .all()
+            )
+            if q:
+                for x in q:
+                    lines.append(
+                        {
+                            "reference_type_id": x.reference_type_id,
+                            "reference_date_id": x.reference_date_id,
+                            "reference_code": x.reference_code,
+                            "reference_description": x.reference_description,
+                        }
+                    )
+                return lines
+        return lines
+
+    def _persist_dte_reference_rows(self, dte_id, reference_dicts):
+        self.db.query(DteReferenceModel).filter(DteReferenceModel.dte_id == dte_id).delete()
+        now = datetime.now()
+        for rd in reference_dicts:
+            if not _reference_line_nonempty(rd):
+                continue
+            row = DteReferenceModel(
+                dte_id=dte_id,
+                reference_type_id=rd.get("reference_type_id"),
+                reference_date_id=rd.get("reference_date_id"),
+                reference_code=rd.get("reference_code"),
+                reference_description=rd.get("reference_description"),
+                added_date=now,
+            )
+            self.db.add(row)
 
     def _find_open_bill_draft(self, form_data):
         """
@@ -683,15 +736,17 @@ class CustomerBillClass:
         dte.chip_id = form_data.chip_id
         dte.status_id = 2
         
-        # Actualizar campos de Orden de Compra si están presentes
-        if hasattr(form_data, 'shopping_order_status_id'):
-            dte.shopping_order_status_id = form_data.shopping_order_status_id
-        if hasattr(form_data, 'shopping_order_reference'):
-            dte.shopping_order_reference = form_data.shopping_order_reference
-        if hasattr(form_data, 'shopping_order_date'):
-            dte.shopping_order_date = form_data.shopping_order_date
-        if hasattr(form_data, 'shopping_order_description'):
-            dte.shopping_order_description = form_data.shopping_order_description
+        if hasattr(form_data, 'category_id') and form_data.category_id is not None:
+            dte.category_id = form_data.category_id
+
+        refs = getattr(form_data, "references", None)
+        if refs is not None:
+            ref_dicts = []
+            for r in refs:
+                d = _reference_line_to_dict(r)
+                if _reference_line_nonempty(d):
+                    ref_dicts.append(d)
+            self._persist_dte_reference_rows(dte.id, ref_dicts)
 
         self.db.commit()
         self.db.refresh(dte)
@@ -845,13 +900,36 @@ class CustomerBillClass:
         
     def get(self, id):
         try:
-            data_query = self.db.query(DteModel.id, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.address, DteModel.cash_amount, CustomerModel.customer, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id). \
-                        outerjoin(CustomerModel, CustomerModel.rut == DteModel.rut). \
-                        filter(DteModel.id == id). \
-                        first()
+            data_query = self.db.query(
+                DteModel.id,
+                DteModel.rut,
+                DteModel.branch_office_id,
+                DteModel.total,
+                CustomerModel.address,
+                DteModel.cash_amount,
+                CustomerModel.customer,
+                CustomerModel.region_id,
+                CustomerModel.commune_id,
+                CustomerModel.activity,
+                CustomerModel.email,
+                CustomerModel.phone,
+                DteModel.chip_id,
+                DteModel.folio,
+                DteModel.status_id,
+                DteModel.added_date,
+                BranchOfficeModel.branch_office,
+                DteModel.category_id,
+            ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id).outerjoin(
+                CustomerModel, CustomerModel.rut == DteModel.rut
+            ).filter(DteModel.id == id).first()
 
             if data_query:
+                ref_rows = (
+                    self.db.query(DteReferenceModel)
+                    .filter(DteReferenceModel.dte_id == id)
+                    .order_by(DteReferenceModel.id)
+                    .all()
+                )
                 # Serializar los datos del empleado
                 customer_bill_data = {
                     "id": data_query.id,
@@ -869,7 +947,17 @@ class CustomerBillClass:
                     "total": data_query.total,
                     "status_id": data_query.status_id,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
-                    "branch_office": data_query.branch_office
+                    "branch_office": data_query.branch_office,
+                    "category_id": data_query.category_id,
+                    "references": [
+                        {
+                            "reference_type_id": x.reference_type_id,
+                            "reference_date_id": x.reference_date_id,
+                            "reference_code": x.reference_code,
+                            "reference_description": x.reference_description,
+                        }
+                        for x in ref_rows
+                    ],
                 }
 
                 # Crear el resultado final como un diccionario
@@ -1004,17 +1092,22 @@ class CustomerBillClass:
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             
-            # Guardar campos de Orden de Compra si están presentes
-            if hasattr(form_data, 'shopping_order_status_id'):
-                dte.shopping_order_status_id = form_data.shopping_order_status_id
-            if hasattr(form_data, 'shopping_order_reference'):
-                dte.shopping_order_reference = form_data.shopping_order_reference
-            if hasattr(form_data, 'shopping_order_date'):
-                dte.shopping_order_date = form_data.shopping_order_date
-            if hasattr(form_data, 'shopping_order_description'):
-                dte.shopping_order_description = form_data.shopping_order_description
+            if hasattr(form_data, 'category_id') and form_data.category_id is not None:
+                dte.category_id = form_data.category_id
+
+            ref_dicts = []
+            refs = getattr(form_data, "references", None)
+            if refs:
+                for r in refs:
+                    d = _reference_line_to_dict(r)
+                    if _reference_line_nonempty(d):
+                        ref_dicts.append(d)
 
             self.db.add(dte)
+            self.db.flush()
+
+            if ref_dicts:
+                self._persist_dte_reference_rows(dte.id, ref_dicts)
 
             try:
                 self.db.commit()
@@ -1165,26 +1258,30 @@ class CustomerBillClass:
                 ]
             }
         
-        # Referencia OC (801): formulario al generar y/o borrador guardado en BD (incl. envío masivo vía FormDataSimulator)
-        oc_status, _coalesce_str = _merge_shopping_order_for_bill(form_data, dte_row)
-        if oc_status == 1:
+        # Referencias SII solo si la factura es categoría 2 (con referencias), alineado con dtes.category_id.
+        ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
+        category_id = _bill_category_id(form_data, dte_row)
+        if category_id == 2 and ref_lines:
             if "Referencia" not in data:
                 data["Referencia"] = []
-
-            oc_reference_raw = _coalesce_str("shopping_order_reference", None)
-            folio_ref = _folio_ref_for_oc(oc_reference_raw)
-            oc_date = _coalesce_str("shopping_order_date", None) or datetime.now().strftime("%Y-%m-%d")
-            oc_description = _coalesce_str("shopping_order_description", None) or "Orden de Compra"
-
-            data["Referencia"].append(
-                {
-                    "NroLinRef": 1,
-                    "TpoDocRef": 801,
-                    "FolioRef": folio_ref,
-                    "FchRef": oc_date,
-                    "RazonRef": oc_description,
-                }
-            )
+            for i, rd in enumerate(ref_lines):
+                tpo_doc = _tpo_doc_ref_from_line_dict(rd)
+                folio_ref = _folio_ref_for_oc(rd.get("reference_date_id"))
+                fch = rd.get("reference_code") or datetime.now().strftime("%Y-%m-%d")
+                if str(fch).strip() in ("", "null", "None"):
+                    fch = datetime.now().strftime("%Y-%m-%d")
+                raz = rd.get("reference_description")
+                if raz is None or str(raz).strip() == "":
+                    raz = "Orden de Compra" if tpo_doc == 801 else "Referencia"
+                data["Referencia"].append(
+                    {
+                        "NroLinRef": i + 1,
+                        "TpoDocRef": tpo_doc,
+                        "FolioRef": folio_ref,
+                        "FchRef": fch,
+                        "RazonRef": raz,
+                    }
+                )
 
         try:
             # Endpoint para generar un DTE temporal
