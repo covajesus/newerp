@@ -30,6 +30,19 @@ def _company_rut_line(company_rut: str) -> str:
     return f"Rut {r}"
 
 
+def _fpdf_output_bytes(pdf: FPDF) -> bytes:
+    """fpdf2 suele aceptar dest='S'; fpdf antiguo devuelve str → hay que codificar."""
+    try:
+        out = pdf.output(dest="S")
+    except TypeError:
+        out = pdf.output()
+    if isinstance(out, (bytes, bytearray, memoryview)):
+        return bytes(out)
+    if isinstance(out, str):
+        return out.encode("latin-1")
+    raise TypeError(f"pdf.output() tipo inesperado: {type(out)}")
+
+
 def _add_logo_mm(pdf: FPDF, x: float, y: float, w_mm: float) -> bool:
     """Descarga el logo y lo dibuja; compatible con fpdf clásico (solo ruta a archivo)."""
     try:
@@ -227,4 +240,4 @@ class DeliveryAddressTagClass:
             pdf.multi_cell(inner_w, line_h_bot, line, align="L")
             y = pdf.get_y()
 
-        return bytes(pdf.output())
+        return _fpdf_output_bytes(pdf)
