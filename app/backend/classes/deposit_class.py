@@ -211,8 +211,8 @@ class DepositClass:
         deposit.deposited_amount = form_data.deposited_amount
         deposit.payment_number = form_data.payment_number
         deposit.collection_amount = form_data.collection_amount
-        deposit.collection_date = form_data.collection_date
-        deposit.deposit_date = form_data.deposit_date
+        deposit.collection_date = self._convert_date_format(form_data.collection_date)
+        deposit.deposit_date = self._convert_date_format(form_data.deposit_date)
         deposit.support = support
         deposit.added_date = datetime.now()
 
@@ -336,9 +336,14 @@ class DepositClass:
                 collection_date_formatted = self._convert_date_format(deposit_data.collection_date)
                 
                 # Verificar duplicados usando los mismos criterios que en store()
+                pn_cmp = (
+                    str(deposit_data.payment_number).strip()
+                    if deposit_data.payment_number is not None
+                    else ""
+                )
                 existing_deposit = self.db.query(DepositModel).filter(
                     DepositModel.branch_office_id == deposit_data.branch_office_id,
-                    DepositModel.payment_number == deposit_data.payment_number,
+                    func.trim(DepositModel.payment_number) == pn_cmp,
                     DepositModel.deposited_amount == deposit_data.deposited_amount,
                     DepositModel.deposit_date == deposit_date_formatted,
                     DepositModel.id != id  # Excluir el registro actual

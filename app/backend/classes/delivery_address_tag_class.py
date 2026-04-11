@@ -1,4 +1,7 @@
 import json
+import os
+import tempfile
+import urllib.request
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -8,6 +11,9 @@ from fpdf import FPDF
 from sqlalchemy.orm import Session
 
 from app.backend.db.models import DeliveryAddressTagModel, RegionModel, CommuneModel
+
+TAG_LOGO_URL = "https://intrajis.com/assets/logo-1jO0MaUN.png"
+TAG_LOGO_USER_AGENT = "Mozilla/5.0 (compatible; JISParking-ERP/1.0)"
 
 
 def _fpdf_output_bytes(pdf: FPDF) -> bytes:
@@ -97,6 +103,51 @@ def _resolve_logo_path() -> str | None:
     return None
 
 
+def _logo_png_bytes() -> bytes | None:
+    p = _resolve_logo_path()
+    if p:
+        try:
+            raw = Path(p).read_bytes()
+            if raw:
+                return raw
+        except OSError:
+            pass
+    try:
+        req = urllib.request.Request(
+            TAG_LOGO_URL,
+            headers={"User-Agent": TAG_LOGO_USER_AGENT},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read() or None
+    except Exception:
+        return None
+
+
+def _draw_logo_mm(pdf: FPDF, x: float, y: float, w_mm: float) -> bool:
+    raw = _logo_png_bytes()
+    if not raw:
+        return False
+    try:
+        pdf.image(BytesIO(raw), x=x, y=y, w=w_mm, h=0)
+        return True
+    except Exception:
+        pass
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(raw)
+            path = tmp.name
+        try:
+            pdf.image(path, x=x, y=y, w=w_mm, h=0)
+            return True
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+    except Exception:
+        return False
+
+
 class DeliveryAddressTagClass:
     def __init__(self, db: Session):
         self.db = db
@@ -178,8 +229,8 @@ class DeliveryAddressTagClass:
 
     def generate_pdf_bytes(self, tag_id: int) -> bytes | None:
         """
-        PDF etiqueta envío (diseño tipo etiqueta postal: cabecera, DE, QR con JSON del tag,
-        Nº envío, A / Para / Dir / Tel / Obs). Página cuadrada 105×105 mm.
+        PDF etiqueta envío alargada (vertical): logo JIS en cabecera, DE, QR, Nº envío, A, datos.
+        Formato ~100×148 mm (estilo segunda referencia).
         """
         data = self.get_one_with_names(tag_id)
         if not data:
@@ -189,8 +240,8 @@ class DeliveryAddressTagClass:
         if not (data["address"] or "").strip():
             return None
 
-        W = 105.0
-        H = 105.0
+        W = 100.0
+        H = 148.0
         M = 4.0
         inner_w = W - 2 * M
 
@@ -221,82 +272,77 @@ class DeliveryAddressTagClass:
         pdf.set_line_width(0.35)
         pdf.rect(M, M, inner_w, H - 2 * M)
 
-        y0 = M + 1.5
-        header_h = 13.0
+        y0 = M + 1.2
+        header_h = 16.0
+        logo_col_w = 16.0
+        date_col_w = 34.0
 
-        logo_path = _resolve_logo_path()
-        if logo_path:
-            try:
-                pdf.image(logo_path, M + 1, y0, w=20, h=0)
-            except Exception:
-                pdf.set_xy(M + 1, y0 + 3)
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.cell(26, 4, "JIS PARKING")
-        else:
-            pdf.set_xy(M + 1, y0 + 3)
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.cell(26, 4, "JIS PARKING")
+        if not _draw_logo_mm(pdf, M + 0.5, y0 + 0.3, logo_col_w):
+            pdf.set_xy(M + 0.5, y0 + 4)
+            pdf.set_font("Helvetica", "B", 7)
+            pdf.cell(logo_col_w, 4, "JIS", align="L")
 
-        pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_xy(M, y0 + 4.5)
-        pdf.cell(inner_w, 5, "ETIQUETA DE ENVÍO", align="C")
+        title_x = M + logo_col_w + 1.5
+        title_w = max(20.0, inner_w - logo_col_w - 1.5 - date_col_w)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_xy(title_x, y0 + 5)
+        pdf.cell(title_w, 5, "ETIQUETA DE ENVÍO", align="C")
 
         pdf.set_font("Helvetica", "", 6)
         pdf.set_text_color(50, 50, 50)
         dt = _datetime_es_cl()
         tw = pdf.get_string_width(dt)
-        pdf.set_xy(W - M - tw - 0.5, y0 + 1.5)
+        pdf.set_xy(W - M - tw - 0.5, y0 + 2)
         pdf.cell(tw, 4, dt)
         pdf.set_text_color(0, 0, 0)
 
         header_bottom = y0 + header_h
         pdf.line(M, header_bottom, W - M, header_bottom)
-        y = header_bottom + 2
+        y = header_bottom + 2.2
 
         pdf.set_font("Helvetica", "B", 7)
         pdf.set_xy(M + 1, y)
         pdf.cell(8, 4, "DE:")
         pdf.set_font("Helvetica", "", 7)
-        de_name = (data["company_name"] or "").strip() or "—"
+        de_name = (data["company_name"] or "").strip() or "JIS Parking SpA"
         pdf.set_xy(M + 10, y)
         pdf.multi_cell(inner_w - 11, 3.3, de_name, align="L")
-        y = pdf.get_y() + 1.5
+        y = pdf.get_y() + 1.8
 
         pdf.line(M, y, W - M, y)
-        y += 2
+        y += 3
 
         qr_payload = _qr_payload(data)
-        qr = qrcode.QRCode(version=None, box_size=2, border=1)
+        qr = qrcode.QRCode(version=None, box_size=3, border=1)
         qr.add_data(qr_payload)
         qr.make(fit=True)
         qr_img = qr.make_image(fill_color="black", back_color="white")
         buf = BytesIO()
         qr_img.save(buf, format="PNG")
         buf.seek(0)
-        qr_mm = 30.0
+        qr_mm = 38.0
         qr_x = M + (inner_w - qr_mm) / 2
         try:
             pdf.image(buf, x=qr_x, y=y, w=qr_mm, h=qr_mm)
         except Exception:
-            pdf.set_xy(M + 2, y + 10)
+            pdf.set_xy(M + 2, y + 12)
             pdf.set_font("Helvetica", "", 6)
             pdf.multi_cell(inner_w - 4, 3, "(QR no disponible)", align="C")
 
         pdf.set_font("Helvetica", "", 6.5)
-        pdf.set_xy(M + 1, y + qr_mm + 0.5)
         tw_e = pdf.get_string_width(envio_txt)
-        pdf.set_xy(W - M - tw_e - 1, y + qr_mm + 0.5)
+        pdf.set_xy(W - M - tw_e - 1, y + qr_mm - 4)
         pdf.cell(tw_e, 3, envio_txt)
 
-        y = y + qr_mm + 4
+        y = y + qr_mm + 5
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_xy(M + 1, y)
         pdf.cell(inner_w, 4, "Nº ENVÍO")
-        y += 4
-        pdf.set_font("Helvetica", "B", 12)
+        y += 4.2
+        pdf.set_font("Helvetica", "B", 13)
         pdf.set_xy(M + 1, y)
-        pdf.cell(inner_w, 6, envio_txt)
-        y += 7
+        pdf.cell(inner_w, 7, envio_txt)
+        y += 8.5
 
         pdf.line(M, y, W - M, y)
         y += 3
@@ -304,11 +350,11 @@ class DeliveryAddressTagClass:
         pdf.set_font("Helvetica", "B", 7)
         pdf.set_xy(M + 1, y)
         pdf.cell(6, 4, "A:")
-        y += 4
-        pdf.set_font("Helvetica", "B", 13)
+        y += 4.2
+        pdf.set_font("Helvetica", "B", 14)
         pdf.set_xy(M + 1, y)
-        pdf.cell(inner_w - 2, 7, city_a[:80])
-        y += 8
+        pdf.cell(inner_w - 2, 8, city_a[:80])
+        y += 9
 
         pdf.line(M, y, W - M, y)
         y += 2.5

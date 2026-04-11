@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.deposit_class import DepositClass
@@ -55,12 +56,26 @@ def store(
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    # Validar que el depósito no existe (evitar duplicados)
-    existing_deposit = db.query(DepositModel).filter(
+    # Sin índice UNIQUE en BD: evitar duplicados en código (sucursal + nº pago + monto + fecha depósito).
+    dc = DepositClass(db)
+    pn = str(form_data.payment_number).strip() if form_data.payment_number is not None else ""
+    raw_dd = form_data.deposit_date or ""
+    if isinstance(raw_dd, str):
+        raw_dd = raw_dd.strip()
+    dd = dc._convert_date_format(raw_dd) if raw_dd else ""
+    date_clause = (
+        DepositModel.deposit_date == dd if dd else DepositModel.deposit_date.is_(None)
+    )
+    existing_deposit = (
+        db.query(DepositModel)
+        .filter(
             DepositModel.branch_office_id == form_data.branch_office_id,
-            DepositModel.payment_number == form_data.payment_number,
-            DepositModel.deposited_amount == form_data.deposited_amount
-        ).count()
+            DepositModel.deposited_amount == form_data.deposited_amount,
+            func.trim(DepositModel.payment_number) == pn,
+            date_clause,
+        )
+        .count()
+    )
 
         
     if existing_deposit > 0:
@@ -80,7 +95,7 @@ def store(
 
         message = FileClass(db).upload(support, remote_path)
 
-        DepositClass(db).store(form_data, remote_path)
+        dc.store(form_data, remote_path)
 
         return {"message": message}
 

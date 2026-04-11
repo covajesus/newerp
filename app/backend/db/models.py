@@ -1161,14 +1161,14 @@ class DepositModel(Base):
     collection_id = Column(Integer)
     status_id = Column(Integer)
     deposited_amount = Column(Integer)
-    payment_number = Column(Integer)
+    payment_number = Column(String(255))
     collection_amount = Column(Integer)
-    collection_date = Column(Text)
-    deposit_date = Column(Text)
-    support = Column(Text)
+    collection_date = Column(Date())
+    deposit_date = Column(Date())
+    support = Column(String(255))
     reject_reason_id = Column(Integer)
-    added_date = Column(Date)
-    updated_date = Column(Date)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
 
 class SocialLawModel(Base):
     __tablename__ = 'social_laws'
