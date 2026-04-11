@@ -7,6 +7,7 @@ from io import BytesIO
 from pathlib import Path
 
 import qrcode
+import qrcode.constants
 from fpdf import FPDF
 from sqlalchemy.orm import Session
 
@@ -121,6 +122,54 @@ def _logo_png_bytes() -> bytes | None:
             return resp.read() or None
     except Exception:
         return None
+
+
+def _draw_qr_mm(pdf: FPDF, qr_payload: str, x: float, y: float, w_mm: float) -> bool:
+    """
+    Incrusta QR en el PDF. PIL RGB + fallbacks (BytesIO / archivo) por compatibilidad fpdf2/Pillow.
+    """
+    try:
+        qr = qrcode.QRCode(
+            version=None,
+            box_size=3,
+            border=2,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+        )
+        qr.add_data(qr_payload)
+        qr.make(fit=True)
+        im = qr.make_image(fill_color="black", back_color="white")
+    except Exception:
+        return False
+
+    im_rgb = im.convert("RGB") if im.mode != "RGB" else im
+
+    try:
+        pdf.image(im_rgb, x=x, y=y, w=w_mm, h=w_mm)
+        return True
+    except Exception:
+        pass
+    try:
+        buf = BytesIO()
+        im_rgb.save(buf, format="PNG")
+        buf.seek(0)
+        pdf.image(buf, x=x, y=y, w=w_mm, h=w_mm)
+        return True
+    except Exception:
+        pass
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            im_rgb.save(tmp.name, format="PNG")
+            path = tmp.name
+        try:
+            pdf.image(path, x=x, y=y, w=w_mm, h=w_mm)
+            return True
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+    except Exception:
+        return False
 
 
 def _draw_logo_mm(pdf: FPDF, x: float, y: float, w_mm: float) -> bool:
@@ -313,28 +362,26 @@ class DeliveryAddressTagClass:
         y += 3
 
         qr_payload = _qr_payload(data)
-        qr = qrcode.QRCode(version=None, box_size=3, border=1)
-        qr.add_data(qr_payload)
-        qr.make(fit=True)
-        qr_img = qr.make_image(fill_color="black", back_color="white")
-        buf = BytesIO()
-        qr_img.save(buf, format="PNG")
-        buf.seek(0)
-        qr_mm = 38.0
+        qr_mm = 40.0
+        qr_pad = 1.5
+        qr_block_h = qr_mm + qr_pad * 2 + 4.5
+        pdf.set_line_width(0.25)
+        pdf.rect(M, y, inner_w, qr_block_h)
+
         qr_x = M + (inner_w - qr_mm) / 2
-        try:
-            pdf.image(buf, x=qr_x, y=y, w=qr_mm, h=qr_mm)
-        except Exception:
-            pdf.set_xy(M + 2, y + 12)
+        qr_y = y + qr_pad
+        if not _draw_qr_mm(pdf, qr_payload, qr_x, qr_y, qr_mm):
+            pdf.set_xy(M + 2, qr_y + qr_mm / 2 - 4)
             pdf.set_font("Helvetica", "", 6)
             pdf.multi_cell(inner_w - 4, 3, "(QR no disponible)", align="C")
 
         pdf.set_font("Helvetica", "", 6.5)
         tw_e = pdf.get_string_width(envio_txt)
-        pdf.set_xy(W - M - tw_e - 1, y + qr_mm - 4)
+        pdf.set_xy(W - M - tw_e - 1.5, y + qr_block_h - 4.5)
         pdf.cell(tw_e, 3, envio_txt)
 
-        y = y + qr_mm + 5
+        y = y + qr_block_h + 2.5
+        pdf.set_line_width(0.35)
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_xy(M + 1, y)
         pdf.cell(inner_w, 4, "Nº ENVÍO")
