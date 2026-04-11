@@ -358,8 +358,8 @@ class DeliveryAddressTagClass:
         pdf.multi_cell(inner_w - 11, 3.3, de_name, align="L")
         y = pdf.get_y() + 1.8
 
-        pdf.line(M, y, W - M, y)
-        y += 3
+        # Solo el borde superior del rect del QR (evita doble línea: línea + rect)
+        y += 1.5
 
         qr_payload = _qr_payload(data)
         qr_mm = 40.0
@@ -432,11 +432,11 @@ class DeliveryAddressTagClass:
         y = pdf.get_y() + 0.5
 
         obs = f"Sucursal: {(data.get('branch_office') or '').strip()} · Sup. RUT: {(data.get('supervisor_rut') or '').strip()}"
-        pdf.set_font("Helvetica", "B", 6.5)
+        pdf.set_font("Helvetica", "B", 7)
         pdf.set_xy(M + 1, y)
-        pdf.cell(14, 3, "Obs.:")
-        pdf.set_font("Helvetica", "", 6.5)
-        pdf.set_xy(M + 15, y)
-        pdf.multi_cell(inner_w - 16, 3, obs, align="L")
+        pdf.cell(12, 3.5, "Obs.:")
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_xy(M + 13, y)
+        pdf.multi_cell(inner_w - 14, 3.2, obs, align="L")
 
         return _fpdf_output_bytes(pdf)
