@@ -112,16 +112,20 @@ def quantity(cashier_id: int, quantity: int, db: Session = Depends(get_db)):
 @folios.get("/db2/counts_by_segment")
 def counts_by_segment_db2(db2: Session = Depends(get_db2)):
     """
-    Totales en DB2 agrupados por folio_segment_id, solo filas con
-    branch_office_id = 0 y requested_status_id = 0 (folios disponibles en central).
+    Totales en DB2 por folio_segment_id (catálogo segments), solo filas con
+    branch_office_id = 0 y requested_status_id = 0. Segmentos sin coincidencias van con total 0.
     """
     query = text("""
-        SELECT folio_segment_id, COUNT(*) AS total
-        FROM folios
-        WHERE branch_office_id = 0
-          AND requested_status_id = 0
-        GROUP BY folio_segment_id
-        ORDER BY folio_segment_id
+        SELECT s.id AS folio_segment_id, COALESCE(c.total, 0) AS total
+        FROM segments s
+        LEFT JOIN (
+            SELECT folio_segment_id, COUNT(*) AS total
+            FROM folios
+            WHERE branch_office_id = 0
+              AND requested_status_id = 0
+            GROUP BY folio_segment_id
+        ) c ON c.folio_segment_id = s.id
+        ORDER BY s.id
     """)
     result = db2.execute(query)
     rows = [
