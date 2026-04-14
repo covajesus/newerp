@@ -2188,6 +2188,12 @@ class GenerateCustomerBill(BaseModel):
 class FolioList(BaseModel):
     page: int
 
+class FolioDb2Store(BaseModel):
+    """Payload del frontend para insertar folios en DB2. v-model: folio_segment_id, start_folio, end_folio."""
+    folio_segment_id: Optional[int] = None
+    start_folio: int
+    end_folio: int
+
 class CafList(BaseModel):
     page: int
 

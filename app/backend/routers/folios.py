@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from app.backend.classes.folio_class import FolioClass
 from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.db.models import FolioModel
-from app.backend.schemas import FolioList
+from app.backend.schemas import FolioList, FolioDb2Store
 from datetime import datetime
 
 folios = APIRouter(
@@ -140,3 +140,59 @@ def counts_by_segment_db2(db2: Session = Depends(get_db2)):
         for row in result
     ]
     return {"message": rows}
+
+
+_MAX_FOLIOS_DB2_STORE = 100_000
+
+
+@folios.post("/db2/store")
+def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
+    """
+    Inserta en DB2 (tabla folios) un registro por cada número entre `start_folio` y `end_folio` (inclusive).
+    `folio` = número del rango; `folio_segment_id` = el enviado; branch_office_id, cashier_id,
+    requested_status_id, used_status_id y billed_status_id en 0.
+    """
+    if body.folio_segment_id is None:
+        raise HTTPException(status_code=400, detail="Seleccione un segmento")
+    if body.start_folio > body.end_folio:
+        raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
+    count = body.end_folio - body.start_folio + 1
+    if count > _MAX_FOLIOS_DB2_STORE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El rango supera el máximo permitido ({_MAX_FOLIOS_DB2_STORE} folios por solicitud)",
+        )
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    insert_sql = text("""
+        INSERT INTO folios (
+            folio, branch_office_id, cashier_id, folio_segment_id,
+            requested_status_id, used_status_id, billed_status_id,
+            added_date, updated_date
+        ) VALUES (
+            :folio, 0, 0, :folio_segment_id,
+            0, 0, 0,
+            :added_date, :updated_date
+        )
+    """)
+    try:
+        for folio_number in range(body.start_folio, body.end_folio + 1):
+            db2.execute(
+                insert_sql,
+                {
+                    "folio": folio_number,
+                    "folio_segment_id": body.folio_segment_id,
+                    "added_date": now,
+                    "updated_date": now,
+                },
+            )
+        db2.commit()
+    except Exception as e:
+        db2.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return {
+        "message": "OK",
+        "inserted": count,
+        "start_folio": body.start_folio,
+        "end_folio": body.end_folio,
+        "folio_segment_id": body.folio_segment_id,
+    }
