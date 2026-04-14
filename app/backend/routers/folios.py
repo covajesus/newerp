@@ -142,9 +142,6 @@ def counts_by_segment_db2(db2: Session = Depends(get_db2)):
     return {"message": rows}
 
 
-_MAX_FOLIOS_DB2_STORE = 100_000
-
-
 @folios.post("/db2/store")
 def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     """
@@ -157,11 +154,6 @@ def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     if body.start_folio > body.end_folio:
         raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
     count = body.end_folio - body.start_folio + 1
-    if count > _MAX_FOLIOS_DB2_STORE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"El rango supera el máximo permitido ({_MAX_FOLIOS_DB2_STORE} folios por solicitud)",
-        )
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     insert_sql = text("""
         INSERT INTO folios (
