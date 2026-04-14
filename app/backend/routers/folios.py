@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from app.backend.classes.folio_class import FolioClass
-from app.backend.db.database import get_db
+from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.db.models import FolioModel
 from app.backend.schemas import FolioList
@@ -106,3 +107,25 @@ def quantity(cashier_id: int, quantity: int, db: Session = Depends(get_db)):
     data = FolioClass(db).quantity(cashier_id, quantity)
 
     return {"message": data}
+
+
+@folios.get("/db2/counts_by_segment")
+def counts_by_segment_db2(db2: Session = Depends(get_db2)):
+    """
+    Totales en DB2 agrupados por folio_segment_id, solo filas con
+    branch_office_id = 0 y requested_status_id = 0 (folios disponibles en central).
+    """
+    query = text("""
+        SELECT folio_segment_id, COUNT(*) AS total
+        FROM folios
+        WHERE branch_office_id = 0
+          AND requested_status_id = 0
+        GROUP BY folio_segment_id
+        ORDER BY folio_segment_id
+    """)
+    result = db2.execute(query)
+    rows = [
+        {"folio_segment_id": row.folio_segment_id, "total": int(row.total)}
+        for row in result
+    ]
+    return {"message": rows}
