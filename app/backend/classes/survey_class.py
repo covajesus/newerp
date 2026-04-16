@@ -11,9 +11,16 @@ class SurveyClass:
     def get_all_surveys(self):
         """Obtiene todas las encuestas"""
         try:
-            surveys = self.db.query(SurveyModel).order_by(SurveyModel.created_at.desc()).all()
+            surveys = (
+                self.db.query(SurveyModel)
+                .filter(SurveyModel.status_id == 1)
+                .order_by(SurveyModel.created_at.desc())
+                .all()
+            )
             return [{
                 "id": survey.id,
+                "branch_office_id": survey.branch_office_id,
+                "status_id": survey.status_id,
                 "title": survey.title,
                 "description": survey.description,
                 "created_at": survey.created_at.isoformat() if survey.created_at else None,
@@ -59,6 +66,8 @@ class SurveyClass:
             
             return {
                 "id": survey.id,
+                "branch_office_id": survey.branch_office_id,
+                "status_id": survey.status_id,
                 "title": survey.title,
                 "description": survey.description,
                 "created_at": survey.created_at.isoformat() if survey.created_at else None,
@@ -73,8 +82,10 @@ class SurveyClass:
         try:
             # Crear la encuesta
             survey = SurveyModel(
+                branch_office_id=survey_data.get("branch_office_id", 0),
+                status_id=survey_data.get("status_id", 1),
                 title=survey_data.get("title"),
-                description=survey_data.get("description")
+                description=survey_data.get("description"),
             )
             self.db.add(survey)
             self.db.flush()  # Para obtener el ID
@@ -117,6 +128,10 @@ class SurveyClass:
             
             survey.title = survey_data.get("title", survey.title)
             survey.description = survey_data.get("description", survey.description)
+            if "branch_office_id" in survey_data:
+                survey.branch_office_id = survey_data["branch_office_id"]
+            if "status_id" in survey_data:
+                survey.status_id = survey_data["status_id"]
             survey.updated_at = datetime.utcnow()
             
             self.db.commit()

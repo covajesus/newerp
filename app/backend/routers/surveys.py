@@ -61,6 +61,8 @@ def create_survey(
         survey_data = {
             "title": survey.title,
             "description": survey.description,
+            "branch_office_id": survey.branch_office_id,
+            "status_id": survey.status_id,
             "questions": [
                 {
                     "question": q.question,
@@ -94,7 +96,11 @@ def update_survey(
             survey_data["title"] = survey.title
         if survey.description is not None:
             survey_data["description"] = survey.description
-        
+        if survey.branch_office_id is not None:
+            survey_data["branch_office_id"] = survey.branch_office_id
+        if survey.status_id is not None:
+            survey_data["status_id"] = survey.status_id
+
         result = SurveyClass(db).update_survey(survey_id, survey_data)
         if result.get("status") == "error":
             raise HTTPException(status_code=404, detail=result.get("message"))

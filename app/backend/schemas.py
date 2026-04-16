@@ -2301,11 +2301,15 @@ class SurveyQuestion(BaseModel):
 class SurveyCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    branch_office_id: int = 0
+    status_id: int = 1
     questions: List[SurveyQuestion] = []
 
 class SurveyUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    branch_office_id: Optional[int] = None
+    status_id: Optional[int] = None
 
 class SurveyQuestionCreate(BaseModel):
     question: str

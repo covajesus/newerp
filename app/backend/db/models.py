@@ -2113,8 +2113,10 @@ class BranchOfficeTransbankViewModel(Base):
 
 class SurveyModel(Base):
     __tablename__ = 'surveys'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
+    branch_office_id = Column(Integer, nullable=False, default=0)
+    status_id = Column(Integer, nullable=False, default=1)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
