@@ -90,6 +90,7 @@ from app.backend.routers.kardex import kardex_values
 from app.backend.routers.products import products
 from app.backend.routers.product_categories import product_categories
 from app.backend.routers.surveys import surveys
+from app.backend.routers.documents import documents
 from app.backend.routers.preventive_maintenances import preventive_maintenances
 from app.backend.routers.whatsapp_webhook import whatsapp_webhook
 from app.backend.routers.cashier_sync import cashier_sync_router
@@ -213,6 +214,7 @@ app.include_router(kardex_values)
 app.include_router(products)
 app.include_router(product_categories)
 app.include_router(surveys)
+app.include_router(documents)
 app.include_router(preventive_maintenances)
 app.include_router(sinister_types)
 app.include_router(whatsapp_webhook)

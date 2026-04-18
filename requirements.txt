@@ -71,3 +71,5 @@ lxml==5.2.2
 rut-chile==0.9.3
 fpdf2==2.8.2
 qrcode[pil]==7.4.2
+python-docx==1.1.2
+matplotlib==3.9.2
