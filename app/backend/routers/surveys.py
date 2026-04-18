@@ -1,8 +1,10 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.survey_class import SurveyClass, SURVEY_ROL_FULL_STATUS_ACCESS
-from app.backend.auth.auth_user import get_current_active_user
+from app.backend.auth.auth_user import get_current_active_user, get_optional_current_user
 from app.backend.db.models import UserModel
 from app.backend.schemas import (
     SurveyQuestionOption,
@@ -59,15 +61,25 @@ def get_all_surveys(
 @surveys.get("/{survey_id}")
 def get_survey(
     survey_id: int,
-    session_user: UserModel = Depends(get_current_active_user),
+    session_user: Optional[UserModel] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
-    """Obtiene una encuesta con sus preguntas y opciones"""
+    """
+    Obtiene una encuesta con sus preguntas y opciones.
+    Sin autenticación: solo encuestas activas (status_id == 1), p. ej. enlace público /survey/view/:id.
+    Con autenticación: aplica reglas de rol (rol 2 ve inactivas; rol 7 solo activas).
+    """
     try:
         data = SurveyClass(db).get_survey(survey_id)
         if data.get("status") == "error":
             raise HTTPException(status_code=404, detail=data.get("message"))
-        _assert_can_read_survey_inactive(session_user, data.get("status_id"))
+        if session_user is not None:
+            _assert_can_read_survey_inactive(session_user, data.get("status_id"))
+        elif data.get("status_id") != 1:
+            raise HTTPException(
+                status_code=403,
+                detail="Esta encuesta no está disponible de forma pública. Inicie sesión con un usuario autorizado.",
+            )
         return {"message": data}
     except HTTPException:
         raise

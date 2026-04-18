@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from fastapi import HTTPException, Depends
@@ -9,6 +11,7 @@ from sqlalchemy.orm import Session
 import bcrypt
 
 oauth2_scheme = OAuth2PasswordBearer("/login_users/token")
+oauth2_scheme_optional = OAuth2PasswordBearer("/login_users/token", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -28,6 +31,29 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     
 def get_current_active_user(current_user: UserModel = Depends(get_current_user)):
     return current_user
+
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+) -> Optional[UserModel]:
+    """
+    Usuario autenticado si el Bearer es válido; None si no hay token o es inválido.
+    Sirve para endpoints que deben funcionar en público (p. ej. responder encuesta) y
+    reforzar reglas cuando sí hay sesión.
+    """
+    if token is None or (isinstance(token, str) and not token.strip()):
+        return None
+    try:
+        decoded_token = jwt.decode(
+            token, os.environ["SECRET_KEY"], algorithms=[os.environ["ALGORITHM"]]
+        )
+        username = decoded_token.get("sub")
+        if username is None:
+            return None
+    except JWTError:
+        return None
+    return get_user(username)
+
 
 def get_user(rut):
     db: Session = next(get_db())
