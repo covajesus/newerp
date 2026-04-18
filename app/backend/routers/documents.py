@@ -6,9 +6,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.backend.db.database import get_db
-from app.backend.classes.survey_class import SurveyClass
+from app.backend.classes.survey_class import SurveyClass, SURVEY_ROL_FULL_STATUS_ACCESS
 from app.backend.auth.auth_user import get_current_active_user
-from app.backend.schemas import UserLogin
+from app.backend.db.models import UserModel, SurveyModel
 
 documents = APIRouter(
     prefix="/documents",
@@ -27,12 +27,22 @@ def _safe_filename_part(text: str, max_len: int = 80) -> str:
 @documents.get("/generate/{survey_id}")
 def generate_survey_word(
     survey_id: int,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
     Genera y descarga un .docx con la encuesta (preguntas) y todas las respuestas.
     """
+    row = db.query(SurveyModel).filter(SurveyModel.id == survey_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Encuesta no encontrada")
+    if row.status_id != 1 and getattr(session_user, "rol_id", None) != SURVEY_ROL_FULL_STATUS_ACCESS:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para generar el documento de encuestas inactivas. "
+            "Solo el rol autorizado puede hacerlo; otros roles (p. ej. rol 7) solo con encuesta activa (status_id 1).",
+        )
+
     svc = SurveyClass(db)
     data, err = svc.export_survey_results_docx(survey_id)
     if err or data is None:

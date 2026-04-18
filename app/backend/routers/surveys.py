@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.classes.survey_class import SurveyClass
+from app.backend.classes.survey_class import SurveyClass, SURVEY_ROL_FULL_STATUS_ACCESS
 from app.backend.auth.auth_user import get_current_active_user
+from app.backend.db.models import UserModel
 from app.backend.schemas import (
-    UserLogin,
     SurveyQuestionOption,
     SurveyQuestion,
     SurveyCreate,
@@ -20,16 +20,38 @@ surveys = APIRouter(
     tags=["Surveys"]
 )
 
+
+def _assert_can_read_survey_inactive(session_user: UserModel, survey_status_id: int | None) -> None:
+    """
+    Encuesta activa (status_id == 1): cualquier usuario autorizado (p. ej. rol 7) puede verla.
+    Otro status: solo rol SURVEY_ROL_FULL_STATUS_ACCESS (2). El rol 7 no ve encuestas inactivas.
+    """
+    if survey_status_id == 1:
+        return
+    if getattr(session_user, "rol_id", None) == SURVEY_ROL_FULL_STATUS_ACCESS:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="No tiene permiso para acceder a encuestas inactivas o no publicadas. "
+        "Solo el rol autorizado puede verlas; las demás cuentas (p. ej. rol 7) solo ven encuestas activas.",
+    )
+
+
 # ========== SURVEY ENDPOINTS ==========
 
 @surveys.get("/")
 def get_all_surveys(
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Obtiene todas las encuestas"""
+    """
+    Listado: solo rol SURVEY_ROL_FULL_STATUS_ACCESS (2) ve todos los status_id.
+    Rol 7 y cualquier otro rol: únicamente encuestas con status_id == 1 (activas).
+    """
     try:
-        data = SurveyClass(db).get_all_surveys()
+        rid = getattr(session_user, "rol_id", None)
+        include_all = rid == SURVEY_ROL_FULL_STATUS_ACCESS
+        data = SurveyClass(db).get_all_surveys(include_all_statuses=include_all)
         return {"message": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -37,6 +59,7 @@ def get_all_surveys(
 @surveys.get("/{survey_id}")
 def get_survey(
     survey_id: int,
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Obtiene una encuesta con sus preguntas y opciones"""
@@ -44,6 +67,7 @@ def get_survey(
         data = SurveyClass(db).get_survey(survey_id)
         if data.get("status") == "error":
             raise HTTPException(status_code=404, detail=data.get("message"))
+        _assert_can_read_survey_inactive(session_user, data.get("status_id"))
         return {"message": data}
     except HTTPException:
         raise
@@ -53,7 +77,7 @@ def get_survey(
 @surveys.post("/")
 def create_survey(
     survey: SurveyCreate,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Crea una nueva encuesta con sus preguntas y opciones"""
@@ -86,7 +110,7 @@ def create_survey(
 def update_survey(
     survey_id: int,
     survey: SurveyUpdate,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Actualiza una encuesta"""
@@ -113,7 +137,7 @@ def update_survey(
 @surveys.delete("/{survey_id}")
 def delete_survey(
     survey_id: int,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Elimina una encuesta"""
@@ -133,7 +157,7 @@ def delete_survey(
 def add_question(
     survey_id: int,
     question: SurveyQuestionCreate,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Agrega una pregunta a una encuesta"""
@@ -157,7 +181,7 @@ def add_question(
 def update_question(
     question_id: int,
     question: SurveyQuestionUpdate,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Actualiza una pregunta"""
@@ -184,7 +208,7 @@ def update_question(
 @surveys.delete("/questions/{question_id}")
 def delete_question(
     question_id: int,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Elimina una pregunta"""
@@ -227,11 +251,16 @@ def submit_response(
 @surveys.get("/{survey_id}/responses")
 def get_survey_responses(
     survey_id: int,
-    session_user: UserLogin = Depends(get_current_active_user),
+    session_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Obtiene todas las respuestas de una encuesta"""
     try:
+        meta = SurveyClass(db).get_survey(survey_id)
+        if isinstance(meta, dict) and meta.get("status") == "error":
+            raise HTTPException(status_code=404, detail=meta.get("message"))
+        _assert_can_read_survey_inactive(session_user, meta.get("status_id"))
+
         data = SurveyClass(db).get_survey_responses(survey_id)
         if isinstance(data, dict) and data.get("status") == "error":
             raise HTTPException(status_code=404, detail=data.get("message"))

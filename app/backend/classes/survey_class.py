@@ -4,21 +4,27 @@ import json
 import os
 from pathlib import Path
 
+# Listado/detalle/respuestas/Word de encuestas con cualquier status_id (no solo activas).
+# Rol 7 y demás usuarios: solo encuestas activas (status_id == 1).
+SURVEY_ROL_FULL_STATUS_ACCESS = 2
+
 class SurveyClass:
     def __init__(self, db):
         self.db = db
 
     # ========== SURVEYS ==========
     
-    def get_all_surveys(self):
-        """Obtiene todas las encuestas"""
+    def get_all_surveys(self, include_all_statuses: bool = False):
+        """
+        Lista encuestas. Por defecto solo activas (status_id == 1): aplica a rol 7 y al resto.
+        Si include_all_statuses es True (solo rol SURVEY_ROL_FULL_STATUS_ACCESS en el router),
+        incluye cualquier estatus.
+        """
         try:
-            surveys = (
-                self.db.query(SurveyModel)
-                .filter(SurveyModel.status_id == 1)
-                .order_by(SurveyModel.created_at.desc())
-                .all()
-            )
+            q = self.db.query(SurveyModel)
+            if not include_all_statuses:
+                q = q.filter(SurveyModel.status_id == 1)
+            surveys = q.order_by(SurveyModel.created_at.desc()).all()
             return [{
                 "id": survey.id,
                 "branch_office_id": survey.branch_office_id,
@@ -247,7 +253,9 @@ class SurveyClass:
             survey = self.db.query(SurveyModel).filter(SurveyModel.id == survey_id).first()
             if not survey:
                 return {"status": "error", "message": "Survey not found"}
-            
+            if survey.status_id != 1:
+                return {"status": "error", "message": "La encuesta no está disponible para respuestas"}
+
             # responses_data es una lista de objetos: [{"question_id": 1, "answer_text": "...", "option_id": null}, ...]
             for response_data in responses_data:
                 question_id = response_data.get("question_id")
