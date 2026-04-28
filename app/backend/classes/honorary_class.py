@@ -18,11 +18,23 @@ class HonoraryClass:
 
         try:
             filters = []
-            if search_branch_office_id is not None:
+            # branch_office_id = 0 se usa en frontend como "sin filtro"
+            if search_branch_office_id not in (None, 0, '0', ''):
                 filters.append(HonoraryModel.branch_office_id == search_branch_office_id)
 
             if search_rut is not None and search_rut != '':
-                filters.append(HonoraryModel.replacement_employee_rut == search_rut)
+                normalized_search_rut = (
+                    str(search_rut).strip().replace('.', '').replace('-', '').upper()
+                )
+                filters.append(
+                    func.upper(
+                        func.replace(
+                            func.replace(HonoraryModel.replacement_employee_rut, '.', ''),
+                            '-',
+                            ''
+                        )
+                    ) == normalized_search_rut
+                )
 
             print(rol_id)
 
@@ -33,7 +45,7 @@ class HonoraryClass:
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
                     filter(
                         *filters
-                    ).order_by(HonoraryModel.added_date.desc())
+                    ).order_by(HonoraryModel.id.desc())
                 
                 data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
                 total_items = data_query.count()
@@ -64,7 +76,7 @@ class HonoraryClass:
                     filter(HonoraryModel.requested_by == rut). \
                     filter(
                         *filters
-                    ).order_by(HonoraryModel.added_date.desc())
+                    ).order_by(HonoraryModel.id.desc())
 
                 data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
                 total_items = data_query.count()
