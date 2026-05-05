@@ -501,8 +501,8 @@ class DteReferenceModel(Base):
     reference_description = Column(String(512))
     added_date = Column(DateTime())
 
-class CustomerTicketItemModel(Base):
-    __tablename__ = 'customer_ticket_items'
+class CustomerDteItemModel(Base):
+    __tablename__ = 'customer_dte_items'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     dte_id = Column(Integer, ForeignKey('dtes.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)

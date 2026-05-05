@@ -2178,6 +2178,12 @@ class CustomerTicketBillSearch(BaseModel):
     customer: Optional[str] = None
     page: int
 
+class CustomerBillItemInput(BaseModel):
+    quantity: int
+    unit_amount: int
+    amount: Optional[int] = None
+    description: str
+
 class GenerateCustomerBill(BaseModel):
     id: Optional[int] = 0
     branch_office_id: int
@@ -2193,6 +2199,8 @@ class GenerateCustomerBill(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     category_id: Optional[int] = None
+    quantity: Optional[int] = None
+    items: List[CustomerBillItemInput] = Field(default_factory=list)
     references: List[CustomerBillReferenceLine] = Field(default_factory=list)
 
 class FolioList(BaseModel):

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel, CustomerTicketItemModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel, CustomerDteItemModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
@@ -126,12 +126,12 @@ class CustomerTicketClass:
         return normalized
 
     def _replace_ticket_items(self, dte_id: int, items):
-        self.db.query(CustomerTicketItemModel).filter(CustomerTicketItemModel.dte_id == dte_id).delete(
+        self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte_id).delete(
             synchronize_session=False
         )
         for item in items:
             self.db.add(
-                CustomerTicketItemModel(
+                CustomerDteItemModel(
                     dte_id=dte_id,
                     line_number=item["line_number"],
                     quantity=item["quantity"],
@@ -152,9 +152,9 @@ class CustomerTicketClass:
         dte_id = getattr(form_data, "id", None)
         if dte_id:
             rows = (
-                self.db.query(CustomerTicketItemModel)
-                .filter(CustomerTicketItemModel.dte_id == dte_id)
-                .order_by(CustomerTicketItemModel.line_number.asc(), CustomerTicketItemModel.id.asc())
+                self.db.query(CustomerDteItemModel)
+                .filter(CustomerDteItemModel.dte_id == dte_id)
+                .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
                 .all()
             )
             if rows:
@@ -602,7 +602,7 @@ class CustomerTicketClass:
         else:
             dte.category_id = 1
             dte.quantity = None
-            self.db.query(CustomerTicketItemModel).filter(CustomerTicketItemModel.dte_id == dte.id).delete(
+            self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte.id).delete(
                 synchronize_session=False
             )
 

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, DteReferenceModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
+from app.backend.db.models import DteModel, DteReferenceModel, CustomerDteItemModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
@@ -57,11 +57,17 @@ def _sync_bill_dte_amounts_from_form(dte, form_data):
     dte.tax = base - round(base / 1.19)
     dte.total = base
     cid = getattr(form_data, "category_id", None)
-    dte.category_id = cid if cid is not None else 1
+    if cid is not None:
+        dte.category_id = cid
+    elif getattr(dte, "category_id", None) is None:
+        dte.category_id = 1
+    qty = getattr(form_data, "quantity", None)
+    if qty is not None:
+        dte.quantity = int(qty)
 
 
 def _bill_category_id(form_data, dte_row):
-    """Factura con referencias SII: category_id = 2 (front y BD)."""
+    """category_id en dtes: 1 normal, 2 con referencias SII, 3 factura grupal (múltiples ítems)."""
     cid = getattr(form_data, "category_id", None)
     if cid is None and dte_row is not None:
         cid = getattr(dte_row, "category_id", None)
@@ -113,6 +119,89 @@ class CustomerBillClass:
     def __init__(self, db: Session):
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
+
+    def _normalize_bill_items(self, items):
+        normalized = []
+        if not items:
+            return normalized
+
+        for idx, item in enumerate(items, start=1):
+            quantity = getattr(item, "quantity", None)
+            unit_amount = getattr(item, "unit_amount", None)
+            amount = getattr(item, "amount", None)
+            description = (getattr(item, "description", None) or "").strip()
+
+            try:
+                q = int(quantity)
+                u = int(unit_amount)
+            except (TypeError, ValueError):
+                continue
+
+            if q < 1 or u < 0 or not description:
+                continue
+
+            try:
+                total = int(amount) if amount is not None else q * u
+            except (TypeError, ValueError):
+                total = q * u
+
+            if total <= 0:
+                total = q * u
+
+            normalized.append({
+                "line_number": idx,
+                "quantity": q,
+                "unit_amount": u,
+                "total_amount": total,
+                "description": description
+            })
+        return normalized
+
+    def _replace_bill_items(self, dte_id: int, items):
+        self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte_id).delete(
+            synchronize_session=False
+        )
+        now = datetime.now()
+        for item in items:
+            self.db.add(
+                CustomerDteItemModel(
+                    dte_id=dte_id,
+                    line_number=item["line_number"],
+                    quantity=item["quantity"],
+                    unit_amount=item["unit_amount"],
+                    total_amount=item["total_amount"],
+                    description=item["description"],
+                    status_id=1,
+                    added_date=now,
+                    updated_date=now
+                )
+            )
+
+    def _get_bill_items_for_generation(self, form_data, dte_row):
+        items = self._normalize_bill_items(getattr(form_data, "items", []))
+        if items:
+            return items
+        dte_id = getattr(form_data, "id", None) or (dte_row.id if dte_row is not None else None)
+        if dte_id:
+            rows = (
+                self.db.query(CustomerDteItemModel)
+                .filter(CustomerDteItemModel.dte_id == dte_id)
+                .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
+                .all()
+            )
+            if rows:
+                return [
+                    {
+                        "line_number": r.line_number,
+                        "quantity": int(r.quantity),
+                        "unit_amount": int(r.unit_amount),
+                        "total_amount": int(r.total_amount),
+                        "description": (r.description or "").strip() or f"Ítem {r.line_number}"
+                    }
+                    for r in rows
+                    if r.quantity and r.unit_amount and r.total_amount
+                ]
+        return []
 
     def _collect_bill_reference_lines(self, form_data, dte_row):
         """Líneas si category_id=2: body del request o filas en dte_references (no hay resumen en dtes)."""
@@ -737,7 +826,11 @@ class CustomerBillClass:
 
         cid = getattr(form_data, "category_id", None)
         dte.category_id = cid if cid is not None else 1
-        dte.quantity = None
+        qty = getattr(form_data, "quantity", None)
+        dte.quantity = int(qty) if qty is not None else None
+        items = self._normalize_bill_items(getattr(form_data, "items", []))
+        if items:
+            dte.quantity = sum(i["quantity"] for i in items)
 
         refs = getattr(form_data, "references", None)
         if refs is not None:
@@ -747,6 +840,9 @@ class CustomerBillClass:
                 if _reference_line_nonempty(d):
                     ref_dicts.append(d)
             self._persist_dte_reference_rows(dte.id, ref_dicts)
+
+        if getattr(form_data, "items", None) is not None:
+            self._replace_bill_items(dte.id, items)
 
         self.db.commit()
         self.db.refresh(dte)
@@ -775,6 +871,7 @@ class CustomerBillClass:
 
     def create_account_asset(self, form_data):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        bill_items = self._get_bill_items_for_generation(form_data, dte_row)
 
         if form_data.dte_type_id == 33:
             american_date = form_data.period + '-01'
@@ -1024,6 +1121,8 @@ class CustomerBillClass:
             folio = None
 
             if code is not None:
+                if isinstance(code, dict) and code.get("status") == "error":
+                    return code
                 if code == 402:
                     return "LibreDTE payment required"
 
@@ -1040,6 +1139,10 @@ class CustomerBillClass:
                     dte.folio = folio
                     dte.status_id = 4
                     _sync_bill_dte_amounts_from_form(dte, form_data)
+                    items = self._get_bill_items_for_generation(form_data, dte)
+                    if items:
+                        dte.quantity = sum(i["quantity"] for i in items)
+                        self._replace_bill_items(dte.id, items)
 
                     try:
                         self.db.commit()
@@ -1061,7 +1164,10 @@ class CustomerBillClass:
             else:
                 return {"status": "error", "message": "No se pudo obtener folio desde LibreDTE"}
         else:
-            return {"status": "error", "message": "Dte already exists for this branch office and customer."}
+            return {
+                "status": "error",
+                "message": "Ya existe un DTE para esta sucursal y este cliente.",
+            }
             
     def store(self, form_data, rol_id):
         if form_data.will_save == 1:
@@ -1094,7 +1200,8 @@ class CustomerBillClass:
 
             cid = getattr(form_data, "category_id", None)
             dte.category_id = cid if cid is not None else 1
-            dte.quantity = None
+            qty = getattr(form_data, "quantity", None)
+            dte.quantity = int(qty) if qty is not None else None
 
             ref_dicts = []
             refs = getattr(form_data, "references", None)
@@ -1106,6 +1213,11 @@ class CustomerBillClass:
 
             self.db.add(dte)
             self.db.flush()
+
+            items = self._normalize_bill_items(getattr(form_data, "items", []))
+            if items:
+                dte.quantity = sum(i["quantity"] for i in items)
+                self._replace_bill_items(dte.id, items)
 
             if ref_dicts:
                 self._persist_dte_reference_rows(dte.id, ref_dicts)
@@ -1191,12 +1303,61 @@ class CustomerBillClass:
             dte_row = self._find_open_bill_draft(form_data)
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        bill_items = self._get_bill_items_for_generation(form_data, dte_row)
 
-        if form_data.chip_id == 1:
+        qty = getattr(form_data, "quantity", None)
+        if qty is None and dte_row is not None and getattr(dte_row, "quantity", None) is not None:
+            qty = dte_row.quantity
+        qty = int(qty) if qty not in (None, "", 0) else None
+
+        if bill_items:
+            detail_lines = []
+            for item in bill_items:
+                detail_lines.append(
+                    {
+                        "NmbItem": item["description"],
+                        "QtyItem": int(item["quantity"]),
+                        "PrcItem": int(item["unit_amount"]),
+                    }
+                )
+            if form_data.chip_id == 1:
+                detail_lines.append(
+                    {
+                        "NmbItem": "Chip",
+                        "QtyItem": 1,
+                        "PrcItem": 5000,
+                    }
+                )
+            data = {
+                "Encabezado": {
+                    "IdDoc": {
+                        "TipoDTE": 33,
+                        "MntBruto": 1
+                    },
+                    "Emisor": {
+                        "RUTEmisor": "76063822-6",
+                        'CdgSIISucur': branch_office_data.dte_code,
+                    },
+                    "Receptor": {
+                        "RUTRecep": customer_data['customer_data']['rut'],
+                        "RznSocRecep": customer_data['customer_data']['customer'],
+                        "GiroRecep": customer_data['customer_data']['activity'],
+                        "DirRecep": customer_data['customer_data']['region'],
+                        "CmnaRecep": customer_data['customer_data']['commune'],
+                        'Contacto': customer_data['customer_data']['email'],
+                        'CorreoRecep': customer_data['customer_data']['email'],
+                    }
+                },
+                "Detalle": detail_lines
+            }
+        elif form_data.chip_id == 1:
             if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":
                 amount = form_data.amount - 5000
             else:
                 amount = form_data.amount
+
+            parking_qty = qty if qty is not None and qty >= 1 else 1
+            parking_unit = round(int(amount) / parking_qty) if parking_qty > 0 else int(amount)
             
             data = {
                 "Encabezado": {
@@ -1221,8 +1382,8 @@ class CustomerBillClass:
                 "Detalle": [
                     {
                         "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": 1,
-                        "PrcItem": amount,
+                        "QtyItem": parking_qty,
+                        "PrcItem": parking_unit,
                     },
                     {
                         "NmbItem": "Chip",
@@ -1232,6 +1393,8 @@ class CustomerBillClass:
                 ]
             }
         else:
+            bill_qty = qty if qty is not None and qty >= 1 else 1
+            bill_unit = round(int(form_data.amount) / bill_qty) if bill_qty > 0 else int(form_data.amount)
             data = {
                 "Encabezado": {
                     "IdDoc": {
@@ -1255,8 +1418,8 @@ class CustomerBillClass:
                 "Detalle": [
                     {
                         "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": 1,
-                        "PrcItem": form_data.amount,
+                        "QtyItem": bill_qty,
+                        "PrcItem": bill_unit,
                     }
                 ]
             }
@@ -1304,10 +1467,17 @@ class CustomerBillClass:
             if response.status_code == 200:
                 dte_data = response.json()
                 code = dte_data.get("codigo")
-
+                if code is None:
+                    return {
+                        "status": "error",
+                        "message": f"LibreDTE no devolvió código de autorización: {response.text}",
+                    }
                 return code
             else:
-                return None
+                return {
+                    "status": "error",
+                    "message": f"LibreDTE rechazó la emisión ({response.status_code}): {response.text}",
+                }
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
