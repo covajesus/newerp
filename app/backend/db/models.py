@@ -501,6 +501,20 @@ class DteReferenceModel(Base):
     reference_description = Column(String(512))
     added_date = Column(DateTime())
 
+class CustomerTicketItemModel(Base):
+    __tablename__ = 'customer_ticket_items'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dte_id = Column(Integer, ForeignKey('dtes.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    line_number = Column(Integer, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_amount = Column(Integer, nullable=False)
+    total_amount = Column(Integer, nullable=False)
+    description = Column(String(500), nullable=False)
+    status_id = Column(Integer, nullable=False, default=1)
+    added_date = Column(DateTime(), nullable=False, default=datetime.now)
+    updated_date = Column(DateTime(), nullable=True, onupdate=datetime.now)
+
 
 class Dte2Model(Base):
     __tablename__ = 'dtes2'

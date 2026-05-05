@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel, CustomerTicketItemModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
@@ -74,8 +74,10 @@ def _sync_ticket_dte_amounts_from_form(dte, form_data):
     if cid is not None:
         dte.category_id = cid
     qty = getattr(form_data, "quantity", None)
-    if getattr(dte, "category_id", None) == 3 and qty is not None:
-        dte.quantity = int(qty)
+    if getattr(dte, "category_id", None) == 3:
+        # Si en generate_ticket no llega quantity, conservar el valor actual del borrador.
+        if qty is not None:
+            dte.quantity = int(qty)
     else:
         dte.quantity = None
 
@@ -84,6 +86,91 @@ class CustomerTicketClass:
     def __init__(self, db: Session):
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
+
+    def _normalize_group_items(self, items):
+        normalized = []
+        if not items:
+            return normalized
+
+        for idx, item in enumerate(items, start=1):
+            quantity = getattr(item, "quantity", None)
+            unit_amount = getattr(item, "unit_amount", None)
+            amount = getattr(item, "amount", None)
+            description = (getattr(item, "description", None) or "").strip()
+
+            try:
+                q = int(quantity)
+                u = int(unit_amount)
+            except (TypeError, ValueError):
+                continue
+
+            if q < 1 or u < 0 or not description:
+                continue
+
+            try:
+                total = int(amount) if amount is not None else q * u
+            except (TypeError, ValueError):
+                total = q * u
+
+            if total <= 0:
+                total = q * u
+
+            normalized.append({
+                "line_number": idx,
+                "quantity": q,
+                "unit_amount": u,
+                "total_amount": total,
+                "description": description
+            })
+
+        return normalized
+
+    def _replace_ticket_items(self, dte_id: int, items):
+        self.db.query(CustomerTicketItemModel).filter(CustomerTicketItemModel.dte_id == dte_id).delete(
+            synchronize_session=False
+        )
+        for item in items:
+            self.db.add(
+                CustomerTicketItemModel(
+                    dte_id=dte_id,
+                    line_number=item["line_number"],
+                    quantity=item["quantity"],
+                    unit_amount=item["unit_amount"],
+                    total_amount=item["total_amount"],
+                    description=item["description"],
+                    status_id=1,
+                    added_date=datetime.now(),
+                    updated_date=datetime.now()
+                )
+            )
+
+    def _get_group_items_for_generation(self, form_data):
+        items = self._normalize_group_items(getattr(form_data, "items", []))
+        if items:
+            return items
+
+        dte_id = getattr(form_data, "id", None)
+        if dte_id:
+            rows = (
+                self.db.query(CustomerTicketItemModel)
+                .filter(CustomerTicketItemModel.dte_id == dte_id)
+                .order_by(CustomerTicketItemModel.line_number.asc(), CustomerTicketItemModel.id.asc())
+                .all()
+            )
+            if rows:
+                return [
+                    {
+                        "line_number": r.line_number,
+                        "quantity": int(r.quantity),
+                        "unit_amount": int(r.unit_amount),
+                        "total_amount": int(r.total_amount),
+                        "description": (r.description or "").strip() or f"Ítem {r.line_number}"
+                    }
+                    for r in rows
+                    if r.quantity and r.unit_amount and r.total_amount
+                ]
+
+        return []
 
     def get_all(self, rol_id = None, rut = None, group=1, page=0, items_per_page=10, period=None):
         try:
@@ -503,14 +590,21 @@ class CustomerTicketClass:
         cid = getattr(form_data, "category_id", None)
         if cid is not None:
             dte.category_id = cid
+            group_items = self._normalize_group_items(getattr(form_data, "items", []))
             qty = getattr(form_data, "quantity", None)
-            if cid == 3 and qty is not None:
+            if cid == 3 and group_items:
+                dte.quantity = sum(item["quantity"] for item in group_items)
+                self._replace_ticket_items(dte.id, group_items)
+            elif cid == 3 and qty is not None:
                 dte.quantity = int(qty)
             else:
                 dte.quantity = None
         else:
             dte.category_id = 1
             dte.quantity = None
+            self.db.query(CustomerTicketItemModel).filter(CustomerTicketItemModel.dte_id == dte.id).delete(
+                synchronize_session=False
+            )
 
         self.db.commit()
         self.db.refresh(dte)
@@ -688,6 +782,15 @@ class CustomerTicketClass:
                     dte.folio = folio
                     dte.status_id = 4
                     _sync_ticket_dte_amounts_from_form(dte, form_data)
+                    group_items = self._get_group_items_for_generation(form_data)
+                    if group_items:
+                        dte.category_id = 3
+                        dte.quantity = sum(item["quantity"] for item in group_items)
+                        # Solo reemplazar cuando vienen items explícitos en payload (create/edit).
+                        if self._normalize_group_items(getattr(form_data, "items", [])):
+                            self._replace_ticket_items(dte.id, group_items)
+                    elif dte.category_id == 3 and getattr(form_data, "quantity", None) is not None:
+                        dte.quantity = int(form_data.quantity)
 
                     try:
                         self.db.commit()
@@ -741,8 +844,11 @@ class CustomerTicketClass:
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             cid = getattr(form_data, "category_id", None)
             dte.category_id = cid if cid is not None else 1
+            group_items = self._normalize_group_items(getattr(form_data, "items", []))
             qty = getattr(form_data, "quantity", None)
-            if dte.category_id == 3 and qty is not None:
+            if dte.category_id == 3 and group_items:
+                dte.quantity = sum(item["quantity"] for item in group_items)
+            elif dte.category_id == 3 and qty is not None:
                 dte.quantity = int(qty)
             else:
                 dte.quantity = None
@@ -750,6 +856,9 @@ class CustomerTicketClass:
             self.db.add(dte)
 
             try:
+                self.db.flush()
+                if dte.category_id == 3 and group_items:
+                    self._replace_ticket_items(dte.id, group_items)
                 self.db.commit()
 
                 return {"status": "success", "message": "Dte saved successfully"}
@@ -937,12 +1046,52 @@ class CustomerTicketClass:
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
-        category_id = getattr(form_data, "category_id", None) or 1
-        qty = getattr(form_data, "quantity", None)
+        dte_id = getattr(form_data, "id", None)
+        source_dte = None
+        if dte_id is not None:
+            source_dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
 
-        if category_id == 3 and qty is not None and int(qty) >= 1:
-            q = int(qty)
-            unit_price = round(int(form_data.amount) / q)
+        category_id = getattr(form_data, "category_id", None)
+        if category_id is None and source_dte is not None:
+            category_id = source_dte.category_id
+        if category_id is None:
+            category_id = 1
+
+        qty = getattr(form_data, "quantity", None)
+        if qty is None and source_dte is not None and source_dte.quantity is not None:
+            qty = source_dte.quantity
+
+        group_items = self._get_group_items_for_generation(form_data)
+
+        if category_id == 3 or group_items:
+            if group_items:
+                detail_lines = [
+                    {
+                        "NmbItem": item["description"],
+                        "QtyItem": int(item["quantity"]),
+                        "PrcItem": int(item["unit_amount"]),
+                    }
+                    for item in group_items
+                ]
+            elif qty is not None and int(qty) >= 1:
+                q = int(qty)
+                unit_price = round(int(form_data.amount) / q)
+                detail_lines = [
+                    {
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "QtyItem": q,
+                        "PrcItem": unit_price,
+                    }
+                ]
+            else:
+                detail_lines = [
+                    {
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "QtyItem": 1,
+                        "PrcItem": int(form_data.amount),
+                    }
+                ]
+
             data = {
                 "Encabezado": {
                     "IdDoc": {
@@ -962,13 +1111,7 @@ class CustomerTicketClass:
                         'CorreoRecep': customer_data['customer_data']['email'],
                     }
                 },
-                "Detalle": [
-                    {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": q,
-                        "PrcItem": unit_price,
-                    }
-                ]
+                "Detalle": detail_lines
             }
         elif form_data.chip_id == 1:
             if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":

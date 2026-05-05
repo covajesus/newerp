@@ -2015,6 +2015,12 @@ class ChangeStatusInCustomerTicketBill(BaseModel):
 class CustomerCollection(BaseModel):
     period: str
 
+class CustomerTicketItemInput(BaseModel):
+    quantity: int
+    unit_amount: int
+    amount: Optional[int] = None
+    description: str
+
 class GenerateCustomerTicket(BaseModel):
     id: Optional[int] = 0
     branch_office_id: int
@@ -2029,8 +2035,9 @@ class GenerateCustomerTicket(BaseModel):
     phone: Optional[str] = None
     activity: Optional[str] = None
     address: Optional[str] = None
-    category_id: Optional[int] = 1
+    category_id: Optional[int] = None
     quantity: Optional[int] = None
+    items: List[CustomerTicketItemInput] = Field(default_factory=list)
 
 
 class CustomerBillReferenceLine(BaseModel):
@@ -2072,6 +2079,9 @@ class ToBeAcceptedCustomerTicket(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     will_save: Optional[int] = 0
+    category_id: Optional[int] = 1
+    quantity: Optional[int] = None
+    items: List[CustomerTicketItemInput] = Field(default_factory=list)
 
 class ToBeAcceptedCustomerTicketBill(BaseModel):
     id: Optional[int] = 0
