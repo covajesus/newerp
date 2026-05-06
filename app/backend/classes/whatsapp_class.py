@@ -4,7 +4,46 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import json
-load_dotenv() 
+load_dotenv()
+
+
+def _libredte_fecha_from_emitido_info(response: requests.Response, fallback_date=None) -> str:
+    """
+    LibreDTE /dte_emitidos/info puede devolver un objeto JSON; si falla el parseo o viene un
+    formato inesperado (p. ej. string), no usar claves tipo dict sobre un str (evita
+    «string indices must be integers»).
+    """
+    fecha = None
+    try:
+        data = response.json()
+    except Exception:
+        body = (response.text or "").strip().strip('"')
+        if len(body) >= 10 and body[4] == "-" and body[7] == "-":
+            fecha = body[:10]
+        return fecha or (_fmt_yyyy_mm_dd(fallback_date) if fallback_date else datetime.now().strftime("%Y-%m-%d"))
+
+    if isinstance(data, dict):
+        fecha = data.get("fecha") or data.get("FchEmis") or data.get("fch_emis")
+        if fecha and not isinstance(fecha, str):
+            fecha = str(fecha)[:10]
+    elif isinstance(data, str):
+        s = data.strip().strip('"')
+        if len(s) >= 10 and s[4] == "-" and s[7] == "-":
+            fecha = s[:10]
+
+    if not fecha:
+        fecha = _fmt_yyyy_mm_dd(fallback_date) if fallback_date else datetime.now().strftime("%Y-%m-%d")
+    return fecha[:10] if fecha else datetime.now().strftime("%Y-%m-%d")
+
+
+def _fmt_yyyy_mm_dd(dt) -> str:
+    if dt is None:
+        return datetime.now().strftime("%Y-%m-%d")
+    if hasattr(dt, "strftime"):
+        return dt.strftime("%Y-%m-%d")
+    s = str(dt).strip()
+    return s[:10] if len(s) >= 10 else datetime.now().strftime("%Y-%m-%d")
+
 
 class WhatsappClass:
     def __init__(self, db):
@@ -65,18 +104,17 @@ class WhatsappClass:
 
         created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
 
-        payload={}
         headers = {
                     "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json"
                 }
 
-        created_dte_response = requests.request("GET", created_dte_url, headers=headers, data=payload)
+        created_dte_response = requests.get(created_dte_url, headers=headers, timeout=45)
 
         print(created_dte_response.text)
-        data = created_dte_response.json()
+        fecha_emitido = _libredte_fecha_from_emitido_info(created_dte_response, getattr(dte_data, "added_date", None))
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + data['fecha'] + '/' + str(dte_data.total)
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + fecha_emitido + '/' + str(dte_data.total)
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
         headers = {
@@ -458,18 +496,17 @@ class WhatsappClass:
 
         created_dte_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
 
-        payload={}
         headers = {
                     "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json"
                 }
 
-        created_dte_response = requests.request("GET", created_dte_url, headers=headers, data=payload)
+        created_dte_response = requests.get(created_dte_url, headers=headers, timeout=45)
 
         print(created_dte_response.text)
-        data = created_dte_response.json()
+        fecha_emitido = _libredte_fecha_from_emitido_info(created_dte_response, getattr(dte_data, "added_date", None))
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + data['fecha'] + '/' + str(dte_data.total)
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + fecha_emitido + '/' + str(dte_data.total)
     
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 

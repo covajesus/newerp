@@ -13,6 +13,7 @@ import uuid
 import base64
 from sqlalchemy import or_
 from fastapi import HTTPException
+from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
 
 
 def _dte_rut_sql_or_bill(rut_column, rut_value):
@@ -120,16 +121,77 @@ class CustomerBillClass:
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
 
+    @staticmethod
+    def _bill_line_input_as_plain(item):
+        """dict leíble para normalizar: soporta Request body dict, Pydantic BaseModel y otros objetos."""
+        if isinstance(item, dict):
+            return item
+        model_dump = getattr(item, "model_dump", None)
+        if callable(model_dump):
+            try:
+                return model_dump()
+            except Exception:
+                pass
+        keys = (
+            "quantity",
+            "unit_amount",
+            "amount",
+            "description",
+            "item_code",
+            "item_name",
+            "unit_measure",
+            "discount_amount",
+            "discount",
+            "dsc_item",
+        )
+        return {k: getattr(item, k, None) for k in keys}
+
+    def _clean_optional_str(self, item, *keys):
+        for k in keys:
+            if isinstance(item, dict):
+                v = item.get(k)
+            else:
+                v = getattr(item, k, None)
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s:
+                return s
+        return None
+
+    def _optional_dsc_item_str(self, item):
+        v = item.get("dsc_item") if isinstance(item, dict) else getattr(item, "dsc_item", None)
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s[:500] if s else None
+
+    def _discount_from_item_input(self, item):
+        for k in ("discount_amount", "discount"):
+            if isinstance(item, dict):
+                v = item.get(k)
+            else:
+                v = getattr(item, k, None)
+            if v is None or v == "":
+                continue
+            try:
+                return max(0, int(v))
+            except (TypeError, ValueError):
+                return 0
+        return 0
+
     def _normalize_bill_items(self, items):
         normalized = []
         if not items:
             return normalized
 
         for idx, item in enumerate(items, start=1):
-            quantity = getattr(item, "quantity", None)
-            unit_amount = getattr(item, "unit_amount", None)
-            amount = getattr(item, "amount", None)
-            description = (getattr(item, "description", None) or "").strip()
+            plain = self._bill_line_input_as_plain(item)
+            quantity = plain.get("quantity")
+            unit_amount = plain.get("unit_amount")
+            amount = plain.get("amount")
+            # Solo texto del campo "Detalle" del formulario; código/nombre/UM van en columnas propias.
+            detalle_only = (plain.get("description") or "").strip()
 
             try:
                 q = int(quantity)
@@ -137,7 +199,9 @@ class CustomerBillClass:
             except (TypeError, ValueError):
                 continue
 
-            if q < 1 or u < 0 or not description:
+            name = self._clean_optional_str(plain, "item_name")
+            code = self._clean_optional_str(plain, "item_code")
+            if q < 1 or u < 0 or (not detalle_only and not name and not code):
                 continue
 
             try:
@@ -148,16 +212,30 @@ class CustomerBillClass:
             if total <= 0:
                 total = q * u
 
+            da = self._discount_from_item_input(plain)
+            stored_description = detalle_only if detalle_only else "-"
+            dsc = self._optional_dsc_item_str(plain)
+            if dsc is None and detalle_only:
+                dsc = detalle_only
+            if dsc is None and (name or code):
+                dsc = name or code
+
             normalized.append({
                 "line_number": idx,
                 "quantity": q,
                 "unit_amount": u,
                 "total_amount": total,
-                "description": description
+                "description": stored_description,
+                "item_code": code,
+                "item_name": name,
+                "unit_measure": self._clean_optional_str(plain, "unit_measure"),
+                "discount_amount": da,
+                "dsc_item": dsc if dsc else None,
             })
         return normalized
 
     def _replace_bill_items(self, dte_id: int, items):
+        print("[_replace_bill_items] dte_id=", dte_id, "insertar", len(items), "fila(s)")
         self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte_id).delete(
             synchronize_session=False
         )
@@ -171,17 +249,39 @@ class CustomerBillClass:
                     unit_amount=item["unit_amount"],
                     total_amount=item["total_amount"],
                     description=item["description"],
+                    item_code=item.get("item_code"),
+                    item_name=item.get("item_name"),
+                    unit_measure=item.get("unit_measure"),
+                    discount_amount=int(item.get("discount_amount") or 0),
+                    dsc_item=item.get("dsc_item"),
                     status_id=1,
                     added_date=now,
                     updated_date=now
                 )
             )
 
+    def _draft_dte_id_for_items(self, form_data, dte_row):
+        """
+        ID del borrador para leer customer_dte_items al emitir.
+        Prioriza dte_row (resuelto por id o por _find_open_bill_draft) sobre form_data.id,
+        para no mezclar borradores cuando el POST trae un id incorrecto.
+        """
+        if dte_row is not None and getattr(dte_row, "id", None) is not None:
+            return int(dte_row.id)
+        raw = getattr(form_data, "id", None)
+        if raw is None:
+            return None
+        try:
+            i = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return i if i != 0 else None
+
     def _get_bill_items_for_generation(self, form_data, dte_row):
         items = self._normalize_bill_items(getattr(form_data, "items", []))
         if items:
             return items
-        dte_id = getattr(form_data, "id", None) or (dte_row.id if dte_row is not None else None)
+        dte_id = self._draft_dte_id_for_items(form_data, dte_row)
         if dte_id:
             rows = (
                 self.db.query(CustomerDteItemModel)
@@ -190,17 +290,30 @@ class CustomerBillClass:
                 .all()
             )
             if rows:
-                return [
-                    {
+                out = []
+                for r in rows:
+                    try:
+                        q = int(r.quantity)
+                        u = int(r.unit_amount)
+                        ta = int(r.total_amount)
+                    except (TypeError, ValueError):
+                        continue
+                    if q < 1 or u < 0 or ta < 0:
+                        continue
+                    da = int(getattr(r, "discount_amount", 0) or 0)
+                    out.append({
                         "line_number": r.line_number,
-                        "quantity": int(r.quantity),
-                        "unit_amount": int(r.unit_amount),
-                        "total_amount": int(r.total_amount),
-                        "description": (r.description or "").strip() or f"Ítem {r.line_number}"
-                    }
-                    for r in rows
-                    if r.quantity and r.unit_amount and r.total_amount
-                ]
+                        "quantity": q,
+                        "unit_amount": u,
+                        "total_amount": ta,
+                        "description": (r.description or "").strip() or f"Ítem {r.line_number}",
+                        "item_code": (r.item_code or "").strip() or None,
+                        "item_name": (r.item_name or "").strip() or None,
+                        "unit_measure": (r.unit_measure or "").strip() or None,
+                        "discount_amount": da,
+                        "dsc_item": (getattr(r, "dsc_item", None) or "").strip() or None,
+                    })
+                return out
         return []
 
     def _collect_bill_reference_lines(self, form_data, dte_row):
@@ -249,6 +362,71 @@ class CustomerBillClass:
                 added_date=now,
             )
             self.db.add(row)
+
+    def _bill_pre_emisor_receptor(self, customer_data, branch_office_data):
+        """Bloques Emisor/Receptor comunes para pre_generate_bill (factura electrónica 33)."""
+        return {
+            "Emisor": {
+                "RUTEmisor": "76063822-6",
+                "CdgSIISucur": branch_office_data.dte_code,
+            },
+            "Receptor": {
+                "RUTRecep": customer_data["customer_data"]["rut"],
+                "RznSocRecep": customer_data["customer_data"]["customer"],
+                "GiroRecep": customer_data["customer_data"]["activity"],
+                "DirRecep": customer_data["customer_data"]["region"],
+                "CmnaRecep": customer_data["customer_data"]["commune"],
+                "Contacto": customer_data["customer_data"]["email"],
+                "CorreoRecep": customer_data["customer_data"]["email"],
+            },
+        }
+
+    def _bill_pre_detalle_lines_parking_o_items(self, form_data, bill_items, qty):
+        """
+        Líneas Detalle para categorías 1 y 2: ítems persistidos/multilínea, chip+parking o una sola línea.
+        """
+        if bill_items:
+            detail_lines = []
+            for item in bill_items:
+                linea = libredte_detalle_line_from_group_item(item)
+                detail_lines.append(linea)
+            if form_data.chip_id == 1:
+                detail_lines.append(
+                    {
+                        "NmbItem": "Chip",
+                        "QtyItem": 1,
+                        "PrcItem": 5000,
+                    }
+                )
+            return detail_lines
+        if form_data.chip_id == 1:
+            if form_data.will_save == 0 or form_data.will_save is None or form_data.will_save == "":
+                amount = form_data.amount - 5000
+            else:
+                amount = form_data.amount
+            parking_qty = qty if qty is not None and qty >= 1 else 1
+            parking_unit = round(int(amount) / parking_qty) if parking_qty > 0 else int(amount)
+            return [
+                {
+                    "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
+                    "QtyItem": parking_qty,
+                    "PrcItem": parking_unit,
+                },
+                {
+                    "NmbItem": "Chip",
+                    "QtyItem": 1,
+                    "PrcItem": 5000,
+                },
+            ]
+        bill_qty = qty if qty is not None and qty >= 1 else 1
+        bill_unit = round(int(form_data.amount) / bill_qty) if bill_qty > 0 else int(form_data.amount)
+        return [
+            {
+                "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
+                "QtyItem": bill_qty,
+                "PrcItem": bill_unit,
+            }
+        ]
 
     def _find_open_bill_draft(self, form_data):
         """
@@ -871,7 +1049,6 @@ class CustomerBillClass:
 
     def create_account_asset(self, form_data):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-        bill_items = self._get_bill_items_for_generation(form_data, dte_row)
 
         if form_data.dte_type_id == 33:
             american_date = form_data.period + '-01'
@@ -1057,6 +1234,28 @@ class CustomerBillClass:
                     ],
                 }
 
+                item_rows = (
+                    self.db.query(CustomerDteItemModel)
+                    .filter(CustomerDteItemModel.dte_id == id)
+                    .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
+                    .all()
+                )
+                customer_bill_data["items"] = [
+                    {
+                        "line_number": r.line_number,
+                        "quantity": int(r.quantity),
+                        "unit_amount": int(r.unit_amount),
+                        "total_amount": int(r.total_amount),
+                        "description": (r.description or "").strip(),
+                        "item_code": (r.item_code or "").strip() or None,
+                        "item_name": (r.item_name or "").strip() or None,
+                        "unit_measure": (r.unit_measure or "").strip() or None,
+                        "discount_amount": int(getattr(r, "discount_amount", 0) or 0),
+                        "dsc_item": (getattr(r, "dsc_item", None) or "").strip() or None,
+                    }
+                    for r in item_rows
+                ]
+
                 # Crear el resultado final como un diccionario
                 result = {
                     "customer_bill_data": customer_bill_data
@@ -1149,8 +1348,11 @@ class CustomerBillClass:
                         self.db.refresh(dte)
 
                         print("Empieza envio de whatsapp")
-
-                        WhatsappClass(self.db).send(dte, form_data.rut)
+                        try:
+                            WhatsappClass(self.db).send(dte, form_data.rut)
+                        except Exception as we:
+                            # El DTE ya quedó timbrado en LibreDTE; no revertir BD por fallo de WhatsApp o info/auxiliar.
+                            print(f"WhatsApp/envío auxiliar falló (factura igual guardada): {we}")
 
                         return {"status": "success", "message": "Dte saved successfully"}
                     except Exception as e:
@@ -1171,6 +1373,38 @@ class CustomerBillClass:
             
     def store(self, form_data, rol_id):
         if form_data.will_save == 1:
+            raw_item_list = list(getattr(form_data, "items", None) or [])
+            items = self._normalize_bill_items(raw_item_list)
+            # Debug: consola del servidor (uvicorn/gunicorn) — si llegan items vacíos o se pierden al normalizar
+            print("[customer_bills/store] category_id=", getattr(form_data, "category_id", None), end=" ")
+            print("raw_len=", len(raw_item_list), "normalized_len=", len(items))
+            try:
+                for idx, raw in enumerate(raw_item_list):
+                    plain = self._bill_line_input_as_plain(raw)
+                    print(f"[customer_bills/store] raw[{idx}]=", json.dumps(plain, ensure_ascii=False, default=str))
+                print("[customer_bills/store] normalized=", json.dumps(items, ensure_ascii=False, default=str))
+            except Exception as dbg_e:
+                print("[customer_bills/store] debug print error:", dbg_e)
+
+            cid_pre = getattr(form_data, "category_id", None)
+            if cid_pre is None:
+                cid_pre = 1
+            if cid_pre == 3:
+                if len(raw_item_list) < 1:
+                    return {
+                        "status": "error",
+                        "message": "Factura grupal requiere al menos un ítem en la lista de líneas.",
+                    }
+                if len(items) != len(raw_item_list) or not items:
+                    return {
+                        "status": "error",
+                        "message": (
+                            "No se guardaron todas las líneas: cada línea debe tener cantidad ≥ 1, precio unitario (neto) ≥ 1 "
+                            "y al menos Detalle, Nombre o Código. Si esto aparece igual con el formulario bien llenado, revise que "
+                            "**Factura grupal** esté en «Sí» antes de guardar."
+                        ),
+                    }
+
             dte = DteModel()
 
             period = datetime.now().strftime('%Y-%m')
@@ -1214,10 +1448,12 @@ class CustomerBillClass:
             self.db.add(dte)
             self.db.flush()
 
-            items = self._normalize_bill_items(getattr(form_data, "items", []))
             if items:
+                print("[customer_bills/store] guardando customer_dte_items dte.id=", dte.id, "filas=", len(items))
                 dte.quantity = sum(i["quantity"] for i in items)
                 self._replace_bill_items(dte.id, items)
+            else:
+                print("[customer_bills/store] NO se insertan líneas: items normalizado vacío (lista [])")
 
             if ref_dicts:
                 self._persist_dte_reference_rows(dte.id, ref_dicts)
@@ -1298,28 +1534,37 @@ class CustomerBillClass:
         _fid = getattr(form_data, "id", None)
         if _fid not in (None, 0):
             dte_row = self.db.query(DteModel).filter(DteModel.id == _fid).first()
-        # No masivo: muchas veces generate_bill no envía id (queda 0); la OC está en el borrador
         if dte_row is None:
             dte_row = self._find_open_bill_draft(form_data)
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         bill_items = self._get_bill_items_for_generation(form_data, dte_row)
 
+        category_id = _bill_category_id(form_data, dte_row)
+        if category_id not in (1, 2, 3):
+            category_id = 1
+
         qty = getattr(form_data, "quantity", None)
         if qty is None and dte_row is not None and getattr(dte_row, "quantity", None) is not None:
             qty = dte_row.quantity
         qty = int(qty) if qty not in (None, "", 0) else None
 
-        if bill_items:
+        er = self._bill_pre_emisor_receptor(customer_data, branch_office_data)
+
+        if category_id == 3:
+            # Factura grupal: solo líneas de ítem (neto por línea, sin MntBruto).
+            if not bill_items:
+                return {
+                    "status": "error",
+                    "message": (
+                        "Factura grupal (categoría 3) sin líneas de ítem: no hay ítems en el cuerpo del request "
+                        "ni filas en customer_dte_items para el borrador. Revise el id del DTE o vuelva a guardar el borrador."
+                    ),
+                }
             detail_lines = []
             for item in bill_items:
-                detail_lines.append(
-                    {
-                        "NmbItem": item["description"],
-                        "QtyItem": int(item["quantity"]),
-                        "PrcItem": int(item["unit_amount"]),
-                    }
-                )
+                linea = libredte_detalle_line_from_group_item(item)
+                detail_lines.append(linea)
             if form_data.chip_id == 1:
                 detail_lines.append(
                     {
@@ -1330,129 +1575,62 @@ class CustomerBillClass:
                 )
             data = {
                 "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 33,
-                        "MntBruto": 1
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
+                    "IdDoc": {"TipoDTE": 33},
+                    **er,
                 },
-                "Detalle": detail_lines
+                "Detalle": detail_lines,
             }
-        elif form_data.chip_id == 1:
-            if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":
-                amount = form_data.amount - 5000
-            else:
-                amount = form_data.amount
-
-            parking_qty = qty if qty is not None and qty >= 1 else 1
-            parking_unit = round(int(amount) / parking_qty) if parking_qty > 0 else int(amount)
-            
+        elif category_id == 2:
+            # Con referencias (OC / otros): mismo detalle que flujo clásico, sin MntBruto; opcional Referencia.
+            detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, bill_items, qty)
             data = {
                 "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 33,
-                        "MntBruto": 1
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
+                    "IdDoc": {"TipoDTE": 33},
+                    **er,
                 },
-                "Detalle": [
-                    {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": parking_qty,
-                        "PrcItem": parking_unit,
-                    },
-                    {
-                        "NmbItem": "Chip",
-                        "QtyItem": 1,
-                        "PrcItem": 5000,
-                    },
-                ]
+                "Detalle": detail_lines,
             }
-        else:
-            bill_qty = qty if qty is not None and qty >= 1 else 1
-            bill_unit = round(int(form_data.amount) / bill_qty) if bill_qty > 0 else int(form_data.amount)
-            data = {
-                "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 33,
-                        "MntBruto": 1
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
-                },
-                "Detalle": [
-                    {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": bill_qty,
-                        "PrcItem": bill_unit,
-                    }
-                ]
-            }
-        
-        # Referencias SII solo si la factura es categoría 2 (con referencias), alineado con dtes.category_id.
-        ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
-        category_id = _bill_category_id(form_data, dte_row)
-        if category_id == 2 and ref_lines:
-            if "Referencia" not in data:
+            ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
+            if ref_lines:
                 data["Referencia"] = []
-            for i, rd in enumerate(ref_lines):
-                tpo_doc = _tpo_doc_ref_from_line_dict(rd)
-                folio_ref = _folio_ref_for_oc(rd.get("reference_date_id"))
-                fch = rd.get("reference_code") or datetime.now().strftime("%Y-%m-%d")
-                if str(fch).strip() in ("", "null", "None"):
-                    fch = datetime.now().strftime("%Y-%m-%d")
-                raz = rd.get("reference_description")
-                if raz is None or str(raz).strip() == "":
-                    raz = "Orden de Compra" if tpo_doc == 801 else "Referencia"
-                data["Referencia"].append(
-                    {
-                        "NroLinRef": i + 1,
-                        "TpoDocRef": tpo_doc,
-                        "FolioRef": folio_ref,
-                        "FchRef": fch,
-                        "RazonRef": raz,
-                    }
-                )
+                for i, rd in enumerate(ref_lines):
+                    tpo_doc = _tpo_doc_ref_from_line_dict(rd)
+                    folio_ref = _folio_ref_for_oc(rd.get("reference_date_id"))
+                    fch = rd.get("reference_code") or datetime.now().strftime("%Y-%m-%d")
+                    if str(fch).strip() in ("", "null", "None"):
+                        fch = datetime.now().strftime("%Y-%m-%d")
+                    raz = rd.get("reference_description")
+                    if raz is None or str(raz).strip() == "":
+                        raz = "Orden de Compra" if tpo_doc == 801 else "Referencia"
+                    data["Referencia"].append(
+                        {
+                            "NroLinRef": i + 1,
+                            "TpoDocRef": tpo_doc,
+                            "FolioRef": folio_ref,
+                            "FchRef": fch,
+                            "RazonRef": raz,
+                        }
+                    )
+        else:
+            # category_id == 1: factura estándar (montos brutos en ítems vía MntBruto).
+            detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, bill_items, qty)
+            data = {
+                "Encabezado": {
+                    "IdDoc": {
+                        "TipoDTE": 33,
+                        "MntBruto": 1,
+                    },
+                    **er,
+                },
+                "Detalle": detail_lines,
+            }
 
         try:
+            # Payload exacto enviado a LibreDTE (POST json=data). Ver consola del backend al pre-generar.
+            print("[pre_generate_bill] emitir payload:\n" + json.dumps(data, indent=2, ensure_ascii=False))
             # Endpoint para generar un DTE temporal
             url = f"https://libredte.cl/api/dte/documentos/emitir?normalizar=1&formato=json&links=0&email=0"
-            
+
             # Enviar solicitud a la API
             response = requests.post(
                 url,
@@ -1462,7 +1640,7 @@ class CustomerBillClass:
                     "Content-Type": "application/json",
                 },
             )
-            
+
             # Manejar la respuesta
             if response.status_code == 200:
                 dte_data = response.json()
@@ -1482,7 +1660,7 @@ class CustomerBillClass:
         except Exception as e:
             print("Error al conectarse a la API:", e)
             return None
-    
+
     def pre_generate_credit_note_ticket(self, customer_data, folio, cash_amount, added_date):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 

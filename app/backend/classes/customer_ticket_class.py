@@ -14,6 +14,7 @@ import json
 import base64
 import uuid
 from sqlalchemy.sql import func
+from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
 
 
 def _dte_rut_sql_or(rut_column, rut_value):
@@ -87,6 +88,34 @@ class CustomerTicketClass:
         self.db = db
         self.file_class = FileClass(db)  # Crear una instancia de FileClass
 
+    def _clean_optional_str(self, item, *keys):
+        for k in keys:
+            v = getattr(item, k, None)
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s:
+                return s
+        return None
+
+    def _optional_dsc_item_str(self, item):
+        v = getattr(item, "dsc_item", None)
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s[:500] if s else None
+
+    def _discount_from_item_input(self, item):
+        for k in ("discount_amount", "discount"):
+            v = getattr(item, k, None)
+            if v is None or v == "":
+                continue
+            try:
+                return max(0, int(v))
+            except (TypeError, ValueError):
+                return 0
+        return 0
+
     def _normalize_group_items(self, items):
         normalized = []
         if not items:
@@ -96,7 +125,7 @@ class CustomerTicketClass:
             quantity = getattr(item, "quantity", None)
             unit_amount = getattr(item, "unit_amount", None)
             amount = getattr(item, "amount", None)
-            description = (getattr(item, "description", None) or "").strip()
+            detalle_only = (getattr(item, "description", None) or "").strip()
 
             try:
                 q = int(quantity)
@@ -104,7 +133,9 @@ class CustomerTicketClass:
             except (TypeError, ValueError):
                 continue
 
-            if q < 1 or u < 0 or not description:
+            name = self._clean_optional_str(item, "item_name")
+            code = self._clean_optional_str(item, "item_code")
+            if q < 1 or u < 0 or (not detalle_only and not name and not code):
                 continue
 
             try:
@@ -115,12 +146,23 @@ class CustomerTicketClass:
             if total <= 0:
                 total = q * u
 
+            da = self._discount_from_item_input(item)
+            stored_description = detalle_only if detalle_only else "-"
+            dsc = self._optional_dsc_item_str(item)
+            if dsc is None and detalle_only:
+                dsc = detalle_only
+
             normalized.append({
                 "line_number": idx,
                 "quantity": q,
                 "unit_amount": u,
                 "total_amount": total,
-                "description": description
+                "description": stored_description,
+                "item_code": code,
+                "item_name": name,
+                "unit_measure": self._clean_optional_str(item, "unit_measure"),
+                "discount_amount": da,
+                "dsc_item": dsc,
             })
 
         return normalized
@@ -138,19 +180,37 @@ class CustomerTicketClass:
                     unit_amount=item["unit_amount"],
                     total_amount=item["total_amount"],
                     description=item["description"],
+                    item_code=item.get("item_code"),
+                    item_name=item.get("item_name"),
+                    unit_measure=item.get("unit_measure"),
+                    discount_amount=int(item.get("discount_amount") or 0),
+                    dsc_item=item.get("dsc_item"),
                     status_id=1,
                     added_date=datetime.now(),
                     updated_date=datetime.now()
                 )
             )
 
-    def _get_group_items_for_generation(self, form_data):
+    def _ticket_draft_id_for_items(self, form_data, source_dte):
+        """Prioriza el DTE resuelto (source_dte) sobre form_data.id al leer customer_dte_items."""
+        if source_dte is not None and getattr(source_dte, "id", None) is not None:
+            return int(source_dte.id)
+        raw = getattr(form_data, "id", None)
+        if raw is None:
+            return None
+        try:
+            i = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return i if i != 0 else None
+
+    def _get_group_items_for_generation(self, form_data, source_dte=None):
         items = self._normalize_group_items(getattr(form_data, "items", []))
         if items:
             return items
 
-        dte_id = getattr(form_data, "id", None)
-        if dte_id:
+        dte_id = self._ticket_draft_id_for_items(form_data, source_dte)
+        if dte_id is not None:
             rows = (
                 self.db.query(CustomerDteItemModel)
                 .filter(CustomerDteItemModel.dte_id == dte_id)
@@ -158,17 +218,30 @@ class CustomerTicketClass:
                 .all()
             )
             if rows:
-                return [
-                    {
+                out = []
+                for r in rows:
+                    try:
+                        q = int(r.quantity)
+                        u = int(r.unit_amount)
+                        ta = int(r.total_amount)
+                    except (TypeError, ValueError):
+                        continue
+                    if q < 1 or u < 0 or ta < 0:
+                        continue
+                    da = int(getattr(r, "discount_amount", 0) or 0)
+                    out.append({
                         "line_number": r.line_number,
-                        "quantity": int(r.quantity),
-                        "unit_amount": int(r.unit_amount),
-                        "total_amount": int(r.total_amount),
-                        "description": (r.description or "").strip() or f"Ítem {r.line_number}"
-                    }
-                    for r in rows
-                    if r.quantity and r.unit_amount and r.total_amount
-                ]
+                        "quantity": q,
+                        "unit_amount": u,
+                        "total_amount": ta,
+                        "description": (r.description or "").strip() or f"Ítem {r.line_number}",
+                        "item_code": (r.item_code or "").strip() or None,
+                        "item_name": (r.item_name or "").strip() or None,
+                        "unit_measure": (r.unit_measure or "").strip() or None,
+                        "discount_amount": da,
+                        "dsc_item": (getattr(r, "dsc_item", None) or "").strip() or None,
+                    })
+                return out
 
         return []
 
@@ -639,14 +712,52 @@ class CustomerTicketClass:
 
     def get(self, id):
         try:
-            data_query = self.db.query(DteModel.id, DteModel.rut, DteModel.branch_office_id, DteModel.total, CustomerModel.address, DteModel.cash_amount, CustomerModel.customer, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.email, CustomerModel.phone, DteModel.chip_id, DteModel.folio, DteModel.status_id, DteModel.added_date, BranchOfficeModel.branch_office). \
-                        outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id). \
-                        outerjoin(CustomerModel, CustomerModel.rut == DteModel.rut). \
-                        filter(DteModel.id == id). \
-                        first()
+            data_query = self.db.query(
+                DteModel.id,
+                DteModel.rut,
+                DteModel.branch_office_id,
+                DteModel.total,
+                CustomerModel.address,
+                DteModel.cash_amount,
+                CustomerModel.customer,
+                CustomerModel.region_id,
+                CustomerModel.commune_id,
+                CustomerModel.activity,
+                CustomerModel.email,
+                CustomerModel.phone,
+                DteModel.chip_id,
+                DteModel.folio,
+                DteModel.status_id,
+                DteModel.added_date,
+                BranchOfficeModel.branch_office,
+                DteModel.category_id,
+            ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id).outerjoin(
+                CustomerModel, CustomerModel.rut == DteModel.rut
+            ).filter(DteModel.id == id).first()
 
             if data_query:
-                # Serializar los datos del empleado
+                item_rows = (
+                    self.db.query(CustomerDteItemModel)
+                    .filter(CustomerDteItemModel.dte_id == id)
+                    .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
+                    .all()
+                )
+                items_payload = [
+                    {
+                        "line_number": r.line_number,
+                        "quantity": int(r.quantity),
+                        "unit_amount": int(r.unit_amount),
+                        "total_amount": int(r.total_amount),
+                        "description": (r.description or "").strip(),
+                        "item_code": (r.item_code or "").strip() or None,
+                        "item_name": (r.item_name or "").strip() or None,
+                        "unit_measure": (r.unit_measure or "").strip() or None,
+                        "discount_amount": int(getattr(r, "discount_amount", 0) or 0),
+                        "dsc_item": (getattr(r, "dsc_item", None) or "").strip() or None,
+                    }
+                    for r in item_rows
+                ]
+
                 customer_ticket_data = {
                     "id": data_query.id,
                     "rut": data_query.rut,
@@ -663,7 +774,9 @@ class CustomerTicketClass:
                     "total": data_query.total,
                     "status_id": data_query.status_id,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
-                    "branch_office": data_query.branch_office
+                    "branch_office": data_query.branch_office,
+                    "category_id": data_query.category_id,
+                    "items": items_payload,
                 }
 
                 result = {
@@ -782,7 +895,7 @@ class CustomerTicketClass:
                     dte.folio = folio
                     dte.status_id = 4
                     _sync_ticket_dte_amounts_from_form(dte, form_data)
-                    group_items = self._get_group_items_for_generation(form_data)
+                    group_items = self._get_group_items_for_generation(form_data, dte)
                     if group_items:
                         dte.category_id = 3
                         dte.quantity = sum(item["quantity"] for item in group_items)
@@ -1061,18 +1174,23 @@ class CustomerTicketClass:
         if qty is None and source_dte is not None and source_dte.quantity is not None:
             qty = source_dte.quantity
 
-        group_items = self._get_group_items_for_generation(form_data)
+        group_items = self._get_group_items_for_generation(form_data, source_dte)
+
+        if category_id == 3 and not group_items:
+            return {
+                "status": "error",
+                "message": (
+                    "Boleta grupal (categoría 3) sin líneas de ítem: cargue ítems en la petición o guarde líneas "
+                    "en customer_dte_items para el borrador."
+                ),
+            }
 
         if category_id == 3 or group_items:
             if group_items:
-                detail_lines = [
-                    {
-                        "NmbItem": item["description"],
-                        "QtyItem": int(item["quantity"]),
-                        "PrcItem": int(item["unit_amount"]),
-                    }
-                    for item in group_items
-                ]
+                detail_lines = []
+                for item in group_items:
+                    linea = libredte_detalle_line_from_group_item(item)
+                    detail_lines.append(linea)
             elif qty is not None and int(qty) >= 1:
                 q = int(qty)
                 unit_price = round(int(form_data.amount) / q)

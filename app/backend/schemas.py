@@ -2020,6 +2020,11 @@ class CustomerTicketItemInput(BaseModel):
     unit_amount: int
     amount: Optional[int] = None
     description: str
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    unit_measure: Optional[str] = None
+    discount_amount: Optional[int] = None
+    dsc_item: Optional[str] = None
 
 class GenerateCustomerTicket(BaseModel):
     id: Optional[int] = 0
@@ -2183,6 +2188,11 @@ class CustomerBillItemInput(BaseModel):
     unit_amount: int
     amount: Optional[int] = None
     description: str
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    unit_measure: Optional[str] = None
+    discount_amount: Optional[int] = None
+    dsc_item: Optional[str] = None
 
 class GenerateCustomerBill(BaseModel):
     id: Optional[int] = 0
