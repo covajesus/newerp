@@ -47,36 +47,28 @@ def _dte_rut_sql_or(rut_column, rut_value):
 
 def _ticket_total_from_form(form_data):
     """
-    Total a guardar (cash_amount/total), misma convención que store() y pre_generate_ticket:
-    - Sin chip: amount es el total.
-    - Con chip y will_save==1 (guardar borrador): amount es solo estacionamiento → total = amount+5000.
-    - Con chip y will_save!=1 (p. ej. default 0 al generar): amount ya es el total con chip → no sumar 5000 otra vez.
+    Total bruto del documento (misma convención que `store`: amount + 5000 si chip).
+    category_id 3 solo cambia ítems/líneas en LibreDTE, no la forma de guardar montos.
     """
-    if getattr(form_data, "chip_id", None) != 1:
-        return int(form_data.amount)
-    if getattr(form_data, "will_save", 0) == 1:
-        return int(form_data.amount) + 5000
-    return int(form_data.amount)
+    amt = int(form_data.amount)
+    if getattr(form_data, "chip_id", None) == 1:
+        return amt + 5000
+    return amt
 
 
 def _sync_ticket_dte_amounts_from_form(dte, form_data):
-    """
-    Al asignar folio (emitir), alinear cash_amount/total/subtotal/IVA con el formulario.
-    Si generate() enlaza el borrador por fallback (RUT sin coincidencia de total), el registro
-    podía quedar con cash_amount NULL o montos viejos; LibreDTE sí timbra el monto correcto.
-    """
+    """Al asignar folio (emitir), alinear cash_amount/total/subtotal/IVA con el mismo criterio que store."""
     base = _ticket_total_from_form(form_data)
     dte.chip_id = form_data.chip_id
     dte.cash_amount = base
+    dte.total = base
     dte.subtotal = round(base / 1.19)
     dte.tax = base - round(base / 1.19)
-    dte.total = base
     cid = getattr(form_data, "category_id", None)
     if cid is not None:
         dte.category_id = cid
     qty = getattr(form_data, "quantity", None)
     if getattr(dte, "category_id", None) == 3:
-        # Si en generate_ticket no llega quantity, conservar el valor actual del borrador.
         if qty is not None:
             dte.quantity = int(qty)
     else:
@@ -653,13 +645,9 @@ class CustomerTicketClass:
 
         dte.branch_office_id = form_data.branch_office_id
         dte.rut = form_data.rut
-        dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-        dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
-        dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
-        dte.discount = 0
-        dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
         dte.chip_id = form_data.chip_id
         dte.status_id = 2
+
         cid = getattr(form_data, "category_id", None)
         if cid is not None:
             dte.category_id = cid
@@ -678,6 +666,12 @@ class CustomerTicketClass:
             self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte.id).delete(
                 synchronize_session=False
             )
+
+        dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
+        dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
+        dte.discount = 0
+        dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
 
         self.db.commit()
         self.db.refresh(dte)
@@ -821,8 +815,12 @@ class CustomerTicketClass:
                 f.write(response.content)
             print(f'PDF guardado como {folio}.pdf')
 
+    def _expected_total_for_generate(self, form_data) -> int:
+        """Total bruto para ubicar el borrador (misma regla que store; cat. 3 no es especial salvo ítems)."""
+        return _ticket_total_from_form(form_data)
+
     def generate(self, form_data):
-        expected_total_doc = _ticket_total_from_form(form_data)
+        expected_total_doc = self._expected_total_for_generate(form_data)
         check_dte_existence = self.db.query(DteModel).filter(
             DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
@@ -839,15 +837,32 @@ class CustomerTicketClass:
 
             code = self.pre_generate_ticket(customer_data, form_data)
             folio = None
+            generar_err = None
 
-            if code is not None:
-                if code == 402:
-                    return "LibreDTE payment required"
+            if isinstance(code, dict) and code.get("status") == "error":
+                return code
 
-                folio = self.generate_ticket(customer_data['customer_data']['rut'], code)
+            if code is None:
+                return {
+                    "status": "error",
+                    "message": "LibreDTE (emitir) no devolvió código de autorización.",
+                }
 
-                if folio is not None:
-                    self.save_pdf_ticket(folio)
+            if code == 402:
+                return "LibreDTE payment required"
+
+            if isinstance(code, int):
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Respuesta inválida en paso emitir ({code}). Revise XML/payload o token LibreDTE."
+                    ),
+                }
+
+            folio, generar_err = self.generate_ticket(customer_data["customer_data"]["rut"], code)
+
+            if folio is not None:
+                self.save_pdf_ticket(folio)
 
             # store() usa status_id=2 (admin/supervisor) o 1 (rol cajero). Borrador folio=0.
             # 1) Match estricto con total; 2) mismo RUT/sucursal/periodo sin total (chip/monto redondeo).
@@ -896,14 +911,13 @@ class CustomerTicketClass:
                     dte.status_id = 4
                     _sync_ticket_dte_amounts_from_form(dte, form_data)
                     group_items = self._get_group_items_for_generation(form_data, dte)
-                    if group_items:
-                        dte.category_id = 3
-                        dte.quantity = sum(item["quantity"] for item in group_items)
-                        # Solo reemplazar cuando vienen items explícitos en payload (create/edit).
-                        if self._normalize_group_items(getattr(form_data, "items", [])):
-                            self._replace_ticket_items(dte.id, group_items)
-                    elif dte.category_id == 3 and getattr(form_data, "quantity", None) is not None:
-                        dte.quantity = int(form_data.quantity)
+                    if getattr(dte, "category_id", None) == 3:
+                        if group_items:
+                            dte.quantity = sum(item["quantity"] for item in group_items)
+                            if self._normalize_group_items(getattr(form_data, "items", [])):
+                                self._replace_ticket_items(dte.id, group_items)
+                        elif getattr(form_data, "quantity", None) is not None:
+                            dte.quantity = int(form_data.quantity)
 
                     try:
                         self.db.commit()
@@ -923,7 +937,8 @@ class CustomerTicketClass:
                         "message": "Dte not found after generation (no hay borrador tipo 39 para este RUT/monto/sucursal o el total no coincide).",
                     }
             else:
-                return {"status": "error", "message": "No se pudo obtener folio desde LibreDTE"}
+                msg = generar_err or "LibreDTE (generar) no devolvió folio."
+                return {"status": "error", "message": msg}
         else:
             return {"status": "error", "message": "Dte already exists for this RUT in the current period"}
         
@@ -947,6 +962,9 @@ class CustomerTicketClass:
             dte.chip_id = form_data.chip_id
             dte.rut = form_data.rut
             dte.folio = 0
+            cid = getattr(form_data, "category_id", None)
+            dte.category_id = cid if cid is not None else 1
+
             dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
             dte.card_amount = 0
             dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
@@ -955,8 +973,6 @@ class CustomerTicketClass:
             dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            cid = getattr(form_data, "category_id", None)
-            dte.category_id = cid if cid is not None else 1
             group_items = self._normalize_group_items(getattr(form_data, "items", []))
             qty = getattr(form_data, "quantity", None)
             if dte.category_id == 3 and group_items:
@@ -1161,18 +1177,28 @@ class CustomerTicketClass:
 
         dte_id = getattr(form_data, "id", None)
         source_dte = None
-        if dte_id is not None:
-            source_dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+        try:
+            did_int = int(dte_id) if dte_id not in (None, "", False) else None
+        except (TypeError, ValueError):
+            did_int = None
+        if did_int:
+            source_dte = self.db.query(DteModel).filter(DteModel.id == did_int).first()
 
         category_id = getattr(form_data, "category_id", None)
         if category_id is None and source_dte is not None:
             category_id = source_dte.category_id
         if category_id is None:
             category_id = 1
+        if category_id not in (1, 3):
+            category_id = 1
 
         qty = getattr(form_data, "quantity", None)
         if qty is None and source_dte is not None and source_dte.quantity is not None:
             qty = source_dte.quantity
+        try:
+            qty = int(qty) if qty not in (None, "", 0) else None
+        except (TypeError, ValueError):
+            qty = None
 
         group_items = self._get_group_items_for_generation(form_data, source_dte)
 
@@ -1185,80 +1211,58 @@ class CustomerTicketClass:
                 ),
             }
 
-        if category_id == 3 or group_items:
-            if group_items:
-                detail_lines = []
-                for item in group_items:
-                    linea = libredte_detalle_line_from_group_item(item)
-                    detail_lines.append(linea)
-            elif qty is not None and int(qty) >= 1:
-                q = int(qty)
-                unit_price = round(int(form_data.amount) / q)
-                detail_lines = [
-                    {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": q,
-                        "PrcItem": unit_price,
-                    }
-                ]
-            else:
-                detail_lines = [
-                    {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": 1,
-                        "PrcItem": int(form_data.amount),
-                    }
-                ]
+        er = {
+            "Emisor": {
+                "RUTEmisor": "76063822-6",
+                "CdgSIISucur": branch_office_data.dte_code,
+            },
+            "Receptor": {
+                "RUTRecep": customer_data["customer_data"]["rut"],
+                "RznSocRecep": customer_data["customer_data"]["customer"],
+                "GiroRecep": customer_data["customer_data"]["activity"],
+                "DirRecep": customer_data["customer_data"]["region"],
+                "CmnaRecep": customer_data["customer_data"]["commune"],
+                "Contacto": customer_data["customer_data"]["email"],
+                "CorreoRecep": customer_data["customer_data"]["email"],
+            },
+        }
 
+        # Categoría 3: igual que boleta normal para montos (LibreDTE normaliza Totales); solo cambia el Detalle por ítems.
+        if category_id == 3:
+            detail_lines = []
+            for item in group_items:
+                detail_lines.append(
+                    libredte_detalle_line_from_group_item(item, include_monto_item=False)
+                )
+            if form_data.chip_id == 1:
+                detail_lines.append(
+                    {
+                        "NmbItem": "Chip",
+                        "QtyItem": 1,
+                        "PrcItem": 5000,
+                    }
+                )
             data = {
                 "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 39
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
+                    "IdDoc": {"TipoDTE": 39},
+                    **er,
                 },
-                "Detalle": detail_lines
+                "Detalle": detail_lines,
             }
         elif form_data.chip_id == 1:
-            if form_data.will_save == 0 or form_data.will_save == None or form_data.will_save == "":
+            if form_data.will_save == 0 or form_data.will_save is None or form_data.will_save == "":
                 amount = form_data.amount - 5000
             else:
                 amount = form_data.amount
 
             data = {
                 "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 39
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
+                    "IdDoc": {"TipoDTE": 39},
+                    **er,
                 },
                 "Detalle": [
                     {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
                         "QtyItem": 1,
                         "PrcItem": amount,
                     },
@@ -1267,39 +1271,44 @@ class CustomerTicketClass:
                         "QtyItem": 1,
                         "PrcItem": 5000,
                     },
-                ]
+                ],
             }
-        else:
+        elif qty is not None and qty >= 1:
+            q = qty
+            unit_price = round(int(form_data.amount) / q) if q > 0 else int(form_data.amount)
             data = {
                 "Encabezado": {
-                    "IdDoc": {
-                        "TipoDTE": 39
-                    },
-                    "Emisor": {
-                        "RUTEmisor": "76063822-6",
-                        'CdgSIISucur': branch_office_data.dte_code,
-                    },
-                    "Receptor": {
-                        "RUTRecep": customer_data['customer_data']['rut'],
-                        "RznSocRecep": customer_data['customer_data']['customer'],
-                        "GiroRecep": customer_data['customer_data']['activity'],
-                        "DirRecep": customer_data['customer_data']['region'],
-                        "CmnaRecep": customer_data['customer_data']['commune'],
-                        'Contacto': customer_data['customer_data']['email'],
-                        'CorreoRecep': customer_data['customer_data']['email'],
-                    }
+                    "IdDoc": {"TipoDTE": 39},
+                    **er,
                 },
                 "Detalle": [
                     {
-                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime('%d-%m-%Y'),
-                        "QtyItem": 1,
-                        "PrcItem": form_data.amount,
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
+                        "QtyItem": q,
+                        "PrcItem": unit_price,
                     }
-                ]
+                ],
+            }
+        else:
+            amt = int(form_data.amount)
+            data = {
+                "Encabezado": {
+                    "IdDoc": {"TipoDTE": 39},
+                    **er,
+                },
+                "Detalle": [
+                    {
+                        "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
+                        "QtyItem": 1,
+                        "PrcItem": amt,
+                    }
+                ],
             }
 
+        # Boleta grupal: Totales van dentro de Encabezado (ver `pre_generate_credit_note_ticket` en
+        # customer_ticket_bill_class). Un nodo "Totales" en la raíz del documento invalida el XML (error TED).
         try:
-            # Endpoint para generar un DTE temporal
+            # normalizar=1: LibreDTE completa IdDoc/FchEmis y cuadra detalle (normalizar=0 suele dar HTTP 400 si falta algo).
             url = f"https://libredte.cl/api/dte/documentos/emitir?normalizar=1&formato=json&links=0&email=0"
             
             # Enviar solicitud a la API
@@ -1319,7 +1328,24 @@ class CustomerTicketClass:
 
                 return code
             else:
-                return response.status_code
+                detail = (response.text or "")[:2500]
+                try:
+                    err_j = response.json()
+                    if isinstance(err_j, dict):
+                        detail = (
+                            err_j.get("mensaje")
+                            or err_j.get("detalle")
+                            or err_j.get("error")
+                            or err_j.get("glosa")
+                            or detail
+                            or str(err_j)
+                        )
+                except Exception:
+                    pass
+                return {
+                    "status": "error",
+                    "message": f"LibreDTE emitir HTTP {response.status_code}: {detail}",
+                }
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
@@ -1387,10 +1413,8 @@ class CustomerTicketClass:
             }
 
         try:
-            # Endpoint para generar un DTE temporal
             url = f"https://libredte.cl/api/dte/documentos/emitir?normalizar=1&formato=json&links=0&email=0"
-            
-            # Enviar solicitud a la API
+
             response = requests.post(
                 url,
                 json=data,
@@ -1399,35 +1423,59 @@ class CustomerTicketClass:
                     "Content-Type": "application/json",
                 },
             )
-            
-            # Manejar la respuesta
-            if response.status_code == 200:
-                dte_data = response.json()
-                code = dte_data.get("codigo")
 
-                return code
-            else:
-                return response.status_code
+            if response.status_code == 200:
+                try:
+                    dte_data = response.json()
+                except Exception:
+                    return {
+                        "status": "error",
+                        "message": (
+                            "LibreDTE emitir respondió 200 pero el cuerpo no es JSON: "
+                            + (response.text[:1200] if response.text else "")
+                        ),
+                    }
+                auth_code = dte_data.get("codigo")
+                if auth_code is None or auth_code == "":
+                    return {
+                        "status": "error",
+                        "message": (
+                            "LibreDTE emitir no devolvió 'codigo': "
+                            + json.dumps(dte_data, ensure_ascii=False)[:1200]
+                        ),
+                    }
+                return auth_code
+
+            try:
+                err_body = response.json()
+                detail = json.dumps(err_body, ensure_ascii=False)[:1500]
+            except Exception:
+                detail = (response.text[:1500] if response.text else "")
+            return {
+                "status": "error",
+                "message": f"LibreDTE emitir rechazó ({response.status_code}): {detail}",
+            }
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
-            return None
-        
+            return {"status": "error", "message": f"Error de red contra LibreDTE emitir: {str(e)}"}
+
     def generate_ticket(self, customer_rut, code):
+        """
+        Devuelve (folio, None) si OK, o (None, mensaje_error) si falla el paso generar de LibreDTE.
+        """
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         data = {
             "emisor": "76063822-6",
             "receptor": customer_rut,
             "dte": 39,
-            "codigo": code
+            "codigo": code,
         }
-            
+
         try:
-            # Endpoint para generar un DTE temporal
             url = f"https://libredte.cl/api/dte/documentos/generar?getXML=0&links=0&email=1&retry=1&gzip=0"
-            
-            # Enviar solicitud a la API
+
             response = requests.post(
                 url,
                 json=data,
@@ -1436,20 +1484,35 @@ class CustomerTicketClass:
                     "Content-Type": "application/json",
                 },
             )
-            
-            if response.status_code == 200:
-                dte_data = response.json()
-                folio = dte_data.get("folio")
 
-                return folio
-            else:
-                print("Error al generar el DTE:")
-                print(response.status_code, response.json())
-                return None
+            if response.status_code == 200:
+                try:
+                    dte_data = response.json()
+                except Exception:
+                    return None, (
+                        "LibreDTE generar respondió 200 pero el cuerpo no es JSON: "
+                        + (response.text[:1200] if response.text else "")
+                    )
+                folio = dte_data.get("folio")
+                if folio is None:
+                    return None, (
+                        "LibreDTE generar no devolvió 'folio': "
+                        + json.dumps(dte_data, ensure_ascii=False)[:1200]
+                    )
+                return folio, None
+
+            try:
+                err_body = response.json()
+                detail = json.dumps(err_body, ensure_ascii=False)[:1500]
+            except Exception:
+                detail = response.text[:1500] if response.text else ""
+            err_msg = f"LibreDTE generar ({response.status_code}): {detail}"
+            print("Error al generar el DTE:", err_msg)
+            return None, err_msg
 
         except Exception as e:
             print("Error al conectarse a la API:", e)
-            return None
+            return None, f"Error de red contra LibreDTE generar: {str(e)}"
 
     def generate_credit_note_ticket(self, customer_rut, code):
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"

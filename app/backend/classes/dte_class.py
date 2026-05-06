@@ -1629,11 +1629,13 @@ class DteClass:
                             
                             # Pre-generar el ticket
                             code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
-                            
+
+                            if isinstance(code, dict) and code.get("status") == "error":
+                                raise Exception(code.get("message", "Error emitir LibreDTE"))
+
                             if code is not None and code != 402:
-                                # Generar el ticket con folio
-                                folio = customer_ticket_class.generate_ticket(dte.rut, code)
-                                
+                                folio, gen_err = customer_ticket_class.generate_ticket(dte.rut, code)
+
                                 if folio:
                                     # Guardar PDF
                                     customer_ticket_class.save_pdf_ticket(folio)
@@ -1647,7 +1649,7 @@ class DteClass:
                                     # Enviar WhatsApp y capturar respuesta
                                     whatsapp_response = whatsapp_class.send(dte, dte.rut)
                                 else:
-                                    raise Exception("No se pudo generar el folio del ticket")
+                                    raise Exception(gen_err or "No se pudo generar el folio del ticket")
                             else:
                                 raise Exception("Error en pre-generación del ticket")
                                 
@@ -1967,9 +1969,12 @@ class DteClass:
                 # Generar ticket
                 customer_ticket_class = CustomerTicketClass(self.db)
                 code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
-                
+
+                if isinstance(code, dict) and code.get("status") == "error":
+                    return {"status": "error", "message": code.get("message", "Error emitir LibreDTE")}
+
                 if code is not None and code != 402:
-                    folio = customer_ticket_class.generate_ticket(dte.rut, code)
+                    folio, gen_err = customer_ticket_class.generate_ticket(dte.rut, code)
                     if folio:
                         customer_ticket_class.save_pdf_ticket(folio)
                         # Actualizar DTE
@@ -1985,7 +1990,7 @@ class DteClass:
                             "pdf_url": pdf_url
                         }
                     else:
-                        return {"status": "error", "message": "No se pudo generar el folio del ticket"}
+                        return {"status": "error", "message": gen_err or "No se pudo generar el folio del ticket"}
                 else:
                     return {"status": "error", "message": "Error en pre-generación del ticket"}
                     

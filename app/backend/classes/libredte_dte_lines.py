@@ -7,7 +7,7 @@ _VLR_CODIGO_MAX = 64
 _UNMD_MAX = 32
 
 
-def libredte_detalle_line_from_group_item(item: dict) -> dict:
+def libredte_detalle_line_from_group_item(item: dict, *, include_monto_item: bool = True) -> dict:
     """
     Mapea un ítem normalizado a un dict Detalle compatible con emitir?normalizar=1.
 
@@ -16,10 +16,18 @@ def libredte_detalle_line_from_group_item(item: dict) -> dict:
       para que el payload no quede sin DscItem cuando solo se llenó el detalle y no dsc_item.
     - CdgItem: solo si hay item_code (objeto TpoCodigo + VlrCodigo, no array; el array rompe el XML del SII).
     - UnmdItem: solo si hay unit_measure.
+
+    Boleta electrónica (39): usar ``include_monto_item=False`` — mismas llaves que una boleta simple
+    (solo QtyItem + PrcItem). Enviar también MontoItem con normalizar=1 puede duplicar totales en el XML.
     """
     qty = int(item["quantity"])
-    prc = int(item["unit_amount"])
+    raw_u = int(item["unit_amount"])
     monto = int(item["total_amount"])
+    # Precio unitario efectivo si hay descuento (total_amount != qty * unit_amount)
+    if qty > 0 and monto != qty * raw_u:
+        prc = max(0, round(monto / qty))
+    else:
+        prc = raw_u
 
     dsc_full = (item.get("description") or "").strip()
     dsc_col = ""
@@ -46,8 +54,9 @@ def libredte_detalle_line_from_group_item(item: dict) -> dict:
         "NmbItem": nm,
         "QtyItem": qty,
         "PrcItem": prc,
-        "MontoItem": monto,
     }
+    if include_monto_item:
+        line["MontoItem"] = monto
 
     # DscItem: columna dsc_item o detalle (no enviar solo el guion placeholder de BD)
     dsc_out = dsc_col if dsc_col else (dsc_full[:_DSC_ITEM_MAX] if dsc_full else "")

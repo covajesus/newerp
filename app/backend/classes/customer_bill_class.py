@@ -50,18 +50,36 @@ def _bill_total_from_form(form_data):
 
 
 def _sync_bill_dte_amounts_from_form(dte, form_data):
-    """Misma lógica que boleta: al emitir folio, fijar montos desde el formulario."""
-    base = _bill_total_from_form(form_data)
-    dte.chip_id = form_data.chip_id
-    dte.cash_amount = base
-    dte.subtotal = round(base / 1.19)
-    dte.tax = base - round(base / 1.19)
-    dte.total = base
+    """
+    Al emitir folio, fijar montos en dtes.
+    - category_id 1: lógica estándar (total = monto base; IVA por división 19 %).
+    - category_id 2/3: regla solicitada en generate_bill:
+      tomar monto base, sumarle 19 % para total, y dejar IVA como diferencia entre
+      el total anterior guardado y el nuevo total.
+    """
+    base = int(_bill_total_from_form(form_data))
+    previous_total = int(getattr(dte, "total", 0) or 0)
     cid = getattr(form_data, "category_id", None)
-    if cid is not None:
+    if cid is None:
+        cid = getattr(dte, "category_id", None)
+    if cid is None:
+        cid = 1
+
+    dte.chip_id = form_data.chip_id
+    if cid in (2, 3):
+        new_total = round(base * 1.19)
+        dte.cash_amount = new_total
+        dte.subtotal = base
+        dte.total = new_total
+        dte.tax = new_total - previous_total
         dte.category_id = cid
-    elif getattr(dte, "category_id", None) is None:
-        dte.category_id = 1
+    else:
+        dte.cash_amount = base
+        dte.subtotal = round(base / 1.19)
+        dte.tax = base - round(base / 1.19)
+        dte.total = base
+        dte.category_id = cid
+
     qty = getattr(form_data, "quantity", None)
     if qty is not None:
         dte.quantity = int(qty)
