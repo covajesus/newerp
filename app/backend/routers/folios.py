@@ -172,15 +172,10 @@ def cron_check_low_stock(
 ):
     """
     Cron: si el stock disponible por segmento (misma lógica que /db2/counts_by_segment)
-    cae bajo FOLIO_LOW_STOCK_THRESHOLD (default 100_000), envía WhatsApp texto (sin plantilla)
-    a los números en FOLIO_ALERT_WHATSAPP_NUMBERS. Sin token: restringir en firewall/nginx si es necesario.
+    cae bajo FOLIO_LOW_STOCK_THRESHOLD (default 100_000), envía WhatsApp (destinatarios en
+    WhatsappClass.send_folio_low_stock_alerts) con plantilla whatsapp_templates.id=7. Sin token: restringir en firewall/nginx.
     """
     threshold = int(os.getenv("FOLIO_LOW_STOCK_THRESHOLD", "100000"))
-    raw_nums = os.getenv(
-        "FOLIO_ALERT_WHATSAPP_NUMBERS",
-        "569964423773,56990202757,56976357193",
-    )
-    recipients = [p.strip() for p in raw_nums.split(",") if p.strip()]
 
     query = text("""
         SELECT
@@ -212,15 +207,12 @@ def cron_check_low_stock(
         tot = r["total"]
         if sid is None or tot >= threshold:
             continue
-        outs = WhatsappClass(db).send_folio_low_stock_alerts_text_only(
-            recipients, int(sid), tot, threshold
-        )
+        outs = WhatsappClass(db).send_folio_low_stock_alerts(int(sid), tot)
         alerts.append({"folio_segment_id": int(sid), "available": tot, "whatsapp": outs})
 
     return {
         "message": {
             "threshold": threshold,
-            "recipients": recipients,
             "segments_checked": rows,
             "segments_alerted": [a["folio_segment_id"] for a in alerts],
             "detail": alerts,

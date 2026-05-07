@@ -1010,18 +1010,6 @@ class WhatsappClass:
             print(f"Error al enviar notificación WhatsApp: {str(e)}")
             return None
 
-    @staticmethod
-    def build_folio_low_stock_message(segment_id: int, available: int, threshold: int) -> str:
-        when = datetime.now().strftime("%Y-%m-%d %H:%M")
-        avail_s = f"{available:,}".replace(",", ".")
-        thr_s = f"{threshold:,}".replace(",", ".")
-        return (
-            f"*{when} · Intrajis — Stock folios*\n\n"
-            f"El segmento *{segment_id}* registra *{avail_s}* folios disponibles en central "
-            f"(sin asignar a caja ni sucursal), por debajo del umbral operativo de *{thr_s}* unidades.\n\n"
-            f"Acción recomendada: coordinar la carga o numeración oportuna para evitar interrupción del servicio."
-        )
-
     def _normalize_whatsapp_phone_cl(self, phone: str) -> str:
         digits = "".join(c for c in str(phone).strip() if c.isdigit())
         if not digits:
@@ -1030,30 +1018,32 @@ class WhatsappClass:
             return digits
         return "56" + digits
 
-    def send_folio_low_stock_alerts_text_only(
-        self,
-        recipients: list[str],
-        segment_id: int,
-        available: int,
-        threshold: int,
-    ) -> list[dict]:
-        """
-        Envío sin plantilla: mensaje tipo texto (WhatsApp Cloud API).
-        Meta suele permitirlo solo si el destinatario tiene ventana de conversación abierta (~24 h)
-        o en números de prueba; si falla, hay que usar plantilla aprobada u otro canal.
-        """
-        token = os.getenv("LIBREDTE_TOKEN")
-        phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "101066132689690")
-        url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
+    def send_folio_low_stock_alerts(self, segment_id: int, available: int) -> list[dict]:
+        whatsapp_recipient_phone_numbers = [
+            "569964423773",
+            "56990202757",
+            "56976357193",
+        ]
+
+        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 7).first()
+
+        token = os.getenv('LIBREDTE_TOKEN')
+
+        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+
         headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
-        body_text = WhatsappClass.build_folio_low_stock_message(segment_id, available, threshold)
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+
+        segment_number_text = str(segment_id)
+        available_folio_count_text = str(int(available))
         outcomes: list[dict] = []
         if not token:
-            return [{"to": r, "ok": False, "error": "LIBREDTE_TOKEN no configurado"} for r in recipients]
-        for raw in recipients:
+            return [{"to": r, "ok": False, "error": "LIBREDTE_TOKEN no configurado"} for r in whatsapp_recipient_phone_numbers]
+        if not whatsapp_template or not whatsapp_template.title:
+            return [{"to": r, "ok": False, "error": "Plantilla WhatsApp id=7 no encontrada o sin title"} for r in whatsapp_recipient_phone_numbers]
+        for raw in whatsapp_recipient_phone_numbers:
             try:
                 to_phone = self._normalize_whatsapp_phone_cl(raw)
             except ValueError as e:
@@ -1062,8 +1052,22 @@ class WhatsappClass:
             payload = {
                 "messaging_product": "whatsapp",
                 "to": to_phone,
-                "type": "text",
-                "text": {"preview_url": False, "body": body_text[:4096]},
+                "type": "template",
+                "template": {
+                    "name": whatsapp_template.title,
+                    "language": {
+                        "code": "es"
+                    },
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": segment_number_text},
+                                {"type": "text", "text": available_folio_count_text},
+                            ]
+                        }
+                    ]
+                }
             }
             try:
                 response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -1076,6 +1080,7 @@ class WhatsappClass:
                     "http_status": response.status_code,
                     "ok": response.status_code == 200,
                     "response": resp_json,
+                    "template": whatsapp_template.title,
                 })
             except Exception as e:
                 outcomes.append({"to": to_phone, "ok": False, "error": str(e)})
