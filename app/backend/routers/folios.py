@@ -1,11 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import bindparam, text
 from app.backend.classes.folio_class import FolioClass
 from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
-from app.backend.db.models import FolioModel
-from app.backend.schemas import FolioList, FolioDb2Store
+from app.backend.db.models import FolioModel, CashierModel
+from app.backend.schemas import FolioList, FolioDb2Store, UserLogin
+from app.backend.auth.auth_user import get_current_active_user
 from datetime import datetime
+
+
+def _parse_csv_folio_numbers_semicolon(content: str) -> set[int]:
+    """CSV con separador `;`, columna folio en índice 2: id;used_id;folio;..."""
+    folios: set[int] = set()
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split(";")]
+        if len(parts) < 3:
+            continue
+        if parts[0].lower() == "id" and parts[2].lower() == "folio":
+            continue
+        try:
+            folios.add(int(parts[2]))
+        except ValueError:
+            continue
+    return folios
 
 folios = APIRouter(
     prefix="/folios",
@@ -225,6 +245,135 @@ def segment_group_folios_db2(
             }
         )
     return {"message": rows}
+
+
+@folios.get("/db2/cashiers_for_segment/{folio_segment_id}")
+def cashiers_for_segment(
+    folio_segment_id: int,
+    db: Session = Depends(get_db),
+    _session_user: UserLogin = Depends(get_current_active_user),
+):
+    """Cajas (datos maestros) cuyo folio_segment_id coincide con el segmento de la ruta."""
+    rows = (
+        db.query(CashierModel)
+        .filter(CashierModel.folio_segment_id == folio_segment_id)
+        .order_by(CashierModel.cashier)
+        .all()
+    )
+    data = [
+        {
+            "id": r.id,
+            "cashier": r.cashier or "",
+            "branch_office_id": r.branch_office_id,
+        }
+        for r in rows
+    ]
+    return {"message": data}
+
+
+@folios.post("/db2/release_folios_csv/{folio_segment_id}")
+async def release_folios_csv(
+    folio_segment_id: int,
+    cashier_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+    _session_user: UserLogin = Depends(get_current_active_user),
+):
+    """
+    Libera en DB2 solo para la caja indicada: pone en 0 branch_office_id, cashier_id y estados,
+    para todo folio que siga asignado a esa caja y cuyo número de folio NO aparezca en el CSV.
+    """
+    if folio_segment_id not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Segmento debe ser 1, 2 o 3")
+
+    cashier = db.query(CashierModel).filter(CashierModel.id == cashier_id).first()
+    if not cashier:
+        raise HTTPException(status_code=400, detail="Caja no encontrada")
+    if cashier.folio_segment_id is None or int(cashier.folio_segment_id) != folio_segment_id:
+        raise HTTPException(status_code=400, detail="La caja no pertenece a este segmento")
+
+    raw = await file.read()
+    if len(raw) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Archivo demasiado grande (máx. 15 MB)")
+    try:
+        text_body = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text_body = raw.decode("latin-1")
+
+    csv_folios = _parse_csv_folio_numbers_semicolon(text_body)
+    if not csv_folios:
+        raise HTTPException(
+            status_code=400,
+            detail="No se leyeron folios válidos del CSV (formato id;used_id;folio;...)",
+        )
+
+    assigned = db2.execute(
+        text("""
+            SELECT id, folio FROM folios
+            WHERE folio_segment_id = :seg
+              AND cashier_id = :cid
+        """),
+        {"seg": folio_segment_id, "cid": cashier_id},
+    ).fetchall()
+
+    to_release_ids: list[int] = []
+    for row in assigned:
+        fid = int(row.id)
+        fn = int(row.folio)
+        if fn not in csv_folios:
+            to_release_ids.append(fid)
+
+    if not to_release_ids:
+        return {
+            "message": {
+                "released": 0,
+                "csv_folio_count": len(csv_folios),
+                "assigned_rows_for_cashier": len(assigned),
+                "detail": "Ningún folio asignado a esta caja quedó fuera del CSV.",
+            }
+        }
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    chunk_size = 2000
+    total_u = 0
+    for i in range(0, len(to_release_ids), chunk_size):
+        chunk = to_release_ids[i : i + chunk_size]
+        upd = (
+            text("""
+            UPDATE folios
+            SET branch_office_id = 0,
+                cashier_id = 0,
+                requested_status_id = 0,
+                used_status_id = 0,
+                billed_status_id = 0,
+                updated_date = :updated_date
+            WHERE id IN :ids
+              AND folio_segment_id = :seg
+              AND cashier_id = :cid
+            """)
+            .bindparams(bindparam("ids", expanding=True))
+        )
+        r = db2.execute(
+            upd,
+            {
+                "ids": chunk,
+                "updated_date": now,
+                "seg": folio_segment_id,
+                "cid": cashier_id,
+            },
+        )
+        total_u += r.rowcount if r.rowcount is not None else len(chunk)
+
+    db2.commit()
+    return {
+        "message": {
+            "released": len(to_release_ids),
+            "csv_folio_count": len(csv_folios),
+            "assigned_rows_for_cashier_before": len(assigned),
+            "updated_rows": total_u,
+        }
+    }
 
 
 @folios.post("/db2/store")

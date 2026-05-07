@@ -1,7 +1,7 @@
 from app.backend.db.models import FolioModel, CashierModel
 import json
 from fastapi.responses import Response
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 class CafClass:
     def __init__(self, db, db2=None):
@@ -72,6 +72,8 @@ class CafClass:
         Crear CAF manual: seleccionar folios disponibles, actualizarlos y generar archivo SQL
         """
         try:
+            quantity = int(quantity)
+
             # Paso 0: Obtener el folio_segment_id del cashier
             cashier = self.db2.query(CashierModel).filter(CashierModel.id == cashier_id).first()
             if not cashier:
@@ -81,9 +83,9 @@ class CafClass:
             if not folio_segment_id:
                 return {"status": "error", "message": f"Cashier {cashier_id} does not have a folio_segment_id assigned"}
             
-            # Paso 1: Seleccionar folios disponibles
+            # Paso 1: Seleccionar folios disponibles (por id de fila; NO usar rango de número de folio en el UPDATE)
             select_query = text("""
-                SELECT 0 as used_id, folio 
+                SELECT id, folio 
                 FROM folios 
                 WHERE folio_segment_id = :folio_segment_id 
                 AND cashier_id = 0 
@@ -104,38 +106,42 @@ class CafClass:
             if len(folios_data) < quantity:
                 return {"status": "error", "message": f"Solo hay {len(folios_data)} folios disponibles para el segment {folio_segment_id}, se solicitaron {quantity}"}
             
-            # Obtener el rango de folios (desde el menor hasta el mayor)
-            folios_numbers = [row.folio for row in folios_data]
+            folio_row_ids = [int(row.id) for row in folios_data]
+            folios_numbers = [int(row.folio) for row in folios_data]
             folio_min = min(folios_numbers)
             folio_max = max(folios_numbers)
             
-            # Paso 2: Actualizar los folios seleccionados
+            # Paso 2: Actualizar únicamente los ids seleccionados (evita asignar todo el intervalo numérico entre min y max)
             from datetime import datetime
             current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            update_query = text("""
+            update_query = (
+                text("""
                 UPDATE folios 
                 SET cashier_id = :cashier_id, 
                     branch_office_id = :branch_office_id, 
                     requested_status_id = 1,
                     added_date = :added_date,
                     updated_date = :updated_date
-                WHERE folio <= :folio_max 
-                AND folio >= :folio_min
-                AND folio_segment_id = :folio_segment_id 
-                AND cashier_id = 0 
-                AND requested_status_id = 0
-            """)
+                WHERE id IN :folio_row_ids
+                  AND folio_segment_id = :folio_segment_id 
+                  AND cashier_id = 0 
+                  AND requested_status_id = 0
+                """)
+                .bindparams(bindparam("folio_row_ids", expanding=True))
+            )
             
-            self.db2.execute(update_query, {
-                "cashier_id": cashier_id,
-                "branch_office_id": branch_office_id,
-                "folio_max": folio_max,
-                "folio_min": folio_min,
-                "folio_segment_id": folio_segment_id,
-                "added_date": current_datetime,
-                "updated_date": current_datetime
-            })
+            self.db2.execute(
+                update_query,
+                {
+                    "cashier_id": cashier_id,
+                    "branch_office_id": branch_office_id,
+                    "folio_segment_id": folio_segment_id,
+                    "added_date": current_datetime,
+                    "updated_date": current_datetime,
+                    "folio_row_ids": folio_row_ids,
+                },
+            )
             
             self.db2.commit()
             
