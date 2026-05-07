@@ -179,6 +179,54 @@ def segment_detail_db2(folio_segment_id: int, db2: Session = Depends(get_db2)):
     return {"message": rows}
 
 
+@folios.get("/db2/segment_group_folios/{folio_segment_id}")
+def segment_group_folios_db2(
+    folio_segment_id: int,
+    request_day: str,
+    cashier_id: int,
+    db2: Session = Depends(get_db2),
+):
+    """
+    Folios DB2 de un grupo concreto (misma fecha de asignación, segmento y caja que `segment_detail`).
+    Devuelve número de folio y estados solicitado / utilizado / facturado.
+    """
+    query = text("""
+        SELECT
+            f.folio,
+            f.branch_office_id,
+            f.cashier_id,
+            COALESCE(f.requested_status_id, 0) AS requested_status_id,
+            COALESCE(f.used_status_id, 0) AS used_status_id,
+            COALESCE(f.billed_status_id, 0) AS billed_status_id
+        FROM folios f
+        WHERE f.folio_segment_id = :seg
+          AND f.cashier_id = :cashier_id
+          AND f.cashier_id IS NOT NULL
+          AND f.cashier_id > 0
+          AND COALESCE(f.requested_status_id, 0) <> 0
+          AND DATE(COALESCE(f.updated_date, f.added_date)) = CAST(:request_day AS DATE)
+        ORDER BY f.folio ASC
+    """)
+    result = db2.execute(
+        query,
+        {"seg": folio_segment_id, "cashier_id": cashier_id, "request_day": request_day},
+    )
+    rows = []
+    for row in result.mappings():
+        bo = row.get("branch_office_id")
+        rows.append(
+            {
+                "folio": int(row["folio"]),
+                "branch_office_id": int(bo) if bo is not None else None,
+                "cashier_id": int(row["cashier_id"]),
+                "requested_status_id": int(row["requested_status_id"]),
+                "used_status_id": int(row["used_status_id"]),
+                "billed_status_id": int(row["billed_status_id"]),
+            }
+        )
+    return {"message": rows}
+
+
 @folios.post("/db2/store")
 def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     """
