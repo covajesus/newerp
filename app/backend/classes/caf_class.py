@@ -98,7 +98,7 @@ class CafClass:
                 "folio_segment_id": folio_segment_id,
                 "quantity": quantity
             })
-            folios_data = result.fetchall()
+            folios_data = result.mappings().all()
             
             if not folios_data:
                 return {"status": "error", "message": f"No hay folios disponibles para el segment {folio_segment_id}"}
@@ -106,8 +106,8 @@ class CafClass:
             if len(folios_data) < quantity:
                 return {"status": "error", "message": f"Solo hay {len(folios_data)} folios disponibles para el segment {folio_segment_id}, se solicitaron {quantity}"}
             
-            folio_row_ids = [int(row.id) for row in folios_data]
-            folios_numbers = [int(row.folio) for row in folios_data]
+            folio_row_ids = [int(row["id"]) for row in folios_data]
+            folios_numbers = [int(row["folio"]) for row in folios_data]
             folio_min = min(folios_numbers)
             folio_max = max(folios_numbers)
             
