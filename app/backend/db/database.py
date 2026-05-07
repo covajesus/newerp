@@ -42,7 +42,7 @@ def get_db():
 DB2_USER = os.getenv('DB2_USER')
 DB2_PASSWORD = os.getenv('DB2_PASSWORD')
 DB2_HOST = os.getenv('DB2_HOST')
-DB2_PORT = os.getenv('DB2_PORT', '3306')
+DB2_PORT = os.getenv('DB2_PORT', '3307')
 DB2_NAME = os.getenv('DB2_NAME', 'jisparking')
 
 # DB2 es opcional, solo se inicializa si las credenciales están disponibles

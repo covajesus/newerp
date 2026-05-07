@@ -142,6 +142,43 @@ def counts_by_segment_db2(db2: Session = Depends(get_db2)):
     return {"message": rows}
 
 
+@folios.get("/db2/segment_detail/{folio_segment_id}")
+def segment_detail_db2(folio_segment_id: int, db2: Session = Depends(get_db2)):
+    """
+    Folios asignados a cajas en DB2, agrupados por día (fecha de asignación) y por caja.
+    Solo filas con caja asignada y estado solicitado distinto de «disponible en central».
+    """
+    query = text("""
+        SELECT
+            DATE(COALESCE(f.updated_date, f.added_date)) AS request_day,
+            f.cashier_id,
+            COUNT(*) AS folios_count
+        FROM folios f
+        WHERE f.folio_segment_id = :seg
+          AND f.cashier_id IS NOT NULL
+          AND f.cashier_id > 0
+          AND COALESCE(f.requested_status_id, 0) <> 0
+        GROUP BY DATE(COALESCE(f.updated_date, f.added_date)), f.cashier_id
+        ORDER BY request_day DESC, f.cashier_id ASC
+    """)
+    result = db2.execute(query, {"seg": folio_segment_id})
+    rows = []
+    for row in result.mappings():
+        rd = row.get("request_day")
+        if hasattr(rd, "isoformat"):
+            day_str = rd.isoformat()
+        else:
+            day_str = str(rd)[:10]
+        rows.append(
+            {
+                "request_day": day_str,
+                "cashier_id": int(row["cashier_id"]),
+                "folios_count": int(row["folios_count"]),
+            }
+        )
+    return {"message": rows}
+
+
 @folios.post("/db2/store")
 def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     """
