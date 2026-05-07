@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+import os
+import secrets
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from sqlalchemy import bindparam, text
 from app.backend.classes.folio_class import FolioClass
+from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.db.models import FolioModel, CashierModel
@@ -160,6 +165,94 @@ def counts_by_segment_db2(db2: Session = Depends(get_db2)):
         for row in result
     ]
     return {"message": rows}
+
+
+@folios.api_route("/db2/cron_check_low_stock", methods=["GET", "POST"])
+def cron_check_low_stock(
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+    x_cron_secret: Optional[str] = Header(default=None, alias="X-Cron-Secret"),
+    secret: Optional[str] = Query(
+        default=None,
+        description="Solo pruebas: requiere CRON_FOLIO_ALERT_ALLOW_QUERY_SECRET=1 en el servidor",
+    ),
+):
+    """
+    Cron: si el stock disponible por segmento (misma lógica que /db2/counts_by_segment)
+    cae bajo FOLIO_LOW_STOCK_THRESHOLD (default 20_000), envía WhatsApp texto (sin plantilla)
+    a los números en FOLIO_ALERT_WHATSAPP_NUMBERS.
+
+    Autenticación: cabecera X-Cron-Secret = CRON_FOLIO_ALERT_SECRET (GET o POST).
+    Opcional para probar en navegador: ?secret=... solo si CRON_FOLIO_ALERT_ALLOW_QUERY_SECRET=1.
+    """
+    expected = (os.getenv("CRON_FOLIO_ALERT_SECRET") or "").strip().encode("utf-8")
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Configure CRON_FOLIO_ALERT_SECRET en el servidor.",
+        )
+    provided = (x_cron_secret or "").strip()
+    if not provided and os.getenv("CRON_FOLIO_ALERT_ALLOW_QUERY_SECRET", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        provided = (secret or "").strip()
+    got = provided.encode("utf-8")
+    if not secrets.compare_digest(got, expected):
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    threshold = int(os.getenv("FOLIO_LOW_STOCK_THRESHOLD", "20000"))
+    raw_nums = os.getenv(
+        "FOLIO_ALERT_WHATSAPP_NUMBERS",
+        "569964423773,56990202757,56976357193",
+    )
+    recipients = [p.strip() for p in raw_nums.split(",") if p.strip()]
+
+    query = text("""
+        SELECT
+            seg.folio_segment_id,
+            COALESCE(SUM(
+                CASE
+                    WHEN f.branch_office_id = 0 AND f.requested_status_id = 0 THEN 1
+                    ELSE 0
+                END
+            ), 0) AS total
+        FROM (
+            SELECT DISTINCT folio_segment_id
+            FROM folios
+            WHERE folio_segment_id IS NOT NULL
+        ) seg
+        LEFT JOIN folios f ON f.folio_segment_id = seg.folio_segment_id
+        GROUP BY seg.folio_segment_id
+        ORDER BY seg.folio_segment_id
+    """)
+    result = db2.execute(query)
+    rows = [
+        {"folio_segment_id": m["folio_segment_id"], "total": int(m["total"])}
+        for m in result.mappings().all()
+    ]
+
+    alerts = []
+    for r in rows:
+        sid = r["folio_segment_id"]
+        tot = r["total"]
+        if sid is None or tot >= threshold:
+            continue
+        outs = WhatsappClass(db).send_folio_low_stock_alerts_text_only(
+            recipients, int(sid), tot, threshold
+        )
+        alerts.append({"folio_segment_id": int(sid), "available": tot, "whatsapp": outs})
+
+    return {
+        "message": {
+            "threshold": threshold,
+            "recipients": recipients,
+            "segments_checked": rows,
+            "segments_alerted": [a["folio_segment_id"] for a in alerts],
+            "detail": alerts,
+        }
+    }
 
 
 @folios.get("/db2/segment_detail/{folio_segment_id}")

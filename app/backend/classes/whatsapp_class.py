@@ -1009,3 +1009,74 @@ class WhatsappClass:
         except Exception as e:
             print(f"Error al enviar notificación WhatsApp: {str(e)}")
             return None
+
+    @staticmethod
+    def build_folio_low_stock_message(segment_id: int, available: int, threshold: int) -> str:
+        when = datetime.now().strftime("%Y-%m-%d %H:%M")
+        avail_s = f"{available:,}".replace(",", ".")
+        thr_s = f"{threshold:,}".replace(",", ".")
+        return (
+            f"*{when} · Intrajis — Stock folios*\n\n"
+            f"El segmento *{segment_id}* registra *{avail_s}* folios disponibles en central "
+            f"(sin asignar a caja ni sucursal), por debajo del umbral operativo de *{thr_s}* unidades.\n\n"
+            f"Acción recomendada: coordinar la carga o numeración oportuna para evitar interrupción del servicio."
+        )
+
+    def _normalize_whatsapp_phone_cl(self, phone: str) -> str:
+        digits = "".join(c for c in str(phone).strip() if c.isdigit())
+        if not digits:
+            raise ValueError("Teléfono vacío")
+        if digits.startswith("56"):
+            return digits
+        return "56" + digits
+
+    def send_folio_low_stock_alerts_text_only(
+        self,
+        recipients: list[str],
+        segment_id: int,
+        available: int,
+        threshold: int,
+    ) -> list[dict]:
+        """
+        Envío sin plantilla: mensaje tipo texto (WhatsApp Cloud API).
+        Meta suele permitirlo solo si el destinatario tiene ventana de conversación abierta (~24 h)
+        o en números de prueba; si falla, hay que usar plantilla aprobada u otro canal.
+        """
+        token = os.getenv("LIBREDTE_TOKEN")
+        phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "101066132689690")
+        url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        body_text = WhatsappClass.build_folio_low_stock_message(segment_id, available, threshold)
+        outcomes: list[dict] = []
+        if not token:
+            return [{"to": r, "ok": False, "error": "LIBREDTE_TOKEN no configurado"} for r in recipients]
+        for raw in recipients:
+            try:
+                to_phone = self._normalize_whatsapp_phone_cl(raw)
+            except ValueError as e:
+                outcomes.append({"to": raw, "ok": False, "error": str(e)})
+                continue
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": to_phone,
+                "type": "text",
+                "text": {"preview_url": False, "body": body_text[:4096]},
+            }
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                try:
+                    resp_json = response.json()
+                except Exception:
+                    resp_json = {"raw": response.text}
+                outcomes.append({
+                    "to": to_phone,
+                    "http_status": response.status_code,
+                    "ok": response.status_code == 200,
+                    "response": resp_json,
+                })
+            except Exception as e:
+                outcomes.append({"to": to_phone, "ok": False, "error": str(e)})
+        return outcomes
