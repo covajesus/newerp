@@ -308,19 +308,27 @@ async def release_folios_csv(
             detail="No se leyeron folios válidos del CSV (formato id;used_id;folio;...)",
         )
 
-    assigned = db2.execute(
+    result = db2.execute(
         text("""
             SELECT id, folio FROM folios
             WHERE folio_segment_id = :seg
               AND cashier_id = :cid
         """),
         {"seg": folio_segment_id, "cid": cashier_id},
-    ).fetchall()
+    )
+    assigned = result.mappings().all()
 
     to_release_ids: list[int] = []
     for row in assigned:
-        fid = int(row.id)
-        fn = int(row.folio)
+        rid = row.get("id")
+        fno = row.get("folio")
+        if rid is None or fno is None:
+            continue
+        try:
+            fid = int(rid)
+            fn = int(fno)
+        except (TypeError, ValueError):
+            continue
         if fn not in csv_folios:
             to_release_ids.append(fid)
 
