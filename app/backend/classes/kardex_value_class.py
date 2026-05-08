@@ -89,9 +89,12 @@ class KardexValueClass:
 
     def store_kardex_entry(self, product_id, qty_change, new_cost):
         """
-        Crear/actualizar registro de kardex con costo promedio ponderado
-        qty_change: cantidad a sumar o restar (positivo para entradas, negativo para salidas)
-        new_cost: costo unitario del nuevo movimiento
+        Actualizar kardex. El campo ``cost`` en BD es la valorización total del inventario
+        (costo total acumulado), coherente con el frontend (divide por cantidad para el unitario).
+
+        qty_change: positivo entradas, negativo salidas
+        new_cost: en entrada, costo unitario del lote; en salida, costo total de la línea a dar de baja.
+                  Salida con 0: se usa (cantidad salida) × (valor total / cantidad actual).
         """
         try:
             # Obtener el registro actual del kardex para este producto
@@ -100,37 +103,57 @@ class KardexValueClass:
             ).first()
             
             if current_kardex:
-                # Existe registro previo - calcular costo promedio ponderado
                 current_qty = current_kardex.qty or 0
-                current_cost = current_kardex.cost or 0
+                current_total_valuation = current_kardex.cost or 0
                 
-                # Nueva cantidad total
                 new_qty_total = current_qty + qty_change
                 
-                if new_qty_total <= 0:
-                    # Si la cantidad queda en 0 o negativa, mantener costo actual
-                    new_avg_cost = current_cost
-                    new_qty_total = max(0, new_qty_total)  # No permitir cantidades negativas
+                if qty_change < 0:
+                    # Salida: restar el costo total de línea del valor total en kardex (no qty × cost).
+                    explicit_line_total = int(round(float(new_cost))) if new_cost is not None else 0
+                    if explicit_line_total > 0:
+                        line_total = explicit_line_total
+                    elif current_qty > 0:
+                        unit_val = int(current_total_valuation / current_qty)
+                        line_total = abs(qty_change) * unit_val
+                    else:
+                        line_total = 0
+                    new_total_valuation = max(0, current_total_valuation - line_total)
+                    new_qty_total = max(0, new_qty_total)
+                    if new_qty_total <= 0:
+                        new_qty_total = 0
+                        new_total_valuation = 0
+                    current_kardex.qty = new_qty_total
+                    current_kardex.cost = new_total_valuation
+                elif qty_change > 0:
+                    # Entrada: sumar valor comprado (costo unitario × cantidad) al total en kardex
+                    if new_qty_total <= 0:
+                        current_kardex.qty = max(0, new_qty_total)
+                        current_kardex.cost = current_total_valuation
+                    else:
+                        unit_in = float(new_cost or 0)
+                        added_value = int(round(unit_in * qty_change))
+                        current_kardex.qty = new_qty_total
+                        current_kardex.cost = current_total_valuation + added_value
                 else:
-                    # Calcular costo promedio ponderado
-                    # (costo_anterior * qty_anterior + costo_nuevo * qty_cambio) / qty_total_nueva
-                    if qty_change > 0:  # Solo para entradas (aumentos de stock)
-                        total_cost_value = (current_cost * current_qty) + (new_cost * qty_change)
-                        new_avg_cost = int(total_cost_value / new_qty_total)
-                    else:  # Para salidas, mantener el costo promedio actual
-                        new_avg_cost = current_cost
-                
-                # Actualizar registro existente
-                current_kardex.qty = new_qty_total
-                current_kardex.cost = new_avg_cost
+                    pass
                 
             else:
                 # No existe registro previo - crear nuevo
-                new_kardex = KardexValueModel(
-                    product_id=product_id,
-                    qty=max(0, qty_change),  # No permitir cantidades negativas
-                    cost=new_cost if qty_change > 0 else 0
-                )
+                if qty_change > 0:
+                    unit_in = float(new_cost or 0)
+                    initial_total = int(round(unit_in * qty_change))
+                    new_kardex = KardexValueModel(
+                        product_id=product_id,
+                        qty=max(0, qty_change),
+                        cost=initial_total,
+                    )
+                else:
+                    new_kardex = KardexValueModel(
+                        product_id=product_id,
+                        qty=0,
+                        cost=0,
+                    )
                 self.db.add(new_kardex)
             
             self.db.commit()

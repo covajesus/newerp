@@ -191,7 +191,7 @@ class MovementClass:
                 # type_id 1 y 3 = Entradas (cantidad positiva)
                 if form_data.type_id in [2, 4]:
                     qty_to_save = -abs(product_data.quantity)  # Asegurar que sea negativo
-                    qty_for_kardex = -product_data.quantity    # Cantidad negativa para kardex
+                    qty_for_kardex = -abs(int(product_data.quantity))  # Siempre salida negativa (evita entrada por error)
                 else:
                     qty_to_save = abs(product_data.quantity)   # Asegurar que sea positivo
                     qty_for_kardex = product_data.quantity     # Cantidad positiva para kardex
@@ -247,9 +247,8 @@ class MovementClass:
                         if product_category and product_category.accounting_account:
                             accounting_account = str(product_category.accounting_account).strip()
                             
-                            # Obtener el costo del kardex actualizado
-                            kardex_value = self.db.query(KardexValueModel).filter(KardexValueModel.product_id == product_data.product_id).first()
-                            cost_to_use = kardex_value.cost if kardex_value else product_data.cost
+                            # Monto del asiento = costo total de línea enviado (mismo valor que baja del kardex)
+                            amount = int(round(float(product_data.cost)))
                             
                             # Preparar fecha para asiento (primer día del mes actual)
                             now = datetime.now()
@@ -261,11 +260,9 @@ class MovementClass:
                             # Preparar datos del asiento
                             message = f"{branch_office.branch_office}_{accounting_account}_{utf8_date}_SalidaInventario_{new_movement.id}_{movement_product.id}"
                             
-                            url = 'https://libredte.cl'
-                            hash_value = 'JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1'
-                            emisor = '76063822-6'
-                            
-                            amount = round(cost_to_use * product_data.quantity)
+                            url_base = "https://libredte.cl"
+                            hash_value = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+                            emisor = "76063822"
                             
                             datos = {
                                 'fecha': f"{year}-{month}-{day}",
@@ -284,22 +281,23 @@ class MovementClass:
                                 }
                             }
                             
-                            # Realizar petición a LibreDTE
+                            # Realizar petición a LibreDTE solo si hay monto > 0
                             headers = {
                                 'Content-Type': 'application/json',
                                 'Authorization': f'Bearer {hash_value}'
                             }
                             
-                            response = requests.post(
-                                f"{url}/lce/lce_asientos/crear/{emisor}",
-                                json=datos,
-                                headers=headers,
-                                timeout=30
-                            )
-                            
-                            if response.status_code != 200:
-                                # Log del error pero no fallar la operación
-                                print(f"Error al crear asiento contable: {response.text}")
+                            if amount > 0:
+                                response = requests.post(
+                                    f"{url_base}/api/lce/lce_asientos/crear/{emisor}",
+                                    json=datos,
+                                    headers=headers,
+                                    timeout=30
+                                )
+                                
+                                if response.status_code != 200:
+                                    # Log del error pero no fallar la operación
+                                    print(f"Error al crear asiento contable: {response.text}")
                             
                     except Exception as e:
                         # Log del error pero no fallar la operación principal
@@ -509,10 +507,24 @@ class MovementClass:
                     self.db.add(new_movement)
                     self.db.flush()  # Para obtener el ID sin hacer commit
                     
+                    # Antes de actualizar kardex: valor de salida para LibreDTE (total/qty × cantidad)
+                    exit_line_total_for_lce = None
+                    if movement_type in [2, 4]:
+                        kv_prev = self.db.query(KardexValueModel).filter(
+                            KardexValueModel.product_id == product.id
+                        ).first()
+                        pq = kv_prev.qty if kv_prev else 0
+                        pt = kv_prev.cost if kv_prev else 0
+                        if pq > 0:
+                            unit_exit = int(pt / pq)
+                            exit_line_total_for_lce = int(round(unit_exit * quantity))
+                        else:
+                            exit_line_total_for_lce = int(round(100 * quantity))
+                    
                     # Determinar cantidad para BD y kardex
                     if movement_type in [2, 4]:  # Salidas
                         qty_to_save = -abs(quantity)
-                        qty_for_kardex = -quantity
+                        qty_for_kardex = -abs(quantity)
                     else:  # Entradas
                         qty_to_save = abs(quantity)
                         qty_for_kardex = quantity
@@ -565,14 +577,6 @@ class MovementClass:
                                 url_base = "https://libredte.cl"
                                 emisor = "76063822"
                                 
-                                # Obtener el costo del kardex para el cálculo
-                                kardex_value = self.db.query(KardexValueModel).filter(
-                                    KardexValueModel.product_id == product.id
-                                ).first()
-                                
-                                # Usar el costo del kardex o un valor por defecto
-                                cost_to_use = kardex_value.cost if kardex_value and kardex_value.cost else 100  # Valor por defecto para carga masiva
-                                
                                 # Procesar fecha usando el período del Excel
                                 try:
                                     year_str, month_str = period.split('-')
@@ -599,8 +603,8 @@ class MovementClass:
                                     accounting_account = str(category.accounting_account).strip()
                                     message = f"{branch_office.branch_office}_{accounting_account}_{fecha_mensaje}_SalidaInventario_Masiva_{new_movement.id}_{movement_product.id}"
                                     
-                                    # Calcular montos
-                                    total_amount = round(cost_to_use * quantity)
+                                    # Monto coherente con la salida (valorización antes del movimiento)
+                                    total_amount = exit_line_total_for_lce if exit_line_total_for_lce is not None else 0
                                     
                                     # Crear datos para LibreDTE
                                     datos = {
@@ -708,16 +712,14 @@ class MovementClass:
             # Procesar cada producto del movimiento
             for movement_product in movement_products:
                 try:
-                    # Calcular el PMP (Precio Medio Ponderado) para el producto
-                    pmp_result = self.db.query(
-                        KardexValueModel.cost.label('pmp')
-                    ).join(
-                        ProductModel, ProductModel.id == KardexValueModel.product_id
-                    ).filter(
-                        ProductModel.id == movement_product.product_id
+                    # Unitario desde valorización total en kardex / cantidad (cost en BD = total inventario)
+                    kv_row = self.db.query(KardexValueModel.qty, KardexValueModel.cost).filter(
+                        KardexValueModel.product_id == movement_product.product_id
                     ).first()
-                    
-                    pmp = round(pmp_result.pmp) if pmp_result.pmp else 0
+                    if kv_row and kv_row.qty:
+                        pmp_unit = int(kv_row.cost / kv_row.qty)
+                    else:
+                        pmp_unit = 0
                     
                     # Obtener detalles del producto y categoría
                     product = self.db.query(ProductModel).filter(
@@ -774,9 +776,13 @@ class MovementClass:
                     # Crear mensaje/glosa
                     message = f"{branch_office_name}_{accounting_account}_{fecha_mensaje}_SalidaInventario_{movement.id}_{movement_product.id}"
                     
-                    # Calcular montos
+                    # Monto: costo total de línea guardado en el movimiento (alineado con kardex); fallback PMP×cantidad
                     qty = abs(movement_product.qty)
-                    total_amount = round(pmp * qty)
+                    line_cost = movement_product.cost if movement_product.cost is not None else 0
+                    if line_cost and float(line_cost) > 0:
+                        total_amount = int(round(float(line_cost)))
+                    else:
+                        total_amount = round(pmp_unit * qty)
                     
                     # Crear datos para LibreDTE
                     datos = {
