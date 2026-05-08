@@ -608,7 +608,7 @@ class CapitulationBankAccountModel(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     bank_id = Column(Integer, ForeignKey('banks.id'))
     account_type_id = Column(Integer)
-    account_number = Column(Integer)
+    account_number = Column(String(255))
     identification_number = Column(String(255))
     email = Column(String(255))
     added_date = Column(DateTime())

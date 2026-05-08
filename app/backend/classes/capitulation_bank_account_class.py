@@ -33,10 +33,9 @@ class CapitulationBankAccountClass:
         if not identification_number:
             raise HTTPException(status_code=400, detail="identification_number inválido")
 
-        try:
-            account_number = int(str(payload["account_number"]).strip())
-        except ValueError:
-            raise HTTPException(status_code=400, detail="El número de cuenta debe ser numérico")
+        account_number = str(payload["account_number"]).strip()
+        if not account_number:
+            raise HTTPException(status_code=400, detail="El número de cuenta es obligatorio")
 
         bank_account = None
         if user_id is not None:
