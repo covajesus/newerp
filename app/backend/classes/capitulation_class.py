@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.backend.db.models import BranchOfficeModel, CapitulationModel, ExpenseTypeModel, UserModel, TotalAcceptedCapitulations
+from app.backend.db.models import BranchOfficeModel, CapitulationModel, ExpenseTypeModel, UserModel, TotalAcceptedCapitulations, CapitulationBankAccountModel
 from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.helper_class import HelperClass
 from datetime import datetime
@@ -366,6 +366,8 @@ class CapitulationClass:
                 CapitulationModel.id,
                 cast(CapitulationModel.document_date, String).label("document_date"),
                 CapitulationModel.supplier_rut,
+                CapitulationModel.user_rut,
+                UserModel.id.label("user_id"),
                 CapitulationModel.document_number,
                 CapitulationModel.document_type_id,
                 CapitulationModel.capitulation_type_id,
@@ -395,11 +397,26 @@ class CapitulationClass:
             ).first()
 
             if data_query:
+                bank_account = None
+                if getattr(data_query, "user_id", None) is not None:
+                    bank_account = (
+                        self.db.query(CapitulationBankAccountModel)
+                        .filter(CapitulationBankAccountModel.user_id == data_query.user_id)
+                        .first()
+                    )
+                if not bank_account and data_query.user_rut is not None:
+                    bank_account = (
+                        self.db.query(CapitulationBankAccountModel)
+                        .filter(CapitulationBankAccountModel.identification_number == str(data_query.user_rut))
+                        .first()
+                    )
+
                 # Serializar los datos del empleado
                 capitulation_data = {
                     "id": data_query.id,
                     "document_date": data_query.document_date.strftime("%Y-%m-%d") if isinstance(data_query.document_date, datetime) else data_query.document_date,
                     "supplier_rut": data_query.supplier_rut,
+                    "user_rut": data_query.user_rut,
                     "document_number": data_query.document_number,
                     "document_type_id": data_query.document_type_id,
                     "capitulation_type_id": data_query.capitulation_type_id,
@@ -419,8 +436,20 @@ class CapitulationClass:
                     "why_was_rejected": data_query.why_was_rejected
                 }
 
+                bank_account_data = None
+                if bank_account:
+                    bank_account_data = {
+                        "id": bank_account.id,
+                        "bank_id": bank_account.bank_id,
+                        "account_type_id": bank_account.account_type_id,
+                        "account_number": bank_account.account_number,
+                        "identification_number": bank_account.identification_number,
+                        "email": bank_account.email,
+                    }
+
                 result = {
-                    "capitulation_data": capitulation_data
+                    "capitulation_data": capitulation_data,
+                    "bank_account_data": bank_account_data,
                 }
 
                 serialized_result = json.dumps(result)

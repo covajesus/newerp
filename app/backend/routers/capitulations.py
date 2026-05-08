@@ -3,6 +3,7 @@ from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.capitulation_class import CapitulationClass
+from app.backend.classes.capitulation_bank_account_class import CapitulationBankAccountClass
 from app.backend.schemas import Capitulation, CapitulationList, UpdateCapitulation, PayCapitulation, ImputeCapitulation, MassiveImputeCapitulation
 from app.backend.db.models import CapitulationModel
 from fastapi import UploadFile, File, HTTPException
@@ -60,10 +61,20 @@ def store(
 
         message = FileClass(db).upload(support, remote_path)
 
-        CapitulationClass(db).store(form_data, session_user, remote_path)
+        capitulation_store_result = CapitulationClass(db).store(form_data, session_user, remote_path)
+        bank_store_result = CapitulationBankAccountClass(db).store(
+            form_data,
+            user_id=session_user.id
+        )
 
-        return {"message": message}
+        return {
+            "message": message,
+            "capitulation": capitulation_store_result,
+            "bank_account": bank_store_result,
+        }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
@@ -167,6 +178,10 @@ def pay(
 def support(id: int, db: Session = Depends(get_db)):
 
     capitulation = CapitulationClass(db).get(id)
+    if not isinstance(capitulation, str):
+        raise HTTPException(status_code=500, detail="Respuesta inválida al obtener capitulación")
+    if capitulation.startswith("Error:"):
+        raise HTTPException(status_code=500, detail=capitulation)
 
     capitulation_data = json.loads(capitulation)
     remote_path = capitulation_data["capitulation_data"]["support"]
@@ -179,6 +194,10 @@ def support(id: int, db: Session = Depends(get_db)):
 def payment_support(id: int, db: Session = Depends(get_db)):
 
     capitulation = CapitulationClass(db).get(id)
+    if not isinstance(capitulation, str):
+        raise HTTPException(status_code=500, detail="Respuesta inválida al obtener capitulación")
+    if capitulation.startswith("Error:"):
+        raise HTTPException(status_code=500, detail=capitulation)
 
     capitulation_data = json.loads(capitulation)
     remote_path = capitulation_data["capitulation_data"]["payment_support"]

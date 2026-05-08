@@ -1133,6 +1133,11 @@ class Capitulation(BaseModel):
     expense_type_id: int
     description: str
     amount: int
+    bank_id: Optional[int] = None
+    account_type_id: Optional[int] = None
+    account_number: Optional[str] = None
+    identification_number: Optional[str] = None
+    email: Optional[str] = None
 
     @classmethod
     def as_form(cls,
@@ -1144,9 +1149,29 @@ class Capitulation(BaseModel):
                 branch_office_id: int = Form(),
                 expense_type_id: int = Form(),
                 description: str = Form(),
-                amount: int = Form()
+                amount: int = Form(),
+                bank_id: int = Form(None),
+                account_type_id: int = Form(None),
+                account_number: str = Form(None),
+                identification_number: str = Form(None),
+                email: str = Form(None),
                 ):
-        return cls(document_date=document_date, supplier_rut=supplier_rut, document_number=document_number, document_type_id=document_type_id, capitulation_type_id=capitulation_type_id, branch_office_id=branch_office_id, expense_type_id=expense_type_id, description=description, amount=amount)
+        return cls(
+            document_date=document_date,
+            supplier_rut=supplier_rut,
+            document_number=document_number,
+            document_type_id=document_type_id,
+            capitulation_type_id=capitulation_type_id,
+            branch_office_id=branch_office_id,
+            expense_type_id=expense_type_id,
+            description=description,
+            amount=amount,
+            bank_id=bank_id,
+            account_type_id=account_type_id,
+            account_number=account_number,
+            identification_number=identification_number,
+            email=email,
+        )
     
 class CarbonMonoxide(BaseModel):
     branch_office_id: int
@@ -2217,10 +2242,11 @@ class FolioList(BaseModel):
     page: int
 
 class FolioDb2Store(BaseModel):
-    """Payload del frontend para insertar folios en DB2. v-model: folio_segment_id, start_folio, end_folio."""
+    """Payload frontend para insertar folios en DB2 por rango o por cantidad."""
     folio_segment_id: Optional[int] = None
-    start_folio: int
-    end_folio: int
+    start_folio: Optional[int] = None
+    end_folio: Optional[int] = None
+    quantity: Optional[int] = None
 
 class CafList(BaseModel):
     page: int

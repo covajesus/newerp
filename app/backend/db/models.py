@@ -601,6 +601,19 @@ class CapitulationModel(Base):
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
+class CapitulationBankAccountModel(Base):
+    __tablename__ = 'capitulation_bank_accounts'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    bank_id = Column(Integer, ForeignKey('banks.id'))
+    account_type_id = Column(Integer)
+    account_number = Column(Integer)
+    identification_number = Column(String(255))
+    email = Column(String(255))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class TotalAcceptedCapitulations(Base):
     __tablename__ = 'total_accepted_capitulations'
 

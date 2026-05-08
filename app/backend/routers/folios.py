@@ -445,15 +445,32 @@ async def release_folios_csv(
 @folios.post("/db2/store")
 def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     """
-    Inserta en DB2 (tabla folios) un registro por cada número entre `start_folio` y `end_folio` (inclusive).
-    `folio` = número del rango; `folio_segment_id` = el enviado; branch_office_id, cashier_id,
-    requested_status_id, used_status_id y billed_status_id en 0.
+    Inserta en DB2 (tabla folios) por:
+    - rango explícito (`start_folio` + `end_folio`), o
+    - `quantity` (calcula correlativo desde MAX(folio) del segmento + 1).
     """
     if body.folio_segment_id is None:
         raise HTTPException(status_code=400, detail="Seleccione un segmento")
-    if body.start_folio > body.end_folio:
-        raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
-    count = body.end_folio - body.start_folio + 1
+    if body.quantity is not None:
+        if body.quantity <= 0:
+            raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
+        max_folio_q = text("""
+            SELECT COALESCE(MAX(folio), 0) AS max_folio
+            FROM folios
+            WHERE folio_segment_id = :seg
+        """)
+        max_row = db2.execute(max_folio_q, {"seg": body.folio_segment_id}).mappings().first()
+        max_folio = int(max_row["max_folio"]) if max_row and max_row.get("max_folio") is not None else 0
+        start_folio = max_folio + 1
+        end_folio = max_folio + int(body.quantity)
+    else:
+        if body.start_folio is None or body.end_folio is None:
+            raise HTTPException(status_code=400, detail="Debe enviar start_folio y end_folio, o quantity")
+        if body.start_folio > body.end_folio:
+            raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
+        start_folio = int(body.start_folio)
+        end_folio = int(body.end_folio)
+    count = end_folio - start_folio + 1
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     insert_sql = text("""
         INSERT INTO folios (
@@ -467,7 +484,7 @@ def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
         )
     """)
     try:
-        for folio_number in range(body.start_folio, body.end_folio + 1):
+        for folio_number in range(start_folio, end_folio + 1):
             db2.execute(
                 insert_sql,
                 {
@@ -484,7 +501,7 @@ def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
     return {
         "message": "OK",
         "inserted": count,
-        "start_folio": body.start_folio,
-        "end_folio": body.end_folio,
+        "start_folio": start_folio,
+        "end_folio": end_folio,
         "folio_segment_id": body.folio_segment_id,
     }
