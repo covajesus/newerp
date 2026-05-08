@@ -62,14 +62,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(
-                        (CapitulationModel.status_id == 1, 0),   # No Revisado
-                        (CapitulationModel.status_id == 2, 1),   # Aceptado
-                        (CapitulationModel.status_id == 13, 2),  # Pagada
-                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
-                        else_=100
-                    ),
-                    CapitulationModel.document_date.desc()
+                    CapitulationModel.id.desc()
                 )
             elif rol_id == 5:
                 # Inicialización de filtros dinámicos
@@ -119,14 +112,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(
-                        (CapitulationModel.status_id == 1, 0),   # No Revisado
-                        (CapitulationModel.status_id == 2, 1),   # Aceptado
-                        (CapitulationModel.status_id == 13, 2),  # Pagada
-                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
-                        else_=100
-                    ),
-                    CapitulationModel.document_date.desc()
+                    CapitulationModel.id.desc()
                 )   
             else:
                 # Inicialización de filtros dinámicos
@@ -176,14 +162,7 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
-                    case(
-                        (CapitulationModel.status_id == 1, 0),   # No Revisado
-                        (CapitulationModel.status_id == 2, 1),   # Aceptado
-                        (CapitulationModel.status_id == 13, 2),  # Pagada
-                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
-                        else_=100
-                    ),
-                    CapitulationModel.document_date.desc()
+                    CapitulationModel.id.desc()
                 )
 
             if page > 0:
