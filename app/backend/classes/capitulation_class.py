@@ -62,6 +62,13 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
+                    ),
                     CapitulationModel.id.desc()
                 )
             elif rol_id == 5:
@@ -112,6 +119,13 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
+                    ),
                     CapitulationModel.id.desc()
                 )   
             else:
@@ -162,6 +176,13 @@ class CapitulationClass:
                 ).filter(
                     *filters
                 ).order_by(
+                    case(
+                        (CapitulationModel.status_id == 1, 0),   # No Revisado
+                        (CapitulationModel.status_id == 2, 1),   # Aceptado
+                        (CapitulationModel.status_id == 13, 2),  # Pagada
+                        (CapitulationModel.status_id == 5, 3),   # Imputada Pagada
+                        else_=100
+                    ),
                     CapitulationModel.id.desc()
                 )
 
