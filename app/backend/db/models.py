@@ -1761,7 +1761,7 @@ class ComparationPendingDtesBankStatementModel(Base):
 class ComparationPendingDepositsBankStatementModel(Base):
     __tablename__ = 'cpdbs'
 
-    id = Column(Integer, primary_key=True)
+    id = Column('bank_statement_id', Integer, primary_key=True)
     branch_office_id = Column(Integer)
     payment_type_id = Column(Integer)
     deposit_id = Column(Integer)

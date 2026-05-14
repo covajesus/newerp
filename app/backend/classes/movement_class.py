@@ -167,11 +167,12 @@ class MovementClass:
         Crear un nuevo movimiento con productos
         """
         try:
-            # Crear movimiento
+            # Crear movimiento (15 = imputado: salidas van ya imputadas por kardex/asiento LibreDTE)
+            initial_status_id = 15 if form_data.type_id in [2, 4] else 17
             new_movement = MovementModel(
                 type_id=form_data.type_id,
                 branch_office_id=form_data.branch_office_id,
-                status_id=17,
+                status_id=initial_status_id,
                 added_date=datetime.utcnow(),
                 updated_date=datetime.utcnow()
             )
