@@ -1735,7 +1735,10 @@ class DteClass:
                             
                             # Pre-generar la factura
                             code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
-                            
+
+                            if isinstance(code, dict) and code.get("status") == "error":
+                                raise Exception(code.get("message", "Error emitir LibreDTE"))
+
                             if code is not None and code != 402:
                                 # Generar la factura con folio
                                 folio = customer_bill_class.generate_bill(dte.rut, code)
@@ -2074,7 +2077,10 @@ class DteClass:
                 # Generar factura
                 customer_bill_class = CustomerBillClass(self.db)
                 code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
-                
+
+                if isinstance(code, dict) and code.get("status") == "error":
+                    return {"status": "error", "message": code.get("message", "Error emitir LibreDTE")}
+
                 if code is not None and code != 402:
                     folio = customer_bill_class.generate_bill(dte.rut, code)
                     if folio:
