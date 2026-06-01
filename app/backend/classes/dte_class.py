@@ -33,10 +33,15 @@ class FormDataSimulator:
         self.chip_id = dte.chip_id  # 1 con chip, 0 sin chip (campo en dtes)
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
-        # Emisión masiva: boleta/factura/NC siempre categoría estándar (1), sin cantidad grupal.
+        # Emisión masiva: categoría 1 estándar o 3 grupal (conserva quantity e ítems en BD).
         if massive_emit:
-            self.category_id = 1
-            self.quantity = None
+            cid = getattr(dte, "category_id", None)
+            if cid == 3:
+                self.category_id = 3
+                self.quantity = getattr(dte, "quantity", None)
+            else:
+                self.category_id = 1
+                self.quantity = None
         else:
             # Orden de compra (factura 33): pre_generate_bill necesita los mismos datos que store/generate
             self.category_id = getattr(dte, "category_id", None)
@@ -51,13 +56,25 @@ class DteClass:
     def __init__(self, db):
         self.db = db
 
+    def _massive_send_category_filter(self):
+        """Envío masivo /send_dtes: solo category_id 1 (estándar) y 3 (grupal)."""
+        return DteModel.category_id.in_([1, 3])
+
+    def _prepare_massive_emit_category(self, dte):
+        """Normaliza a categoría 1 salvo facturas/boletas grupales (3), que se conservan."""
+        cid = getattr(dte, "category_id", None)
+        if cid == 3:
+            return
+        if cid != 1:
+            dte.category_id = 1
+            dte.quantity = None
+            self.db.add(dte)
+            self.db.commit()
+            self.db.refresh(dte)
+
     def _pin_massive_standard_category(self, dte):
-        """Emisión masiva: boleta, factura y NC van como category_id=1 (sin quantity grupal)."""
-        dte.category_id = 1
-        dte.quantity = None
-        self.db.add(dte)
-        self.db.commit()
-        self.db.refresh(dte)
+        """Compat: delega en _prepare_massive_emit_category."""
+        self._prepare_massive_emit_category(dte)
 
     def validate_old_dte(self, folio, rut, dte_version_id):
         try:
@@ -1577,8 +1594,8 @@ class DteClass:
             if dte_type_id > 0:
                 base_filter.append(DteModel.dte_type_id == dte_type_id)
 
-            # Alineado con envío masivo: solo category_id estándar (1) o legacy NULL
-            base_filter.append(or_(DteModel.category_id == 1, DteModel.category_id.is_(None)))
+            # Envío masivo: solo category_id 1 (estándar) o 3 (grupal)
+            base_filter.append(self._massive_send_category_filter())
             
             quantity = self.db.query(DteModel).filter(*base_filter).count()
             
@@ -1615,12 +1632,12 @@ class DteClass:
             # Obtener el período actual en formato YYYY-MM
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Solo categoría estándar (1) o sin categoría; no boleta grupal (3) ni factura con refs (2) por masivo
+            # Solo categoría estándar (1) o grupal (3); excluye referencias (2)
             dtes = self.db.query(DteModel).filter(
                 DteModel.period == current_period,
                 DteModel.status_id == 2,
                 DteModel.branch_office_id == 32,
-                or_(DteModel.category_id == 1, DteModel.category_id.is_(None)),
+                self._massive_send_category_filter(),
             ).all()
             
             whatsapp_class = WhatsappClass(self.db)
@@ -1649,7 +1666,7 @@ class DteClass:
                     # Aplicar el mismo proceso que en generate_ticket/generate_bill según el tipo
                     # Si el DTE no tiene folio, necesita generarlo primero
                     if not dte.folio or dte.folio == 0:
-                        self._pin_massive_standard_category(dte)
+                        self._prepare_massive_emit_category(dte)
                         # Crear un objeto form_data simulado
                         form_data_sim = FormDataSimulator(dte, massive_emit=True)
                         
@@ -1991,7 +2008,7 @@ class DteClass:
                     "pdf_url": pdf_url
                 }
 
-            self._pin_massive_standard_category(dte)
+            self._prepare_massive_emit_category(dte)
             # Crear un objeto form_data simulado
             form_data_sim = FormDataSimulator(dte, massive_emit=True)
             
@@ -2137,7 +2154,7 @@ class DteClass:
                 DteModel.period == current_period,
                 status_filter,
                 DteModel.dte_version_id == 1,
-                or_(DteModel.category_id == 1, DteModel.category_id.is_(None)),
+                self._massive_send_category_filter(),
             ]
             
             # Si branch_office_id es 0, procesar todas las sucursales
@@ -2366,7 +2383,8 @@ class DteClass:
                         remaining_filter = [
                             DteModel.period == current_period,
                             remaining_status_filter,
-                            DteModel.dte_version_id == 1
+                            DteModel.dte_version_id == 1,
+                            self._massive_send_category_filter(),
                         ]
                         
                         # Si branch_office_id no es 0, filtrar por sucursal específica
