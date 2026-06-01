@@ -141,7 +141,7 @@ def existence(folio:int, db: Session = Depends(get_db)):
     return {"message": data}
 
 @dtes.get("/open_customer_billing_period/{period}")
-def existence(period:str, db: Session = Depends(get_db)):
+def open_period(period:str, db: Session = Depends(get_db)):
     data = DteClass(db).open_customer_billing_period(period)
     
     return {"message": data}

@@ -1256,7 +1256,7 @@ class DteClass:
             .filter(DteModel.status_id == 5)
             .filter(DteModel.dte_version_id == 1)
             .filter(DteModel.dte_type_id.in_([33, 39]))
-            .filter(DteModel.category_id.in_([1, 3]))
+            .filter(DteModel.category_id.in_([3]))
             .all()
         )
 
