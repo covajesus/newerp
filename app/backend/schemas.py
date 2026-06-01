@@ -2092,6 +2092,8 @@ class ToBeAcceptedCustomerBill(BaseModel):
     address: Optional[str] = None
     will_save: Optional[int] = 0
     category_id: Optional[int] = None
+    quantity: Optional[int] = None
+    items: List[CustomerTicketItemInput] = Field(default_factory=list)
     references: List[CustomerBillReferenceLine] = Field(default_factory=list)
 
 class ToBeAcceptedCustomerTicket(BaseModel):

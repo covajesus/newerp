@@ -1189,6 +1189,41 @@ class CustomerBillClass:
 
         self.db.commit()
         self.db.refresh(dte)
+
+    def _serialize_customer_dte_item_row(self, row):
+        return {
+            "line_number": row.line_number,
+            "quantity": int(row.quantity),
+            "unit_amount": int(row.unit_amount),
+            "total_amount": int(row.total_amount),
+            "description": (row.description or "").strip(),
+            "item_code": (row.item_code or "").strip() or None,
+            "item_name": (row.item_name or "").strip() or None,
+            "unit_measure": (row.unit_measure or "").strip() or None,
+            "discount_amount": int(getattr(row, "discount_amount", 0) or 0),
+            "dsc_item": (getattr(row, "dsc_item", None) or "").strip() or None,
+        }
+
+    def list_customer_dte_items(self, dte_id: int):
+        """Líneas de factura grupal desde customer_dte_items."""
+        try:
+            dte = self.db.query(DteModel.id).filter(DteModel.id == dte_id).first()
+            if not dte:
+                return {"status": "error", "message": "Dte no encontrado", "items": []}
+
+            item_rows = (
+                self.db.query(CustomerDteItemModel)
+                .filter(CustomerDteItemModel.dte_id == dte_id)
+                .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
+                .all()
+            )
+            return {
+                "status": "success",
+                "dte_id": dte_id,
+                "items": [self._serialize_customer_dte_item_row(r) for r in item_rows],
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e), "items": []}
         
     def get(self, id):
         try:
@@ -1252,27 +1287,12 @@ class CustomerBillClass:
                     ],
                 }
 
-                item_rows = (
-                    self.db.query(CustomerDteItemModel)
-                    .filter(CustomerDteItemModel.dte_id == id)
-                    .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
-                    .all()
+                items_payload = self.list_customer_dte_items(id)
+                customer_bill_data["items"] = (
+                    items_payload.get("items", [])
+                    if isinstance(items_payload, dict)
+                    else []
                 )
-                customer_bill_data["items"] = [
-                    {
-                        "line_number": r.line_number,
-                        "quantity": int(r.quantity),
-                        "unit_amount": int(r.unit_amount),
-                        "total_amount": int(r.total_amount),
-                        "description": (r.description or "").strip(),
-                        "item_code": (r.item_code or "").strip() or None,
-                        "item_name": (r.item_name or "").strip() or None,
-                        "unit_measure": (r.unit_measure or "").strip() or None,
-                        "discount_amount": int(getattr(r, "discount_amount", 0) or 0),
-                        "dsc_item": (getattr(r, "dsc_item", None) or "").strip() or None,
-                    }
-                    for r in item_rows
-                ]
 
                 # Crear el resultado final como un diccionario
                 result = {

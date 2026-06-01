@@ -101,6 +101,13 @@ def edit(id:int, db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@customer_bills.get("/customer_dte_items/{id}")
+def customer_dte_items(id: int, db: Session = Depends(get_db)):
+    """Detalle grupal (customer_dte_items) para edición de factura."""
+    data = CustomerBillClass(db).list_customer_dte_items(id)
+
+    return {"message": data}
+
 @customer_bills.get("/delete/{id}")
 def delete(id:int, db: Session = Depends(get_db)):
     data = CustomerBillClass(db).delete(id)
