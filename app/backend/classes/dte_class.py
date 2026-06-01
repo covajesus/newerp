@@ -4,7 +4,16 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import desc, cast, Date, func, or_, text
 from sqlalchemy.dialects import mysql
-from app.backend.db.models import DteModel, Dte2Model, BranchOfficeModel, CustomerModel, SupplierModel, CommuneModel, TotalDtesToBeSentModel
+from app.backend.db.models import (
+    DteModel,
+    Dte2Model,
+    BranchOfficeModel,
+    CustomerModel,
+    SupplierModel,
+    CommuneModel,
+    TotalDtesToBeSentModel,
+    CustomerDteItemModel,
+)
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
@@ -1241,17 +1250,21 @@ class DteClass:
 
         last_period = HelperClass.fix_last_dte_period(period)
 
-        dte_data = self.db.query(DteModel)\
-                                .filter(DteModel.period == last_period)\
-                                .filter(DteModel.status_id == 5)\
-                                .filter(DteModel.dte_version_id == 1)\
-                                .filter(DteModel.dte_type_id.in_([33, 39]))\
-                                .all()
-        
+        dte_data = (
+            self.db.query(DteModel)
+            .filter(DteModel.period == last_period)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.dte_type_id.in_([33, 39]))
+            .filter(DteModel.category_id.in_([1, 3]))
+            .all()
+        )
+
         if dte_data:
             for dte_datum in dte_data:
 
                 added_date = HelperClass.create_period_date(period)
+                src_category = int(dte_datum.category_id) if dte_datum.category_id is not None else 1
 
                 dte = DteModel(
                         rut=dte_datum.rut,
@@ -1260,7 +1273,7 @@ class DteClass:
                         dte_type_id=dte_datum.dte_type_id,
                         dte_version_id=1,
                         expense_type_id=25,
-                        chip_id=0,
+                        chip_id=dte_datum.chip_id or 0,
                         status_id=1,
                         cash_amount=dte_datum.cash_amount,
                         card_amount=0,
@@ -1269,11 +1282,43 @@ class DteClass:
                         discount=0,
                         total=dte_datum.total,
                         period=current_period,
+                        category_id=src_category,
+                        quantity=dte_datum.quantity if src_category == 3 else None,
                         added_date=added_date
                     )
-                
-                # Agregar el objeto a la sesión
+
                 self.db.add(dte)
+                self.db.flush()
+
+                if src_category == 3:
+                    source_items = (
+                        self.db.query(CustomerDteItemModel)
+                        .filter(CustomerDteItemModel.dte_id == dte_datum.id)
+                        .order_by(
+                            CustomerDteItemModel.line_number.asc(),
+                            CustomerDteItemModel.id.asc(),
+                        )
+                        .all()
+                    )
+                    for row in source_items:
+                        self.db.add(
+                            CustomerDteItemModel(
+                                dte_id=dte.id,
+                                line_number=row.line_number,
+                                quantity=row.quantity,
+                                unit_amount=row.unit_amount,
+                                total_amount=row.total_amount,
+                                description=row.description,
+                                item_code=row.item_code,
+                                item_name=row.item_name,
+                                unit_measure=row.unit_measure,
+                                discount_amount=row.discount_amount or 0,
+                                dsc_item=row.dsc_item,
+                                status_id=row.status_id or 1,
+                                added_date=datetime.now(),
+                                updated_date=datetime.now(),
+                            )
+                        )
 
                 self.db.commit()
             try:
