@@ -518,6 +518,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -542,6 +543,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -578,6 +580,7 @@ class CustomerBillClass:
                         "branch_office_id": dte.branch_office_id,
                         "customer": dte.customer,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
                         "total": dte.total,
                         "status_id": dte.status_id,
@@ -605,6 +608,7 @@ class CustomerBillClass:
                         "customer": dte.customer,
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "total": dte.total,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -636,6 +640,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -662,6 +667,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -700,6 +706,7 @@ class CustomerBillClass:
                         "branch_office_id": dte.branch_office_id,
                         "customer": dte.customer,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
                         "total": dte.total,
                         "status_id": dte.status_id,
@@ -727,6 +734,7 @@ class CustomerBillClass:
                         "customer": dte.customer,
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "total": dte.total,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -775,6 +783,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -799,6 +808,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -835,6 +845,7 @@ class CustomerBillClass:
                         "branch_office_id": dte.branch_office_id,
                         "customer": dte.customer,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
                         "total": dte.total,
                         "status_id": dte.status_id,
@@ -862,6 +873,7 @@ class CustomerBillClass:
                         "customer": dte.customer,
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "total": dte.total,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -903,6 +915,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -929,6 +942,7 @@ class CustomerBillClass:
                         DteModel.rut,
                         DteModel.status_id,
                         DteModel.chip_id,
+                        DteModel.category_id,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -967,6 +981,7 @@ class CustomerBillClass:
                         "branch_office_id": dte.branch_office_id,
                         "customer": dte.customer,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
                         "total": dte.total,
                         "status_id": dte.status_id,
@@ -994,6 +1009,7 @@ class CustomerBillClass:
                         "customer": dte.customer,
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
+                        "category_id": dte.category_id if dte.category_id is not None else 1,
                         "total": dte.total,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
