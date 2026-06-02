@@ -20,7 +20,17 @@ def index(customer_ticket_inputs:CustomerTicketList, session_user: UserLogin = D
 
 @customer_tickets.post("/search")
 def search(customer_ticket_inputs:CustomerTicketSearch, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = CustomerTicketClass(db).search(session_user.rol_id, session_user.rut, customer_ticket_inputs.branch_office_id, customer_ticket_inputs.rut,  customer_ticket_inputs.customer, customer_ticket_inputs.status_id, customer_ticket_inputs.supervisor_id, customer_ticket_inputs.page)
+    data = CustomerTicketClass(db).search(
+        session_user.rol_id,
+        session_user.rut,
+        customer_ticket_inputs.branch_office_id,
+        customer_ticket_inputs.rut,
+        customer_ticket_inputs.customer,
+        customer_ticket_inputs.status_id,
+        customer_ticket_inputs.supervisor_id,
+        customer_ticket_inputs.page,
+        category_id=customer_ticket_inputs.category_id,
+    )
 
     return {"message": data}
 

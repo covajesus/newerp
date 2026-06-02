@@ -425,7 +425,7 @@ class CustomerTicketClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
-    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
+    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10, category_id=None):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Filtros: borradores boleta (39), período mes actual. 0 en sucursal = todas.
@@ -450,6 +450,8 @@ class CustomerTicketClass:
 
                 if supervisor_id is not None and supervisor_id != "":
                     filters.append(BranchOfficeModel.principal_supervisor == supervisor_id)
+                if category_id is not None and category_id != "" and category_id != 0:
+                    filters.append(DteModel.category_id == category_id)
 
                 query = self.db.query(
                     DteModel.id,
@@ -545,6 +547,8 @@ class CustomerTicketClass:
                     filters.append(DteModel.status_id == status_id)
                 else:
                     filters.append(DteModel.status_id < 4)
+                if category_id is not None and category_id != "" and category_id != 0:
+                    filters.append(DteModel.category_id == category_id)
 
                 filters.append(DteModel.dte_version_id == 1)
                 filters.append(DteModel.dte_type_id == 39)

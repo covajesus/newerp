@@ -2184,7 +2184,7 @@ class CustomerBillSearch(BaseModel):
     customer: Optional[str] = None
     status_id: Optional[int] = None
     supervisor_id: Optional[int] = None
-    customer: Optional[str] = None
+    category_id: Optional[int] = None
     page: int
 
 class CollectionSearch(BaseModel):
@@ -2199,7 +2199,7 @@ class CustomerTicketSearch(BaseModel):
     customer: Optional[str] = None
     status_id: Optional[int] = None
     supervisor_id: Optional[int] = None
-    customer: Optional[str] = None
+    category_id: Optional[int] = None
     page: int
 
 class CustomerTicketBillSearch(BaseModel):
