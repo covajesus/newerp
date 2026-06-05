@@ -271,7 +271,7 @@ class DepositClass:
                     DepositModel.branch_office_id == deposit_data.branch_office_id,
                     DepositModel.payment_number == deposit_data.payment_number,
                     DepositModel.deposited_amount == deposit_data.deposited_amount,
-                    DepositModel.deposit_date == deposit_date_formatted,
+                    DepositModel.collection_date == collection_date_formatted,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 
@@ -345,7 +345,7 @@ class DepositClass:
                     DepositModel.branch_office_id == deposit_data.branch_office_id,
                     func.trim(DepositModel.payment_number) == pn_cmp,
                     DepositModel.deposited_amount == deposit_data.deposited_amount,
-                    DepositModel.deposit_date == deposit_date_formatted,
+                    DepositModel.collection_date == collection_date_formatted,
                     DepositModel.id != id  # Excluir el registro actual
                 ).first()
                 

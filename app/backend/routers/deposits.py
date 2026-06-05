@@ -56,15 +56,15 @@ def store(
     support: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    # Sin índice UNIQUE en BD: evitar duplicados en código (sucursal + nº pago + monto + fecha depósito).
+    # Sin índice UNIQUE en BD: evitar duplicados en código (sucursal + nº pago + monto + fecha recaudación).
     dc = DepositClass(db)
     pn = str(form_data.payment_number).strip() if form_data.payment_number is not None else ""
-    raw_dd = form_data.deposit_date or ""
-    if isinstance(raw_dd, str):
-        raw_dd = raw_dd.strip()
-    dd = dc._convert_date_format(raw_dd) if raw_dd else ""
+    raw_cd = form_data.collection_date or ""
+    if isinstance(raw_cd, str):
+        raw_cd = raw_cd.strip()
+    cd = dc._convert_date_format(raw_cd) if raw_cd else ""
     date_clause = (
-        DepositModel.deposit_date == dd if dd else DepositModel.deposit_date.is_(None)
+        DepositModel.collection_date == cd if cd else DepositModel.collection_date.is_(None)
     )
     existing_deposit = (
         db.query(DepositModel)
