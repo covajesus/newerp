@@ -65,18 +65,29 @@ def _v2_simplefactura_token(db):
     return token
 
 
-def _v2_resolve_sucursal(branch_office_name=None):
+SF_SUCURSAL_SUFFIX = " - JIS PARKING SPA"
+
+
+def _v2_sucursal_name_for_branch(branch):
     """
-    Sucursal en la URL invoiceV2/{sucursal} de SimpleFactura.
-    En Jisparking todas las emisiones van por Casa_Matriz (como el biller y NC máquina).
-    La sucursal de negocio (ALVI MAIPU, etc.) va en Emisor.CdgSIISucur = branch.dte_code.
+    Nombre de sucursal en SimpleFactura (path invoiceV2/{nombre}).
+    En el panel SF suele ser: '{branch_offices.branch_office} - JIS PARKING SPA'
+    ej. 'ALVI MAIPU - JIS PARKING SPA'. CdgSIISucur sigue yendo en el DTE.
     """
-    default = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
-    return default or "Casa_Matriz"
+    if branch is None:
+        fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
+        return fallback or "Casa_Matriz"
+    base = (getattr(branch, "branch_office", None) or "").strip()
+    if not base:
+        fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
+        return fallback or "Casa_Matriz"
+    if SF_SUCURSAL_SUFFIX.upper() in base.upper():
+        return base
+    return f"{base}{SF_SUCURSAL_SUFFIX}"
 
 
 def _v2_emit_invoice(db, documento, sucursal, dte_label="DTE"):
-    sucursal_slug = quote(_v2_resolve_sucursal(sucursal), safe="")
+    sucursal_slug = quote((sucursal or "Casa_Matriz").strip(), safe="")
     url = f"https://api.simplefactura.cl/invoiceV2/{sucursal_slug}"
     response = requests.post(
         url,
@@ -1972,7 +1983,7 @@ class CustomerTicketClass:
             return _v2_emit_invoice(
                 self.db,
                 documento,
-                _v2_resolve_sucursal(branch.branch_office),
+                _v2_sucursal_name_for_branch(branch),
                 "Boleta",
             )
         except ValueError as exc:
@@ -2020,7 +2031,7 @@ class CustomerTicketClass:
             emit_result = _v2_emit_invoice(
                 self.db,
                 documento,
-                _v2_resolve_sucursal(branch.branch_office),
+                _v2_sucursal_name_for_branch(branch),
                 "Boleta",
             )
         except ValueError as exc:

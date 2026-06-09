@@ -17,7 +17,7 @@ from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_gr
 from app.backend.classes.customer_ticket_class import (
     DTE_VERSION_V2,
     _v2_emit_invoice,
-    _v2_resolve_sucursal,
+    _v2_sucursal_name_for_branch,
 )
 
 
@@ -2160,7 +2160,7 @@ class CustomerBillClass:
             return _v2_emit_invoice(
                 self.db,
                 documento,
-                _v2_resolve_sucursal(branch.branch_office),
+                _v2_sucursal_name_for_branch(branch),
                 "Factura",
             )
         except ValueError as exc:
@@ -2212,7 +2212,7 @@ class CustomerBillClass:
             emit_result = _v2_emit_invoice(
                 self.db,
                 documento,
-                _v2_resolve_sucursal(branch.branch_office),
+                _v2_sucursal_name_for_branch(branch),
                 "Factura",
             )
         except ValueError as exc:
