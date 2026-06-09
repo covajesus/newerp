@@ -43,21 +43,9 @@ def store(
         raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
     
 @sinisters.delete("/delete/{id}")
-def delete(id:int, db: Session = Depends(get_db)):
-    sinister_data = SinisterClass(db).get(id)
-
-    sinister_data = json.loads(sinister_data)
-
-    file_name = sinister_data["sinister_data"]["support"]
-
-    remote_path = f"{file_name}"
-
-    message = FileClass(db).delete(remote_path)
-
-    if message == "success":
-        SinisterClass(db).delete(id)
-
-    return {"message": message}
+def delete(id: int, db: Session = Depends(get_db)):
+    result = SinisterClass(db).delete(id)
+    return {"message": result.get("message", "error")}
 
 @sinisters.get("/download/{id}")
 def download(id: int, db: Session = Depends(get_db)):

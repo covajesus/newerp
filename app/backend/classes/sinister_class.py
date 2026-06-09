@@ -1,4 +1,5 @@
 from app.backend.db.models import SinisterModel, BranchOfficeModel, SinisterReviewModel
+from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from datetime import date, datetime
@@ -290,12 +291,38 @@ class SinisterClass:
             error_message = str(e)
             return f"Error: {error_message}"
         
+    def _safe_delete_file(self, file_class, remote_path: str | None) -> None:
+        if not remote_path:
+            return
+        try:
+            file_class.delete(remote_path)
+        except Exception:
+            pass
+
     def delete(self, id):
         try:
+            sinister = self.db.query(SinisterModel).filter(SinisterModel.id == id).first()
+            if not sinister:
+                return {"status": "error", "message": "Siniestro no encontrado"}
+
+            file_class = FileClass(self.db)
+            reviews = self.db.query(SinisterReviewModel).filter(
+                SinisterReviewModel.sinister_id == id
+            ).all()
+
+            for review in reviews:
+                self._safe_delete_file(file_class, review.support)
+
+            self.db.query(SinisterReviewModel).filter(
+                SinisterReviewModel.sinister_id == id
+            ).delete(synchronize_session=False)
+
+            self._safe_delete_file(file_class, sinister.support)
+
             self.db.query(SinisterModel).filter(SinisterModel.id == id).delete()
             self.db.commit()
 
-            return {"status": "success", "message": "Sinister value deleted successfully"}
+            return {"status": "success", "message": "success"}
 
         except Exception as e:
             self.db.rollback()
