@@ -13,6 +13,7 @@ import requests
 import json
 import base64
 import uuid
+import os
 from urllib.parse import quote
 from sqlalchemy.sql import func
 from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
@@ -66,18 +67,16 @@ def _v2_simplefactura_token(db):
 
 def _v2_resolve_sucursal(branch_office_name=None):
     """
-    Nombre de sucursal en SimpleFactura (path invoiceV2/{sucursal}).
-    Debe coincidir exactamente con el panel SF (ej. 'ALVI MAIPU', no 'ALVI_MAIPU').
+    Sucursal en la URL invoiceV2/{sucursal} de SimpleFactura.
+    En Jisparking todas las emisiones van por Casa_Matriz (como el biller y NC máquina).
+    La sucursal de negocio (ALVI MAIPU, etc.) va en Emisor.CdgSIISucur = branch.dte_code.
     """
-    if branch_office_name:
-        name = branch_office_name.strip()
-        if name:
-            return name
-    return "Casa_Matriz"
+    default = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
+    return default or "Casa_Matriz"
 
 
 def _v2_emit_invoice(db, documento, sucursal, dte_label="DTE"):
-    sucursal_slug = quote((sucursal or "Casa_Matriz").strip(), safe="")
+    sucursal_slug = quote(_v2_resolve_sucursal(sucursal), safe="")
     url = f"https://api.simplefactura.cl/invoiceV2/{sucursal_slug}"
     response = requests.post(
         url,
