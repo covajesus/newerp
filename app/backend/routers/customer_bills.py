@@ -200,14 +200,14 @@ def generate_bill_v2(customer_bill_inputs: GenerateCustomerBill, db: Session = D
     return {"message": data}
 
 
-@customer_bills.post("/v2/test_factura")
-def test_factura_v2(customer_bill_inputs: GenerateCustomerBill, db: Session = Depends(get_db)):
+@customer_bills.post("/v2/test_bill")
+def test_bill_v2(customer_bill_inputs: GenerateCustomerBill, db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
     if existence_data == 'Customer does not exist':
         CustomerClass(db).store(customer_bill_inputs)
     else:
         CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
-    data = CustomerBillClass(db).test_emit_factura_v2(customer_bill_inputs)
+    data = CustomerBillClass(db).test_emit_bill_v2(customer_bill_inputs)
     return {"message": data}
 
 

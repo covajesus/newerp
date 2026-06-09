@@ -51,7 +51,7 @@ def _dte_rut_sql_or(rut_column, rut_value):
     return or_(*[rut_column == v for v in clean])
 
 
-def _v2_simplefactura_token(db):
+def _v2_get_simple_factura_token(db):
     auth = AuthenticationClass(db)
     if auth.check_simplefactura_token() == 0:
         token = auth.create_simplefactura_token()
@@ -65,35 +65,34 @@ def _v2_simplefactura_token(db):
     return token
 
 
-SF_SUCURSAL_SUFFIX = " - JIS PARKING SPA"
+SIMPLE_FACTURA_BRANCH_SUFFIX = " - JIS PARKING SPA"
+# Testing: force invoiceV2 URL branch. Set to None to use real branch name again.
+SIMPLE_FACTURA_FORCE_URL_BRANCH = "Casa_Matriz"
 
 
-def _v2_sucursal_name_for_branch(branch):
-    """
-    Nombre de sucursal en SimpleFactura (path invoiceV2/{nombre}).
-    En el panel SF suele ser: '{branch_offices.branch_office} - JIS PARKING SPA'
-    ej. 'ALVI MAIPU - JIS PARKING SPA'. CdgSIISucur sigue yendo en el DTE.
-    """
+def _v2_simple_factura_branch_name(branch):
+    """SimpleFactura invoiceV2 path branch name, e.g. 'ALVI MAIPU - JIS PARKING SPA'."""
     if branch is None:
         fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
         return fallback or "Casa_Matriz"
-    base = (getattr(branch, "branch_office", None) or "").strip()
-    if not base:
+    base_name = (getattr(branch, "branch_office", None) or "").strip()
+    if not base_name:
         fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
         return fallback or "Casa_Matriz"
-    if SF_SUCURSAL_SUFFIX.upper() in base.upper():
-        return base
-    return f"{base}{SF_SUCURSAL_SUFFIX}"
+    if SIMPLE_FACTURA_BRANCH_SUFFIX.upper() in base_name.upper():
+        return base_name
+    return f"{base_name}{SIMPLE_FACTURA_BRANCH_SUFFIX}"
 
 
-def _v2_emit_invoice(db, documento, sucursal, dte_label="DTE"):
-    sucursal_slug = quote((sucursal or "Casa_Matriz").strip(), safe="")
-    url = f"https://api.simplefactura.cl/invoiceV2/{sucursal_slug}"
+def _v2_emit_invoice(db, document, branch_name, dte_label="DTE"):
+    url_branch = SIMPLE_FACTURA_FORCE_URL_BRANCH or branch_name or "Casa_Matriz"
+    branch_slug = quote(url_branch.strip(), safe="")
+    url = f"https://api.simplefactura.cl/invoiceV2/{branch_slug}"
     response = requests.post(
         url,
-        json={"Documento": documento},
+        json={"Documento": document},
         headers={
-            "Authorization": f"Bearer {_v2_simplefactura_token(db)}",
+            "Authorization": f"Bearer {_v2_get_simple_factura_token(db)}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
@@ -1793,7 +1792,7 @@ class CustomerTicketClass:
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
 
-    # --- Emisión v2 SimpleFactura (dte_version_id = 3) ---
+    # --- SimpleFactura v2 (dte_version_id = 3) ---
 
     def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10, period=None):
         return self.get_all(rol_id, rut, group, page, items_per_page, period, dte_version_id=DTE_VERSION_V2)
@@ -1885,42 +1884,44 @@ class CustomerTicketClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
 
-    def _v2_format_boleta_detalle(self, raw_lines):
-        formatted = []
-        total = 0
+    def _v2_format_ticket_detail_lines(self, raw_lines):
+        formatted_lines = []
+        total_amount = 0
         for index, line in enumerate(raw_lines, start=1):
             qty = int(line.get("QtyItem", 1) or 1)
-            prc = int(line.get("PrcItem", 0) or 0)
-            monto = line.get("MontoItem")
-            monto = int(monto) if monto is not None else qty * prc
-            total += monto
+            unit_price = int(line.get("PrcItem", 0) or 0)
+            line_amount = line.get("MontoItem")
+            line_amount = int(line_amount) if line_amount is not None else qty * unit_price
+            total_amount += line_amount
             entry = {
                 "NroLinDet": str(index),
                 "NmbItem": line.get("NmbItem", "Item"),
                 "QtyItem": str(qty),
                 "UnmdItem": line.get("UnmdItem") or "un",
-                "PrcItem": prc,
-                "MontoItem": monto,
+                "PrcItem": unit_price,
+                "MontoItem": line_amount,
             }
             if line.get("DscItem"):
                 entry["DscItem"] = line["DscItem"]
             if line.get("CdgItem"):
                 entry["CdgItem"] = line["CdgItem"]
-            formatted.append(entry)
-        mnt_neto = round(total / 1.19)
-        return formatted, mnt_neto, total - mnt_neto, total
+            formatted_lines.append(entry)
+        net_amount = round(total_amount / 1.19)
+        return formatted_lines, net_amount, total_amount - net_amount, total_amount
 
-    def _build_boleta_documento_v2(self, customer_data, form_data, branch):
+    def _build_ticket_document_v2(self, customer_data, form_data, branch):
         source_dte = self._ticket_source_dte_from_form(form_data)
         detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
             return detail_lines
 
-        cd = customer_data["customer_data"]
-        sf_detalle, mnt_neto, iva, total = self._v2_format_boleta_detalle(detail_lines)
+        customer = customer_data["customer_data"]
+        sf_detail_lines, net_amount, tax_amount, total_amount = self._v2_format_ticket_detail_lines(
+            detail_lines
+        )
         issue_date = datetime.now().strftime("%Y-%m-%d")
 
-        emisor = {
+        issuer = {
             "RUTEmisor": "76063822-6",
             "RznSocEmisor": "Jisparking SpA",
             "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
@@ -1928,11 +1929,11 @@ class CustomerTicketClass:
             "CmnaOrigen": "Santiago",
         }
         if branch.dte_code is not None:
-            emisor["CdgSIISucur"] = branch.dte_code
+            issuer["CdgSIISucur"] = branch.dte_code
 
-        receptor = {
-            "RUTRecep": cd["rut"],
-            "RznSocRecep": cd.get("customer") or cd["rut"],
+        receiver = {
+            "RUTRecep": customer["rut"],
+            "RznSocRecep": customer.get("customer") or customer["rut"],
         }
         for key, src in (
             ("GiroRecep", "activity"),
@@ -1941,9 +1942,9 @@ class CustomerTicketClass:
             ("Contacto", "email"),
             ("CorreoRecep", "email"),
         ):
-            val = cd.get(src)
+            val = customer.get(src)
             if val:
-                receptor[key] = val
+                receiver[key] = val
 
         return {
             "Encabezado": {
@@ -1954,14 +1955,18 @@ class CustomerTicketClass:
                     "IndServicio": 3,
                     "IndMntNeto": 2,
                 },
-                "Emisor": emisor,
-                "Receptor": receptor,
-                "Totales": {"MntNeto": mnt_neto, "IVA": iva, "MntTotal": total},
+                "Emisor": issuer,
+                "Receptor": receiver,
+                "Totales": {
+                    "MntNeto": net_amount,
+                    "IVA": tax_amount,
+                    "MntTotal": total_amount,
+                },
             },
-            "Detalle": sf_detalle,
+            "Detalle": sf_detail_lines,
         }
 
-    def test_emit_boleta_v2(self, form_data):
+    def test_emit_ticket_v2(self, form_data):
         branch = (
             self.db.query(BranchOfficeModel)
             .filter(BranchOfficeModel.id == form_data.branch_office_id)
@@ -1975,15 +1980,15 @@ class CustomerTicketClass:
         if "customer_data" not in customer_data:
             return {"status": "error", "message": "Cliente no encontrado"}
 
-        documento = self._build_boleta_documento_v2(customer_data, form_data, branch)
-        if isinstance(documento, dict) and documento.get("status") == "error":
-            return documento
+        document = self._build_ticket_document_v2(customer_data, form_data, branch)
+        if isinstance(document, dict) and document.get("status") == "error":
+            return document
 
         try:
             return _v2_emit_invoice(
                 self.db,
-                documento,
-                _v2_sucursal_name_for_branch(branch),
+                document,
+                _v2_simple_factura_branch_name(branch),
                 "Boleta",
             )
         except ValueError as exc:
@@ -2023,15 +2028,15 @@ class CustomerTicketClass:
         if not branch:
             return {"status": "error", "message": "Sucursal no encontrada"}
 
-        documento = self._build_boleta_documento_v2(customer_data, form_data, branch)
-        if isinstance(documento, dict) and documento.get("status") == "error":
-            return documento
+        document = self._build_ticket_document_v2(customer_data, form_data, branch)
+        if isinstance(document, dict) and document.get("status") == "error":
+            return document
 
         try:
             emit_result = _v2_emit_invoice(
                 self.db,
-                documento,
-                _v2_sucursal_name_for_branch(branch),
+                document,
+                _v2_simple_factura_branch_name(branch),
                 "Boleta",
             )
         except ValueError as exc:

@@ -17,7 +17,7 @@ from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_gr
 from app.backend.classes.customer_ticket_class import (
     DTE_VERSION_V2,
     _v2_emit_invoice,
-    _v2_sucursal_name_for_branch,
+    _v2_simple_factura_branch_name,
 )
 
 
@@ -2030,7 +2030,7 @@ class CustomerBillClass:
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
 
-    # --- Emisión v2 SimpleFactura (dte_version_id = 3) ---
+    # --- SimpleFactura v2 (dte_version_id = 3) ---
 
     def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10):
         return self.get_all(rol_id, rut, group, page, items_per_page, dte_version_id=DTE_VERSION_V2)
@@ -2075,31 +2075,31 @@ class CustomerBillClass:
                     return {"status": "error", "message": f"Error: {str(e)}"}
         return result
 
-    def _v2_format_factura_detalle(self, raw_lines):
-        formatted = []
+    def _v2_format_bill_detail_lines(self, raw_lines):
+        formatted_lines = []
         for index, line in enumerate(raw_lines, start=1):
             qty = int(line.get("QtyItem", 1) or 1)
-            price = int(line.get("PrcItem", 0) or 0)
-            formatted.append(
+            unit_price = int(line.get("PrcItem", 0) or 0)
+            formatted_lines.append(
                 {
                     "NroLinDet": str(index),
                     "NmbItem": line.get("NmbItem", "Item"),
                     "QtyItem": str(qty),
                     "UnmdItem": line.get("UnmdItem", "un"),
-                    "PrcItem": str(price),
-                    "MontoItem": str(qty * price),
+                    "PrcItem": str(unit_price),
+                    "MontoItem": str(qty * unit_price),
                 }
             )
-        return formatted
+        return formatted_lines
 
-    def _build_factura_documento_v2(self, cd, detail_lines, branch):
-        today = datetime.now().strftime("%Y-%m-%d")
-        detalle = self._v2_format_factura_detalle(detail_lines)
-        total = sum(int(line["MontoItem"]) for line in detalle)
-        mnt_neto = round(total / 1.19)
-        iva = total - mnt_neto
+    def _build_bill_document_v2(self, customer, detail_lines, branch):
+        issue_date = datetime.now().strftime("%Y-%m-%d")
+        sf_detail_lines = self._v2_format_bill_detail_lines(detail_lines)
+        total_amount = sum(int(line["MontoItem"]) for line in sf_detail_lines)
+        net_amount = round(total_amount / 1.19)
+        tax_amount = total_amount - net_amount
 
-        emisor = {
+        issuer = {
             "RUTEmisor": "76063822-6",
             "RznSocEmisor": "Jisparking SpA",
             "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
@@ -2107,37 +2107,37 @@ class CustomerBillClass:
             "CmnaOrigen": "Santiago",
         }
         if branch.dte_code is not None:
-            emisor["CdgSIISucur"] = branch.dte_code
+            issuer["CdgSIISucur"] = branch.dte_code
 
-        receptor = {
-            "RUTRecep": cd["rut"],
-            "RznSocRecep": cd.get("customer") or cd["rut"],
+        receiver = {
+            "RUTRecep": customer["rut"],
+            "RznSocRecep": customer.get("customer") or customer["rut"],
         }
-        if cd.get("activity"):
-            receptor["GiroRecep"] = cd["activity"]
-        if cd.get("address") or cd.get("region"):
-            receptor["DirRecep"] = cd.get("address") or cd.get("region")
-        if cd.get("commune"):
-            receptor["CmnaRecep"] = cd["commune"]
-        if cd.get("email"):
-            receptor["CorreoRecep"] = cd["email"]
-            receptor["Contacto"] = cd["email"]
+        if customer.get("activity"):
+            receiver["GiroRecep"] = customer["activity"]
+        if customer.get("address") or customer.get("region"):
+            receiver["DirRecep"] = customer.get("address") or customer.get("region")
+        if customer.get("commune"):
+            receiver["CmnaRecep"] = customer["commune"]
+        if customer.get("email"):
+            receiver["CorreoRecep"] = customer["email"]
+            receiver["Contacto"] = customer["email"]
 
         return {
             "Encabezado": {
-                "IdDoc": {"TipoDTE": 33, "FchEmis": today, "FchVenc": today, "MntBruto": 1},
-                "Emisor": emisor,
-                "Receptor": receptor,
+                "IdDoc": {"TipoDTE": 33, "FchEmis": issue_date, "FchVenc": issue_date, "MntBruto": 1},
+                "Emisor": issuer,
+                "Receptor": receiver,
                 "Totales": {
-                    "MntNeto": str(mnt_neto),
-                    "IVA": str(iva),
-                    "MntTotal": str(total),
+                    "MntNeto": str(net_amount),
+                    "IVA": str(tax_amount),
+                    "MntTotal": str(total_amount),
                 },
             },
-            "Detalle": detalle,
+            "Detalle": sf_detail_lines,
         }
 
-    def test_emit_factura_v2(self, form_data):
+    def test_emit_bill_v2(self, form_data):
         branch = (
             self.db.query(BranchOfficeModel)
             .filter(BranchOfficeModel.id == form_data.branch_office_id)
@@ -2150,17 +2150,17 @@ class CustomerBillClass:
         customer_data = json.loads(customer)
         if "customer_data" not in customer_data:
             return {"status": "error", "message": "Cliente no encontrado"}
-        cd = customer_data["customer_data"]
+        customer_record = customer_data["customer_data"]
 
         qty = getattr(form_data, "quantity", None)
         qty = int(qty) if qty not in (None, "", 0) else None
         detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, [], qty)
-        documento = self._build_factura_documento_v2(cd, detail_lines, branch)
+        document = self._build_bill_document_v2(customer_record, detail_lines, branch)
         try:
             return _v2_emit_invoice(
                 self.db,
-                documento,
-                _v2_sucursal_name_for_branch(branch),
+                document,
+                _v2_simple_factura_branch_name(branch),
                 "Factura",
             )
         except ValueError as exc:
@@ -2189,7 +2189,7 @@ class CustomerBillClass:
 
         customer = CustomerClass(self.db).get_by_rut(form_data.rut)
         customer_data = json.loads(customer)
-        cd = customer_data["customer_data"]
+        customer_record = customer_data["customer_data"]
 
         branch = (
             self.db.query(BranchOfficeModel)
@@ -2208,11 +2208,11 @@ class CustomerBillClass:
         detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, bill_items, qty)
 
         try:
-            documento = self._build_factura_documento_v2(cd, detail_lines, branch)
+            document = self._build_bill_document_v2(customer_record, detail_lines, branch)
             emit_result = _v2_emit_invoice(
                 self.db,
-                documento,
-                _v2_sucursal_name_for_branch(branch),
+                document,
+                _v2_simple_factura_branch_name(branch),
                 "Factura",
             )
         except ValueError as exc:

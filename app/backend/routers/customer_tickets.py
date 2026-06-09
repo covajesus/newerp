@@ -183,14 +183,14 @@ def store_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserL
     return {"message": data}
 
 
-@customer_tickets.post("/v2/test_boleta")
-def test_boleta_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+@customer_tickets.post("/v2/test_ticket")
+def test_ticket_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
     if existence_data == 'Customer does not exist':
         CustomerClass(db).store(customer_ticket_inputs)
     else:
         CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
-    data = CustomerTicketClass(db).test_emit_boleta_v2(customer_ticket_inputs)
+    data = CustomerTicketClass(db).test_emit_ticket_v2(customer_ticket_inputs)
     return {"message": data}
 
 
