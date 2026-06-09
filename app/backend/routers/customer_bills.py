@@ -147,3 +147,77 @@ def check_payments(db: Session = Depends(get_db)):
     data = CustomerBillClass(db).check_payments()
 
     return {"message": data}
+
+
+@customer_bills.post("/v2/")
+def index_v2(customer_bill_inputs: CustomerBillList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).get_all_v2(session_user.rol_id, session_user.rut, 1, customer_bill_inputs.page)
+    return {"message": data}
+
+
+@customer_bills.post("/v2/search")
+def search_v2(customer_bills: CustomerBillSearch, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerBillClass(db).search_v2(
+        session_user.rol_id,
+        session_user.rut,
+        customer_bills.branch_office_id,
+        customer_bills.rut,
+        customer_bills.customer,
+        customer_bills.status_id,
+        customer_bills.supervisor_id,
+        customer_bills.page,
+        category_id=customer_bills.category_id,
+    )
+    return {"message": data}
+
+
+@customer_bills.post("/v2/store")
+def store_v2(customer_ticket_inputs: GenerateCustomerBill, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    try:
+        existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+        if customer_ticket_inputs.will_save == 1:
+            if existence_data == 'Customer does not exist':
+                CustomerClass(db).store(customer_ticket_inputs)
+            else:
+                CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+        data = CustomerBillClass(db).store_v2(customer_ticket_inputs, session_user.rol_id)
+        return {"message": data}
+    except Exception as e:
+        print(f"Error en store_v2: {str(e)}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
+
+
+@customer_bills.post("/v2/generate_bill")
+def generate_bill_v2(customer_bill_inputs: GenerateCustomerBill, db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
+    if customer_bill_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_bill_inputs)
+        else:
+            CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
+    data = CustomerBillClass(db).generate_v2(customer_bill_inputs)
+    return {"message": data}
+
+
+@customer_bills.post("/v2/test_factura")
+def test_factura_v2(customer_bill_inputs: GenerateCustomerBill, db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
+    if existence_data == 'Customer does not exist':
+        CustomerClass(db).store(customer_bill_inputs)
+    else:
+        CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
+    data = CustomerBillClass(db).test_emit_factura_v2(customer_bill_inputs)
+    return {"message": data}
+
+
+@customer_bills.get("/v2/pre_accept/{id}")
+def pre_accept_v2(id: int, db: Session = Depends(get_db)):
+    CustomerBillClass(db).pre_accept(id)
+    return {"message": "success"}
+
+
+@customer_bills.get("/v2/reject/{id}")
+def reject_v2(id: int, db: Session = Depends(get_db)):
+    CustomerBillClass(db).reject(id)
+    return {"message": "success"}

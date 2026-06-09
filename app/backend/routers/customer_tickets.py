@@ -135,3 +135,72 @@ def check_payments(db: Session = Depends(get_db)):
     data = CustomerTicketClass(db).check_payments()
 
     return {"message": data}
+
+
+@customer_tickets.post("/v2/")
+def index_v2(customer_ticket_inputs: CustomerTicketList, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).get_all_v2(session_user.rol_id, session_user.rut, 1, customer_ticket_inputs.page)
+    return {"message": data}
+
+
+@customer_tickets.post("/v2/search")
+def search_v2(customer_ticket_inputs: CustomerTicketSearch, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    data = CustomerTicketClass(db).search_v2(
+        session_user.rol_id,
+        session_user.rut,
+        customer_ticket_inputs.branch_office_id,
+        customer_ticket_inputs.rut,
+        customer_ticket_inputs.customer,
+        customer_ticket_inputs.status_id,
+        customer_ticket_inputs.supervisor_id,
+        customer_ticket_inputs.page,
+        category_id=customer_ticket_inputs.category_id,
+    )
+    return {"message": data}
+
+
+@customer_tickets.post("/v2/generate_ticket")
+def generate_ticket_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+    data = CustomerTicketClass(db).generate_v2(customer_ticket_inputs)
+    return {"message": data}
+
+
+@customer_tickets.post("/v2/store")
+def store_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+    if customer_ticket_inputs.will_save == 1:
+        if existence_data == 'Customer does not exist':
+            CustomerClass(db).store(customer_ticket_inputs)
+        else:
+            CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+    data = CustomerTicketClass(db).store_v2(customer_ticket_inputs, session_user.rol_id)
+    return {"message": data}
+
+
+@customer_tickets.post("/v2/test_boleta")
+def test_boleta_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
+    if existence_data == 'Customer does not exist':
+        CustomerClass(db).store(customer_ticket_inputs)
+    else:
+        CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
+    data = CustomerTicketClass(db).test_emit_boleta_v2(customer_ticket_inputs)
+    return {"message": data}
+
+
+@customer_tickets.get("/v2/pre_accept/{id}")
+def pre_accept_v2(id: int, db: Session = Depends(get_db)):
+    CustomerTicketClass(db).pre_accept(id)
+    return {"message": "success"}
+
+
+@customer_tickets.get("/v2/reject/{id}")
+def reject_v2(id: int, db: Session = Depends(get_db)):
+    CustomerTicketClass(db).reject(id)
+    return {"message": "success"}

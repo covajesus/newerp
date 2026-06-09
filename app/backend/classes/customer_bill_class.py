@@ -14,6 +14,11 @@ import base64
 from sqlalchemy import or_
 from fastapi import HTTPException
 from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
+from app.backend.classes.customer_ticket_class import (
+    DTE_VERSION_V2,
+    _v2_emit_invoice,
+    _v2_resolve_sucursal,
+)
 
 
 def _dte_rut_sql_or_bill(rut_column, rut_value):
@@ -446,7 +451,7 @@ class CustomerBillClass:
             }
         ]
 
-    def _find_open_bill_draft(self, form_data):
+    def _find_open_bill_draft(self, form_data, dte_version_id=1):
         """
         Borrador factura 33 (folio 0, status 1/2) mismo criterio que generate() tras timbrar.
         Sirve para leer OC en pre_generate cuando el front no manda id (no masivo).
@@ -462,7 +467,7 @@ class CustomerBillClass:
                     DteModel.branch_office_id == form_data.branch_office_id,
                     rut_clause,
                     DteModel.dte_type_id == 33,
-                    DteModel.dte_version_id == 1,
+                    DteModel.dte_version_id == dte_version_id,
                     DteModel.status_id.in_((1, 2)),
                     DteModel.period == period_str,
                     DteModel.folio == 0,
@@ -482,7 +487,7 @@ class CustomerBillClass:
                     DteModel.branch_office_id == form_data.branch_office_id,
                     rut_clause,
                     DteModel.dte_type_id == 33,
-                    DteModel.dte_version_id == 1,
+                    DteModel.dte_version_id == dte_version_id,
                     DteModel.status_id.in_((1, 2)),
                     DteModel.period == period_str,
                 )
@@ -491,14 +496,14 @@ class CustomerBillClass:
             )
         return dte
 
-    def get_all(self, rol_id = None, rut = None, group = 1, page=0, items_per_page=10):
+    def get_all(self, rol_id = None, rut = None, group = 1, page=0, items_per_page=10, dte_version_id=1):
         try:
             print(rol_id)
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
                 filters = []
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id == dte_version_id)
                 filters.append(DteModel.dte_type_id == 33)
                 filters.append(DteModel.rut != None)
 
@@ -620,7 +625,7 @@ class CustomerBillClass:
                 # Inicialización de filtros dinámicos
                 filters = []
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id == dte_version_id)
                 filters.append(DteModel.dte_type_id == 33)
                 filters.append(DteModel.rut != None)
 
@@ -747,7 +752,7 @@ class CustomerBillClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
-    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10, category_id=None):
+    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10, category_id=None, dte_version_id=1):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
@@ -766,7 +771,7 @@ class CustomerBillClass:
                 if category_id is not None and category_id != "" and category_id != 0:
                     filters.append(DteModel.category_id == category_id)
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id == dte_version_id)
                 filters.append(DteModel.status_id < 4)
                 filters.append(DteModel.dte_type_id == 33)
                 filters.append(DteModel.rut != None)
@@ -898,7 +903,7 @@ class CustomerBillClass:
                 if category_id is not None and category_id != "" and category_id != 0:
                     filters.append(DteModel.category_id == category_id)
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id == dte_version_id)
                 filters.append(DteModel.status_id < 4)
                 filters.append(DteModel.dte_type_id == 33)
                 filters.append(DteModel.rut != None)
@@ -2024,5 +2029,242 @@ class CustomerBillClass:
                         print(f"Dte actualizado correctamente: {dte.folio}")
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
+
+    # --- Emisión v2 SimpleFactura (dte_version_id = 3) ---
+
+    def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10):
+        return self.get_all(rol_id, rut, group, page, items_per_page, dte_version_id=DTE_VERSION_V2)
+
+    def search_v2(
+        self,
+        rol_id=None,
+        supervisor_rut=None,
+        branch_office_id=None,
+        rut=None,
+        customer=None,
+        status_id=None,
+        supervisor_id=None,
+        page=0,
+        items_per_page=10,
+        category_id=None,
+    ):
+        return self.search(
+            rol_id,
+            supervisor_rut,
+            branch_office_id,
+            rut,
+            customer,
+            status_id,
+            supervisor_id,
+            page,
+            items_per_page,
+            category_id,
+            dte_version_id=DTE_VERSION_V2,
+        )
+
+    def store_v2(self, form_data, rol_id):
+        result = self.store(form_data, rol_id)
+        if isinstance(result, dict) and result.get("status") == "success":
+            dte = self._find_open_bill_draft(form_data, dte_version_id=1)
+            if dte:
+                dte.dte_version_id = DTE_VERSION_V2
+                try:
+                    self.db.commit()
+                except Exception as e:
+                    self.db.rollback()
+                    return {"status": "error", "message": f"Error: {str(e)}"}
+        return result
+
+    def _v2_format_factura_detalle(self, raw_lines):
+        formatted = []
+        for index, line in enumerate(raw_lines, start=1):
+            qty = int(line.get("QtyItem", 1) or 1)
+            price = int(line.get("PrcItem", 0) or 0)
+            formatted.append(
+                {
+                    "NroLinDet": str(index),
+                    "NmbItem": line.get("NmbItem", "Item"),
+                    "QtyItem": str(qty),
+                    "UnmdItem": line.get("UnmdItem", "un"),
+                    "PrcItem": str(price),
+                    "MontoItem": str(qty * price),
+                }
+            )
+        return formatted
+
+    def _build_factura_documento_v2(self, cd, detail_lines, branch):
+        today = datetime.now().strftime("%Y-%m-%d")
+        detalle = self._v2_format_factura_detalle(detail_lines)
+        total = sum(int(line["MontoItem"]) for line in detalle)
+        mnt_neto = round(total / 1.19)
+        iva = total - mnt_neto
+
+        emisor = {
+            "RUTEmisor": "76063822-6",
+            "RznSocEmisor": "Jisparking SpA",
+            "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+            "DirOrigen": "Matucana 40",
+            "CmnaOrigen": "Santiago",
+        }
+        if branch.dte_code is not None:
+            emisor["CdgSIISucur"] = branch.dte_code
+
+        receptor = {
+            "RUTRecep": cd["rut"],
+            "RznSocRecep": cd.get("customer") or cd["rut"],
+        }
+        if cd.get("activity"):
+            receptor["GiroRecep"] = cd["activity"]
+        if cd.get("address") or cd.get("region"):
+            receptor["DirRecep"] = cd.get("address") or cd.get("region")
+        if cd.get("commune"):
+            receptor["CmnaRecep"] = cd["commune"]
+        if cd.get("email"):
+            receptor["CorreoRecep"] = cd["email"]
+            receptor["Contacto"] = cd["email"]
+
+        return {
+            "Encabezado": {
+                "IdDoc": {"TipoDTE": 33, "FchEmis": today, "FchVenc": today, "MntBruto": 1},
+                "Emisor": emisor,
+                "Receptor": receptor,
+                "Totales": {
+                    "MntNeto": str(mnt_neto),
+                    "IVA": str(iva),
+                    "MntTotal": str(total),
+                },
+            },
+            "Detalle": detalle,
+        }
+
+    def test_emit_factura_v2(self, form_data):
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == form_data.branch_office_id)
+            .first()
+        )
+        if not branch:
+            return {"status": "error", "message": "Sucursal no encontrada"}
+
+        customer = CustomerClass(self.db).get_by_rut(form_data.rut)
+        customer_data = json.loads(customer)
+        if "customer_data" not in customer_data:
+            return {"status": "error", "message": "Cliente no encontrado"}
+        cd = customer_data["customer_data"]
+
+        qty = getattr(form_data, "quantity", None)
+        qty = int(qty) if qty not in (None, "", 0) else None
+        detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, [], qty)
+        documento = self._build_factura_documento_v2(cd, detail_lines, branch)
+        try:
+            return _v2_emit_invoice(
+                self.db,
+                documento,
+                _v2_resolve_sucursal(branch.branch_office),
+                "Factura",
+            )
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc)}
+
+    def generate_v2(self, form_data):
+        expected_total_doc = _bill_total_from_form(form_data)
+        check_dte_existence = (
+            self.db.query(DteModel)
+            .filter(
+                DteModel.branch_office_id == form_data.branch_office_id,
+                DteModel.rut == form_data.rut,
+                DteModel.total == expected_total_doc,
+                DteModel.dte_type_id == 33,
+                DteModel.dte_version_id == DTE_VERSION_V2,
+                DteModel.status_id == 4,
+                DteModel.period == datetime.now().strftime("%Y-%m"),
+            )
+            .count()
+        )
+        if check_dte_existence != 0:
+            return {
+                "status": "error",
+                "message": "Ya existe un DTE para esta sucursal y este cliente.",
+            }
+
+        customer = CustomerClass(self.db).get_by_rut(form_data.rut)
+        customer_data = json.loads(customer)
+        cd = customer_data["customer_data"]
+
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == form_data.branch_office_id)
+            .first()
+        )
+        if not branch:
+            return {"status": "error", "message": "Sucursal no encontrada"}
+
+        dte_row = self._find_open_bill_draft(form_data, dte_version_id=DTE_VERSION_V2)
+        bill_items = self._get_bill_items_for_generation(form_data, dte_row)
+        qty = getattr(form_data, "quantity", None)
+        if qty is None and dte_row is not None and getattr(dte_row, "quantity", None) is not None:
+            qty = dte_row.quantity
+        qty = int(qty) if qty not in (None, "", 0) else None
+        detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, bill_items, qty)
+
+        try:
+            documento = self._build_factura_documento_v2(cd, detail_lines, branch)
+            emit_result = _v2_emit_invoice(
+                self.db,
+                documento,
+                _v2_resolve_sucursal(branch.branch_office),
+                "Factura",
+            )
+        except ValueError as exc:
+            return {"status": "error", "message": str(exc)}
+
+        if emit_result.get("status") != "success":
+            return {
+                "status": "error",
+                "message": emit_result.get("message") or "SimpleFactura no emitió la factura",
+                "errors": emit_result.get("errors"),
+                "response": emit_result.get("response"),
+            }
+
+        folio = emit_result.get("folio")
+        if folio is None:
+            return {
+                "status": "error",
+                "message": "SimpleFactura no devolvió folio",
+                "response": emit_result.get("response"),
+            }
+
+        dte = self._find_open_bill_draft(form_data, dte_version_id=DTE_VERSION_V2)
+        if not dte:
+            return {
+                "status": "error",
+                "message": (
+                    f"Factura emitida en SimpleFactura (folio {folio}) "
+                    "pero no hay borrador v2 en base de datos."
+                ),
+                "folio": folio,
+                "response": emit_result.get("response"),
+            }
+
+        dte.folio = folio
+        dte.status_id = 4
+        _sync_bill_dte_amounts_from_form(dte, form_data)
+        items = self._get_bill_items_for_generation(form_data, dte)
+        if items:
+            dte.quantity = sum(i["quantity"] for i in items)
+            self._replace_bill_items(dte.id, items)
+
+        try:
+            self.db.commit()
+            self.db.refresh(dte)
+            return {
+                "status": "success",
+                "message": "Dte saved successfully",
+                "folio": folio,
+                "response": emit_result.get("response"),
+            }
+        except Exception as e:
+            self.db.rollback()
+            return {"status": "error", "message": f"Error: {str(e)}"}
 
 
