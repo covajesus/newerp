@@ -205,6 +205,49 @@ class KlapClass:
         }
         return self._create_order_safe(payload)
 
+    def payment_url_for_dte(self, dte, customer) -> dict[str, Any]:
+        """Crea orden Klap y devuelve redirect_url + link proxy para WhatsApp/copiar."""
+        result = self.create_subscriber_dte_order(dte, customer)
+        if result.get("status") != "success":
+            return result
+        order_id = result.get("order_id")
+        redirect_url = result.get("redirect_url")
+        proxy_base = os.getenv(
+            "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
+            "https://intrajisbackend.com/api/klap/pay",
+        ).rstrip("/")
+        mode = (os.getenv("KLAP_WHATSAPP_URL_MODE") or "proxy").strip().lower()
+        if mode == "direct" and redirect_url:
+            base = os.getenv(
+                "KLAP_WHATSAPP_URL_BASE",
+                "https://pagos-pasarela.multicaja.cl/",
+            ).rstrip("/") + "/"
+            whatsapp_url_data = (
+                redirect_url[len(base):]
+                if redirect_url.startswith(base)
+                else redirect_url
+            )
+        else:
+            whatsapp_url_data = order_id
+        return {
+            "status": "success",
+            "order_id": order_id,
+            "redirect_url": redirect_url,
+            "payment_link": f"{proxy_base}/{order_id}",
+            "whatsapp_url_data": whatsapp_url_data,
+            "response": result.get("response"),
+        }
+
+    def redirect_url_for_order(self, order_id: str) -> str | None:
+        """Obtiene redirect_url de Klap para redirigir al cliente."""
+        if not self.api_key:
+            return None
+        try:
+            body = self.get_order(order_id)
+        except HTTPException:
+            return None
+        return body.get("redirect_url") if isinstance(body, dict) else None
+
     def get_order(self, order_id: str) -> dict[str, Any]:
         """GET /payment-gateway/v1/orders/{order_id}"""
         return self._request("GET", f"/payment-gateway/v1/orders/{order_id}")

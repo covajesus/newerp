@@ -3,12 +3,17 @@ Proxy y webhooks para Klap Order API (Boleta2 / Factura2).
 
 Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
 """
+import os
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.backend.classes.klap_class import KlapClass
+from app.backend.db.database import get_db
+from app.backend.db.models import CustomerModel, DteModel
 
 klap_payments = APIRouter(prefix="/klap", tags=["Klap Payments"])
 
@@ -70,6 +75,36 @@ class KlapCreateOrderRequest(BaseModel):
 class KlapRefundRequest(BaseModel):
     reference_id: Optional[str] = None
     amount: Optional[float] = None
+
+
+@klap_payments.get("/pay/{order_id}")
+def pay_redirect(order_id: str):
+    """
+    Redirección pública al checkout Klap.
+    Usar como base del botón WhatsApp: https://intrajisbackend.com/api/klap/pay/{{1}}
+    """
+    redirect_url = KlapClass().redirect_url_for_order(order_id)
+    if not redirect_url:
+        raise HTTPException(status_code=404, detail="Orden Klap no encontrada o sin URL de pago")
+    return RedirectResponse(url=redirect_url, status_code=302)
+
+
+@klap_payments.get("/dtes/{dte_id}/payment-url")
+def dte_payment_url(dte_id: int, db: Session = Depends(get_db)):
+    """Genera enlace de pago Klap para un DTE abonado v2 (copiar enlace)."""
+    dte = db.query(DteModel).filter(DteModel.id == dte_id).first()
+    if not dte:
+        raise HTTPException(status_code=404, detail="DTE no encontrado")
+    customer = db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    result = KlapClass().payment_url_for_dte(dte, customer)
+    if result.get("status") != "success":
+        raise HTTPException(
+            status_code=502,
+            detail=result.get("message") or "No se pudo crear orden Klap",
+        )
+    return {"message": result}
 
 
 @klap_payments.post("/orders")

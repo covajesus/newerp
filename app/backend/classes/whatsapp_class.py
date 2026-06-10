@@ -8,26 +8,54 @@ import json
 load_dotenv()
 
 
-def _klap_whatsapp_button_suffix(redirect_url: str) -> str:
-    """
-    Sufijo dinámico para el botón URL del template WhatsApp con pago Klap.
-    El template en Meta debe usar como base KLAP_WHATSAPP_URL_BASE, p. ej.
-    https://pagos-pasarela.multicaja.cl/ (prod) o sandbox según ambiente.
-    """
-    redirect_url = (redirect_url or "").strip()
-    if not redirect_url:
-        return ""
+def klap_payment_proxy_public_url(order_id: str) -> str:
+    """URL pública que redirige a la pasarela Klap (para copiar / referencia)."""
     base = os.getenv(
-        "KLAP_WHATSAPP_URL_BASE",
-        "https://pagos-pasarela.multicaja.cl/",
-    ).rstrip("/") + "/"
-    if redirect_url.startswith(base):
-        return redirect_url[len(base):]
-    parsed = urlparse(redirect_url)
-    suffix = (parsed.path or "").lstrip("/")
-    if parsed.query:
-        suffix = f"{suffix}?{parsed.query}"
-    return suffix
+        "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
+        "https://intrajisbackend.com/api/klap/pay",
+    ).rstrip("/")
+    return f"{base}/{order_id}"
+
+
+def _klap_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
+    """
+    Parámetro {{1}} del botón URL del template WhatsApp.
+
+    Modo proxy (default): el template en Meta debe usar
+    https://intrajisbackend.com/api/klap/pay/{{1}}
+    y aquí enviamos solo el order_id de Klap.
+
+    Modo direct: el template debe usar KLAP_WHATSAPP_URL_BASE + {{1}}
+    (p. ej. https://sandbox.mcdesaqa.cl/pagos/{{1}}).
+    """
+    mode = (os.getenv("KLAP_WHATSAPP_URL_MODE") or "proxy").strip().lower()
+    if mode == "direct":
+        redirect_url = (redirect_url or "").strip()
+        if not redirect_url:
+            return ""
+        base = os.getenv(
+            "KLAP_WHATSAPP_URL_BASE",
+            "https://pagos-pasarela.multicaja.cl/",
+        ).rstrip("/") + "/"
+        if redirect_url.startswith(base):
+            return redirect_url[len(base):]
+        parsed = urlparse(redirect_url)
+        suffix = (parsed.path or "").lstrip("/")
+        if parsed.query:
+            suffix = f"{suffix}?{parsed.query}"
+        return suffix
+    return (order_id or "").strip()
+
+
+def _whatsapp_v2_template_name(db) -> str:
+    """Nombre Meta de la plantilla v2 (botón Klap). Default: envio_dte_v2."""
+    name = (os.getenv("WHATSAPP_TEMPLATE_V2") or "envio_dte_v2").strip()
+    row = (
+        db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.title == name)
+        .first()
+    )
+    return (row.title if row and row.title else name).strip()
 
 
 def _libredte_issue_date_from_emitido_info(response: requests.Response, fallback_date=None) -> str:
@@ -243,10 +271,10 @@ class WhatsappClass:
                 "whatsapp_accepted": "rejected"
             }
 
-    def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None):
+    def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None, phone_override=None):
         """
         WhatsApp post-emisión v2 (SimpleFactura + pago Klap).
-        Misma plantilla que send() (whatsapp_templates.id=1) pero el botón usa redirect_url de Klap.
+        Plantilla Meta: envio_dte_v2 (mismo cuerpo que envio_dte; botón → /api/klap/pay/{order_id}).
         """
         from app.backend.classes.klap_class import KlapClass
         from app.backend.classes.customer_ticket_class import CustomerTicketClass
@@ -261,13 +289,7 @@ class WhatsappClass:
         if not customer.phone or str(customer.phone).strip() == "":
             return {"status": "skipped", "message": "Cliente sin teléfono"}
 
-        whatsapp_template = (
-            self.db.query(WhatsappTemplateModel)
-            .filter(WhatsappTemplateModel.id == 1)
-            .first()
-        )
-        if not whatsapp_template:
-            return {"status": "error", "message": "Plantilla WhatsApp id=1 no encontrada"}
+        template_name = _whatsapp_v2_template_name(self.db)
 
         branch_office = (
             self.db.query(BranchOfficeModel)
@@ -305,14 +327,16 @@ class WhatsappClass:
                 "klap": klap_result,
             }
 
+        order_id = klap_result.get("order_id")
         redirect_url = klap_result.get("redirect_url")
-        url_data = _klap_whatsapp_button_suffix(redirect_url)
+        url_data = _klap_whatsapp_url_data(order_id, redirect_url)
         if not url_data:
             return {
                 "status": "error",
-                "message": "redirect_url Klap vacía para botón WhatsApp",
+                "message": "Orden Klap sin order_id/redirect_url para botón WhatsApp",
                 "klap": klap_result,
             }
+        payment_link = klap_payment_proxy_public_url(order_id)
 
         token = os.getenv("LIBREDTE_TOKEN")
         graph_url = "https://graph.facebook.com/v20.0/101066132689690/messages"
@@ -342,7 +366,8 @@ class WhatsappClass:
 
         dte_type = "boleta" if int(dte_data.dte_type_id) == 39 else "factura"
 
-        phone_str = str(customer.phone).strip()
+        phone_raw = phone_override if phone_override else customer.phone
+        phone_str = str(phone_raw).strip()
         customer_phone = phone_str if phone_str.startswith("56") else "56" + phone_str
 
         payload = {
@@ -350,7 +375,7 @@ class WhatsappClass:
             "to": f"{customer_phone}",
             "type": "template",
             "template": {
-                "name": whatsapp_template.title,
+                "name": template_name,
                 "language": {"code": "es"},
                 "components": [
                     {
@@ -388,7 +413,10 @@ class WhatsappClass:
             },
         }
 
-        print(f"[v2] WhatsApp Klap url_data={url_data}", flush=True)
+        print(
+            f"[v2] WhatsApp template={template_name} url_data={url_data} payment_link={payment_link}",
+            flush=True,
+        )
         print(payload, flush=True)
 
         try:
@@ -401,9 +429,11 @@ class WhatsappClass:
                 "response": response_data,
                 "whatsapp_accepted": "accepted" if response.status_code == 200 else "rejected",
                 "klap": {
-                    "order_id": klap_result.get("order_id"),
+                    "order_id": order_id,
                     "redirect_url": redirect_url,
+                    "payment_link": payment_link,
                     "url_data": url_data,
+                    "template": template_name,
                 },
             }
         except Exception as exc:
@@ -679,6 +709,30 @@ class WhatsappClass:
     
     def resend(self, dte_id, phone):
         dte_data = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+        if not dte_data:
+            return {"status": "error", "message": "DTE no encontrado"}
+
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        issued_dte_info_url = (
+            "https://libredte.cl/api/dte/dte_emitidos/info/"
+            + str(dte_data.dte_type_id)
+            + "/"
+            + str(dte_data.folio)
+            + "/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+        )
+        issued_dte_info_response = requests.get(
+            issued_dte_info_url,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+            timeout=45,
+        )
+        libredte_body = (issued_dte_info_response.text or "").strip()
+        if issued_dte_info_response.status_code != 200 or "No existe el documento" in libredte_body:
+            print("[resend] DTE no está en LibreDTE → send_v2_invoice (Klap)", flush=True)
+            return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
+
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
@@ -686,21 +740,21 @@ class WhatsappClass:
         image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
 
         token = os.getenv("LIBREDTE_TOKEN")
-        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-        issued_dte_info_url = "https://libredte.cl/api/dte/dte_emitidos/info/"+ str(dte_data.dte_type_id) +"/"+ str(dte_data.folio) +"/76063822?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
-
-        headers = {
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json"
-                }
-
-        issued_dte_info_response = requests.get(issued_dte_info_url, headers=headers, timeout=45)
 
         print(issued_dte_info_response.text)
-        issued_date_for_payment_link = _libredte_issue_date_from_emitido_info(issued_dte_info_response, getattr(dte_data, "added_date", None))
+        issued_date_for_payment_link = _libredte_issue_date_from_emitido_info(
+            issued_dte_info_response, getattr(dte_data, "added_date", None)
+        )
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + issued_date_for_payment_link + '/' + str(dte_data.total)
+        url_data = (
+            str(dte_data.dte_type_id)
+            + "/"
+            + str(dte_data.folio)
+            + "/76063822/"
+            + issued_date_for_payment_link
+            + "/"
+            + str(dte_data.total)
+        )
     
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
