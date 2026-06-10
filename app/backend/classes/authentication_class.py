@@ -2,7 +2,6 @@
 from app.backend.db.models import UserModel, EmployeeModel
 from fastapi import HTTPException
 from app.backend.auth.auth_user import pwd_context
-from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.user_class import UserClass
 from datetime import datetime, timedelta
 from typing import Union
@@ -11,6 +10,7 @@ from jose import jwt
 import requests
 import json
 import bcrypt
+
 
 class AuthenticationClass:
     def __init__(self, db):
@@ -152,52 +152,4 @@ class AuthenticationClass:
         hashed_string = bcrypt.hashpw(encoded_string, salt)
 
         return hashed_string
-
-    def create_simplefactura_token(self):
-        url = "https://api.simplefactura.cl/token"
-
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        payload = {
-            "email": "jesuscova@jisparking.com",
-            "password": "Jgames88!"
-        }
-
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-
-        if response.status_code == 200:
-            data = response.json()
-            access_token = data.get("accessToken")
-            SettingClass(self.db).update_token(access_token)
-            return access_token
-        else:
-            # No exponer detalles del error por seguridad
-            return None
-            
-    def check_simplefactura_token(self):
-        setting_data = SettingClass(self.db).get()
-        token = setting_data["setting_data"]["simplefactura_token"]
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {token}'
-        }
-
-        url = "https://api.simplefactura.cl/token/expire"
-
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 401:
-            return 0
-
-        if response.status_code == 429:
-            return 2
-
-        try:
-            return response.json()
-        except requests.exceptions.JSONDecodeError:
-            # No exponer detalles de la respuesta por seguridad
-            return 3
 

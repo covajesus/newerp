@@ -8,6 +8,33 @@ import pandas
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from sqlalchemy import or_
+
+
+def dte_rut_sql_or(rut_column, rut_value):
+    """Variantes de RUT en dtes.rut (27141399-8, 271413998, etc.) para buscar borradores."""
+    if rut_value is None:
+        return rut_column.is_(None)
+    raw = str(rut_value).strip()
+    if not raw:
+        return rut_column == ""
+    variants = {raw, raw.upper().replace(".", "").replace(" ", "")}
+    s = raw.upper().replace(".", "").replace(" ", "")
+    if "-" in s:
+        left, right = s.split("-", 1)
+        body = "".join(c for c in left if c.isdigit())
+        dv = right.strip().upper()[:1] if right else ""
+        if body and dv:
+            variants.add(f"{body}-{dv}")
+            variants.add(f"{body}{dv}")
+    digits = "".join(c for c in s if c.isdigit())
+    if len(digits) >= 7:
+        variants.add(digits)
+    clean = [v for v in variants if v is not None and str(v).strip()]
+    if len(clean) == 1:
+        return rut_column == clean[0]
+    return or_(*[rut_column == v for v in clean])
+
 
 class HelperClass:
 

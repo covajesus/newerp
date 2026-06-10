@@ -35,6 +35,33 @@ folios = APIRouter(
     tags=["Folios"]
 )
 
+@folios.get("/reserve/{document_type_id}")
+def reserve_folio_by_document_type(
+    document_type_id: int,
+    branch_office_id: int,
+    dte_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Reserva folio de la pool central (branch_office_id=0, used_id=0).
+    document_type_id en URL: 33 factura, 39 boleta, 61 nota de crédito.
+    Query: branch_office_id (requerido), dte_id (opcional).
+    """
+    data = FolioClass(db).reserve_next_by_document_type(
+        document_type_id,
+        branch_office_id=branch_office_id,
+        dte_id=dte_id,
+    )
+    return {"message": data}
+
+
+@folios.get("/release/{folio_row_id}")
+def release_folio_pool(folio_row_id: int, db: Session = Depends(get_db)):
+    """Libera folio reservado (used_id=0) si la emisión no se completó."""
+    data = FolioClass(db).release_folio_pool(folio_row_id)
+    return {"message": data}
+
+
 @folios.post("/")
 def get_all_folios(folio: FolioList, db: Session = Depends(get_db)):
 

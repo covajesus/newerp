@@ -1,6 +1,7 @@
 from app.backend.db.models import FolioModel, CashierModel, FolioReportModel, FolioQuantityPerCashierModel
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.alert_class import AlertClass
+from sqlalchemy import text
 import json
 import requests
 import pytz
@@ -344,3 +345,151 @@ class FolioClass:
                         print(i)
                 else:
                     return "No hay folios disponibles en el CAF"
+
+    ALLOWED_DOCUMENT_TYPE_IDS = (33, 39, 61)
+
+    def reserve_next_by_document_type(
+        self, document_type_id: int, branch_office_id: int, dte_id=None
+    ):
+        """
+        Reserva folio libre de la pool central (branch_office_id=0, used_id=0).
+        document_type_id: 33 factura, 39 boleta, 61 nota de crédito.
+        Asigna branch_office_id de la sucursal y used_id=1.
+        """
+        doc_type = int(document_type_id)
+        if doc_type not in self.ALLOWED_DOCUMENT_TYPE_IDS:
+            return {
+                "status": "error",
+                "message": "document_type_id debe ser 33 (factura), 39 (boleta) o 61 (nota de crédito)",
+            }
+
+        try:
+            branch_id = int(branch_office_id)
+        except (TypeError, ValueError):
+            return {"status": "error", "message": "branch_office_id es requerido"}
+        if branch_id <= 0:
+            return {"status": "error", "message": "branch_office_id inválido"}
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dte_id_value = 0
+        if dte_id not in (None, "", 0, "0"):
+            try:
+                dte_id_value = int(dte_id)
+            except (TypeError, ValueError):
+                dte_id_value = 0
+
+        try:
+            row = (
+                self.db.execute(
+                    text(
+                        """
+                        SELECT id, folio
+                        FROM folios
+                        WHERE document_type_id = :document_type_id
+                          AND used_id = 0
+                          AND branch_office_id = 0
+                          AND (dte_id IS NULL OR dte_id = 0)
+                        ORDER BY folio ASC
+                        LIMIT 1
+                        FOR UPDATE
+                        """
+                    ),
+                    {"document_type_id": doc_type},
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return {
+                    "status": "error",
+                    "message": (
+                        f"No hay folios disponibles para document_type_id {doc_type} "
+                        "(pool central branch_office_id=0)"
+                    ),
+                }
+
+            folio_id = int(row["id"])
+            folio_number = int(row["folio"])
+            updated = self.db.execute(
+                text(
+                    """
+                    UPDATE folios
+                    SET branch_office_id = :branch_office_id,
+                        used_id = 1,
+                        dte_id = :dte_id,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                      AND used_id = 0
+                      AND branch_office_id = 0
+                    """
+                ),
+                {
+                    "id": folio_id,
+                    "branch_office_id": branch_id,
+                    "dte_id": dte_id_value,
+                    "updated_date": now,
+                },
+            )
+            if not updated.rowcount:
+                self.db.rollback()
+                return {
+                    "status": "error",
+                    "message": "El folio fue tomado por otra petición, intente de nuevo",
+                }
+
+            self.db.commit()
+            return {
+                "status": "success",
+                "id": folio_id,
+                "folio": folio_number,
+                "dte_id": dte_id_value,
+                "branch_office_id": branch_id,
+                "document_type_id": doc_type,
+            }
+        except Exception as exc:
+            self.db.rollback()
+            return {"status": "error", "message": str(exc)}
+
+    def bind_folio_to_dte(self, folio_row_id: int, dte_id: int):
+        """Vincula fila en folios al dte emitido."""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            self.db.execute(
+                text(
+                    """
+                    UPDATE folios
+                    SET dte_id = :dte_id,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                    """
+                ),
+                {"id": int(folio_row_id), "dte_id": int(dte_id), "updated_date": now},
+            )
+            self.db.commit()
+            return {"status": "success"}
+        except Exception as exc:
+            self.db.rollback()
+            return {"status": "error", "message": str(exc)}
+
+    def release_folio_pool(self, folio_row_id: int):
+        """Libera folio si la emisión falló: branch_office_id→0, used_id→0, dte_id→0."""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            self.db.execute(
+                text(
+                    """
+                    UPDATE folios
+                    SET branch_office_id = 0,
+                        used_id = 0,
+                        dte_id = 0,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                    """
+                ),
+                {"id": int(folio_row_id), "updated_date": now},
+            )
+            self.db.commit()
+            return {"status": "success", "message": "Folio liberado"}
+        except Exception as exc:
+            self.db.rollback()
+            return {"status": "error", "message": str(exc)}

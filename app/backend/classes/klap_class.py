@@ -107,6 +107,16 @@ class KlapClass:
         if webhooks:
             body["webhooks"] = webhooks
 
+        customs = list(body.get("customs") or [])
+        customs_keys = {str(c.get("key")) for c in customs if isinstance(c, dict)}
+        for method in body.get("methods") or []:
+            exp_key = f"{method}_expiration_minutes"
+            if exp_key not in customs_keys:
+                customs.append({"key": exp_key, "value": "-1"})
+                customs_keys.add(exp_key)
+        if customs:
+            body["customs"] = customs
+
         return body
 
     def create_order(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -116,6 +126,84 @@ class KlapClass:
             "/payment-gateway/v1/orders",
             json_body=self._with_defaults(payload),
         )
+
+    def _create_order_safe(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Crea orden Klap sin lanzar HTTPException (uso interno WhatsApp v2)."""
+        if not self.api_key:
+            return {"status": "error", "message": "KLAP_API_KEY no configurada en el servidor."}
+        try:
+            body = self.create_order(payload)
+        except HTTPException as exc:
+            return {"status": "error", "message": str(exc.detail)}
+        except Exception as exc:
+            return {"status": "error", "message": str(exc)}
+
+        redirect_url = body.get("redirect_url")
+        if not redirect_url:
+            return {
+                "status": "error",
+                "message": "Klap no devolvió redirect_url",
+                "response": body,
+            }
+        return {
+            "status": "success",
+            "redirect_url": redirect_url,
+            "order_id": body.get("order_id"),
+            "response": body,
+        }
+
+    def create_subscriber_dte_order(self, dte, customer) -> dict[str, Any]:
+        """
+        Orden de pago Klap para boleta/factura abonados v2.
+        Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
+        """
+        dte_type_id = int(getattr(dte, "dte_type_id", 39) or 39)
+        folio = int(getattr(dte, "folio", 0) or 0)
+        dte_id = getattr(dte, "id", None)
+        label = "Boleta" if dte_type_id == 39 else "Factura"
+        total = int(getattr(dte, "total", 0) or 0)
+        if total <= 0:
+            return {"status": "error", "message": "Total del DTE inválido para orden Klap"}
+
+        reference_id = f"intrajis-dte-{dte_id}-{folio}"[:100]
+        methods_raw = os.getenv("KLAP_PAYMENT_METHODS", "tarjetas")
+        methods = [m.strip() for m in methods_raw.split(",") if m.strip()]
+
+        user: dict[str, str] = {}
+        email = getattr(customer, "email", None)
+        if email and str(email).strip():
+            user["email"] = str(email).strip()
+        rut = getattr(customer, "rut", None)
+        if rut and str(rut).strip():
+            user["rut"] = str(rut).strip()
+        phone = getattr(customer, "phone", None)
+        if phone and str(phone).strip():
+            user["phone"] = str(phone).strip().lstrip("+")
+        customer_name = getattr(customer, "customer", None)
+        if customer_name and str(customer_name).strip():
+            parts = str(customer_name).strip().split(None, 1)
+            user["first_name"] = parts[0]
+            user["last_name"] = parts[1] if len(parts) > 1 else "Cliente"
+        else:
+            user["first_name"] = "Cliente"
+            user["last_name"] = "Jisparking"
+
+        payload: dict[str, Any] = {
+            "reference_id": reference_id,
+            "description": f"{label} folio {folio}",
+            "methods": methods or ["tarjetas"],
+            "amount": {"currency": "CLP", "total": total},
+            "items": [
+                {
+                    "name": f"{label} folio {folio}",
+                    "code": str(folio),
+                    "price": total,
+                    "quantity": 1,
+                }
+            ],
+            "user": user,
+        }
+        return self._create_order_safe(payload)
 
     def get_order(self, order_id: str) -> dict[str, Any]:
         """GET /payment-gateway/v1/orders/{order_id}"""

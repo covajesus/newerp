@@ -4,7 +4,7 @@ from datetime import datetime
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
-from app.backend.classes.authentication_class import AuthenticationClass
+from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.helper_class import HelperClass
 import requests
 import json
@@ -455,10 +455,10 @@ class HonoraryClass:
         amount = round(int(amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
 
         # Verificar y renovar token si es necesario
-        check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
+        check_token_status = CustomerTicketClass(self.db).check_simplefactura_token()
         if check_token_status == 0:
             print('El token de Simple Factura está vencido, renovando...')
-            AuthenticationClass(self.db).create_simplefactura_token()
+            CustomerTicketClass(self.db).create_simplefactura_token()
         
         # Obtener token actualizado
         updated_settings = SettingClass(self.db).get()

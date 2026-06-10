@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.backend.db.models import DteModel, DteReferenceModel, CustomerDteItemModel, CustomerModel, BranchOfficeModel, UserModel, ExpenseTypeModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.helper_class import HelperClass, dte_rut_sql_or
 from app.backend.classes.file_class import FileClass
 import requests
 from datetime import datetime
@@ -14,35 +14,7 @@ import base64
 from sqlalchemy import or_
 from fastapi import HTTPException
 from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
-from app.backend.classes.customer_ticket_class import (
-    DTE_VERSION_V2,
-    _v2_emit_invoice,
-    _v2_simple_factura_branch_name,
-)
-
-
-def _dte_rut_sql_or_bill(rut_column, rut_value):
-    if rut_value is None:
-        return rut_column.is_(None)
-    raw = str(rut_value).strip()
-    if not raw:
-        return rut_column == ""
-    variants = {raw, raw.upper().replace(".", "").replace(" ", "")}
-    s = raw.upper().replace(".", "").replace(" ", "")
-    if "-" in s:
-        left, right = s.split("-", 1)
-        body = "".join(c for c in left if c.isdigit())
-        dv = right.strip().upper()[:1] if right else ""
-        if body and dv:
-            variants.add(f"{body}-{dv}")
-            variants.add(f"{body}{dv}")
-    digits = "".join(c for c in s if c.isdigit())
-    if len(digits) >= 7:
-        variants.add(digits)
-    clean = [v for v in variants if v is not None and str(v).strip()]
-    if len(clean) == 1:
-        return rut_column == clean[0]
-    return or_(*[rut_column == v for v in clean])
+from app.backend.classes.customer_ticket_class import CustomerTicketClass, DTE_VERSION_V2, ticket_v2_issuer, v2_dte_api_date
 
 
 def _bill_total_from_form(form_data):
@@ -458,7 +430,7 @@ class CustomerBillClass:
         """
         period_str = datetime.now().strftime("%Y-%m")
         expected_total = _bill_total_from_form(form_data)
-        rut_clause = _dte_rut_sql_or_bill(DteModel.rut, form_data.rut)
+        rut_clause = dte_rut_sql_or(DteModel.rut, form_data.rut)
 
         def _q(require_total: bool):
             q = (
@@ -2030,7 +2002,7 @@ class CustomerBillClass:
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
 
-    # --- SimpleFactura v2 (dte_version_id = 3) ---
+    # --- Emisión v2 (SimpleFactura invoiceV2, dte_version_id = 1) ---
 
     def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10):
         return self.get_all(rol_id, rut, group, page, items_per_page, dte_version_id=DTE_VERSION_V2)
@@ -2063,24 +2035,15 @@ class CustomerBillClass:
         )
 
     def store_v2(self, form_data, rol_id):
-        result = self.store(form_data, rol_id)
-        if isinstance(result, dict) and result.get("status") == "success":
-            dte = self._find_open_bill_draft(form_data, dte_version_id=1)
-            if dte:
-                dte.dte_version_id = DTE_VERSION_V2
-                try:
-                    self.db.commit()
-                except Exception as e:
-                    self.db.rollback()
-                    return {"status": "error", "message": f"Error: {str(e)}"}
-        return result
+        return self.store(form_data, rol_id)
 
-    def _v2_format_bill_detail_lines(self, raw_lines):
-        formatted_lines = []
-        for index, line in enumerate(raw_lines, start=1):
+    def _build_bill_document_v2(self, customer, detail_lines, branch):
+        issue_date = v2_dte_api_date()
+        v2_detail_lines = []
+        for index, line in enumerate(detail_lines, start=1):
             qty = int(line.get("QtyItem", 1) or 1)
             unit_price = int(line.get("PrcItem", 0) or 0)
-            formatted_lines.append(
+            v2_detail_lines.append(
                 {
                     "NroLinDet": str(index),
                     "NmbItem": line.get("NmbItem", "Item"),
@@ -2090,24 +2053,11 @@ class CustomerBillClass:
                     "MontoItem": str(qty * unit_price),
                 }
             )
-        return formatted_lines
-
-    def _build_bill_document_v2(self, customer, detail_lines, branch):
-        issue_date = datetime.now().strftime("%Y-%m-%d")
-        sf_detail_lines = self._v2_format_bill_detail_lines(detail_lines)
-        total_amount = sum(int(line["MontoItem"]) for line in sf_detail_lines)
+        total_amount = sum(int(line["MontoItem"]) for line in v2_detail_lines)
         net_amount = round(total_amount / 1.19)
         tax_amount = total_amount - net_amount
 
-        issuer = {
-            "RUTEmisor": "76063822-6",
-            "RznSocEmisor": "Jisparking SpA",
-            "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
-            "DirOrigen": "Matucana 40",
-            "CmnaOrigen": "Santiago",
-        }
-        if branch.dte_code is not None:
-            issuer["CdgSIISucur"] = branch.dte_code
+        issuer = ticket_v2_issuer(branch)
 
         receiver = {
             "RUTRecep": customer["rut"],
@@ -2134,7 +2084,7 @@ class CustomerBillClass:
                     "MntTotal": str(total_amount),
                 },
             },
-            "Detalle": sf_detail_lines,
+            "Detalle": v2_detail_lines,
         }
 
     def test_emit_bill_v2(self, form_data):
@@ -2156,15 +2106,7 @@ class CustomerBillClass:
         qty = int(qty) if qty not in (None, "", 0) else None
         detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, [], qty)
         document = self._build_bill_document_v2(customer_record, detail_lines, branch)
-        try:
-            return _v2_emit_invoice(
-                self.db,
-                document,
-                _v2_simple_factura_branch_name(branch),
-                "Factura",
-            )
-        except ValueError as exc:
-            return {"status": "error", "message": str(exc)}
+        return CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
 
     def generate_v2(self, form_data):
         expected_total_doc = _bill_total_from_form(form_data)
@@ -2207,21 +2149,13 @@ class CustomerBillClass:
         qty = int(qty) if qty not in (None, "", 0) else None
         detail_lines = self._bill_pre_detalle_lines_parking_o_items(form_data, bill_items, qty)
 
-        try:
-            document = self._build_bill_document_v2(customer_record, detail_lines, branch)
-            emit_result = _v2_emit_invoice(
-                self.db,
-                document,
-                _v2_simple_factura_branch_name(branch),
-                "Factura",
-            )
-        except ValueError as exc:
-            return {"status": "error", "message": str(exc)}
+        document = self._build_bill_document_v2(customer_record, detail_lines, branch)
+        emit_result = CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
 
         if emit_result.get("status") != "success":
             return {
                 "status": "error",
-                "message": emit_result.get("message") or "SimpleFactura no emitió la factura",
+                "message": emit_result.get("message") or "Emisión v2 no emitió la factura",
                 "errors": emit_result.get("errors"),
                 "response": emit_result.get("response"),
             }
@@ -2230,7 +2164,7 @@ class CustomerBillClass:
         if folio is None:
             return {
                 "status": "error",
-                "message": "SimpleFactura no devolvió folio",
+                "message": "Emisión v2 no devolvió folio",
                 "response": emit_result.get("response"),
             }
 
@@ -2239,7 +2173,7 @@ class CustomerBillClass:
             return {
                 "status": "error",
                 "message": (
-                    f"Factura emitida en SimpleFactura (folio {folio}) "
+                    f"Factura emitida en v2 (folio {folio}) "
                     "pero no hay borrador v2 en base de datos."
                 ),
                 "folio": folio,
@@ -2257,11 +2191,25 @@ class CustomerBillClass:
         try:
             self.db.commit()
             self.db.refresh(dte)
+            recipient_email = (customer_record.get("email") or "").strip()
+            email_result = CustomerTicketClass(self.db).send_invoice_v2_email(
+                folio,
+                dte_type_id=33,
+                to_emails=recipient_email,
+                pdf=True,
+                xml=False,
+            )
+
+            print("Empieza envio de whatsapp v2 (Klap)", flush=True)
+            whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte, form_data.rut)
+
             return {
                 "status": "success",
                 "message": "Dte saved successfully",
                 "folio": folio,
                 "response": emit_result.get("response"),
+                "email": email_result,
+                "whatsapp": whatsapp_result,
             }
         except Exception as e:
             self.db.rollback()

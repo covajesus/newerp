@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, ExpenseTypeModel, CustomerDteItemModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.helper_class import HelperClass, dte_rut_sql_or
 from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
@@ -14,124 +14,60 @@ import json
 import base64
 import uuid
 import os
-from urllib.parse import quote
+import time
 from sqlalchemy.sql import func
 from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
-from app.backend.classes.authentication_class import AuthenticationClass
+from app.backend.classes.folio_class import FolioClass
 from app.backend.classes.setting_class import SettingClass
 
-DTE_VERSION_V2 = 3
+JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
+    "JISBACKEND_SETTINGS_TOKEN_URL",
+    "https://jisbackend.com/api/settings/get_token",
+)
+
+DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor SimpleFactura invoiceV2
+DTE_VERSION_V2_LEGACY = 3  # Borradores v2 creados antes de alinear a dte_version_id=1
+DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
+DTE_V2_HTTP_TIMEOUT = 30
 
 
-def _dte_rut_sql_or(rut_column, rut_value):
-    """
-    El RUT en `dtes.rut` (string) puede guardarse como 27141399-8, 271413998, etc.
-    Evita que generate() no encuentre el borrador por formato distinto al del formulario.
-    """
-    if rut_value is None:
-        return rut_column.is_(None)
-    raw = str(rut_value).strip()
-    if not raw:
-        return rut_column == ""
-    variants = {raw, raw.upper().replace(".", "").replace(" ", "")}
-    s = raw.upper().replace(".", "").replace(" ", "")
-    if "-" in s:
-        left, right = s.split("-", 1)
-        body = "".join(c for c in left if c.isdigit())
-        dv = right.strip().upper()[:1] if right else ""
-        if body and dv:
-            variants.add(f"{body}-{dv}")
-            variants.add(f"{body}{dv}")
-    digits = "".join(c for c in s if c.isdigit())
-    if len(digits) >= 7:
-        variants.add(digits)
-    clean = [v for v in variants if v is not None and str(v).strip()]
-    if len(clean) == 1:
-        return rut_column == clean[0]
-    return or_(*[rut_column == v for v in clean])
-
-
-def _v2_get_simple_factura_token(db):
-    auth = AuthenticationClass(db)
-    if auth.check_simplefactura_token() == 0:
-        token = auth.create_simplefactura_token()
-        if not token:
-            raise ValueError("No se pudo obtener token SimpleFactura")
-        return token
-    setting_data = SettingClass(db).get()
-    token = setting_data["setting_data"]["simplefactura_token"]
-    if not token:
-        raise ValueError("Token SimpleFactura no configurado en settings")
-    return token
-
-
-SIMPLE_FACTURA_BRANCH_SUFFIX = " - JIS PARKING SPA"
-# Testing: force invoiceV2 URL branch. Set to None to use real branch name again.
-SIMPLE_FACTURA_FORCE_URL_BRANCH = "Casa_Matriz"
-
-
-def _v2_simple_factura_branch_name(branch):
-    """SimpleFactura invoiceV2 path branch name, e.g. 'ALVI MAIPU - JIS PARKING SPA'."""
+def v2_invoice_branch_display(branch) -> str:
     if branch is None:
-        fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
-        return fallback or "Casa_Matriz"
+        return ""
     base_name = (getattr(branch, "branch_office", None) or "").strip()
     if not base_name:
-        fallback = os.getenv("SIMPLEFACTURA_SUCURSAL", "Casa_Matriz").strip()
-        return fallback or "Casa_Matriz"
-    if SIMPLE_FACTURA_BRANCH_SUFFIX.upper() in base_name.upper():
+        return ""
+    if DTE_V2_BRANCH_SUFFIX.upper() in base_name.upper():
         return base_name
-    return f"{base_name}{SIMPLE_FACTURA_BRANCH_SUFFIX}"
+    return f"{base_name}{DTE_V2_BRANCH_SUFFIX}"
 
 
-def _v2_emit_invoice(db, document, branch_name, dte_label="DTE"):
-    url_branch = SIMPLE_FACTURA_FORCE_URL_BRANCH or branch_name or "Casa_Matriz"
-    branch_slug = quote(url_branch.strip(), safe="")
-    url = f"https://api.simplefactura.cl/invoiceV2/{branch_slug}"
-    response = requests.post(
-        url,
-        json={"Documento": document},
-        headers={
-            "Authorization": f"Bearer {_v2_get_simple_factura_token(db)}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        timeout=120,
-    )
-    try:
-        body = response.json()
-    except ValueError:
-        body = {"raw": response.text}
+def v2_dte_api_date(dt=None) -> str:
+    """FchEmis/FchVenc en invoiceV2 (yyyy-mm-dd; System.DateTime de SimpleFactura)."""
+    if dt is None:
+        return datetime.now().strftime("%Y-%m-%d")
+    if isinstance(dt, str):
+        raw = dt.strip()[:10]
+        if len(raw) == 10 and raw[2] == "-":
+            d, m, y = raw.split("-")
+            return f"{y}-{m}-{d}"
+        if len(raw) == 10 and raw[4] == "-":
+            return raw
+        return datetime.now().strftime("%Y-%m-%d")
+    return dt.strftime("%Y-%m-%d")
 
-    if response.status_code >= 400:
-        return {
-            "status": "error",
-            "http_status": response.status_code,
-            "message": (body.get("message") if isinstance(body, dict) else body)
-            or f"Error al emitir {dte_label} en SimpleFactura",
-            "errors": body.get("errors") if isinstance(body, dict) else None,
-            "response": body,
-        }
 
-    if isinstance(body, dict) and body.get("status") not in (None, 200):
-        return {
-            "status": "error",
-            "http_status": response.status_code,
-            "message": body.get("message") or "SimpleFactura rechazó la emisión",
-            "errors": body.get("errors"),
-            "response": body,
-        }
-
-    data = body.get("data") if isinstance(body, dict) else None
-    folio = data.get("folio") if isinstance(data, dict) else None
-    return {
-        "status": "success",
-        "http_status": response.status_code,
-        "message": body.get("message") if isinstance(body, dict) else f"{dte_label} emitido",
-        "folio": folio,
-        "data": data,
-        "response": body,
+def ticket_v2_issuer(branch):
+    issuer = {
+        "RUTEmisor": "76063822-6",
+        "RznSocEmisor": "Jisparking SpA",
+        "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+        "DirOrigen": "Matucana 40",
+        "CmnaOrigen": "Santiago",
     }
+    if branch is not None and getattr(branch, "dte_code", None) is not None:
+        issuer["CdgSIISucur"] = branch.dte_code
+    return issuer
 
 
 def _ticket_total_from_form(form_data):
@@ -326,7 +262,7 @@ class CustomerTicketClass:
 
         return []
 
-    def get_all(self, rol_id = None, rut = None, group=1, page=0, items_per_page=10, period=None, dte_version_id=1):
+    def get_all(self, rol_id = None, rut = None, group=1, page=0, items_per_page=10, period=None, dte_version_id=1, include_emitted=False):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Inicialización de filtros dinámicos
@@ -337,7 +273,17 @@ class CustomerTicketClass:
                 filters.append(DteModel.rut != None)
 
                 if group == 1:
-                    filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
+                    if include_emitted:
+                        filters.append(
+                            or_(
+                                DteModel.status_id == 1,
+                                DteModel.status_id == 2,
+                                DteModel.status_id == 3,
+                                DteModel.status_id == 4,
+                            )
+                        )
+                    else:
+                        filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
 
                     current_period = datetime.now().strftime('%Y-%m')
                     filters.append(DteModel.period == current_period)
@@ -398,7 +344,17 @@ class CustomerTicketClass:
                 filters.append(DteModel.rut != None)
 
                 if group == 1:
-                    filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
+                    if include_emitted:
+                        filters.append(
+                            or_(
+                                DteModel.status_id == 1,
+                                DteModel.status_id == 2,
+                                DteModel.status_id == 3,
+                                DteModel.status_id == 4,
+                            )
+                        )
+                    else:
+                        filters.append(or_(DteModel.status_id == 1, DteModel.status_id == 2, DteModel.status_id == 3))
 
                     current_period = datetime.now().strftime('%Y-%m')
                     filters.append(DteModel.period == current_period)
@@ -483,7 +439,7 @@ class CustomerTicketClass:
                     "folio": dte.folio,
                     "total": dte.total,
                     "status_id": dte.status_id,
-                    "added_date": dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office
                 } for dte in data]
 
@@ -509,7 +465,7 @@ class CustomerTicketClass:
                     "category_id": dte.category_id if dte.category_id is not None else 1,
                     "folio": dte.folio,
                     "total": dte.total,
-                    "added_date": dte.added_date.strftime('%Y-%m-%d') if dte.added_date else None,
+                    "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
                     "status_id": dte.status_id
                 } for dte in data]
@@ -520,7 +476,7 @@ class CustomerTicketClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
 
-    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10, category_id=None, dte_version_id=1):
+    def search(self, rol_id = None, supervisor_rut = None, branch_office_id=None, rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10, category_id=None, dte_version_id=1, include_emitted=False):
         try:
             if rol_id == 1 or rol_id == 2:
                 # Filtros: borradores boleta (39), período mes actual. 0 en sucursal = todas.
@@ -529,12 +485,14 @@ class CustomerTicketClass:
                 if branch_office_id is not None and branch_office_id != "" and branch_office_id != 0:
                     filters.append(DteModel.branch_office_id == branch_office_id)
                 if rut is not None and str(rut).strip() != "":
-                    filters.append(_dte_rut_sql_or(DteModel.rut, rut))
+                    filters.append(dte_rut_sql_or(DteModel.rut, rut))
                 if customer is not None and customer != "":
                     filters.append(CustomerModel.customer.like(f"%{customer}%"))
                 # Evitar mezclar status_id explícito con status_id < 4 a la vez (contradicciones).
                 if status_id is not None and status_id != "":
                     filters.append(DteModel.status_id == status_id)
+                elif include_emitted:
+                    filters.append(DteModel.status_id.in_((1, 2, 3, 4)))
                 else:
                     filters.append(DteModel.status_id < 4)
 
@@ -638,11 +596,13 @@ class CustomerTicketClass:
                 if branch_office_id is not None and branch_office_id != "" and branch_office_id != 0:
                     filters.append(DteModel.branch_office_id == branch_office_id)
                 if rut is not None and str(rut).strip() != "":
-                    filters.append(_dte_rut_sql_or(DteModel.rut, rut))
+                    filters.append(dte_rut_sql_or(DteModel.rut, rut))
                 if customer is not None and customer != "":
                     filters.append(CustomerModel.customer.like(f"%{customer}%"))
                 if status_id is not None and status_id != "":
                     filters.append(DteModel.status_id == status_id)
+                elif include_emitted:
+                    filters.append(DteModel.status_id.in_((1, 2, 3, 4)))
                 else:
                     filters.append(DteModel.status_id < 4)
                 if category_id is not None and category_id != "" and category_id != 0:
@@ -1022,7 +982,7 @@ class CustomerTicketClass:
             }
         ]
 
-    def _ticket_receptor_from_customer(self, customer_data: dict) -> dict:
+    def _ticket_receiver_from_customer(self, customer_data: dict) -> dict:
         cd = customer_data["customer_data"]
         return {
             "RUTRecep": cd["rut"],
@@ -1084,7 +1044,7 @@ class CustomerTicketClass:
             if folio is not None:
                 period_str = datetime.now().strftime("%Y-%m")
                 expected_total = expected_total_doc
-                rut_clause = _dte_rut_sql_or(DteModel.rut, form_data.rut)
+                rut_clause = dte_rut_sql_or(DteModel.rut, form_data.rut)
 
                 def _find_draft(require_total: bool):
                     q = (
@@ -1400,7 +1360,7 @@ class CustomerTicketClass:
                 "RUTEmisor": "76063822-6",
                 "CdgSIISucur": branch_office_data.dte_code,
             },
-            "Receptor": self._ticket_receptor_from_customer(customer_data),
+            "Receptor": self._ticket_receiver_from_customer(customer_data),
         }
 
         data = {
@@ -1792,10 +1752,401 @@ class CustomerTicketClass:
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
 
-    # --- SimpleFactura v2 (dte_version_id = 3) ---
+    # --- Emisión v2 (SimpleFactura invoiceV2, dte_version_id = 1) ---
+
+    def create_simplefactura_token(self):
+        url = "https://api.simplefactura.cl/token"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "email": "jesuscova@jisparking.com",
+            "password": "Jgames88!",
+        }
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            access_token = data.get("accessToken")
+            SettingClass(self.db).update_token(access_token)
+            return access_token
+        return None
+
+    def check_simplefactura_token(self):
+        setting_data = SettingClass(self.db).get()
+        token = setting_data["setting_data"]["simplefactura_token"]
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+        url = "https://api.simplefactura.cl/token/expire"
+        response = requests.get(url, headers=headers, timeout=30)
+        if response.status_code == 401:
+            return 0
+        if response.status_code == 429:
+            return 2
+        try:
+            return response.json()
+        except requests.exceptions.JSONDecodeError:
+            return 3
+
+    def fetch_simplefactura_token_from_jisbackend(self):
+        """Token v2 desde jisbackend.com/api/settings/get_token."""
+        response = requests.get(JISBACKEND_SETTINGS_TOKEN_URL, timeout=15)
+        if response.status_code != 200:
+            raise ValueError(
+                f"jisbackend get_token HTTP {response.status_code}: {(response.text or '')[:200]}"
+            )
+        body = response.json()
+        message = body.get("message")
+        if not isinstance(message, dict):
+            raise ValueError("jisbackend get_token: respuesta sin message")
+        token = message.get("simplefactura_token")
+        if not token:
+            raise ValueError("jisbackend get_token: simplefactura_token vacío")
+        SettingClass(self.db).update_token(token)
+        return token
+
+    def get_token(self):
+        """Token para emisión v2 (invoiceV2)."""
+        try:
+            token = self.fetch_simplefactura_token_from_jisbackend()
+            return {
+                "status": "success",
+                "accessToken": token,
+                "source": "jisbackend.com",
+                "renewed": False,
+            }
+        except (ValueError, requests.RequestException) as exc:
+            return {"status": "error", "message": str(exc)}
+
+    def check_token(self):
+        check = self.check_simplefactura_token()
+        if check == 0:
+            return {"status": "expired", "message": "Token v2 vencido"}
+        if check == 2:
+            return {"status": "rate_limited", "message": "Rate limit al verificar token v2"}
+        if check == 3:
+            return {"status": "unknown", "message": "No se pudo verificar token v2"}
+        return {"status": "valid", "expire_info": check}
+
+    def emit_invoice_v2(self, document, branch, dte_label="DTE"):
+        """POST invoiceV2 (misma capa que pre_generate_ticket / generate_ticket en LibreDTE)."""
+        forced = (os.getenv("DTE_V2_FORCE_TOKEN") or os.getenv("SIMPLEFACTURA_FORCE_TOKEN") or "").strip()
+        if forced:
+            token = forced
+        else:
+            result = self.get_token()
+            if result.get("status") != "success":
+                return {"status": "error", "message": result.get("message") or "No se pudo obtener token v2"}
+            token = result.get("accessToken")
+            if not token:
+                return {"status": "error", "message": "Token v2 vacío"}
+
+        default_branch = (
+            os.getenv("DTE_V2_SUCURSAL") or os.getenv("SIMPLEFACTURA_SUCURSAL") or "Casa_Matriz"
+        ).strip() or "Casa_Matriz"
+
+        # SimpleFactura invoiceV2 URL uses the registered branch slug (Casa_Matriz).
+        # The parking location is sent in Emisor.CdgSIISucur via ticket_v2_issuer(branch).
+        branch_office_name = v2_invoice_branch_display(branch)
+        branch_slug = default_branch
+        url = f"https://api.simplefactura.cl/invoiceV2/{branch_slug}"
+        payload = {"Documento": document}
+        payload_json = json.dumps(payload, ensure_ascii=False, indent=2)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        print(
+            f"[v2] URL: {url} (sf_branch={branch_slug}, branch_office={branch_office_name or 'n/a'})",
+            flush=True,
+        )
+        print(f"[v2] JSON payload:\n{payload_json}", flush=True)
+
+        t0 = time.time()
+        try:
+            response = requests.post(
+                url,
+                data=json.dumps(payload, ensure_ascii=False),
+                headers=headers,
+                timeout=DTE_V2_HTTP_TIMEOUT,
+            )
+        except requests.Timeout:
+            print(f"[v2] timeout after {time.time() - t0:.2f}s", flush=True)
+            return {
+                "status": "error",
+                "message": f"Emisión v2 no respondió a tiempo ({DTE_V2_HTTP_TIMEOUT}s)",
+                "v2_url": url,
+            }
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"Error de conexión emisión v2: {exc}", "v2_url": url}
+
+        if response.status_code == 401:
+            try:
+                token = self.fetch_simplefactura_token_from_jisbackend()
+                response = requests.post(
+                    url,
+                    data=json.dumps(payload, ensure_ascii=False),
+                    headers={**headers, "Authorization": f"Bearer {token}"},
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except (ValueError, requests.RequestException) as exc:
+                return {"status": "error", "message": f"No se pudo refrescar token v2: {exc}", "v2_url": url}
+
+        text = (response.text or "").strip()
+        try:
+            body = response.json() if text else {"raw": ""}
+            if not isinstance(body, dict):
+                body = {"raw": text[:500]}
+        except ValueError:
+            body = {"raw": text[:500]}
+
+        print(f"[v2] HTTP {response.status_code} in {time.time() - t0:.2f}s", flush=True)
+
+        if response.status_code >= 400:
+            msg = body.get("message") if isinstance(body, dict) else text[:500]
+            errors = body.get("errors") if isinstance(body, dict) else None
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": f"Emisión v2 HTTP {response.status_code}: {msg or errors}",
+                "errors": errors,
+                "response": body,
+                "v2_url": url,
+            }
+
+        if isinstance(body, dict) and body.get("status") not in (None, 200):
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": body.get("message") or "Emisión v2 rechazada",
+                "errors": body.get("errors"),
+                "response": body,
+                "v2_url": url,
+            }
+
+        folio = None
+        data = body.get("data") if isinstance(body, dict) else None
+        if isinstance(data, dict):
+            for key in ("folio", "Folio", "folioDte", "FolioDTE"):
+                if data.get(key) is not None:
+                    folio = data.get(key)
+                    break
+        if folio is None and isinstance(body, dict):
+            for key in ("folio", "Folio"):
+                if body.get(key) is not None:
+                    folio = body.get(key)
+                    break
+
+        return {
+            "status": "success",
+            "http_status": response.status_code,
+            "message": body.get("message") if isinstance(body, dict) else f"{dte_label} emitido",
+            "folio": folio,
+            "data": data,
+            "response": body,
+            "v2_url": url,
+            "v2_branch": branch_slug,
+            "v2_branch_slug": branch_slug,
+            "v2_branch_office": branch_office_name or None,
+        }
+
+    def _v2_bearer_token(self):
+        forced = (os.getenv("DTE_V2_FORCE_TOKEN") or os.getenv("SIMPLEFACTURA_FORCE_TOKEN") or "").strip()
+        if forced:
+            return forced, None
+        result = self.get_token()
+        if result.get("status") != "success":
+            return None, result.get("message") or "No se pudo obtener token v2"
+        token = result.get("accessToken")
+        if not token:
+            return None, "Token v2 vacío"
+        return token, None
+
+    def send_invoice_v2_email(
+        self,
+        folio,
+        dte_type_id=39,
+        to_emails=None,
+        pdf=True,
+        xml=False,
+        comments=None,
+    ):
+        """
+        Envía boleta/factura por correo vía SimpleFactura POST /dte/enviar/mail.
+        Docs: https://documentacion.simplefactura.cl/
+        """
+        recipients = []
+        if isinstance(to_emails, str):
+            to_emails = [to_emails]
+        if to_emails:
+            recipients = [
+                str(email).strip()
+                for email in to_emails
+                if email and str(email).strip() and "@" in str(email)
+            ]
+        if not recipients:
+            return {"status": "skipped", "message": "Sin correo destinatario"}
+
+        token, token_err = self._v2_bearer_token()
+        if not token:
+            return {"status": "error", "message": token_err}
+
+        payload = {
+            "rutEmpresa": "76063822-6",
+            "dte": {
+                "folio": int(folio),
+                "tipoDTE": int(dte_type_id),
+            },
+            "mail": {
+                "to": recipients,
+                "ccos": [],
+                "ccs": [],
+            },
+            "pdf": bool(pdf),
+            "xml": bool(xml),
+        }
+        if comments:
+            payload["comments"] = comments
+
+        url = "https://api.simplefactura.cl/dte/enviar/mail"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        print(f"[v2] POST {url} folio={folio} tipo={dte_type_id} to={recipients}", flush=True)
+
+        try:
+            response = requests.post(
+                url,
+                data=json.dumps(payload, ensure_ascii=False),
+                headers=headers,
+                timeout=DTE_V2_HTTP_TIMEOUT,
+            )
+        except requests.Timeout:
+            return {"status": "error", "message": f"Envío correo v2 no respondió a tiempo ({DTE_V2_HTTP_TIMEOUT}s)"}
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"Error de conexión envío correo v2: {exc}"}
+
+        if response.status_code == 401:
+            try:
+                token = self.fetch_simplefactura_token_from_jisbackend()
+                response = requests.post(
+                    url,
+                    data=json.dumps(payload, ensure_ascii=False),
+                    headers={**headers, "Authorization": f"Bearer {token}"},
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except (ValueError, requests.RequestException) as exc:
+                return {"status": "error", "message": f"No se pudo refrescar token v2 (correo): {exc}"}
+
+        text = (response.text or "").strip()
+        try:
+            body = response.json() if text else {}
+            if not isinstance(body, dict):
+                body = {"raw": text[:500]}
+        except ValueError:
+            body = {"raw": text[:500]}
+
+        print(f"[v2] email HTTP {response.status_code}: {text[:300]}", flush=True)
+
+        if response.status_code >= 400:
+            msg = body.get("message") if isinstance(body, dict) else text[:500]
+            errors = body.get("errors") if isinstance(body, dict) else None
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": f"Envío correo v2 HTTP {response.status_code}: {msg or errors}",
+                "errors": errors,
+                "response": body,
+            }
+
+        return {
+            "status": "success",
+            "http_status": response.status_code,
+            "message": body.get("message") if isinstance(body, dict) else "Correo enviado",
+            "response": body,
+        }
+
+    def save_simplefactura_pdf_ticket(self, folio, dte_type_id=39):
+        """
+        Descarga PDF desde SimpleFactura getPdf y lo publica en /files/{folio}.pdf
+        (mismo path que usa WhatsApp send() con LibreDTE).
+        """
+        remote_path = f"{int(folio)}.pdf"
+        try:
+            self.file_class.download(remote_path)
+            return {
+                "status": "success",
+                "url": self.file_class.get(remote_path),
+                "cached": True,
+            }
+        except HTTPException:
+            pass
+
+        token, token_err = self._v2_bearer_token()
+        if not token:
+            return {"status": "error", "message": token_err or "Sin token v2 para PDF"}
+
+        payload = {
+            "credenciales": {
+                "rutEmisor": "76063822-6",
+                "nombreSucursal": "Casa Matriz",
+            },
+            "dteReferenciadoExterno": {
+                "folio": int(folio),
+                "codigoTipoDte": int(dte_type_id),
+                "ambiente": 1,
+            },
+        }
+        url = "https://api.simplefactura.cl/getPdf"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=DTE_V2_HTTP_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"Error getPdf v2: {exc}"}
+
+        if response.status_code == 401:
+            try:
+                token = self.fetch_simplefactura_token_from_jisbackend()
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers={**headers, "Authorization": f"Bearer {token}"},
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except (ValueError, requests.RequestException) as exc:
+                return {"status": "error", "message": f"No se pudo refrescar token v2 (PDF): {exc}"}
+
+        if response.status_code != 200 or not response.content:
+            return {
+                "status": "error",
+                "message": f"getPdf v2 HTTP {response.status_code}",
+                "response": (response.text or "")[:500],
+            }
+
+        self.file_class.temporal_upload(response.content, remote_path)
+        return {
+            "status": "success",
+            "url": self.file_class.get(remote_path),
+            "cached": False,
+        }
 
     def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10, period=None):
-        return self.get_all(rol_id, rut, group, page, items_per_page, period, dte_version_id=DTE_VERSION_V2)
+        return self.get_all(
+            rol_id, rut, group, page, items_per_page, period,
+            dte_version_id=DTE_VERSION_V2,
+            include_emitted=True,
+        )
 
     def search_v2(
         self,
@@ -1822,6 +2173,7 @@ class CustomerTicketClass:
             items_per_page,
             category_id,
             dte_version_id=DTE_VERSION_V2,
+            include_emitted=True,
         )
 
     def store_v2(self, form_data, rol_id):
@@ -1884,87 +2236,57 @@ class CustomerTicketClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
 
-    def _v2_format_ticket_detail_lines(self, raw_lines):
-        formatted_lines = []
-        total_amount = 0
-        for index, line in enumerate(raw_lines, start=1):
-            qty = int(line.get("QtyItem", 1) or 1)
-            unit_price = int(line.get("PrcItem", 0) or 0)
-            line_amount = line.get("MontoItem")
-            line_amount = int(line_amount) if line_amount is not None else qty * unit_price
-            total_amount += line_amount
-            entry = {
-                "NroLinDet": str(index),
-                "NmbItem": line.get("NmbItem", "Item"),
-                "QtyItem": str(qty),
-                "UnmdItem": line.get("UnmdItem") or "un",
-                "PrcItem": unit_price,
-                "MontoItem": line_amount,
-            }
-            if line.get("DscItem"):
-                entry["DscItem"] = line["DscItem"]
-            if line.get("CdgItem"):
-                entry["CdgItem"] = line["CdgItem"]
-            formatted_lines.append(entry)
-        net_amount = round(total_amount / 1.19)
-        return formatted_lines, net_amount, total_amount - net_amount, total_amount
-
-    def _build_ticket_document_v2(self, customer_data, form_data, branch):
-        source_dte = self._ticket_source_dte_from_form(form_data)
-        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
-        if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
-            return detail_lines
-
-        customer = customer_data["customer_data"]
-        sf_detail_lines, net_amount, tax_amount, total_amount = self._v2_format_ticket_detail_lines(
-            detail_lines
+    def test_emit_biller_style_v2(self, total=700, item_label="Estacionamiento 113 - 918", branch_office_id=1):
+        """Prueba invoiceV2 biller (Bearer, Folio desde tabla folios)."""
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == branch_office_id)
+            .first()
         )
-        issue_date = datetime.now().strftime("%Y-%m-%d")
+        folio_res = FolioClass(self.db).reserve_next_by_document_type(39, branch_office_id=branch_office_id)
+        if folio_res.get("status") != "success":
+            return folio_res
 
-        issuer = {
-            "RUTEmisor": "76063822-6",
-            "RznSocEmisor": "Jisparking SpA",
-            "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
-            "DirOrigen": "Matucana 40",
-            "CmnaOrigen": "Santiago",
-        }
-        if branch.dte_code is not None:
-            issuer["CdgSIISucur"] = branch.dte_code
-
-        receiver = {
-            "RUTRecep": customer["rut"],
-            "RznSocRecep": customer.get("customer") or customer["rut"],
-        }
-        for key, src in (
-            ("GiroRecep", "activity"),
-            ("DirRecep", "region"),
-            ("CmnaRecep", "commune"),
-            ("Contacto", "email"),
-            ("CorreoRecep", "email"),
-        ):
-            val = customer.get(src)
-            if val:
-                receiver[key] = val
-
-        return {
+        issue_date = v2_dte_api_date()
+        due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
+        subtotal = round(total / 1.19)
+        tax = total - subtotal
+        document = {
             "Encabezado": {
                 "IdDoc": {
                     "TipoDTE": 39,
                     "FchEmis": issue_date,
-                    "FchVenc": issue_date,
+                    "FchVenc": due_date,
+                    "Folio": int(folio_res["folio"]),
                     "IndServicio": 3,
                     "IndMntNeto": 2,
                 },
-                "Emisor": issuer,
-                "Receptor": receiver,
+                "Emisor": ticket_v2_issuer(branch),
+                "Receptor": {
+                    "RUTRecep": "66666666-6",
+                    "RznSocRecep": "Cliente en Sucursal",
+                },
                 "Totales": {
-                    "MntNeto": net_amount,
-                    "IVA": tax_amount,
-                    "MntTotal": total_amount,
+                    "MntNeto": subtotal,
+                    "IVA": tax,
+                    "MntTotal": total,
                 },
             },
-            "Detalle": sf_detail_lines,
+            "Detalle": [
+                {
+                    "NroLinDet": "1",
+                    "NmbItem": item_label,
+                    "QtyItem": "1",
+                    "UnmdItem": "un",
+                    "PrcItem": subtotal,
+                    "MontoItem": subtotal,
+                }
+            ],
         }
+        emit_result = self.emit_invoice_v2(document, branch, "Boleta biller test")
+        if emit_result.get("status") != "success":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+        return emit_result
 
     def test_emit_ticket_v2(self, form_data):
         branch = (
@@ -1980,21 +2302,172 @@ class CustomerTicketClass:
         if "customer_data" not in customer_data:
             return {"status": "error", "message": "Cliente no encontrado"}
 
-        document = self._build_ticket_document_v2(customer_data, form_data, branch)
-        if isinstance(document, dict) and document.get("status") == "error":
-            return document
+        folio_res = FolioClass(self.db).reserve_next_by_document_type(
+            39,
+            branch_office_id=getattr(form_data, "branch_office_id", None),
+            dte_id=getattr(form_data, "id", None),
+        )
+        if folio_res.get("status") != "success":
+            return folio_res
 
-        try:
-            return _v2_emit_invoice(
-                self.db,
-                document,
-                _v2_simple_factura_branch_name(branch),
-                "Boleta",
+        source_dte = self._ticket_source_dte_from_form(form_data)
+        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
+        if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return detail_lines
+
+        folio_res = FolioClass(self.db).reserve_next_by_document_type(
+            39,
+            branch_office_id=getattr(form_data, "branch_office_id", None),
+            dte_id=getattr(form_data, "id", None),
+        )
+        if folio_res.get("status") != "success":
+            return folio_res
+
+        source_dte = self._ticket_source_dte_from_form(form_data)
+        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
+        if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return detail_lines
+
+        formatted_lines = []
+        total_gross = 0
+        for index, line in enumerate(detail_lines, start=1):
+            qty = int(line.get("QtyItem", 1) or 1)
+            unit_gross = int(line.get("PrcItem", 0) or 0)
+            line_gross = line.get("MontoItem")
+            line_gross = int(line_gross) if line_gross is not None else qty * unit_gross
+            total_gross += line_gross
+            line_net = round(line_gross / 1.19)
+            unit_net = round(unit_gross / 1.19)
+            entry = {
+                "NroLinDet": str(index),
+                "NmbItem": line.get("NmbItem", "Item"),
+                "QtyItem": str(qty),
+                "UnmdItem": line.get("UnmdItem") or "un",
+                "PrcItem": unit_net,
+                "MontoItem": line_net,
+            }
+            if line.get("DscItem"):
+                entry["DscItem"] = line["DscItem"]
+            if line.get("CdgItem"):
+                entry["CdgItem"] = line["CdgItem"]
+            formatted_lines.append(entry)
+
+        cd = customer_data["customer_data"]
+        receiver = {
+            "RUTRecep": (getattr(form_data, "rut", None) or cd.get("rut") or "").strip(),
+            "RznSocRecep": (
+                (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
+            ).strip(),
+        }
+        address = getattr(form_data, "address", None) or cd.get("address") or cd.get("region")
+        if address:
+            receiver["DirRecep"] = str(address).strip()
+        commune = cd.get("commune")
+        if commune:
+            receiver["CmnaRecep"] = str(commune).strip()
+        email = getattr(form_data, "email", None) or cd.get("email")
+        if email:
+            email = str(email).strip()
+            receiver["CorreoRecep"] = email
+            receiver["Contacto"] = email
+        phone = getattr(form_data, "phone", None) or cd.get("phone")
+        if phone:
+            receiver["TelefonoRecep"] = str(phone).strip()
+
+        issue_date = v2_dte_api_date()
+        due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
+        net_amount = round(total_gross / 1.19)
+        tax_amount = total_gross - net_amount
+        document = {
+            "Encabezado": {
+                "IdDoc": {
+                    "TipoDTE": 39,
+                    "FchEmis": issue_date,
+                    "FchVenc": due_date,
+                    "Folio": int(folio_res["folio"]),
+                    "IndServicio": 3,
+                    "IndMntNeto": 2,
+                },
+                "Emisor": ticket_v2_issuer(branch),
+                "Receptor": receiver,
+                "Totales": {
+                    "MntNeto": net_amount,
+                    "IVA": tax_amount,
+                    "MntTotal": total_gross,
+                },
+            },
+            "Detalle": formatted_lines,
+        }
+
+        emit_result = self.emit_invoice_v2(document, branch, "Boleta")
+        if emit_result.get("status") != "success":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+        return emit_result
+
+    def _resolve_v2_ticket_draft(self, form_data, expected_total_doc):
+        """Borrador v2 en dtes (status 1 o 2, folio 0) para actualizar al emitir."""
+        period_str = datetime.now().strftime("%Y-%m")
+        rut_clause = dte_rut_sql_or(DteModel.rut, form_data.rut)
+
+        form_dte_id = getattr(form_data, "id", None)
+        if form_dte_id not in (None, "", 0):
+            try:
+                form_dte_id = int(form_dte_id)
+            except (TypeError, ValueError):
+                form_dte_id = None
+        if form_dte_id:
+            dte = (
+                self.db.query(DteModel)
+                .filter(
+                    DteModel.id == form_dte_id,
+                    DteModel.dte_type_id == 39,
+                    DteModel.dte_version_id.in_((DTE_VERSION_V2, DTE_VERSION_V2_LEGACY)),
+                    DteModel.status_id.in_((1, 2)),
+                )
+                .first()
             )
-        except ValueError as exc:
-            return {"status": "error", "message": str(exc)}
+            if dte is not None:
+                return dte
+
+        def _find_draft(require_total: bool):
+            q = self.db.query(DteModel).filter(
+                DteModel.branch_office_id == form_data.branch_office_id,
+                rut_clause,
+                DteModel.dte_type_id == 39,
+                DteModel.dte_version_id.in_((DTE_VERSION_V2, DTE_VERSION_V2_LEGACY)),
+                DteModel.status_id.in_((1, 2)),
+                DteModel.period == period_str,
+                DteModel.folio == 0,
+            )
+            if require_total:
+                q = q.filter(DteModel.total == expected_total_doc)
+            return q.order_by(DteModel.id.desc()).first()
+
+        dte = _find_draft(True) or _find_draft(False)
+        if dte is not None:
+            return dte
+
+        return (
+            self.db.query(DteModel)
+            .filter(
+                DteModel.branch_office_id == form_data.branch_office_id,
+                rut_clause,
+                DteModel.dte_type_id == 39,
+                DteModel.dte_version_id.in_((DTE_VERSION_V2, DTE_VERSION_V2_LEGACY)),
+                DteModel.status_id.in_((1, 2)),
+                DteModel.period == period_str,
+            )
+            .order_by(DteModel.id.desc())
+            .first()
+        )
 
     def generate_v2(self, form_data):
+        print(
+            f"[v2] generate_v2 rut={form_data.rut} branch={form_data.branch_office_id}",
+            flush=True,
+        )
         expected_total_doc = self._expected_total_for_generate(form_data)
         check_dte_existence = (
             self.db.query(DteModel)
@@ -2003,7 +2476,7 @@ class CustomerTicketClass:
                 DteModel.rut == form_data.rut,
                 DteModel.total == expected_total_doc,
                 DteModel.dte_type_id == 39,
-                DteModel.dte_version_id == DTE_VERSION_V2,
+                DteModel.dte_version_id.in_((DTE_VERSION_V2, DTE_VERSION_V2_LEGACY)),
                 DteModel.status_id == 4,
                 DteModel.period == datetime.now().strftime("%Y-%m"),
             )
@@ -2028,82 +2501,133 @@ class CustomerTicketClass:
         if not branch:
             return {"status": "error", "message": "Sucursal no encontrada"}
 
-        document = self._build_ticket_document_v2(customer_data, form_data, branch)
-        if isinstance(document, dict) and document.get("status") == "error":
-            return document
-
-        try:
-            emit_result = _v2_emit_invoice(
-                self.db,
-                document,
-                _v2_simple_factura_branch_name(branch),
-                "Boleta",
-            )
-        except ValueError as exc:
-            return {"status": "error", "message": str(exc)}
-
-        if emit_result.get("status") != "success":
-            return {
-                "status": "error",
-                "message": emit_result.get("message") or "SimpleFactura no emitió la boleta",
-                "errors": emit_result.get("errors"),
-                "response": emit_result.get("response"),
-            }
-
-        folio = emit_result.get("folio")
-        if folio is None:
-            return {
-                "status": "error",
-                "message": "SimpleFactura no devolvió folio",
-                "response": emit_result.get("response"),
-            }
-
-        period_str = datetime.now().strftime("%Y-%m")
-        rut_clause = _dte_rut_sql_or(DteModel.rut, form_data.rut)
-
-        def _find_draft(require_total: bool):
-            q = self.db.query(DteModel).filter(
-                DteModel.branch_office_id == form_data.branch_office_id,
-                rut_clause,
-                DteModel.dte_type_id == 39,
-                DteModel.dte_version_id == DTE_VERSION_V2,
-                DteModel.status_id.in_((1, 2)),
-                DteModel.period == period_str,
-                DteModel.folio == 0,
-            )
-            if require_total:
-                q = q.filter(DteModel.total == expected_total_doc)
-            return q.order_by(DteModel.id.desc()).first()
-
-        dte = _find_draft(True) or _find_draft(False)
-        if dte is None:
-            dte = (
-                self.db.query(DteModel)
-                .filter(
-                    DteModel.branch_office_id == form_data.branch_office_id,
-                    rut_clause,
-                    DteModel.dte_type_id == 39,
-                    DteModel.dte_version_id == DTE_VERSION_V2,
-                    DteModel.status_id.in_((1, 2)),
-                    DteModel.period == period_str,
-                )
-                .order_by(DteModel.id.desc())
-                .first()
-            )
-
+        dte = self._resolve_v2_ticket_draft(form_data, expected_total_doc)
         if not dte:
             return {
                 "status": "error",
-                "message": (
-                    f"Boleta emitida en SimpleFactura (folio {folio}) "
-                    "pero no hay borrador v2 en base de datos."
-                ),
-                "folio": folio,
-                "response": emit_result.get("response"),
+                "message": "No hay borrador v2 en dtes para emitir (status 1 o 2, folio 0).",
             }
 
-        dte.folio = folio
+        folio_res = FolioClass(self.db).reserve_next_by_document_type(
+            39,
+            branch_office_id=getattr(form_data, "branch_office_id", None),
+            dte_id=dte.id,
+        )
+        if folio_res.get("status") != "success":
+            return folio_res
+
+        source_dte = self._ticket_source_dte_from_form(form_data)
+        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
+        if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return detail_lines
+
+        formatted_lines = []
+        total_gross = 0
+        for index, line in enumerate(detail_lines, start=1):
+            qty = int(line.get("QtyItem", 1) or 1)
+            unit_gross = int(line.get("PrcItem", 0) or 0)
+            line_gross = line.get("MontoItem")
+            line_gross = int(line_gross) if line_gross is not None else qty * unit_gross
+            total_gross += line_gross
+            line_net = round(line_gross / 1.19)
+            unit_net = round(unit_gross / 1.19)
+            entry = {
+                "NroLinDet": str(index),
+                "NmbItem": line.get("NmbItem", "Item"),
+                "QtyItem": str(qty),
+                "UnmdItem": line.get("UnmdItem") or "un",
+                "PrcItem": unit_net,
+                "MontoItem": line_net,
+            }
+            if line.get("DscItem"):
+                entry["DscItem"] = line["DscItem"]
+            if line.get("CdgItem"):
+                entry["CdgItem"] = line["CdgItem"]
+            formatted_lines.append(entry)
+
+        cd = customer_data["customer_data"]
+        receiver = {
+            "RUTRecep": (getattr(form_data, "rut", None) or cd.get("rut") or "").strip(),
+            "RznSocRecep": (
+                (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
+            ).strip(),
+        }
+        address = getattr(form_data, "address", None) or cd.get("address") or cd.get("region")
+        if address:
+            receiver["DirRecep"] = str(address).strip()
+        commune = cd.get("commune")
+        if commune:
+            receiver["CmnaRecep"] = str(commune).strip()
+        email = getattr(form_data, "email", None) or cd.get("email")
+        if email:
+            email = str(email).strip()
+            receiver["CorreoRecep"] = email
+            receiver["Contacto"] = email
+        phone = getattr(form_data, "phone", None) or cd.get("phone")
+        if phone:
+            receiver["TelefonoRecep"] = str(phone).strip()
+
+        base_date = dte.added_date if dte.added_date else datetime.now()
+        issue_date = v2_dte_api_date(base_date)
+        due_date = v2_dte_api_date(base_date + timedelta(days=30))
+        net_amount = round(total_gross / 1.19)
+        tax_amount = total_gross - net_amount
+        document = {
+            "Encabezado": {
+                "IdDoc": {
+                    "TipoDTE": 39,
+                    "FchEmis": issue_date,
+                    "FchVenc": due_date,
+                    "Folio": int(folio_res["folio"]),
+                    "IndServicio": 3,
+                    "IndMntNeto": 2,
+                },
+                "Emisor": ticket_v2_issuer(branch),
+                "Receptor": receiver,
+                "Totales": {
+                    "MntNeto": net_amount,
+                    "IVA": tax_amount,
+                    "MntTotal": total_gross,
+                },
+            },
+            "Detalle": formatted_lines,
+        }
+
+        emit_result = self.emit_invoice_v2(document, branch, "Boleta")
+
+        print(f"[v2] emit_result status={emit_result.get('status')}", flush=True)
+
+        if emit_result.get("status") != "success":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return {
+                "status": "error",
+                "message": emit_result.get("message") or "Emisión v2 no emitió la boleta",
+                "errors": emit_result.get("errors"),
+                "response": emit_result.get("response"),
+                "v2_url": emit_result.get("v2_url"),
+                "v2_payload": {"Documento": document},
+            }
+
+        folio_number = int(folio_res["folio"])
+        if emit_result.get("folio") is not None:
+            try:
+                folio_number = int(emit_result.get("folio"))
+            except (TypeError, ValueError):
+                pass
+        else:
+            id_doc = document.get("Encabezado", {}).get("IdDoc", {})
+            doc_folio = id_doc.get("Folio")
+            if doc_folio is not None:
+                try:
+                    folio_number = int(doc_folio)
+                except (TypeError, ValueError):
+                    pass
+
+        dte.folio = folio_number
         dte.status_id = 4
+        dte.dte_version_id = DTE_VERSION_V2
+        dte.updated_date = datetime.now()
         _sync_ticket_dte_amounts_from_form(dte, form_data)
         group_items = self._get_group_items_for_generation(form_data, dte)
         if getattr(dte, "category_id", None) == 3:
@@ -2117,14 +2641,33 @@ class CustomerTicketClass:
         try:
             self.db.commit()
             self.db.refresh(dte)
+            FolioClass(self.db).bind_folio_to_dte(folio_res["id"], dte.id)
+
+            recipient_email = (getattr(form_data, "email", None) or cd.get("email") or "").strip()
+            email_result = self.send_invoice_v2_email(
+                folio_number,
+                dte_type_id=39,
+                to_emails=recipient_email,
+                pdf=True,
+                xml=False,
+            )
+
+            print("Empieza envio de whatsapp v2 (Klap)", flush=True)
+            whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte, form_data.rut)
+
             return {
                 "status": "success",
                 "message": "Dte saved successfully",
-                "folio": folio,
+                "dte_id": dte.id,
+                "folio": dte.folio,
+                "status_id": dte.status_id,
                 "response": emit_result.get("response"),
+                "email": email_result,
+                "whatsapp": whatsapp_result,
             }
         except Exception as e:
             self.db.rollback()
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
             return {"status": "error", "message": f"Error: {str(e)}"}
 
 

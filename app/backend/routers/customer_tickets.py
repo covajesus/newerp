@@ -161,6 +161,10 @@ def search_v2(customer_ticket_inputs: CustomerTicketSearch, session_user: UserLo
 
 @customer_tickets.post("/v2/generate_ticket")
 def generate_ticket_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    print(
+        f"[v2] POST generate_ticket rut={customer_ticket_inputs.rut} branch={customer_ticket_inputs.branch_office_id}",
+        flush=True,
+    )
     existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
     if customer_ticket_inputs.will_save == 1:
         if existence_data == 'Customer does not exist':
@@ -191,6 +195,17 @@ def test_ticket_v2(customer_ticket_inputs: GenerateCustomerTicket, session_user:
     else:
         CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
     data = CustomerTicketClass(db).test_emit_ticket_v2(customer_ticket_inputs)
+    return {"message": data}
+
+
+@customer_tickets.post("/v2/test_biller_style")
+def test_biller_style_v2(
+    total: int = 700,
+    branch_office_id: int = 1,
+    db: Session = Depends(get_db),
+):
+    """Prueba invoiceV2 biller (Bearer, Casa_Matriz, folio desde pool central)."""
+    data = CustomerTicketClass(db).test_emit_biller_style_v2(total, branch_office_id=branch_office_id)
     return {"message": data}
 
 

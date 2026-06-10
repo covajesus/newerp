@@ -5,7 +5,7 @@ from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import func
 import pytz
-from app.backend.classes.authentication_class import AuthenticationClass
+from app.backend.classes.customer_ticket_class import CustomerTicketClass
 import json
 from datetime import date, timedelta
 from sqlalchemy import and_
@@ -645,11 +645,11 @@ class CollectionClass:
                 collection_inputs['added_date']
             )
 
-            check_token_status = AuthenticationClass(self.db).check_simplefactura_token()
+            check_token_status = CustomerTicketClass(self.db).check_simplefactura_token()
 
             if check_token_status == 0:
                 print('El token está vencido.')
-                AuthenticationClass(self.db).create_simplefactura_token()
+                CustomerTicketClass(self.db).create_simplefactura_token()
             else:
                 print('El token está vigente.')
 

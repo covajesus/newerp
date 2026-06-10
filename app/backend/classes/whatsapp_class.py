@@ -3,8 +3,31 @@ from app.backend.db.models import CustomerModel, MovementModel, WhatsappTemplate
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from urllib.parse import urlparse
 import json
 load_dotenv()
+
+
+def _klap_whatsapp_button_suffix(redirect_url: str) -> str:
+    """
+    Sufijo dinámico para el botón URL del template WhatsApp con pago Klap.
+    El template en Meta debe usar como base KLAP_WHATSAPP_URL_BASE, p. ej.
+    https://pagos-pasarela.multicaja.cl/ (prod) o sandbox según ambiente.
+    """
+    redirect_url = (redirect_url or "").strip()
+    if not redirect_url:
+        return ""
+    base = os.getenv(
+        "KLAP_WHATSAPP_URL_BASE",
+        "https://pagos-pasarela.multicaja.cl/",
+    ).rstrip("/") + "/"
+    if redirect_url.startswith(base):
+        return redirect_url[len(base):]
+    parsed = urlparse(redirect_url)
+    suffix = (parsed.path or "").lstrip("/")
+    if parsed.query:
+        suffix = f"{suffix}?{parsed.query}"
+    return suffix
 
 
 def _libredte_issue_date_from_emitido_info(response: requests.Response, fallback_date=None) -> str:
@@ -218,6 +241,177 @@ class WhatsappClass:
                 "response": response.text,
                 "error": str(e),
                 "whatsapp_accepted": "rejected"
+            }
+
+    def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None):
+        """
+        WhatsApp post-emisión v2 (SimpleFactura + pago Klap).
+        Misma plantilla que send() (whatsapp_templates.id=1) pero el botón usa redirect_url de Klap.
+        """
+        from app.backend.classes.klap_class import KlapClass
+        from app.backend.classes.customer_ticket_class import CustomerTicketClass
+
+        customer = (
+            self.db.query(CustomerModel)
+            .filter(CustomerModel.rut == customer_rut)
+            .first()
+        )
+        if not customer:
+            return {"status": "skipped", "message": "Cliente no encontrado"}
+        if not customer.phone or str(customer.phone).strip() == "":
+            return {"status": "skipped", "message": "Cliente sin teléfono"}
+
+        whatsapp_template = (
+            self.db.query(WhatsappTemplateModel)
+            .filter(WhatsappTemplateModel.id == 1)
+            .first()
+        )
+        if not whatsapp_template:
+            return {"status": "error", "message": "Plantilla WhatsApp id=1 no encontrada"}
+
+        branch_office = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == dte_data.branch_office_id)
+            .first()
+        )
+        if not branch_office:
+            return {"status": "error", "message": "Sucursal no encontrada"}
+
+        user = (
+            self.db.query(UserModel)
+            .filter(UserModel.rut == branch_office.principal_supervisor)
+            .first()
+        )
+        if not user:
+            return {"status": "error", "message": "Supervisor de sucursal no encontrado"}
+
+        document_url = pdf_url
+        if not document_url:
+            pdf_result = CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
+                dte_data.folio,
+                dte_type_id=dte_data.dte_type_id,
+            )
+            if pdf_result.get("status") != "success":
+                print(f"[v2] PDF para WhatsApp: {pdf_result}", flush=True)
+            document_url = pdf_result.get("url") or (
+                f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
+            )
+
+        klap_result = KlapClass().create_subscriber_dte_order(dte_data, customer)
+        if klap_result.get("status") != "success":
+            return {
+                "status": "error",
+                "message": klap_result.get("message") or "No se pudo crear orden Klap",
+                "klap": klap_result,
+            }
+
+        redirect_url = klap_result.get("redirect_url")
+        url_data = _klap_whatsapp_button_suffix(redirect_url)
+        if not url_data:
+            return {
+                "status": "error",
+                "message": "redirect_url Klap vacía para botón WhatsApp",
+                "klap": klap_result,
+            }
+
+        token = os.getenv("LIBREDTE_TOKEN")
+        graph_url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        added_date_str = dte_data.added_date.strftime("%d-%m-%Y")
+
+        required_fields = {
+            "DTE type": dte_data.dte_type_id,
+            "Folio": dte_data.folio,
+            "Date": added_date_str,
+            "Total": dte_data.total,
+            "Branch": branch_office.branch_office,
+            "Supervisor": user.full_name,
+            "Phone": user.phone,
+            "Email": user.email,
+        }
+        for label, value in required_fields.items():
+            if value is None or str(value).strip() == "":
+                return {
+                    "status": "error",
+                    "message": f"El campo '{label}' está vacío o no definido.",
+                }
+
+        dte_type = "boleta" if int(dte_data.dte_type_id) == 39 else "factura"
+
+        phone_str = str(customer.phone).strip()
+        customer_phone = phone_str if phone_str.startswith("56") else "56" + phone_str
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": f"{customer_phone}",
+            "type": "template",
+            "template": {
+                "name": whatsapp_template.title,
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "document",
+                                "document": {
+                                    "link": document_url,
+                                    "filename": f"{dte_data.folio}.pdf",
+                                },
+                            }
+                        ],
+                    },
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": str(dte_type)},
+                            {"type": "text", "text": str(dte_data.folio)},
+                            {"type": "text", "text": added_date_str},
+                            {"type": "text", "text": str(dte_data.total)},
+                            {"type": "text", "text": branch_office.branch_office},
+                            {"type": "text", "text": user.full_name},
+                            {"type": "text", "text": user.phone},
+                            {"type": "text", "text": user.email},
+                        ],
+                    },
+                    {
+                        "type": "button",
+                        "index": "0",
+                        "sub_type": "url",
+                        "parameters": [{"type": "text", "text": url_data}],
+                    },
+                ],
+            },
+        }
+
+        print(f"[v2] WhatsApp Klap url_data={url_data}", flush=True)
+        print(payload, flush=True)
+
+        try:
+            response = requests.post(graph_url, json=payload, headers=headers, timeout=45)
+            print(response.text, flush=True)
+            response_data = response.json()
+            return {
+                "status": "success" if response.status_code == 200 else "error",
+                "status_code": response.status_code,
+                "response": response_data,
+                "whatsapp_accepted": "accepted" if response.status_code == 200 else "rejected",
+                "klap": {
+                    "order_id": klap_result.get("order_id"),
+                    "redirect_url": redirect_url,
+                    "url_data": url_data,
+                },
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "error": str(exc),
+                "whatsapp_accepted": "rejected",
+                "klap": klap_result,
             }
 
     def check_whatsapp_balance(self):
