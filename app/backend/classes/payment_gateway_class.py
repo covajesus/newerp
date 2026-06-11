@@ -42,11 +42,11 @@ class PaymentGatewayClass:
         ).rstrip("/")
         self.return_url = payments_env(
             "PAYMENTS_RETURN_URL",
-            default="https://intrajis.com/payments/success",
+            default="https://intrajisbackend.com/api/payments/return",
         )
         self.cancel_url = payments_env(
             "PAYMENTS_CANCEL_URL",
-            default="https://intrajis.com/payments/rejected",
+            default="https://intrajisbackend.com/api/payments/cancel",
         )
         self.webhook_confirm_url = payments_env(
             "PAYMENTS_WEBHOOK_CONFIRM_URL",
@@ -56,7 +56,10 @@ class PaymentGatewayClass:
             "PAYMENTS_WEBHOOK_REJECT_URL",
             default="https://intrajisbackend.com/api/payments/webhooks/reject",
         )
-        self.webhook_validation_url = payments_env("PAYMENTS_WEBHOOK_VALIDATION_URL")
+        self.webhook_validation_url = payments_env(
+            "PAYMENTS_WEBHOOK_VALIDATION_URL",
+            default="https://intrajisbackend.com/api/payments/webhooks/validation",
+        )
 
     def _headers(self) -> dict[str, str]:
         if not self.api_key:

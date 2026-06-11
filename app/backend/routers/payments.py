@@ -16,6 +16,13 @@ from app.backend.classes.payment_gateway_class import (
     PaymentGatewayClass,
     normalize_gateway_order_id,
 )
+from app.backend.classes.payment_webhook_class import (
+    certification_debug_response,
+    extract_payment_ids,
+    require_webhook_api_key,
+    validate_order_webhook_payload,
+    webhook_ok_response,
+)
 from app.backend.classes.payments_env import payments_env
 from app.backend.db.database import get_db
 from app.backend.db.models import CustomerModel, DteModel
@@ -226,40 +233,104 @@ def get_transaction(transaction_id: str):
 
 @payments.post("/webhooks/validation")
 async def webhook_validation(request: Request):
+    """
+    Called by Klap when an order is created (before checkout).
+    Must verify header `apikey` and accept/reject the order payload.
+    """
+    require_webhook_api_key(request)
     payload = await _read_json(request)
-    return {"status": "ok", "payload": payload}
+    validate_order_webhook_payload(payload)
+
+    response = webhook_ok_response(
+        source="webhook_validation",
+        apikey_verified=True,
+        reference_id=payload.get("reference_id") or payload.get("referenceId"),
+    )
+    if _webhook_debug_enabled():
+        response.update(certification_debug_response(request))
+    return response
 
 
 @payments.post("/webhooks/confirm")
 async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
+    """Mandatory Klap webhook: payment completed."""
+    require_webhook_api_key(request)
     payload = await _read_json(request)
-    reference_id = (
-        payload.get("reference_id")
-        or payload.get("referenceId")
-        or (payload.get("order") or {}).get("reference_id")
-    )
-    order_id = payload.get("order_id") or payload.get("orderId")
+    reference_id, order_id = _resolve_payment_ids(payload)
+    dte_updated = False
     if reference_id and order_id:
-        DtePaymentDataClass(db).record_payment_return(
-            str(reference_id),
-            str(order_id),
+        result = DtePaymentDataClass(db).record_payment_return(
+            reference_id,
+            order_id,
             source="webhook_confirm",
         )
-    return {"status": "ok", "payload": payload}
+        dte_updated = bool(result.get("dte_updated"))
+        print(
+            f"[payments] webhook_confirm ref={reference_id} order={order_id} "
+            f"dte_updated={dte_updated}",
+            flush=True,
+        )
+    else:
+        print(f"[payments] webhook_confirm missing ids payload={payload}", flush=True)
+
+    response = webhook_ok_response(
+        source="webhook_confirm",
+        apikey_verified=True,
+        dte_updated=dte_updated,
+    )
+    if _webhook_debug_enabled():
+        response.update(certification_debug_response(request))
+    return response
 
 
 @payments.post("/webhooks/reject")
 async def webhook_reject(request: Request, db: Session = Depends(get_db)):
+    """Klap webhook: payment failed, canceled or expired."""
+    require_webhook_api_key(request)
     payload = await _read_json(request)
-    reference_id = payload.get("reference_id") or payload.get("referenceId")
-    order_id = payload.get("order_id") or payload.get("orderId")
+    reference_id, order_id = _resolve_payment_ids(payload)
     if reference_id and order_id:
         DtePaymentDataClass(db).record_payment_return(
-            str(reference_id),
-            str(order_id),
+            reference_id,
+            order_id,
             source="webhook_reject",
         )
-    return {"status": "ok", "payload": payload}
+        print(
+            f"[payments] webhook_reject ref={reference_id} order={order_id}",
+            flush=True,
+        )
+    else:
+        print(f"[payments] webhook_reject missing ids payload={payload}", flush=True)
+
+    response = webhook_ok_response(
+        source="webhook_reject",
+        apikey_verified=True,
+    )
+    if _webhook_debug_enabled():
+        response.update(certification_debug_response(request))
+    return response
+
+
+def _webhook_debug_enabled() -> bool:
+    return payments_env("PAYMENTS_WEBHOOK_DEBUG", default="false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _resolve_payment_ids(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+    reference_id, order_id = extract_payment_ids(payload)
+    if order_id and not reference_id:
+        try:
+            order = PaymentGatewayClass().get_order(order_id)
+            if isinstance(order, dict):
+                reference_id = order.get("reference_id") or order.get("referenceId")
+                if reference_id:
+                    reference_id = str(reference_id).strip()
+        except HTTPException:
+            pass
+    return reference_id, order_id
 
 
 async def _read_json(request: Request) -> dict[str, Any]:
