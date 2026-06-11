@@ -35,7 +35,7 @@ def api_keys_match(provided: str | None, expected: str) -> bool:
 
 def require_webhook_api_key(request: Request) -> None:
     """
-    Klap sends header `apikey` on every webhook call.
+    Klap sends header `apikey` on confirm/reject notifications.
     Invalid key -> 403001 (required for production certification).
     """
     expected = expected_webhook_api_key()
@@ -51,6 +51,18 @@ def require_webhook_api_key(request: Request) -> None:
             status_code=403,
             detail={"code": "403001", "message": "The apikey is not valid"},
         )
+
+
+def verify_webhook_api_key_if_present(request: Request) -> bool:
+    """
+    webhook_validation during order creation: verify apikey only when Klap sends it.
+    Returns True when a header was present and matched.
+    """
+    provided = incoming_api_key(request)
+    if not provided:
+        return False
+    require_webhook_api_key(request)
+    return True
 
 
 def webhook_ok_response(*, source: str, **extra: Any) -> dict[str, Any]:

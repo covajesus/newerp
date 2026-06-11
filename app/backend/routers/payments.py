@@ -19,8 +19,10 @@ from app.backend.classes.payment_gateway_class import (
 from app.backend.classes.payment_webhook_class import (
     certification_debug_response,
     extract_payment_ids,
+    incoming_api_key,
     require_webhook_api_key,
     validate_order_webhook_payload,
+    verify_webhook_api_key_if_present,
     webhook_ok_response,
 )
 from app.backend.classes.payments_env import payments_env
@@ -235,16 +237,23 @@ def get_transaction(transaction_id: str):
 async def webhook_validation(request: Request):
     """
     Called by Klap when an order is created (before checkout).
-    Must verify header `apikey` and accept/reject the order payload.
+    Validates the order payload; apikey header is checked when present.
     """
-    require_webhook_api_key(request)
     payload = await _read_json(request)
+    apikey_verified = verify_webhook_api_key_if_present(request)
+    reference_id = payload.get("reference_id") or payload.get("referenceId")
+    print(
+        f"[payments] webhook_validation ref={reference_id} "
+        f"apikey_header={'yes' if incoming_api_key(request) else 'no'} "
+        f"verified={apikey_verified}",
+        flush=True,
+    )
     validate_order_webhook_payload(payload)
 
     response = webhook_ok_response(
         source="webhook_validation",
-        apikey_verified=True,
-        reference_id=payload.get("reference_id") or payload.get("referenceId"),
+        apikey_verified=apikey_verified,
+        reference_id=reference_id,
     )
     if _webhook_debug_enabled():
         response.update(certification_debug_response(request))

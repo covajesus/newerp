@@ -325,15 +325,21 @@ class WhatsappClass:
         from app.backend.classes.payment_gateway_class import PaymentGatewayClass
         from app.backend.classes.customer_ticket_class import CustomerTicketClass
 
+        folio = getattr(dte_data, "folio", None)
+
         customer = (
             self.db.query(CustomerModel)
             .filter(CustomerModel.rut == customer_rut)
             .first()
         )
         if not customer:
-            return {"status": "skipped", "message": "Cliente no encontrado"}
+            result = {"status": "skipped", "message": "Cliente no encontrado"}
+            print(f"[v2] WhatsApp folio={folio} skipped: {result['message']}", flush=True)
+            return result
         if not customer.phone or str(customer.phone).strip() == "":
-            return {"status": "skipped", "message": "Cliente sin teléfono"}
+            result = {"status": "skipped", "message": "Cliente sin teléfono"}
+            print(f"[v2] WhatsApp folio={folio} skipped: {result['message']} rut={customer_rut}", flush=True)
+            return result
 
         whatsapp_template = (
             self.db.query(WhatsappTemplateModel)
@@ -341,10 +347,12 @@ class WhatsappClass:
             .first()
         )
         if not whatsapp_template or not whatsapp_template.title:
-            return {
+            result = {
                 "status": "error",
                 "message": "Plantilla WhatsApp id=8 (envio_dte_v3) no encontrada o sin title",
             }
+            print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
+            return result
 
         branch_office = (
             self.db.query(BranchOfficeModel)
@@ -352,7 +360,9 @@ class WhatsappClass:
             .first()
         )
         if not branch_office:
-            return {"status": "error", "message": "Sucursal no encontrada"}
+            result = {"status": "error", "message": "Sucursal no encontrada"}
+            print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
+            return result
 
         user = (
             self.db.query(UserModel)
@@ -360,7 +370,9 @@ class WhatsappClass:
             .first()
         )
         if not user:
-            return {"status": "error", "message": "Supervisor de sucursal no encontrado"}
+            result = {"status": "error", "message": "Supervisor de sucursal no encontrado"}
+            print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
+            return result
 
         document_url = pdf_url
         if not document_url:
@@ -369,28 +381,33 @@ class WhatsappClass:
                 dte_type_id=dte_data.dte_type_id,
             )
             if pdf_result.get("status") != "success":
-                print(f"[v2] PDF para WhatsApp: {pdf_result}", flush=True)
+                print(f"[v2] PDF para WhatsApp folio={folio}: {pdf_result}", flush=True)
             document_url = pdf_result.get("url") or (
                 f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
             )
 
+        print(f"[v2] WhatsApp folio={folio} creating payment order total={dte_data.total}", flush=True)
         order_result = PaymentGatewayClass().create_subscriber_dte_order(dte_data, customer)
         if order_result.get("status") != "success":
-            return {
+            result = {
                 "status": "error",
                 "message": order_result.get("message") or "Failed to create payment order",
                 "payments": order_result,
             }
+            print(f"[v2] WhatsApp folio={folio} payment order failed: {result}", flush=True)
+            return result
 
         order_id = order_result.get("order_id")
         redirect_url = order_result.get("redirect_url")
         url_data = _payments_whatsapp_url_data(order_id, redirect_url)
         if not url_data:
-            return {
+            result = {
                 "status": "error",
                 "message": "Payment order missing order_id/redirect_url for WhatsApp button",
                 "payments": order_result,
             }
+            print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
+            return result
         payment_link = payment_proxy_public_url(order_id)
 
         token = whatsapp_access_token()
@@ -414,10 +431,12 @@ class WhatsappClass:
         }
         for label, value in required_fields.items():
             if value is None or str(value).strip() == "":
-                return {
+                result = {
                     "status": "error",
                     "message": f"El campo '{label}' está vacío o no definido.",
                 }
+                print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
+                return result
 
         dte_type = "boleta" if int(dte_data.dte_type_id) == 39 else "factura"
 
@@ -476,7 +495,7 @@ class WhatsappClass:
 
         token_error = validate_whatsapp_access_token()
         if token_error:
-            print(f"[v2] WhatsApp token check failed: {token_error}", flush=True)
+            print(f"[v2] WhatsApp folio={folio} token check failed: {token_error}", flush=True)
             token_error["payments"] = {
                 "order_id": order_id,
                 "redirect_url": redirect_url,
@@ -492,7 +511,7 @@ class WhatsappClass:
             response_data = response.json() if response.content else {}
             graph_error = (response_data.get("error") or {}) if isinstance(response_data, dict) else {}
             if response.status_code != 200 and graph_error.get("code") == 190:
-                return {
+                result = {
                     "status": "error",
                     "status_code": response.status_code,
                     "message": (
@@ -510,7 +529,9 @@ class WhatsappClass:
                         "template": whatsapp_template.title,
                     },
                 }
-            return {
+                print(f"[v2] WhatsApp folio={folio} Meta 190: renew WHATSAPP_ACCESS_TOKEN", flush=True)
+                return result
+            result = {
                 "status": "success" if response.status_code == 200 else "error",
                 "status_code": response.status_code,
                 "response": response_data,
@@ -523,13 +544,23 @@ class WhatsappClass:
                     "template": whatsapp_template.title,
                 },
             }
+            print(
+                f"[v2] WhatsApp folio={folio} send status={result['status']} "
+                f"http={response.status_code} accepted={result['whatsapp_accepted']}",
+                flush=True,
+            )
+            if result["status"] != "success":
+                print(f"[v2] WhatsApp folio={folio} graph response: {response_data}", flush=True)
+            return result
         except Exception as exc:
-            return {
+            result = {
                 "status": "error",
                 "error": str(exc),
                 "whatsapp_accepted": "rejected",
                 "payments": order_result,
             }
+            print(f"[v2] WhatsApp folio={folio} exception: {exc}", flush=True)
+            return result
 
     def check_whatsapp_balance(self):
         """

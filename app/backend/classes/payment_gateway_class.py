@@ -159,8 +159,10 @@ class PaymentGatewayClass:
         try:
             body = self.create_order(payload)
         except HTTPException as exc:
+            print(f"[payments] create_order failed: {exc.detail}", flush=True)
             return {"status": "error", "message": str(exc.detail)}
         except Exception as exc:
+            print(f"[payments] create_order failed: {exc}", flush=True)
             return {"status": "error", "message": str(exc)}
 
         redirect_url = body.get("redirect_url")
