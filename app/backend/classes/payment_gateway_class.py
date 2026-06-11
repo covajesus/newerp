@@ -44,7 +44,10 @@ class PaymentGatewayClass:
             "PAYMENTS_RETURN_URL",
             default="https://intrajis.com/payments/success",
         )
-        self.cancel_url = payments_env("PAYMENTS_CANCEL_URL")
+        self.cancel_url = payments_env(
+            "PAYMENTS_CANCEL_URL",
+            default="https://intrajis.com/payments/rejected",
+        )
         self.webhook_confirm_url = payments_env(
             "PAYMENTS_WEBHOOK_CONFIRM_URL",
             default="https://intrajisbackend.com/api/payments/webhooks/confirm",

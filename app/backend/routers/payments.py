@@ -107,6 +107,24 @@ def payment_return_redirect(
     return RedirectResponse(url=f"{frontend_base}?{qs}", status_code=302)
 
 
+@payments.get("/cancel")
+def payment_cancel_redirect(
+    referenceId: Optional[str] = None,
+    orderId: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    frontend_base = payments_env(
+        "PAYMENTS_CANCEL_FRONTEND_URL",
+        default="https://intrajis.com/payments/rejected",
+    ).rstrip("/")
+    if referenceId and orderId:
+        DtePaymentDataClass(db).record_payment_return(
+            referenceId, orderId, source="cancel_redirect"
+        )
+    qs = urlencode({"referenceId": referenceId or "", "orderId": orderId or ""})
+    return RedirectResponse(url=f"{frontend_base}?{qs}", status_code=302)
+
+
 @payments.post("/payment-return")
 def register_payment_return(body: PaymentReturnRequest, db: Session = Depends(get_db)):
     ref = body.reference_id
