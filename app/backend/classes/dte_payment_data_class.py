@@ -14,6 +14,13 @@ from app.backend.db.models import (
     DtePaymentDataModel,
 )
 
+# Same ids used on dtes.payment_type_id (2 = card / online gateway)
+PAYMENT_TYPE_LABELS: dict[int, str] = {
+    1: "Efectivo",
+    2: "Tarjeta",
+    3: "Transferencia",
+}
+
 
 def document_folio_from_reference_id(reference_id: str | None) -> int | None:
     """Parse document folio from reference_id (numeric or legacy intrajis-dte-{id}-{folio})."""
@@ -29,6 +36,25 @@ def document_folio_from_reference_id(reference_id: str | None) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def payment_type_id_from_gateway(gateway_response: dict | None, payment_status: str | None) -> int | None:
+    """Map gateway response to internal payment_type_id."""
+    if payment_status != "completed":
+        return None
+    method = None
+    if isinstance(gateway_response, dict):
+        selected = gateway_response.get("selected_method")
+        if isinstance(selected, dict):
+            method = (selected.get("type") or selected.get("name") or "").lower()
+        elif isinstance(selected, str):
+            method = selected.lower()
+        methods = gateway_response.get("methods")
+        if not method and isinstance(methods, list) and methods:
+            method = str(methods[0]).lower()
+    if method and any(k in method for k in ("transfer", "transferencia")):
+        return 3
+    return 2
 
 
 class DtePaymentDataClass:
@@ -54,6 +80,15 @@ class DtePaymentDataClass:
                 pass
         return None
 
+    def _resolve_customer(self, dte: DteModel | None) -> CustomerModel | None:
+        if not dte or not dte.rut:
+            return None
+        return (
+            self.db.query(CustomerModel)
+            .filter(CustomerModel.rut == dte.rut)
+            .first()
+        )
+
     def record_payment_return(
         self,
         reference_id: str,
@@ -68,11 +103,11 @@ class DtePaymentDataClass:
 
         document_folio = document_folio_from_reference_id(reference_id)
         dte = self._find_dte(document_folio, reference_id)
+        customer = self._resolve_customer(dte)
 
         gateway_response: dict = {}
         payment_status = None
         amount = None
-        payment_method = None
         try:
             gateway_response = PaymentGatewayClass().get_order(order_id) or {}
             if isinstance(gateway_response, dict):
@@ -80,31 +115,13 @@ class DtePaymentDataClass:
                 amount_block = gateway_response.get("amount") or {}
                 if isinstance(amount_block, dict) and amount_block.get("total") is not None:
                     amount = int(float(amount_block["total"]))
-                payment_method = gateway_response.get("selected_method")
-                if isinstance(payment_method, dict):
-                    payment_method = payment_method.get("name") or payment_method.get("type")
         except Exception as exc:
             gateway_response = {"fetch_error": str(exc)}
 
         rut = getattr(dte, "rut", None) if dte else None
-        customer_name = None
-        branch_name = None
-        if dte and dte.rut:
-            customer = (
-                self.db.query(CustomerModel)
-                .filter(CustomerModel.rut == dte.rut)
-                .first()
-            )
-            if customer:
-                customer_name = getattr(customer, "customer", None)
-        if dte and dte.branch_office_id:
-            branch = (
-                self.db.query(BranchOfficeModel)
-                .filter(BranchOfficeModel.id == dte.branch_office_id)
-                .first()
-            )
-            if branch:
-                branch_name = getattr(branch, "branch_office", None)
+        customer_id = customer.id if customer else None
+        branch_office_id = getattr(dte, "branch_office_id", None) if dte else None
+        payment_type_id = payment_type_id_from_gateway(gateway_response, payment_status)
 
         if amount is None and dte and getattr(dte, "total", None):
             amount = int(dte.total)
@@ -126,27 +143,27 @@ class DtePaymentDataClass:
         if row:
             row.reference_id = reference_id
             row.dte_id = dte.id if dte else row.dte_id
+            row.customer_id = customer_id or row.customer_id
+            row.payment_type_id = payment_type_id or row.payment_type_id
+            row.branch_office_id = branch_office_id or row.branch_office_id
             row.folio = document_folio or row.folio
             row.payment_status = payment_status or row.payment_status
             row.amount = amount if amount is not None else row.amount
             row.rut = rut or row.rut
-            row.customer_name = customer_name or row.customer_name
-            row.branch_office = branch_name or row.branch_office
-            row.payment_method = payment_method or row.payment_method
             row.raw_payload = raw_json
             row.updated_date = now
         else:
             row = DtePaymentDataModel(
                 dte_id=dte.id if dte else None,
+                customer_id=customer_id,
+                payment_type_id=payment_type_id,
+                branch_office_id=branch_office_id,
                 folio=document_folio,
                 reference_id=reference_id,
                 order_id=order_id,
                 payment_status=payment_status,
                 amount=amount,
                 rut=rut,
-                customer_name=customer_name,
-                branch_office=branch_name,
-                payment_method=payment_method,
                 raw_payload=raw_json,
                 added_date=now,
                 updated_date=now,
@@ -156,7 +173,7 @@ class DtePaymentDataClass:
         dte_updated = False
         if dte and payment_status == "completed" and dte.status_id == 4:
             dte.status_id = 5
-            dte.payment_type_id = 2
+            dte.payment_type_id = payment_type_id or 2
             dte.card_amount = amount or dte.total
             dte.payment_date = now.strftime("%Y-%m-%d")
             dte.updated_date = now
@@ -194,18 +211,48 @@ class DtePaymentDataClass:
         return self.serialize(row)
 
     def serialize(self, row: DtePaymentDataModel) -> dict:
+        customer_name = None
+        if row.customer_id:
+            customer = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.id == row.customer_id)
+                .first()
+            )
+            if customer:
+                customer_name = customer.customer
+
+        branch_office_name = None
+        if row.branch_office_id:
+            branch = (
+                self.db.query(BranchOfficeModel)
+                .filter(BranchOfficeModel.id == row.branch_office_id)
+                .first()
+            )
+            if branch:
+                branch_office_name = branch.branch_office
+
+        payment_type_label = None
+        if row.payment_type_id is not None:
+            payment_type_label = PAYMENT_TYPE_LABELS.get(
+                int(row.payment_type_id),
+                f"Tipo {row.payment_type_id}",
+            )
+
         return {
             "id": row.id,
             "dte_id": row.dte_id,
+            "customer_id": row.customer_id,
+            "payment_type_id": row.payment_type_id,
+            "branch_office_id": row.branch_office_id,
             "document_folio": row.folio,
             "reference_id": row.reference_id,
             "order_id": row.order_id,
             "payment_status": row.payment_status,
             "amount": row.amount,
             "rut": row.rut,
-            "customer_name": row.customer_name,
-            "branch_office": row.branch_office,
-            "payment_method": row.payment_method,
+            "customer_name": customer_name,
+            "branch_office": branch_office_name,
+            "payment_type": payment_type_label,
             "added_date": row.added_date.strftime("%d-%m-%Y %H:%M")
             if row.added_date
             else None,
