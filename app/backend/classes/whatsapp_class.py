@@ -104,17 +104,6 @@ def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
     return (order_id or "").strip()
 
 
-def _whatsapp_v2_template_name(db) -> str:
-    """Meta template name for v2 invoice WhatsApp. Default: envio_dte_v2."""
-    name = (os.getenv("WHATSAPP_TEMPLATE_V2") or "envio_dte_v2").strip()
-    row = (
-        db.query(WhatsappTemplateModel)
-        .filter(WhatsappTemplateModel.title == name)
-        .first()
-    )
-    return (row.title if row and row.title else name).strip()
-
-
 def _libredte_issue_date_from_emitido_info(response: requests.Response, fallback_date=None) -> str:
     """
     LibreDTE /dte_emitidos/info puede devolver un objeto JSON; si falla el parseo o viene un
@@ -331,7 +320,7 @@ class WhatsappClass:
     def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None, phone_override=None):
         """
         WhatsApp post-emisión v2 (SimpleFactura + online payment).
-        Plantilla Meta: envio_dte_v2 (mismo cuerpo que envio_dte; botón → /api/payments/pay/{order_id}).
+        Plantilla Meta: envio_dte_v3 (botón → /api/payments/pay/{order_id}).
         """
         from app.backend.classes.payment_gateway_class import PaymentGatewayClass
         from app.backend.classes.customer_ticket_class import CustomerTicketClass
@@ -346,7 +335,16 @@ class WhatsappClass:
         if not customer.phone or str(customer.phone).strip() == "":
             return {"status": "skipped", "message": "Cliente sin teléfono"}
 
-        template_name = _whatsapp_v2_template_name(self.db)
+        whatsapp_template = (
+            self.db.query(WhatsappTemplateModel)
+            .filter(WhatsappTemplateModel.id == 8)
+            .first()
+        )
+        if not whatsapp_template or not whatsapp_template.title:
+            return {
+                "status": "error",
+                "message": "Plantilla WhatsApp id=8 (envio_dte_v3) no encontrada o sin title",
+            }
 
         branch_office = (
             self.db.query(BranchOfficeModel)
@@ -432,7 +430,7 @@ class WhatsappClass:
             "to": f"{customer_phone}",
             "type": "template",
             "template": {
-                "name": template_name,
+                "name": whatsapp_template.title,
                 "language": {"code": "es"},
                 "components": [
                     {
@@ -471,7 +469,7 @@ class WhatsappClass:
         }
 
         print(
-            f"[v2] WhatsApp template={template_name} url_data={url_data} payment_link={payment_link}",
+            f"[v2] WhatsApp template={whatsapp_template.title} url_data={url_data} payment_link={payment_link}",
             flush=True,
         )
         print(payload, flush=True)
@@ -484,7 +482,7 @@ class WhatsappClass:
                 "redirect_url": redirect_url,
                 "payment_link": payment_link,
                 "url_data": url_data,
-                "template": template_name,
+                "template": whatsapp_template.title,
             }
             return token_error
 
@@ -509,7 +507,7 @@ class WhatsappClass:
                         "redirect_url": redirect_url,
                         "payment_link": payment_link,
                         "url_data": url_data,
-                        "template": template_name,
+                        "template": whatsapp_template.title,
                     },
                 }
             return {
@@ -522,7 +520,7 @@ class WhatsappClass:
                     "redirect_url": redirect_url,
                     "payment_link": payment_link,
                     "url_data": url_data,
-                    "template": template_name,
+                    "template": whatsapp_template.title,
                 },
             }
         except Exception as exc:

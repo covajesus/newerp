@@ -135,7 +135,7 @@ def pay_redirect(order_id: str):
 def _pay_redirect_to_gateway(order_id: str):
     """
     Public redirect to payment gateway checkout.
-    WhatsApp template envio_dte_v2: https://intrajisbackend.com/api/payments/pay/{{1}}
+    WhatsApp template envio_dte_v3: https://intrajisbackend.com/api/payments/pay/{{1}}
     """
     normalized = normalize_gateway_order_id(order_id)
     if not normalized:

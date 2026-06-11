@@ -253,7 +253,7 @@ class DtePaymentDataClass:
             "customer_name": customer_name,
             "branch_office": branch_office_name,
             "payment_type": payment_type_label,
-            "added_date": row.added_date.strftime("%d-%m-%Y %H:%M")
+            "added_date": row.added_date.strftime("%d-%m-%Y")
             if row.added_date
             else None,
         }
