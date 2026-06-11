@@ -66,22 +66,27 @@ def validate_whatsapp_access_token() -> dict | None:
         }
 
 
-def payment_proxy_public_url(order_id: str) -> str:
-    """Public URL that redirects to the payment gateway checkout."""
+def payment_proxy_public_url(pay_id: str) -> str:
+    """Public URL that redirects to the payment gateway checkout (folio or legacy order_id)."""
     base = payments_env(
         "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
         default="https://intrajisbackend.com/api/payments/pay",
     ).rstrip("/")
-    return f"{base}/{order_id}"
+    return f"{base}/{pay_id}"
 
 
-def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
+def _payments_whatsapp_url_data(
+    order_id: str,
+    redirect_url: str,
+    *,
+    document_folio: int | str | None = None,
+) -> str:
     """
     Dynamic {{1}} suffix for the WhatsApp template URL button.
 
     Proxy mode (default): Meta template base
     https://intrajisbackend.com/api/payments/pay/{{1}}
-    and we send only the gateway order_id.
+    and we send the document folio so the same message works after a rejected payment.
 
     Direct mode: template uses PAYMENTS_WHATSAPP_URL_BASE + {{1}}.
     """
@@ -101,7 +106,8 @@ def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
         if parsed.query:
             suffix = f"{suffix}?{parsed.query}"
         return suffix
-    return (order_id or "").strip()
+    folio = document_folio or order_id or ""
+    return str(folio).strip()
 
 
 def _libredte_issue_date_from_emitido_info(response: requests.Response, fallback_date=None) -> str:
@@ -399,7 +405,11 @@ class WhatsappClass:
 
         order_id = order_result.get("order_id")
         redirect_url = order_result.get("redirect_url")
-        url_data = _payments_whatsapp_url_data(order_id, redirect_url)
+        url_data = _payments_whatsapp_url_data(
+            order_id,
+            redirect_url,
+            document_folio=folio,
+        )
         if not url_data:
             result = {
                 "status": "error",
@@ -408,7 +418,17 @@ class WhatsappClass:
             }
             print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
             return result
-        payment_link = payment_proxy_public_url(order_id)
+        payment_link = payment_proxy_public_url(url_data)
+
+        from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
+
+        DtePaymentDataClass(self.db).record_order_created(
+            dte=dte_data,
+            customer=customer,
+            order_id=str(order_id or ""),
+            reference_id=str(folio),
+            gateway_response=order_result.get("response"),
+        )
 
         token = whatsapp_access_token()
         graph_url = whatsapp_graph_messages_url()

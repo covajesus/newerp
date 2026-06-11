@@ -23,12 +23,15 @@ PAYMENT_TYPE_LABELS: dict[int, str] = {
 
 
 def document_folio_from_reference_id(reference_id: str | None) -> int | None:
-    """Parse document folio from reference_id (numeric or legacy intrajis-dte-{id}-{folio})."""
+    """Parse document folio from reference_id (numeric, 32130049-r2, legacy intrajis-dte-*)."""
     if not reference_id:
         return None
     ref = str(reference_id).strip()
     if ref.isdigit():
         return int(ref)
+    prefix = re.match(r"^(\d+)", ref)
+    if prefix:
+        return int(prefix.group(1))
     match = re.search(r"(?:intrajis-dte-\d+-)?(\d+)$", ref, re.I)
     if match:
         try:
@@ -60,6 +63,62 @@ def payment_type_id_from_gateway(gateway_response: dict | None, payment_status: 
 class DtePaymentDataClass:
     def __init__(self, db: Session):
         self.db = db
+
+    def record_order_created(
+        self,
+        *,
+        dte,
+        customer,
+        order_id: str,
+        reference_id: str,
+        gateway_response: dict | None = None,
+    ) -> dict:
+        """Persist a newly created Klap order so folio pay links can retry without a new WhatsApp."""
+        order_id = (order_id or "").strip()
+        reference_id = (reference_id or "").strip()
+        if not order_id or not reference_id:
+            return {"status": "error", "message": "order_id and reference_id are required"}
+
+        existing = (
+            self.db.query(DtePaymentDataModel)
+            .filter(DtePaymentDataModel.order_id == order_id)
+            .first()
+        )
+        if existing:
+            return {"status": "success", "payment_data": self.serialize(existing)}
+
+        document_folio = document_folio_from_reference_id(reference_id)
+        if document_folio is None and dte and getattr(dte, "folio", None):
+            document_folio = int(dte.folio)
+        amount = int(getattr(dte, "total", 0) or 0) if dte else None
+        now = datetime.now()
+        raw_json = json.dumps(
+            {"source": "order_created", "gateway": gateway_response or {}},
+            ensure_ascii=False,
+            default=str,
+        )
+        row = DtePaymentDataModel(
+            dte_id=dte.id if dte else None,
+            customer_id=customer.id if customer else None,
+            branch_office_id=getattr(dte, "branch_office_id", None) if dte else None,
+            folio=document_folio,
+            reference_id=reference_id,
+            order_id=order_id,
+            payment_status="pending",
+            amount=amount,
+            rut=getattr(dte, "rut", None) if dte else None,
+            raw_payload=raw_json,
+            added_date=now,
+            updated_date=now,
+        )
+        self.db.add(row)
+        try:
+            self.db.commit()
+            self.db.refresh(row)
+        except Exception as exc:
+            self.db.rollback()
+            return {"status": "error", "message": f"Failed to save payment order: {exc}"}
+        return {"status": "success", "payment_data": self.serialize(row)}
 
     def _find_dte(self, document_folio: int | None, reference_id: str) -> DteModel | None:
         if document_folio:

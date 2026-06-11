@@ -12,10 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
-from app.backend.classes.payment_gateway_class import (
-    PaymentGatewayClass,
-    normalize_gateway_order_id,
-)
+from app.backend.classes.payment_gateway_class import PaymentGatewayClass
 from app.backend.classes.payment_webhook_class import (
     certification_debug_response,
     extract_payment_ids,
@@ -154,24 +151,17 @@ def get_payment_data(order_id: str, db: Session = Depends(get_db)):
 
 
 @payments.get("/pay/{order_id:path}")
-def pay_redirect(order_id: str):
-    return _pay_redirect_to_gateway(order_id)
+def pay_redirect(order_id: str, db: Session = Depends(get_db)):
+    return _pay_redirect_to_gateway(order_id, db)
 
 
-def _pay_redirect_to_gateway(order_id: str):
+def _pay_redirect_to_gateway(pay_id: str, db: Session):
     """
     Public redirect to payment gateway checkout.
     WhatsApp template envio_dte_v3: https://intrajisbackend.com/api/payments/pay/{{1}}
+    {{1}} may be document folio (stable) or legacy gateway order_id.
     """
-    normalized = normalize_gateway_order_id(order_id)
-    if not normalized:
-        raise HTTPException(status_code=400, detail="Invalid payment order_id")
-    redirect_url = PaymentGatewayClass().redirect_url_for_order(normalized)
-    if not redirect_url:
-        raise HTTPException(
-            status_code=404,
-            detail="Payment order not found or missing checkout URL",
-        )
+    redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(pay_id, db)
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
@@ -263,9 +253,20 @@ async def webhook_validation(request: Request):
 @payments.post("/webhooks/confirm")
 async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
     """Mandatory Klap webhook: payment completed."""
-    require_webhook_api_key(request)
     payload = await _read_json(request)
+    apikey_status = log_webhook_apikey_status(request)
     reference_id, order_id = _resolve_payment_ids(payload)
+    print(
+        f"[payments] webhook_confirm ref={reference_id} order={order_id} "
+        f"apikey_header={apikey_status['apikey_header_present']} "
+        f"apikey_match={apikey_status['apikey_match']}",
+        flush=True,
+    )
+    if not _webhook_apikey_optional() and not apikey_status["apikey_match"]:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "403001", "message": "The apikey is not valid"},
+        )
     dte_updated = False
     if reference_id and order_id:
         result = DtePaymentDataClass(db).record_payment_return(
@@ -284,8 +285,8 @@ async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
 
     response = webhook_ok_response(
         source="webhook_confirm",
-        apikey_verified=True,
         dte_updated=dte_updated,
+        **apikey_status,
     )
     if _webhook_debug_enabled():
         response.update(certification_debug_response(request))
@@ -295,9 +296,20 @@ async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
 @payments.post("/webhooks/reject")
 async def webhook_reject(request: Request, db: Session = Depends(get_db)):
     """Klap webhook: payment failed, canceled or expired."""
-    require_webhook_api_key(request)
     payload = await _read_json(request)
+    apikey_status = log_webhook_apikey_status(request)
     reference_id, order_id = _resolve_payment_ids(payload)
+    print(
+        f"[payments] webhook_reject ref={reference_id} order={order_id} "
+        f"apikey_header={apikey_status['apikey_header_present']} "
+        f"apikey_match={apikey_status['apikey_match']}",
+        flush=True,
+    )
+    if not _webhook_apikey_optional() and not apikey_status["apikey_match"]:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "403001", "message": "The apikey is not valid"},
+        )
     if reference_id and order_id:
         DtePaymentDataClass(db).record_payment_return(
             reference_id,
@@ -313,11 +325,39 @@ async def webhook_reject(request: Request, db: Session = Depends(get_db)):
 
     response = webhook_ok_response(
         source="webhook_reject",
-        apikey_verified=True,
+        **apikey_status,
     )
     if _webhook_debug_enabled():
         response.update(certification_debug_response(request))
     return response
+
+
+@payments.post("/webhooks/certification-evidence")
+async def webhook_certification_evidence(request: Request):
+    """
+    JSON for Klap certification email (integracionweb@klap.cl).
+    Requires PAYMENTS_WEBHOOK_DEBUG=true and header apikey = PAYMENTS_API_KEY.
+    """
+    if not _webhook_debug_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    require_webhook_api_key(request)
+    payload = await _read_json(request)
+    body = {
+        "purpose": "Klap certification: header Apikey matches merchant PAYMENTS_API_KEY",
+        **certification_debug_response(request),
+    }
+    if payload:
+        body["sample_payload_received"] = payload
+    return body
+
+
+def _webhook_apikey_optional() -> bool:
+    """Sandbox: Klap webhooks may send apikey that differs from PAYMENTS_API_KEY."""
+    return payments_env("PAYMENTS_WEBHOOK_STRICT_APIKEY", default="false").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _webhook_debug_enabled() -> bool:

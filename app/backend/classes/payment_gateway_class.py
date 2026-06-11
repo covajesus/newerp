@@ -8,16 +8,21 @@ from __future__ import annotations
 
 import re
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 
 import requests
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.backend.classes.payments_env import payments_env
+from app.backend.db.models import CustomerModel, DteModel, DtePaymentDataModel
 
 _GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
 _UNIQUE_ONLY_METHODS = frozenset({"*", "tarjetas_api"})
 _DEFAULT_METHOD_EXPIRATION_METHODS = ("tarjetas", "sodexo", "edenred")
+_RETRY_ORDER_STATUSES = frozenset(
+    {"canceled", "cancelled", "rejected", "expired", "failed", "refunded"}
+)
 
 
 def normalize_payment_methods(raw: str | None) -> list[str]:
@@ -215,7 +220,13 @@ class PaymentGatewayClass:
             "response": body,
         }
 
-    def create_subscriber_dte_order(self, dte, customer) -> dict[str, Any]:
+    def create_subscriber_dte_order(
+        self,
+        dte,
+        customer,
+        *,
+        reference_id: str | None = None,
+    ) -> dict[str, Any]:
         """Payment order for v2 subscriber ticket/invoice."""
         dte_type_id = int(getattr(dte, "dte_type_id", 39) or 39)
         document_folio = int(getattr(dte, "folio", 0) or 0)
@@ -226,7 +237,7 @@ class PaymentGatewayClass:
         if total <= 0:
             return {"status": "error", "message": "Invalid DTE total for payment order"}
 
-        reference_id = str(document_folio)[:100]
+        reference_id = (reference_id or str(document_folio))[:100]
         methods_raw = payments_env("PAYMENTS_METHODS", default="tarjetas")
         methods = normalize_payment_methods(methods_raw)
         print(f"[payments] create_subscriber_dte_order folio={document_folio} methods={methods}", flush=True)
@@ -301,17 +312,200 @@ class PaymentGatewayClass:
                 else redirect_url
             )
         else:
-            whatsapp_url_data = order_id
+            whatsapp_url_data = str(getattr(dte, "folio", "") or order_id or "")
         return {
             "status": "success",
             "order_id": order_id,
             "redirect_url": redirect_url,
-            "payment_link": f"{proxy_base}/{order_id}",
+            "payment_link": f"{proxy_base}/{whatsapp_url_data}",
             "whatsapp_url_data": whatsapp_url_data,
             "response": result.get("response"),
         }
 
+    def _frontend_success_url(self, reference_id: str, order_id: str) -> str:
+        base = payments_env(
+            "PAYMENTS_RETURN_FRONTEND_URL",
+            default="https://intrajis.com/payments/success",
+        ).rstrip("/")
+        qs = urlencode({"referenceId": reference_id, "orderId": order_id})
+        return f"{base}?{qs}"
+
+    def _next_reference_id(self, folio: int, db: Session) -> str:
+        """Unique Klap reference_id per payment attempt (folio, folio-r2, …)."""
+        folio_s = str(folio)
+        refs = (
+            db.query(DtePaymentDataModel.reference_id)
+            .filter(DtePaymentDataModel.folio == folio)
+            .all()
+        )
+        max_attempt = 0
+        for (ref,) in refs:
+            if not ref:
+                continue
+            ref_s = str(ref).strip()
+            if ref_s == folio_s:
+                max_attempt = max(max_attempt, 1)
+                continue
+            match = re.match(rf"^{re.escape(folio_s)}-r(\d+)$", ref_s)
+            if match:
+                max_attempt = max(max_attempt, int(match.group(1)))
+        if max_attempt == 0:
+            return folio_s
+        return f"{folio_s}-r{max_attempt + 1}"
+
+    def checkout_url_for_pay_link(self, pay_id: str, db: Session) -> str:
+        """Resolve /payments/pay/{id} — folio (stable) or legacy gateway order_id."""
+        cleaned = unquote((pay_id or "").strip()).strip("/")
+        for junk in ("{{1}}", "{{ 1 }}", "%7B%7B1%7D%7D", "{1}"):
+            cleaned = cleaned.replace(junk, "")
+        if cleaned.isdigit():
+            return self.checkout_url_for_folio(int(cleaned), db)
+        normalized = normalize_gateway_order_id(cleaned)
+        if normalized and _GATEWAY_ORDER_ID_RE.match(normalized):
+            return self.checkout_url_for_order_id(normalized, db)
+        raise HTTPException(status_code=400, detail="Invalid payment link")
+
+    def _order_checkout_url(self, gateway_order: dict[str, Any]) -> str | None:
+        status = str(gateway_order.get("status") or "").lower()
+        redirect_url = gateway_order.get("redirect_url")
+        if status == "pending" and redirect_url:
+            return str(redirect_url)
+        return None
+
+    def checkout_url_for_folio(self, folio: int, db: Session) -> str:
+        """Stable pay link by document folio — creates a new Klap order if the last one expired."""
+        dte = (
+            db.query(DteModel)
+            .filter(DteModel.folio == folio)
+            .order_by(DteModel.id.desc())
+            .first()
+        )
+        if not dte:
+            raise HTTPException(status_code=404, detail="Document not found for payment")
+
+        if int(getattr(dte, "status_id", 0) or 0) == 5:
+            row = (
+                db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.folio == folio)
+                .order_by(DtePaymentDataModel.id.desc())
+                .first()
+            )
+            if row and row.order_id:
+                return self._frontend_success_url(
+                    str(row.reference_id or folio),
+                    str(row.order_id),
+                )
+
+        customer = (
+            db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+            if dte.rut
+            else None
+        )
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found for payment")
+
+        latest = (
+            db.query(DtePaymentDataModel)
+            .filter(DtePaymentDataModel.folio == folio)
+            .order_by(DtePaymentDataModel.id.desc())
+            .first()
+        )
+        if latest and latest.order_id:
+            try:
+                gateway_order = self.get_order(str(latest.order_id))
+                checkout = self._order_checkout_url(gateway_order)
+                if checkout:
+                    print(
+                        f"[payments] pay folio={folio} reusing pending order={latest.order_id}",
+                        flush=True,
+                    )
+                    return checkout
+                status = str(gateway_order.get("status") or "").lower()
+                if status == "completed":
+                    return self._frontend_success_url(
+                        str(gateway_order.get("reference_id") or folio),
+                        str(latest.order_id),
+                    )
+            except HTTPException:
+                pass
+
+        ref_id = self._next_reference_id(folio, db)
+        print(f"[payments] pay folio={folio} new Klap order reference_id={ref_id}", flush=True)
+        result = self.create_subscriber_dte_order(dte, customer, reference_id=ref_id)
+        if result.get("status") != "success":
+            raise HTTPException(
+                status_code=502,
+                detail=result.get("message") or "Failed to create payment order",
+            )
+        redirect_url = result.get("redirect_url")
+        if not redirect_url:
+            raise HTTPException(status_code=502, detail="Payment gateway missing redirect_url")
+        from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
+
+        DtePaymentDataClass(db).record_order_created(
+            dte=dte,
+            customer=customer,
+            order_id=str(result.get("order_id") or ""),
+            reference_id=ref_id,
+            gateway_response=result.get("response"),
+        )
+        return str(redirect_url)
+
+    def checkout_url_for_order_id(self, order_id: str, db: Session) -> str:
+        """Legacy WhatsApp links by order_id — recreates checkout if Klap order was rejected."""
+        normalized = normalize_gateway_order_id(order_id)
+        if not normalized:
+            raise HTTPException(status_code=400, detail="Invalid payment order_id")
+
+        try:
+            gateway_order = self.get_order(normalized)
+        except HTTPException:
+            row = (
+                db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.order_id == normalized)
+                .first()
+            )
+            if row and row.folio:
+                return self.checkout_url_for_folio(int(row.folio), db)
+            raise
+
+        checkout = self._order_checkout_url(gateway_order)
+        if checkout:
+            return checkout
+
+        status = str(gateway_order.get("status") or "").lower()
+        if status == "completed":
+            return self._frontend_success_url(
+                str(gateway_order.get("reference_id") or ""),
+                normalized,
+            )
+
+        if status in _RETRY_ORDER_STATUSES or not gateway_order.get("redirect_url"):
+            from app.backend.classes.dte_payment_data_class import document_folio_from_reference_id
+
+            folio = document_folio_from_reference_id(gateway_order.get("reference_id"))
+            if folio is None:
+                row = (
+                    db.query(DtePaymentDataModel)
+                    .filter(DtePaymentDataModel.order_id == normalized)
+                    .first()
+                )
+                if row and row.folio:
+                    folio = int(row.folio)
+            if folio is not None:
+                print(
+                    f"[payments] pay order={normalized} status={status} → new order for folio={folio}",
+                    flush=True,
+                )
+                return self.checkout_url_for_folio(folio, db)
+
+        redirect_url = gateway_order.get("redirect_url")
+        if redirect_url:
+            return str(redirect_url)
+        raise HTTPException(status_code=404, detail="Payment order not available for checkout")
+
     def redirect_url_for_order(self, order_id: str) -> str | None:
+        """Deprecated: use checkout_url_for_order_id with db session."""
         if not self.api_key:
             return None
         normalized = normalize_gateway_order_id(order_id)
