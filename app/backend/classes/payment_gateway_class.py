@@ -21,7 +21,7 @@ _GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
 _UNIQUE_ONLY_METHODS = frozenset({"*", "tarjetas_api"})
 _DEFAULT_METHOD_EXPIRATION_METHODS = ("tarjetas", "sodexo", "edenred")
 _RETRY_ORDER_STATUSES = frozenset(
-    {"canceled", "cancelled", "rejected", "expired", "failed", "refunded"}
+    {"canceled", "cancelled", "rejected", "expired", "failed", "refunded", "refund"}
 )
 
 
@@ -380,6 +380,15 @@ class PaymentGatewayClass:
             .order_by(DteModel.id.desc())
             .first()
         )
+        if not dte:
+            pay_row = (
+                db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.folio == folio)
+                .order_by(DtePaymentDataModel.id.desc())
+                .first()
+            )
+            if pay_row and pay_row.dte_id:
+                dte = db.query(DteModel).filter(DteModel.id == pay_row.dte_id).first()
         if not dte:
             raise HTTPException(status_code=404, detail="Document not found for payment")
 

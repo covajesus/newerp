@@ -1,0 +1,7 @@
+{
+  "reference_id": "32130049",
+  "order_id": "1M9738e3440c3e4caea7bf0b7069f7efdb",
+  "status": "pending",
+  "amount": { "currency": "CLP", "total": 1000 },
+  "methods": ["tarjetas"]
+}
