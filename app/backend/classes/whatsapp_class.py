@@ -5,35 +5,94 @@ from dotenv import load_dotenv
 from datetime import datetime
 from urllib.parse import urlparse
 import json
+from app.backend.classes.payments_env import payments_env
 load_dotenv()
 
+WHATSAPP_GRAPH_PHONE_NUMBER_ID = "101066132689690"
+WHATSAPP_GRAPH_API_VERSION = "v20.0"
 
-def klap_payment_proxy_public_url(order_id: str) -> str:
-    """URL pública que redirige a la pasarela Klap (para copiar / referencia)."""
-    base = os.getenv(
+
+def whatsapp_access_token() -> str:
+    """Meta Graph token for WhatsApp (WHATSAPP_ACCESS_TOKEN, fallback LIBREDTE_TOKEN)."""
+    return (
+        os.getenv("WHATSAPP_ACCESS_TOKEN")
+        or os.getenv("LIBREDTE_TOKEN")
+        or ""
+    ).strip()
+
+
+def whatsapp_graph_messages_url() -> str:
+    return (
+        f"https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/"
+        f"{WHATSAPP_GRAPH_PHONE_NUMBER_ID}/messages"
+    )
+
+
+def validate_whatsapp_access_token() -> dict | None:
+    """Return an error dict when the Meta token is missing or invalid."""
+    token = whatsapp_access_token()
+    if not token:
+        return {
+            "status": "error",
+            "message": "WHATSAPP_ACCESS_TOKEN / LIBREDTE_TOKEN is not configured",
+            "whatsapp_accepted": "rejected",
+        }
+    try:
+        response = requests.get(
+            f"https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/me",
+            params={"access_token": token},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            return None
+        payload = response.json() if response.content else {}
+        error = payload.get("error") or {}
+        return {
+            "status": "error",
+            "message": (
+                "Invalid or expired WhatsApp token (Meta Graph API). "
+                "Renew WHATSAPP_ACCESS_TOKEN in Meta Business."
+            ),
+            "status_code": response.status_code,
+            "response": payload,
+            "whatsapp_error_code": error.get("code"),
+            "whatsapp_accepted": "rejected",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Could not validate WhatsApp token: {exc}",
+            "whatsapp_accepted": "rejected",
+        }
+
+
+def payment_proxy_public_url(order_id: str) -> str:
+    """Public URL that redirects to the payment gateway checkout."""
+    base = payments_env(
+        "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
         "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
-        "https://intrajisbackend.com/api/klap/pay",
+        "https://intrajisbackend.com/api/payments/pay",
     ).rstrip("/")
     return f"{base}/{order_id}"
 
 
-def _klap_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
+def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
     """
-    Parámetro {{1}} del botón URL del template WhatsApp.
+    Dynamic {{1}} suffix for the WhatsApp template URL button.
 
-    Modo proxy (default): el template en Meta debe usar
-    https://intrajisbackend.com/api/klap/pay/{{1}}
-    y aquí enviamos solo el order_id de Klap.
+    Proxy mode (default): Meta template base
+    https://intrajisbackend.com/api/payments/pay/{{1}}
+    and we send only the gateway order_id.
 
-    Modo direct: el template debe usar KLAP_WHATSAPP_URL_BASE + {{1}}
-    (p. ej. https://sandbox.mcdesaqa.cl/pagos/{{1}}).
+    Direct mode: template uses PAYMENTS_WHATSAPP_URL_BASE + {{1}}.
     """
-    mode = (os.getenv("KLAP_WHATSAPP_URL_MODE") or "proxy").strip().lower()
+    mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", "KLAP_WHATSAPP_URL_MODE", "proxy").strip().lower()
     if mode == "direct":
         redirect_url = (redirect_url or "").strip()
         if not redirect_url:
             return ""
-        base = os.getenv(
+        base = payments_env(
+            "PAYMENTS_WHATSAPP_URL_BASE",
             "KLAP_WHATSAPP_URL_BASE",
             "https://pagos-pasarela.multicaja.cl/",
         ).rstrip("/") + "/"
@@ -45,6 +104,11 @@ def _klap_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
             suffix = f"{suffix}?{parsed.query}"
         return suffix
     return (order_id or "").strip()
+
+
+# Backward-compatible aliases
+klap_payment_proxy_public_url = payment_proxy_public_url
+_klap_whatsapp_url_data = _payments_whatsapp_url_data
 
 
 def _whatsapp_v2_template_name(db) -> str:
@@ -274,7 +338,7 @@ class WhatsappClass:
     def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None, phone_override=None):
         """
         WhatsApp post-emisión v2 (SimpleFactura + pago Klap).
-        Plantilla Meta: envio_dte_v2 (mismo cuerpo que envio_dte; botón → /api/klap/pay/{order_id}).
+        Plantilla Meta: envio_dte_v2 (mismo cuerpo que envio_dte; botón → /api/payments/pay/{order_id}).
         """
         from app.backend.classes.klap_class import KlapClass
         from app.backend.classes.customer_ticket_class import CustomerTicketClass
@@ -319,27 +383,27 @@ class WhatsappClass:
                 f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
             )
 
-        klap_result = KlapClass().create_subscriber_dte_order(dte_data, customer)
-        if klap_result.get("status") != "success":
+        order_result = KlapClass().create_subscriber_dte_order(dte_data, customer)
+        if order_result.get("status") != "success":
             return {
                 "status": "error",
-                "message": klap_result.get("message") or "No se pudo crear orden Klap",
-                "klap": klap_result,
+                "message": order_result.get("message") or "Failed to create payment order",
+                "payments": order_result,
             }
 
-        order_id = klap_result.get("order_id")
-        redirect_url = klap_result.get("redirect_url")
-        url_data = _klap_whatsapp_url_data(order_id, redirect_url)
+        order_id = order_result.get("order_id")
+        redirect_url = order_result.get("redirect_url")
+        url_data = _payments_whatsapp_url_data(order_id, redirect_url)
         if not url_data:
             return {
                 "status": "error",
-                "message": "Orden Klap sin order_id/redirect_url para botón WhatsApp",
-                "klap": klap_result,
+                "message": "Payment order missing order_id/redirect_url for WhatsApp button",
+                "payments": order_result,
             }
-        payment_link = klap_payment_proxy_public_url(order_id)
+        payment_link = payment_proxy_public_url(order_id)
 
-        token = os.getenv("LIBREDTE_TOKEN")
-        graph_url = "https://graph.facebook.com/v20.0/101066132689690/messages"
+        token = whatsapp_access_token()
+        graph_url = whatsapp_graph_messages_url()
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -419,16 +483,48 @@ class WhatsappClass:
         )
         print(payload, flush=True)
 
+        token_error = validate_whatsapp_access_token()
+        if token_error:
+            print(f"[v2] WhatsApp token check failed: {token_error}", flush=True)
+            token_error["payments"] = {
+                "order_id": order_id,
+                "redirect_url": redirect_url,
+                "payment_link": payment_link,
+                "url_data": url_data,
+                "template": template_name,
+            }
+            return token_error
+
         try:
             response = requests.post(graph_url, json=payload, headers=headers, timeout=45)
             print(response.text, flush=True)
-            response_data = response.json()
+            response_data = response.json() if response.content else {}
+            graph_error = (response_data.get("error") or {}) if isinstance(response_data, dict) else {}
+            if response.status_code != 200 and graph_error.get("code") == 190:
+                return {
+                    "status": "error",
+                    "status_code": response.status_code,
+                    "message": (
+                        "Invalid or expired WhatsApp token (Meta error 190). "
+                        "Renew WHATSAPP_ACCESS_TOKEN in Meta Business."
+                    ),
+                    "response": response_data,
+                    "whatsapp_error_code": 190,
+                    "whatsapp_accepted": "rejected",
+                    "payments": {
+                        "order_id": order_id,
+                        "redirect_url": redirect_url,
+                        "payment_link": payment_link,
+                        "url_data": url_data,
+                        "template": template_name,
+                    },
+                }
             return {
                 "status": "success" if response.status_code == 200 else "error",
                 "status_code": response.status_code,
                 "response": response_data,
                 "whatsapp_accepted": "accepted" if response.status_code == 200 else "rejected",
-                "klap": {
+                "payments": {
                     "order_id": order_id,
                     "redirect_url": redirect_url,
                     "payment_link": payment_link,
@@ -441,7 +537,7 @@ class WhatsappClass:
                 "status": "error",
                 "error": str(exc),
                 "whatsapp_accepted": "rejected",
-                "klap": klap_result,
+                "payments": order_result,
             }
 
     def check_whatsapp_balance(self):

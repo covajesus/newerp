@@ -1,9 +1,8 @@
 """
-Proxy y webhooks para Klap Order API (Boleta2 / Factura2).
+Proxy and webhooks for Klap Order API (Boleta2 / Factura2).
 
 Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
 """
-import os
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
@@ -11,11 +10,13 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.backend.classes.klap_class import KlapClass
+from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
+from app.backend.classes.klap_class import KlapClass, normalize_gateway_order_id
+from app.backend.classes.payments_env import payments_env
 from app.backend.db.database import get_db
 from app.backend.db.models import CustomerModel, DteModel
 
-klap_payments = APIRouter(prefix="/klap", tags=["Klap Payments"])
+klap_payments = APIRouter(prefix="/payments", tags=["Payments"])
 
 
 class KlapUserModel(BaseModel):
@@ -72,20 +73,78 @@ class KlapCreateOrderRequest(BaseModel):
     webhooks: Optional[KlapWebhookModel] = None
 
 
+class KlapPaymentReturnRequest(BaseModel):
+    reference_id: Optional[str] = Field(None, alias="referenceId")
+    order_id: Optional[str] = Field(None, alias="orderId")
+
+    model_config = {"populate_by_name": True}
+
+
 class KlapRefundRequest(BaseModel):
     reference_id: Optional[str] = None
     amount: Optional[float] = None
 
 
-@klap_payments.get("/pay/{order_id}")
+@klap_payments.get("/return")
+def klap_return_redirect(
+    referenceId: Optional[str] = None,
+    orderId: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Return URL alternativa en el backend: guarda y redirige al frontend público.
+    """
+    frontend_base = payments_env(
+        "PAYMENTS_RETURN_FRONTEND_URL",
+        "KLAP_RETURN_FRONTEND_URL",
+        "https://intrajis.com/payments/success",
+    ).rstrip("/")
+    if referenceId and orderId:
+        DtePaymentDataClass(db).record_payment_return(referenceId, orderId, source="return_redirect")
+    from urllib.parse import urlencode
+
+    qs = urlencode({"referenceId": referenceId or "", "orderId": orderId or ""})
+    return RedirectResponse(url=f"{frontend_base}?{qs}", status_code=302)
+
+
+@klap_payments.post("/payment-return")
+def register_payment_return(body: KlapPaymentReturnRequest, db: Session = Depends(get_db)):
+    """Registra retorno Klap (público, sin sesión)."""
+    ref = body.reference_id
+    oid = body.order_id
+    if not ref or not oid:
+        raise HTTPException(status_code=400, detail="referenceId y orderId son obligatorios")
+    result = DtePaymentDataClass(db).record_payment_return(ref, oid, source="frontend_return")
+    if result.get("status") != "success":
+        raise HTTPException(status_code=502, detail=result.get("message") or "Error al registrar pago")
+    return {"message": result}
+
+
+@klap_payments.get("/payment-data/{order_id}")
+def get_payment_data(order_id: str, db: Session = Depends(get_db)):
+    """Consulta datos guardados de un pago Klap (público)."""
+    data = DtePaymentDataClass(db).get_by_order_id(order_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    return {"message": data}
+
+
+@klap_payments.get("/pay/{order_id:path}")
 def pay_redirect(order_id: str):
     """
     Redirección pública al checkout Klap.
-    Usar como base del botón WhatsApp: https://intrajisbackend.com/api/klap/pay/{{1}}
+    Plantilla WhatsApp envio_dte_v2: https://intrajisbackend.com/api/payments/pay/ + variable {{1}}
+    ({{1}} = order_id de Klap; no debe quedar {{1}} literal en la URL final).
     """
-    redirect_url = KlapClass().redirect_url_for_order(order_id)
+    normalized = normalize_gateway_order_id(order_id)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="order_id Klap inválido")
+    redirect_url = KlapClass().redirect_url_for_order(normalized)
     if not redirect_url:
-        raise HTTPException(status_code=404, detail="Orden Klap no encontrada o sin URL de pago")
+        raise HTTPException(
+            status_code=404,
+            detail="Orden Klap no encontrada o sin URL de pago",
+        )
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
@@ -155,16 +214,34 @@ async def webhook_validation(request: Request):
 
 
 @klap_payments.post("/webhooks/confirm")
-async def webhook_confirm(request: Request):
+async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
     payload = await _read_json(request)
-    # TODO: marcar boleta/factura Klap como pagada
+    reference_id = (
+        payload.get("reference_id")
+        or payload.get("referenceId")
+        or (payload.get("order") or {}).get("reference_id")
+    )
+    order_id = payload.get("order_id") or payload.get("orderId")
+    if reference_id and order_id:
+        DtePaymentDataClass(db).record_payment_return(
+            str(reference_id),
+            str(order_id),
+            source="webhook_confirm",
+        )
     return {"status": "ok", "payload": payload}
 
 
 @klap_payments.post("/webhooks/reject")
-async def webhook_reject(request: Request):
+async def webhook_reject(request: Request, db: Session = Depends(get_db)):
     payload = await _read_json(request)
-    # TODO: registrar rechazo de pago Klap
+    reference_id = payload.get("reference_id") or payload.get("referenceId")
+    order_id = payload.get("order_id") or payload.get("orderId")
+    if reference_id and order_id:
+        DtePaymentDataClass(db).record_payment_return(
+            str(reference_id),
+            str(order_id),
+            source="webhook_reject",
+        )
     return {"status": "ok", "payload": payload}
 
 

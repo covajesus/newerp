@@ -2256,3 +2256,22 @@ class CashierSyncCommandModel(Base):
     result_text = Column(Text, nullable=True)
     error_text = Column(Text, nullable=True)
     duration_ms = Column(Integer, nullable=True)
+
+
+class DtePaymentDataModel(Base):
+    __tablename__ = "dtes_payment_data"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dte_id = Column(Integer, nullable=True)
+    folio = Column(Integer, nullable=True)
+    reference_id = Column(String(100), nullable=False)
+    order_id = Column(String(128), nullable=False, unique=True)
+    payment_status = Column(String(32), nullable=True)
+    amount = Column(Integer, nullable=True)
+    rut = Column(String(32), nullable=True)
+    customer_name = Column(String(255), nullable=True)
+    branch_office = Column(String(255), nullable=True)
+    payment_method = Column(String(64), nullable=True)
+    raw_payload = Column(Text, nullable=True)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())

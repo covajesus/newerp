@@ -10,36 +10,73 @@ Autenticación: header `apikey`.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
+from urllib.parse import unquote
 
 import requests
 from fastapi import HTTPException
 
+_GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
+
+
+def normalize_gateway_order_id(raw: str) -> str:
+    """
+    Limpia order_id recibido en /payments/pay/{order_id}.
+    Meta a veces deja {{1}} literal en la URL si la plantilla no usa variable dinámica.
+    Ej.: {{1}}1M37f0...  →  1M37f0...
+    """
+    cleaned = unquote((raw or "").strip())
+    for junk in ("{{1}}", "{{ 1 }}", "%7B%7B1%7D%7D", "{1}"):
+        cleaned = cleaned.replace(junk, "")
+    cleaned = cleaned.strip().strip("/")
+    if cleaned and _GATEWAY_ORDER_ID_RE.match(cleaned):
+        return cleaned
+    # Extraer el primer token con forma de order_id Klap dentro del string
+    match = re.search(r"([0-9][0-9A-Za-z]{20,})", cleaned)
+    return match.group(1) if match else cleaned
+
+
+normalize_klap_order_id = normalize_gateway_order_id
+
+
+from app.backend.classes.payments_env import payments_env
+
 
 class KlapClass:
     def __init__(self):
-        self.api_key = os.getenv("KLAP_API_KEY", "")
-        self.base_url = os.getenv(
+        self.api_key = payments_env("PAYMENTS_API_KEY", "KLAP_API_KEY")
+        self.base_url = payments_env(
+            "PAYMENTS_API_BASE_URL",
             "KLAP_API_BASE_URL",
             "https://api.pasarela.multicaja.cl",
         ).rstrip("/")
-        self.return_url = os.getenv("KLAP_RETURN_URL", "")
-        self.cancel_url = os.getenv("KLAP_CANCEL_URL", "")
-        self.webhook_confirm_url = os.getenv(
+        self.return_url = payments_env(
+            "PAYMENTS_RETURN_URL",
+            "KLAP_RETURN_URL",
+            "https://intrajis.com/payments/success",
+        )
+        self.cancel_url = payments_env("PAYMENTS_CANCEL_URL", "KLAP_CANCEL_URL")
+        self.webhook_confirm_url = payments_env(
+            "PAYMENTS_WEBHOOK_CONFIRM_URL",
             "KLAP_WEBHOOK_CONFIRM_URL",
-            "https://intrajisbackend.com/api/klap/webhooks/confirm",
+            "https://intrajisbackend.com/api/payments/webhooks/confirm",
         )
-        self.webhook_reject_url = os.getenv(
+        self.webhook_reject_url = payments_env(
+            "PAYMENTS_WEBHOOK_REJECT_URL",
             "KLAP_WEBHOOK_REJECT_URL",
-            "https://intrajisbackend.com/api/klap/webhooks/reject",
+            "https://intrajisbackend.com/api/payments/webhooks/reject",
         )
-        self.webhook_validation_url = os.getenv("KLAP_WEBHOOK_VALIDATION_URL", "")
+        self.webhook_validation_url = payments_env(
+            "PAYMENTS_WEBHOOK_VALIDATION_URL",
+            "KLAP_WEBHOOK_VALIDATION_URL",
+        )
 
     def _headers(self) -> dict[str, str]:
         if not self.api_key:
             raise HTTPException(
                 status_code=503,
-                detail="KLAP_API_KEY no configurada en el servidor.",
+                detail="PAYMENTS_API_KEY is not configured on the server.",
             )
         return {
             "apikey": self.api_key,
@@ -130,7 +167,7 @@ class KlapClass:
     def _create_order_safe(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Crea orden Klap sin lanzar HTTPException (uso interno WhatsApp v2)."""
         if not self.api_key:
-            return {"status": "error", "message": "KLAP_API_KEY no configurada en el servidor."}
+            return {"status": "error", "message": "PAYMENTS_API_KEY is not configured on the server."}
         try:
             body = self.create_order(payload)
         except HTTPException as exc:
@@ -158,15 +195,16 @@ class KlapClass:
         Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
         """
         dte_type_id = int(getattr(dte, "dte_type_id", 39) or 39)
-        folio = int(getattr(dte, "folio", 0) or 0)
-        dte_id = getattr(dte, "id", None)
-        label = "Boleta" if dte_type_id == 39 else "Factura"
+        document_folio = int(getattr(dte, "folio", 0) or 0)
+        document_type_label = "Ticket" if dte_type_id == 39 else "Invoice"
         total = int(getattr(dte, "total", 0) or 0)
+        if document_folio <= 0:
+            return {"status": "error", "message": "Invalid document folio for payment order"}
         if total <= 0:
-            return {"status": "error", "message": "Total del DTE inválido para orden Klap"}
+            return {"status": "error", "message": "Invalid DTE total for payment order"}
 
-        reference_id = f"intrajis-dte-{dte_id}-{folio}"[:100]
-        methods_raw = os.getenv("KLAP_PAYMENT_METHODS", "tarjetas")
+        reference_id = str(document_folio)[:100]
+        methods_raw = payments_env("PAYMENTS_METHODS", "KLAP_PAYMENT_METHODS", "tarjetas")
         methods = [m.strip() for m in methods_raw.split(",") if m.strip()]
 
         user: dict[str, str] = {}
@@ -183,20 +221,20 @@ class KlapClass:
         if customer_name and str(customer_name).strip():
             parts = str(customer_name).strip().split(None, 1)
             user["first_name"] = parts[0]
-            user["last_name"] = parts[1] if len(parts) > 1 else "Cliente"
+            user["last_name"] = parts[1] if len(parts) > 1 else "Customer"
         else:
-            user["first_name"] = "Cliente"
+            user["first_name"] = "Customer"
             user["last_name"] = "Jisparking"
 
         payload: dict[str, Any] = {
             "reference_id": reference_id,
-            "description": f"{label} folio {folio}",
+            "description": f"{document_type_label} folio {document_folio}",
             "methods": methods or ["tarjetas"],
             "amount": {"currency": "CLP", "total": total},
             "items": [
                 {
-                    "name": f"{label} folio {folio}",
-                    "code": str(folio),
+                    "name": f"{document_type_label} folio {document_folio}",
+                    "code": str(document_folio),
                     "price": total,
                     "quantity": 1,
                 }
@@ -212,13 +250,15 @@ class KlapClass:
             return result
         order_id = result.get("order_id")
         redirect_url = result.get("redirect_url")
-        proxy_base = os.getenv(
+        proxy_base = payments_env(
+            "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
             "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
-            "https://intrajisbackend.com/api/klap/pay",
+            "https://intrajisbackend.com/api/payments/pay",
         ).rstrip("/")
-        mode = (os.getenv("KLAP_WHATSAPP_URL_MODE") or "proxy").strip().lower()
+        mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", "KLAP_WHATSAPP_URL_MODE", "proxy").strip().lower()
         if mode == "direct" and redirect_url:
-            base = os.getenv(
+            base = payments_env(
+                "PAYMENTS_WHATSAPP_URL_BASE",
                 "KLAP_WHATSAPP_URL_BASE",
                 "https://pagos-pasarela.multicaja.cl/",
             ).rstrip("/") + "/"
@@ -242,8 +282,11 @@ class KlapClass:
         """Obtiene redirect_url de Klap para redirigir al cliente."""
         if not self.api_key:
             return None
+        normalized = normalize_gateway_order_id(order_id)
+        if not normalized:
+            return None
         try:
-            body = self.get_order(order_id)
+            body = self.get_order(normalized)
         except HTTPException:
             return None
         return body.get("redirect_url") if isinstance(body, dict) else None
