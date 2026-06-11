@@ -16,6 +16,41 @@ from fastapi import HTTPException
 from app.backend.classes.payments_env import payments_env
 
 _GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
+_UNIQUE_ONLY_METHODS = frozenset({"*", "tarjetas_api"})
+_DEFAULT_METHOD_EXPIRATION_METHODS = ("tarjetas", "sodexo", "edenred")
+
+
+def normalize_payment_methods(raw: str | None) -> list[str]:
+    """
+    Parse PAYMENTS_METHODS env value for Klap POST /orders.
+
+    Klap 400006: methods marked (U) such as * or tarjetas_api must be alone.
+    Duplicate entries in the list also trigger 400006.
+    """
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for part in (raw or "tarjetas").replace(";", ",").split(","):
+        method = part.strip().lower()
+        if not method or method in seen:
+            continue
+        seen.add(method)
+        ordered.append(method)
+
+    if not ordered:
+        return ["tarjetas"]
+
+    unique_hits = [m for m in ordered if m in _UNIQUE_ONLY_METHODS]
+    if unique_hits:
+        return [unique_hits[0]]
+
+    return ordered
+
+
+def _methods_for_expiration_customs(methods: list[str]) -> list[str]:
+    """Klap expects tarjetas_expiration_minutes etc., not *_expiration_minutes."""
+    if methods == ["*"]:
+        return list(_DEFAULT_METHOD_EXPIRATION_METHODS)
+    return methods
 
 
 def normalize_gateway_order_id(raw: str) -> str:
@@ -135,7 +170,8 @@ class PaymentGatewayClass:
 
         customs = list(body.get("customs") or [])
         customs_keys = {str(c.get("key")) for c in customs if isinstance(c, dict)}
-        for method in body.get("methods") or []:
+        methods = list(body.get("methods") or [])
+        for method in _methods_for_expiration_customs(methods):
             exp_key = f"{method}_expiration_minutes"
             if exp_key not in customs_keys:
                 customs.append({"key": exp_key, "value": "-1"})
@@ -192,7 +228,8 @@ class PaymentGatewayClass:
 
         reference_id = str(document_folio)[:100]
         methods_raw = payments_env("PAYMENTS_METHODS", default="tarjetas")
-        methods = [m.strip() for m in methods_raw.split(",") if m.strip()]
+        methods = normalize_payment_methods(methods_raw)
+        print(f"[payments] create_subscriber_dte_order folio={document_folio} methods={methods}", flush=True)
 
         user: dict[str, str] = {}
         email = getattr(customer, "email", None)
@@ -216,7 +253,7 @@ class PaymentGatewayClass:
         payload: dict[str, Any] = {
             "reference_id": reference_id,
             "description": f"{document_type_label} folio {document_folio}",
-            "methods": methods or ["tarjetas"],
+            "methods": methods,
             "amount": {"currency": "CLP", "total": total},
             "items": [
                 {
@@ -228,7 +265,18 @@ class PaymentGatewayClass:
             ],
             "user": user,
         }
-        return self._create_order_safe(payload)
+        result = self._create_order_safe(payload)
+        if result.get("status") != "success" and methods != ["*"]:
+            msg = str(result.get("message", "")).lower()
+            if "400006" in msg or "payment method list invalid" in msg or "must be unique" in msg:
+                print(
+                    f"[payments] retry folio={document_folio} with methods=['*'] "
+                    f"after: {result.get('message')}",
+                    flush=True,
+                )
+                payload["methods"] = ["*"]
+                result = self._create_order_safe(payload)
+        return result
 
     def payment_url_for_dte(self, dte, customer) -> dict[str, Any]:
         """Create payment order and return proxy link for WhatsApp / copy."""
