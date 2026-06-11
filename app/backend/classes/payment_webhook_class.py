@@ -53,16 +53,14 @@ def require_webhook_api_key(request: Request) -> None:
         )
 
 
-def verify_webhook_api_key_if_present(request: Request) -> bool:
-    """
-    webhook_validation during order creation: verify apikey only when Klap sends it.
-    Returns True when a header was present and matched.
-    """
-    provided = incoming_api_key(request)
-    if not provided:
-        return False
-    require_webhook_api_key(request)
-    return True
+def log_webhook_apikey_status(request: Request) -> dict[str, str | bool]:
+    """Log-only apikey check for webhook_validation (must not block order creation)."""
+    expected = expected_webhook_api_key()
+    provided = incoming_api_key(request) or ""
+    return {
+        "apikey_header_present": bool(provided),
+        "apikey_match": api_keys_match(provided, expected) if provided and expected else False,
+    }
 
 
 def webhook_ok_response(*, source: str, **extra: Any) -> dict[str, Any]:
