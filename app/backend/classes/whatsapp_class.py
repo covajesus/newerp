@@ -70,8 +70,7 @@ def payment_proxy_public_url(order_id: str) -> str:
     """Public URL that redirects to the payment gateway checkout."""
     base = payments_env(
         "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
-        "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
-        "https://intrajisbackend.com/api/payments/pay",
+        default="https://intrajisbackend.com/api/payments/pay",
     ).rstrip("/")
     return f"{base}/{order_id}"
 
@@ -86,15 +85,14 @@ def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
 
     Direct mode: template uses PAYMENTS_WHATSAPP_URL_BASE + {{1}}.
     """
-    mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", "KLAP_WHATSAPP_URL_MODE", "proxy").strip().lower()
+    mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", default="proxy").strip().lower()
     if mode == "direct":
         redirect_url = (redirect_url or "").strip()
         if not redirect_url:
             return ""
         base = payments_env(
             "PAYMENTS_WHATSAPP_URL_BASE",
-            "KLAP_WHATSAPP_URL_BASE",
-            "https://pagos-pasarela.multicaja.cl/",
+            default="https://pagos-pasarela.multicaja.cl/",
         ).rstrip("/") + "/"
         if redirect_url.startswith(base):
             return redirect_url[len(base):]
@@ -106,13 +104,8 @@ def _payments_whatsapp_url_data(order_id: str, redirect_url: str) -> str:
     return (order_id or "").strip()
 
 
-# Backward-compatible aliases
-klap_payment_proxy_public_url = payment_proxy_public_url
-_klap_whatsapp_url_data = _payments_whatsapp_url_data
-
-
 def _whatsapp_v2_template_name(db) -> str:
-    """Nombre Meta de la plantilla v2 (botón Klap). Default: envio_dte_v2."""
+    """Meta template name for v2 invoice WhatsApp. Default: envio_dte_v2."""
     name = (os.getenv("WHATSAPP_TEMPLATE_V2") or "envio_dte_v2").strip()
     row = (
         db.query(WhatsappTemplateModel)
@@ -337,10 +330,10 @@ class WhatsappClass:
 
     def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None, phone_override=None):
         """
-        WhatsApp post-emisión v2 (SimpleFactura + pago Klap).
+        WhatsApp post-emisión v2 (SimpleFactura + online payment).
         Plantilla Meta: envio_dte_v2 (mismo cuerpo que envio_dte; botón → /api/payments/pay/{order_id}).
         """
-        from app.backend.classes.klap_class import KlapClass
+        from app.backend.classes.payment_gateway_class import PaymentGatewayClass
         from app.backend.classes.customer_ticket_class import CustomerTicketClass
 
         customer = (
@@ -383,7 +376,7 @@ class WhatsappClass:
                 f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
             )
 
-        order_result = KlapClass().create_subscriber_dte_order(dte_data, customer)
+        order_result = PaymentGatewayClass().create_subscriber_dte_order(dte_data, customer)
         if order_result.get("status") != "success":
             return {
                 "status": "error",
@@ -826,7 +819,7 @@ class WhatsappClass:
         )
         libredte_body = (issued_dte_info_response.text or "").strip()
         if issued_dte_info_response.status_code != 200 or "No existe el documento" in libredte_body:
-            print("[resend] DTE no está en LibreDTE → send_v2_invoice (Klap)", flush=True)
+            print("[resend] DTE no está en LibreDTE → send_v2_invoice (payments)", flush=True)
             return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
 
         whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()

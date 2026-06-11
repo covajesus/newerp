@@ -93,7 +93,7 @@ from app.backend.routers.surveys import surveys
 from app.backend.routers.documents import documents
 from app.backend.routers.preventive_maintenances import preventive_maintenances
 from app.backend.routers.whatsapp_webhook import whatsapp_webhook
-from app.backend.routers.klap_payments import klap_payments
+from app.backend.routers.payments import payments
 from app.backend.routers.cashier_sync import cashier_sync_router
 from app.backend.routers.delivery_address_tags import delivery_address_tags
 
@@ -219,7 +219,7 @@ app.include_router(documents)
 app.include_router(preventive_maintenances)
 app.include_router(sinister_types)
 app.include_router(whatsapp_webhook)
-app.include_router(klap_payments)
+app.include_router(payments)
 app.include_router(cashier_sync_router)
 app.include_router(delivery_address_tags)
 

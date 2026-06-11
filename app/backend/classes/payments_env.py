@@ -1,4 +1,4 @@
-"""Read PAYMENTS_* env vars with optional legacy KLAP_* fallback."""
+"""Read PAYMENTS_* environment variables."""
 
 from __future__ import annotations
 

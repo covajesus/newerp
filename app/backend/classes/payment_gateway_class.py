@@ -1,15 +1,11 @@
 """
-Cliente HTTP para Klap Order API (Multicaja pasarela e-commerce).
+HTTP client for the e-commerce payment gateway (Multicaja pasarela).
 
-Documentación OpenAPI:
-https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
-Spec: https://api.pasarela.multicaja.cl/docs/swagger/ecommerce_api_payments.yml
-
-Autenticación: header `apikey`.
+Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
+Auth: header `apikey`.
 """
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 from urllib.parse import unquote
@@ -17,14 +13,15 @@ from urllib.parse import unquote
 import requests
 from fastapi import HTTPException
 
+from app.backend.classes.payments_env import payments_env
+
 _GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
 
 
 def normalize_gateway_order_id(raw: str) -> str:
     """
-    Limpia order_id recibido en /payments/pay/{order_id}.
-    Meta a veces deja {{1}} literal en la URL si la plantilla no usa variable dinámica.
-    Ej.: {{1}}1M37f0...  →  1M37f0...
+    Clean order_id received at /payments/pay/{order_id}.
+    Meta sometimes leaves {{1}} literal in the URL when the template is misconfigured.
     """
     cleaned = unquote((raw or "").strip())
     for junk in ("{{1}}", "{{ 1 }}", "%7B%7B1%7D%7D", "{1}"):
@@ -32,45 +29,31 @@ def normalize_gateway_order_id(raw: str) -> str:
     cleaned = cleaned.strip().strip("/")
     if cleaned and _GATEWAY_ORDER_ID_RE.match(cleaned):
         return cleaned
-    # Extraer el primer token con forma de order_id Klap dentro del string
     match = re.search(r"([0-9][0-9A-Za-z]{20,})", cleaned)
     return match.group(1) if match else cleaned
 
 
-normalize_klap_order_id = normalize_gateway_order_id
-
-
-from app.backend.classes.payments_env import payments_env
-
-
-class KlapClass:
+class PaymentGatewayClass:
     def __init__(self):
-        self.api_key = payments_env("PAYMENTS_API_KEY", "KLAP_API_KEY")
+        self.api_key = payments_env("PAYMENTS_API_KEY")
         self.base_url = payments_env(
             "PAYMENTS_API_BASE_URL",
-            "KLAP_API_BASE_URL",
-            "https://api.pasarela.multicaja.cl",
+            default="https://api.pasarela.multicaja.cl",
         ).rstrip("/")
         self.return_url = payments_env(
             "PAYMENTS_RETURN_URL",
-            "KLAP_RETURN_URL",
-            "https://intrajis.com/payments/success",
+            default="https://intrajis.com/payments/success",
         )
-        self.cancel_url = payments_env("PAYMENTS_CANCEL_URL", "KLAP_CANCEL_URL")
+        self.cancel_url = payments_env("PAYMENTS_CANCEL_URL")
         self.webhook_confirm_url = payments_env(
             "PAYMENTS_WEBHOOK_CONFIRM_URL",
-            "KLAP_WEBHOOK_CONFIRM_URL",
-            "https://intrajisbackend.com/api/payments/webhooks/confirm",
+            default="https://intrajisbackend.com/api/payments/webhooks/confirm",
         )
         self.webhook_reject_url = payments_env(
             "PAYMENTS_WEBHOOK_REJECT_URL",
-            "KLAP_WEBHOOK_REJECT_URL",
-            "https://intrajisbackend.com/api/payments/webhooks/reject",
+            default="https://intrajisbackend.com/api/payments/webhooks/reject",
         )
-        self.webhook_validation_url = payments_env(
-            "PAYMENTS_WEBHOOK_VALIDATION_URL",
-            "KLAP_WEBHOOK_VALIDATION_URL",
-        )
+        self.webhook_validation_url = payments_env("PAYMENTS_WEBHOOK_VALIDATION_URL")
 
     def _headers(self) -> dict[str, str]:
         if not self.api_key:
@@ -105,7 +88,7 @@ class KlapClass:
         except requests.RequestException as exc:
             raise HTTPException(
                 status_code=502,
-                detail=f"Error de conexión con Klap: {exc}",
+                detail=f"Payment gateway connection error: {exc}",
             ) from exc
 
         if response.status_code >= 400:
@@ -165,7 +148,6 @@ class KlapClass:
         )
 
     def _create_order_safe(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Crea orden Klap sin lanzar HTTPException (uso interno WhatsApp v2)."""
         if not self.api_key:
             return {"status": "error", "message": "PAYMENTS_API_KEY is not configured on the server."}
         try:
@@ -179,7 +161,7 @@ class KlapClass:
         if not redirect_url:
             return {
                 "status": "error",
-                "message": "Klap no devolvió redirect_url",
+                "message": "Payment gateway did not return redirect_url",
                 "response": body,
             }
         return {
@@ -190,10 +172,7 @@ class KlapClass:
         }
 
     def create_subscriber_dte_order(self, dte, customer) -> dict[str, Any]:
-        """
-        Orden de pago Klap para boleta/factura abonados v2.
-        Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
-        """
+        """Payment order for v2 subscriber ticket/invoice."""
         dte_type_id = int(getattr(dte, "dte_type_id", 39) or 39)
         document_folio = int(getattr(dte, "folio", 0) or 0)
         document_type_label = "Ticket" if dte_type_id == 39 else "Invoice"
@@ -204,7 +183,7 @@ class KlapClass:
             return {"status": "error", "message": "Invalid DTE total for payment order"}
 
         reference_id = str(document_folio)[:100]
-        methods_raw = payments_env("PAYMENTS_METHODS", "KLAP_PAYMENT_METHODS", "tarjetas")
+        methods_raw = payments_env("PAYMENTS_METHODS", default="tarjetas")
         methods = [m.strip() for m in methods_raw.split(",") if m.strip()]
 
         user: dict[str, str] = {}
@@ -244,7 +223,7 @@ class KlapClass:
         return self._create_order_safe(payload)
 
     def payment_url_for_dte(self, dte, customer) -> dict[str, Any]:
-        """Crea orden Klap y devuelve redirect_url + link proxy para WhatsApp/copiar."""
+        """Create payment order and return proxy link for WhatsApp / copy."""
         result = self.create_subscriber_dte_order(dte, customer)
         if result.get("status") != "success":
             return result
@@ -252,15 +231,13 @@ class KlapClass:
         redirect_url = result.get("redirect_url")
         proxy_base = payments_env(
             "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
-            "KLAP_WHATSAPP_PROXY_PUBLIC_BASE",
-            "https://intrajisbackend.com/api/payments/pay",
+            default="https://intrajisbackend.com/api/payments/pay",
         ).rstrip("/")
-        mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", "KLAP_WHATSAPP_URL_MODE", "proxy").strip().lower()
+        mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", default="proxy").strip().lower()
         if mode == "direct" and redirect_url:
             base = payments_env(
                 "PAYMENTS_WHATSAPP_URL_BASE",
-                "KLAP_WHATSAPP_URL_BASE",
-                "https://pagos-pasarela.multicaja.cl/",
+                default="https://pagos-pasarela.multicaja.cl/",
             ).rstrip("/") + "/"
             whatsapp_url_data = (
                 redirect_url[len(base):]
@@ -279,7 +256,6 @@ class KlapClass:
         }
 
     def redirect_url_for_order(self, order_id: str) -> str | None:
-        """Obtiene redirect_url de Klap para redirigir al cliente."""
         if not self.api_key:
             return None
         normalized = normalize_gateway_order_id(order_id)
@@ -292,7 +268,6 @@ class KlapClass:
         return body.get("redirect_url") if isinstance(body, dict) else None
 
     def get_order(self, order_id: str) -> dict[str, Any]:
-        """GET /payment-gateway/v1/orders/{order_id}"""
         return self._request("GET", f"/payment-gateway/v1/orders/{order_id}")
 
     def refund_order(
@@ -300,7 +275,6 @@ class KlapClass:
         order_id: str,
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """POST /payment-gateway/v1/orders/{order_id}/refund"""
         return self._request(
             "POST",
             f"/payment-gateway/v1/orders/{order_id}/refund",
@@ -314,7 +288,6 @@ class KlapClass:
         order_id: str | None = None,
         mc_code: str | None = None,
     ) -> dict[str, Any]:
-        """GET /payment-gateway/v1/transactions"""
         params: dict[str, str] = {}
         if reference_id:
             params["reference_id"] = reference_id
@@ -329,7 +302,6 @@ class KlapClass:
         )
 
     def get_transaction(self, transaction_id: str) -> dict[str, Any]:
-        """GET /payment-gateway/v1/transactions/{transaction_id}"""
         return self._request(
             "GET",
             f"/payment-gateway/v1/transactions/{transaction_id}",

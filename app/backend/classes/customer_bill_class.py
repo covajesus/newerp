@@ -2200,7 +2200,7 @@ class CustomerBillClass:
                 xml=False,
             )
 
-            print("Empieza envio de whatsapp v2 (Klap)", flush=True)
+            print("Empieza envio de whatsapp v2 (payments)", flush=True)
             whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte, form_data.rut)
 
             return {

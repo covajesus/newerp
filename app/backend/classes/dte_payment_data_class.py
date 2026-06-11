@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.backend.classes.klap_class import KlapClass
+from app.backend.classes.payment_gateway_class import PaymentGatewayClass
 from app.backend.db.models import (
     BranchOfficeModel,
     CustomerModel,
@@ -74,7 +74,7 @@ class DtePaymentDataClass:
         amount = None
         payment_method = None
         try:
-            gateway_response = KlapClass().get_order(order_id) or {}
+            gateway_response = PaymentGatewayClass().get_order(order_id) or {}
             if isinstance(gateway_response, dict):
                 payment_status = gateway_response.get("status")
                 amount_block = gateway_response.get("amount") or {}
@@ -182,8 +182,6 @@ class DtePaymentDataClass:
             "payment_data": self.serialize(row),
             "dte_updated": dte_updated,
         }
-
-    record_klap_return = record_payment_return
 
     def get_by_order_id(self, order_id: str) -> dict | None:
         row = (
