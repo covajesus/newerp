@@ -49,6 +49,7 @@ from app.backend.routers.customer_tickets import customer_tickets
 from app.backend.routers.customer_bills import customer_bills
 from app.backend.routers.customer_credit_notes import customer_credit_notes
 from app.backend.routers.machine_tickets import machine_tickets
+from app.backend.routers.cashier_dtes import cashier_dtes
 from app.backend.routers.supervisors import supervisors
 from app.backend.routers.expense_types import expense_types
 from app.backend.routers.received_tributary_documents import received_tributary_documents
@@ -76,6 +77,8 @@ from app.backend.routers.segments import segments
 from app.backend.routers.zones import zones
 from app.backend.routers.principals import principals
 from app.backend.routers.group_details import group_details
+from app.backend.routers.dte_line_item_names import dte_line_item_names
+from app.backend.routers.dte_line_item_details import dte_line_item_details
 from app.backend.routers.accountability import accountability
 from app.backend.routers.remuneration import remuneration
 from app.backend.routers.suppliers import suppliers
@@ -175,6 +178,7 @@ app.include_router(customer_tickets)
 app.include_router(customer_bills)
 app.include_router(customer_credit_notes)
 app.include_router(machine_tickets)
+app.include_router(cashier_dtes)
 app.include_router(supervisors)
 app.include_router(expense_types)
 app.include_router(received_tributary_documents)
@@ -201,6 +205,8 @@ app.include_router(segments)
 app.include_router(zones)
 app.include_router(principals)
 app.include_router(group_details)
+app.include_router(dte_line_item_names)
+app.include_router(dte_line_item_details)
 app.include_router(accountability)
 app.include_router(remuneration)
 app.include_router(suppliers)

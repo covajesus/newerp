@@ -1,7 +1,7 @@
 """
-Incoming webhook handlers for the Klap / Multicaja payment gateway.
+Incoming webhook handlers for the external payment gateway (Multicaja).
 
-Docs: https://developers.klap.cl/webhooks
+Provider docs: https://developers.klap.cl/webhooks
 OpenAPI: https://api.pasarela.multicaja.cl/docs/swagger/ecommerce_api_payments.yml
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ def api_keys_match(provided: str | None, expected: str) -> bool:
 
 def require_webhook_api_key(request: Request) -> None:
     """
-    Klap sends header `apikey` on confirm/reject notifications.
+    The gateway sends header `apikey` on confirm/reject notifications.
     Invalid key -> 403001 (required for production certification).
     """
     expected = expected_webhook_api_key()
@@ -96,7 +96,7 @@ def extract_payment_ids(payload: dict[str, Any]) -> tuple[str | None, str | None
 
 def validate_order_webhook_payload(payload: dict[str, Any]) -> None:
     """
-    webhook_validation runs when Klap creates an order.
+    webhook_validation runs when the gateway creates an order.
     Reject invalid orders before checkout is offered to the payer.
     """
     reference_id = payload.get("reference_id") or payload.get("referenceId")
@@ -145,7 +145,7 @@ def validate_order_webhook_payload(payload: dict[str, Any]) -> None:
 
 def certification_debug_response(request: Request) -> dict[str, str]:
     """
-    Fields useful when Klap asks for evidence that header apikey matches
+    Fields useful when the provider asks for evidence that header apikey matches
     the key configured on the merchant side (production certification).
     """
     expected = expected_webhook_api_key()

@@ -27,9 +27,9 @@ _RETRY_ORDER_STATUSES = frozenset(
 
 def normalize_payment_methods(raw: str | None) -> list[str]:
     """
-    Parse PAYMENTS_METHODS env value for Klap POST /orders.
+    Parse PAYMENTS_METHODS env value for gateway POST /orders.
 
-    Klap 400006: methods marked (U) such as * or tarjetas_api must be alone.
+    Gateway error 400006: methods marked (U) such as * or tarjetas_api must be alone.
     Duplicate entries in the list also trigger 400006.
     """
     ordered: list[str] = []
@@ -52,7 +52,7 @@ def normalize_payment_methods(raw: str | None) -> list[str]:
 
 
 def _methods_for_expiration_customs(methods: list[str]) -> list[str]:
-    """Klap expects tarjetas_expiration_minutes etc., not *_expiration_minutes."""
+    """Gateway expects tarjetas_expiration_minutes etc., not *_expiration_minutes."""
     if methods == ["*"]:
         return list(_DEFAULT_METHOD_EXPIRATION_METHODS)
     return methods
@@ -331,7 +331,7 @@ class PaymentGatewayClass:
         return f"{base}?{qs}"
 
     def _next_reference_id(self, folio: int, db: Session) -> str:
-        """Unique Klap reference_id per payment attempt (folio, folio-r2, …)."""
+        """Unique gateway reference_id per payment attempt (folio, folio-r2, …)."""
         folio_s = str(folio)
         refs = (
             db.query(DtePaymentDataModel.reference_id)
@@ -373,7 +373,7 @@ class PaymentGatewayClass:
         return None
 
     def checkout_url_for_folio(self, folio: int, db: Session) -> str:
-        """Stable pay link by document folio — creates a new Klap order if the last one expired."""
+        """Stable pay link by document folio — creates a new gateway order if the last one expired."""
         dte = (
             db.query(DteModel)
             .filter(DteModel.folio == folio)
@@ -439,7 +439,7 @@ class PaymentGatewayClass:
                 pass
 
         ref_id = self._next_reference_id(folio, db)
-        print(f"[payments] pay folio={folio} new Klap order reference_id={ref_id}", flush=True)
+        print(f"[payments] pay folio={folio} new gateway order reference_id={ref_id}", flush=True)
         result = self.create_subscriber_dte_order(dte, customer, reference_id=ref_id)
         if result.get("status") != "success":
             raise HTTPException(
@@ -461,7 +461,7 @@ class PaymentGatewayClass:
         return str(redirect_url)
 
     def checkout_url_for_order_id(self, order_id: str, db: Session) -> str:
-        """Legacy WhatsApp links by order_id — recreates checkout if Klap order was rejected."""
+        """Legacy WhatsApp links by order_id — recreates checkout if gateway order was rejected."""
         normalized = normalize_gateway_order_id(order_id)
         if not normalized:
             raise HTTPException(status_code=400, detail="Invalid payment order_id")

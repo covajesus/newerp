@@ -1,4 +1,4 @@
-"""Construcción de líneas Detalle (JSON LibreDTE → XML SII) para facturas/boletas con ítems agrupados."""
+"""Build Detalle lines (LibreDTE JSON → SII XML) for grouped invoice/ticket items."""
 
 
 _NMB_ITEM_MAX = 80
@@ -7,66 +7,63 @@ _VLR_CODIGO_MAX = 64
 _UNMD_MAX = 32
 
 
-def libredte_detalle_line_from_group_item(item: dict, *, include_monto_item: bool = True) -> dict:
+def libredte_detail_line_from_group_item(item: dict, *, include_line_amount: bool = True) -> dict:
     """
-    Mapea un ítem normalizado a un dict Detalle compatible con emitir?normalizar=1.
+    Map a normalized item to a Detalle dict compatible with emitir?normalizar=1.
 
-    - NmbItem: nombre breve (item_name, o description, o «Ítem n»).
-    - DscItem: descripción extendida — prioriza columna dsc_item; si no, ``description`` (detalle),
-      para que el payload no quede sin DscItem cuando solo se llenó el detalle y no dsc_item.
-    - CdgItem: solo si hay item_code (objeto TpoCodigo + VlrCodigo, no array; el array rompe el XML del SII).
-    - UnmdItem: solo si hay unit_measure.
+    - NmbItem: short name (item_name, or description, or «Item n»).
+    - DscItem: extended description — prefers dsc_item column; else ``description``.
+    - CdgItem: only when item_code is set (TpoCodigo + VlrCodigo object).
+    - UnmdItem: only when unit_measure is set.
 
-    Boleta electrónica (39): usar ``include_monto_item=False`` — mismas llaves que una boleta simple
-    (solo QtyItem + PrcItem). Enviar también MontoItem con normalizar=1 puede duplicar totales en el XML.
+    Electronic ticket (39): use ``include_line_amount=False`` — same keys as a simple
+    ticket (QtyItem + PrcItem only). Sending MontoItem with normalizar=1 may duplicate totals.
     """
     qty = int(item["quantity"])
-    raw_u = int(item["unit_amount"])
-    monto = int(item["total_amount"])
-    # Precio unitario efectivo si hay descuento (total_amount != qty * unit_amount)
-    if qty > 0 and monto != qty * raw_u:
-        prc = max(0, round(monto / qty))
+    raw_unit = int(item["unit_amount"])
+    line_amount = int(item["total_amount"])
+    if qty > 0 and line_amount != qty * raw_unit:
+        unit_price = max(0, round(line_amount / qty))
     else:
-        prc = raw_u
+        unit_price = raw_unit
 
-    dsc_full = (item.get("description") or "").strip()
-    dsc_col = ""
+    detail_text = (item.get("description") or "").strip()
+    dsc_column = ""
     raw_dsc = item.get("dsc_item")
     if raw_dsc is not None:
         s = str(raw_dsc).strip()
         if s:
-            dsc_col = s[:_DSC_ITEM_MAX]
+            dsc_column = s[:_DSC_ITEM_MAX]
 
     item_name = (item.get("item_name") or "").strip()
     raw_code = item.get("item_code")
-    code = (str(raw_code).strip() if raw_code is not None else "")[:_VLR_CODIGO_MAX]
-    raw_um = item.get("unit_measure")
-    um = (str(raw_um).strip() if raw_um is not None else "")[:_UNMD_MAX]
+    item_code = (str(raw_code).strip() if raw_code is not None else "")[:_VLR_CODIGO_MAX]
+    raw_unit_measure = item.get("unit_measure")
+    unit_measure = (str(raw_unit_measure).strip() if raw_unit_measure is not None else "")[:_UNMD_MAX]
 
     if item_name:
-        nm = item_name[:_NMB_ITEM_MAX]
-    elif dsc_full:
-        nm = dsc_full[:_NMB_ITEM_MAX]
+        name_field = item_name[:_NMB_ITEM_MAX]
+    elif detail_text:
+        name_field = detail_text[:_NMB_ITEM_MAX]
     else:
-        nm = f"Ítem {item.get('line_number', 1)}"
+        name_field = f"Item {item.get('line_number', 1)}"
 
     line: dict = {
-        "NmbItem": nm,
+        "NmbItem": name_field,
         "QtyItem": qty,
-        "PrcItem": prc,
+        "PrcItem": unit_price,
     }
-    if include_monto_item:
-        line["MontoItem"] = monto
+    if include_line_amount:
+        line["MontoItem"] = line_amount
 
-    # DscItem: columna dsc_item o detalle (no enviar solo el guion placeholder de BD)
-    dsc_out = dsc_col if dsc_col else (dsc_full[:_DSC_ITEM_MAX] if dsc_full else "")
+    dsc_out = dsc_column if dsc_column else (detail_text[:_DSC_ITEM_MAX] if detail_text else "")
     if dsc_out and dsc_out.strip() not in ("", "-"):
         line["DscItem"] = dsc_out
 
-    if code:
-        line["CdgItem"] = {"TpoCodigo": "INT1", "VlrCodigo": code}
+    if item_code:
+        line["CdgItem"] = {"TpoCodigo": "INT1", "VlrCodigo": item_code}
 
-    if um:
-        line["UnmdItem"] = um
+    if unit_measure:
+        line["UnmdItem"] = unit_measure
 
     return line

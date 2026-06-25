@@ -16,16 +16,17 @@ import uuid
 import os
 import time
 from sqlalchemy.sql import func
-from app.backend.classes.libredte_dte_lines import libredte_detalle_line_from_group_item
+from app.backend.classes.libredte_dte_lines import libredte_detail_line_from_group_item
 from app.backend.classes.folio_class import FolioClass
 from app.backend.classes.setting_class import SettingClass
+from sqlalchemy import text, bindparam
 
 JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
     "JISBACKEND_SETTINGS_TOKEN_URL",
     "https://jisbackend.com/api/settings/get_token",
 )
 
-DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor SimpleFactura invoiceV2
+DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor externo invoiceV2
 DTE_VERSION_V2_LEGACY = 3  # Borradores v2 creados antes de alinear a dte_version_id=1
 DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
 DTE_V2_HTTP_TIMEOUT = 30
@@ -43,7 +44,7 @@ def v2_invoice_branch_display(branch) -> str:
 
 
 def v2_dte_api_date(dt=None) -> str:
-    """FchEmis/FchVenc en invoiceV2 (yyyy-mm-dd; System.DateTime de SimpleFactura)."""
+    """FchEmis/FchVenc en invoiceV2 (yyyy-mm-dd)."""
     if dt is None:
         return datetime.now().strftime("%Y-%m-%d")
     if isinstance(dt, str):
@@ -142,7 +143,7 @@ class CustomerTicketClass:
             quantity = getattr(item, "quantity", None)
             unit_amount = getattr(item, "unit_amount", None)
             amount = getattr(item, "amount", None)
-            detalle_only = (getattr(item, "description", None) or "").strip()
+            detail_only = (getattr(item, "description", None) or "").strip()
 
             try:
                 q = int(quantity)
@@ -152,7 +153,7 @@ class CustomerTicketClass:
 
             name = self._clean_optional_str(item, "item_name")
             code = self._clean_optional_str(item, "item_code")
-            if q < 1 or u < 0 or (not detalle_only and not name and not code):
+            if q < 1 or u < 0 or (not detail_only and not name and not code):
                 continue
 
             try:
@@ -164,10 +165,10 @@ class CustomerTicketClass:
                 total = q * u
 
             da = self._discount_from_item_input(item)
-            stored_description = detalle_only if detalle_only else "-"
+            stored_description = detail_only if detail_only else "-"
             dsc = self._optional_dsc_item_str(item)
-            if dsc is None and detalle_only:
-                dsc = detalle_only
+            if dsc is None and detail_only:
+                dsc = detail_only
 
             normalized.append({
                 "line_number": idx,
@@ -261,6 +262,19 @@ class CustomerTicketClass:
                 return out
 
         return []
+
+    def _v2_folio_pool_dte_ids(self, dte_ids):
+        """DTE ids whose folio was reserved from the central pool (v2 emit)."""
+        ids = [int(i) for i in (dte_ids or []) if i not in (None, "", 0)]
+        if not ids:
+            return set()
+        stmt = text(
+            "SELECT DISTINCT dte_id FROM folios "
+            "WHERE dte_id IN :dte_ids AND dte_id > 0 "
+            "AND document_type_id IN (33, 39)"
+        ).bindparams(bindparam("dte_ids", expanding=True))
+        rows = self.db.execute(stmt, {"dte_ids": ids}).scalars().all()
+        return {int(r) for r in rows if r is not None}
 
     def get_all(self, rol_id = None, rut = None, group=1, page=0, items_per_page=10, period=None, dte_version_id=1, include_emitted=False):
         try:
@@ -428,6 +442,8 @@ class CustomerTicketClass:
                 if not data:
                     return {"status": "error", "message": "No data found"}
 
+                v2_folio_pool_ids = self._v2_folio_pool_dte_ids([d.id for d in data])
+
                 # Serializar los datos
                 serialized_data = [{
                     "id": dte.id,
@@ -440,7 +456,8 @@ class CustomerTicketClass:
                     "total": dte.total,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "branch_office": dte.branch_office
+                    "branch_office": dte.branch_office,
+                    "v2_emit": dte.id in v2_folio_pool_ids,
                 } for dte in data]
 
                 return {
@@ -455,6 +472,8 @@ class CustomerTicketClass:
             else:
                 data = query.all()
 
+                v2_folio_pool_ids = self._v2_folio_pool_dte_ids([d.id for d in data])
+
                 # Serializar los datos
                 serialized_data = [{
                     "id": dte.id,
@@ -467,7 +486,8 @@ class CustomerTicketClass:
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
-                    "status_id": dte.status_id
+                    "status_id": dte.status_id,
+                    "v2_emit": dte.id in v2_folio_pool_ids,
                 } for dte in data]
 
                 return serialized_data
@@ -714,18 +734,19 @@ class CustomerTicketClass:
         dte.status_id = 2
 
         cid = getattr(form_data, "category_id", None)
+        effective_cid = int(cid) if cid is not None else int(dte.category_id or 1)
         if cid is not None:
-            dte.category_id = cid
-            group_items = self._normalize_group_items(getattr(form_data, "items", []))
-            qty = getattr(form_data, "quantity", None)
-            if cid == 3 and group_items:
+            dte.category_id = effective_cid
+
+        group_items = self._normalize_group_items(getattr(form_data, "items", []))
+        qty = getattr(form_data, "quantity", None)
+        if effective_cid == 3:
+            if group_items:
                 dte.quantity = sum(item["quantity"] for item in group_items)
                 self._replace_ticket_items(dte.id, group_items)
-            elif cid == 3 and qty is not None:
+            elif qty is not None:
                 dte.quantity = int(qty)
-            else:
-                dte.quantity = None
-        else:
+        elif cid is not None:
             dte.category_id = 1
             dte.quantity = None
             self.db.query(CustomerDteItemModel).filter(CustomerDteItemModel.dte_id == dte.id).delete(
@@ -929,7 +950,7 @@ class CustomerTicketClass:
             detail_lines = []
             for item in group_items:
                 detail_lines.append(
-                    libredte_detalle_line_from_group_item(item, include_monto_item=False)
+                    libredte_detail_line_from_group_item(item, include_line_amount=False)
                 )
             if form_data.chip_id == 1:
                 detail_lines.append(
@@ -981,6 +1002,43 @@ class CustomerTicketClass:
                 "PrcItem": amt,
             }
         ]
+
+    def _v2_format_detalle_lines(self, detail_lines, category_id: int) -> tuple[list, int]:
+        """
+        Detalle invoiceV2 (gateway v2).
+        Cat. 1: PrcItem en líneas pre-generadas es bruto (como LibreDTE).
+        # Cat. 3 (group): PrcItem is already net from libredte_detail_line_from_group_item.
+        """
+        prices_are_net = int(category_id or 1) == 3
+        formatted_lines: list[dict] = []
+        total_gross = 0
+        for index, line in enumerate(detail_lines, start=1):
+            qty = int(line.get("QtyItem", 1) or 1)
+            prc_raw = int(line.get("PrcItem", 0) or 0)
+            monto_raw = line.get("MontoItem")
+            if prices_are_net:
+                line_net = int(monto_raw) if monto_raw is not None else qty * prc_raw
+                unit_net = prc_raw if qty <= 1 else max(0, round(line_net / qty))
+                line_gross = round(line_net * 1.19)
+            else:
+                line_gross = int(monto_raw) if monto_raw is not None else qty * prc_raw
+                line_net = round(line_gross / 1.19)
+                unit_net = round(prc_raw / 1.19) if prc_raw else 0
+            total_gross += line_gross
+            entry = {
+                "NroLinDet": str(index),
+                "NmbItem": line.get("NmbItem", "Item"),
+                "QtyItem": str(qty),
+                "UnmdItem": line.get("UnmdItem") or "un",
+                "PrcItem": unit_net,
+                "MontoItem": line_net,
+            }
+            if line.get("DscItem"):
+                entry["DscItem"] = line["DscItem"]
+            if line.get("CdgItem"):
+                entry["CdgItem"] = line["CdgItem"]
+            formatted_lines.append(entry)
+        return formatted_lines, total_gross
 
     def _ticket_receiver_from_customer(self, customer_data: dict) -> dict:
         cd = customer_data["customer_data"]
@@ -1752,7 +1810,7 @@ class CustomerTicketClass:
 
                         WhatsappClass(self.db).notify_payment(dte.folio)
 
-    # --- Emisión v2 (SimpleFactura invoiceV2, dte_version_id = 1) ---
+    # --- Emisión v2 (invoiceV2 gateway, dte_version_id = 1) ---
 
     def create_simplefactura_token(self):
         url = "https://api.simplefactura.cl/token"
@@ -1844,7 +1902,7 @@ class CustomerTicketClass:
             os.getenv("DTE_V2_SUCURSAL") or os.getenv("SIMPLEFACTURA_SUCURSAL") or "Casa_Matriz"
         ).strip() or "Casa_Matriz"
 
-        # SimpleFactura invoiceV2 URL uses the registered branch slug (Casa_Matriz).
+        # Gateway v2 invoiceV2 URL uses the registered branch slug (Casa_Matriz).
         # The parking location is sent in Emisor.CdgSIISucur via ticket_v2_issuer(branch).
         branch_office_name = v2_invoice_branch_display(branch)
         branch_slug = default_branch
@@ -1950,6 +2008,282 @@ class CustomerTicketClass:
             "v2_branch_office": branch_office_name or None,
         }
 
+    def _build_subscriber_credit_note_document_v2(
+        self,
+        customer_data,
+        branch,
+        *,
+        ref_dte_type,
+        ref_folio,
+        ref_date,
+        gross_amount,
+        nc_folio,
+    ):
+        receiver = self._ticket_receiver_from_customer(customer_data)
+        ref_date_str = v2_dte_api_date(ref_date)
+        issue_date = v2_dte_api_date()
+        gross = int(abs(gross_amount))
+        net = round(gross / 1.19)
+        tax = gross - net
+        return {
+            "Encabezado": {
+                "IdDoc": {
+                    "TipoDTE": 61,
+                    "FchEmis": issue_date,
+                    "Folio": int(nc_folio),
+                },
+                "Emisor": ticket_v2_issuer(branch),
+                "Receptor": receiver,
+                "Totales": {
+                    "MntNeto": net,
+                    "IVA": tax,
+                    "MntTotal": gross,
+                },
+            },
+            "Detalle": [
+                {
+                    "NroLinDet": "1",
+                    "IndExe": 0,
+                    "NmbItem": "Nota de Crédito de Venta",
+                    "QtyItem": "1",
+                    "PrcItem": net,
+                    "MontoItem": net,
+                }
+            ],
+            "Referencia": [
+                {
+                    "NroLinRef": 1,
+                    "TpoDocRef": str(ref_dte_type),
+                    "FolioRef": str(ref_folio),
+                    "FchRef": ref_date_str,
+                    "CodRef": 1,
+                    "RazonRef": "Anula factura o boleta",
+                }
+            ],
+        }
+
+    def emit_credit_note_v2(self, document, branch, dte_label="Nota de crédito"):
+        """POST invoiceCreditDebitNotesV2 (NC tipo 61, gateway v2)."""
+        forced = (os.getenv("DTE_V2_FORCE_TOKEN") or os.getenv("SIMPLEFACTURA_FORCE_TOKEN") or "").strip()
+        if forced:
+            token = forced
+        else:
+            result = self.get_token()
+            if result.get("status") != "success":
+                return {"status": "error", "message": result.get("message") or "No se pudo obtener token v2"}
+            token = result.get("accessToken")
+            if not token:
+                return {"status": "error", "message": "Token v2 vacío"}
+
+        default_branch = (
+            os.getenv("DTE_V2_SUCURSAL") or os.getenv("SIMPLEFACTURA_SUCURSAL") or "Casa_Matriz"
+        ).strip() or "Casa_Matriz"
+        branch_office_name = v2_invoice_branch_display(branch)
+        branch_slug = default_branch
+        url = f"https://api.simplefactura.cl/invoiceCreditDebitNotesV2/{branch_slug}/6"
+        payload = {"Documento": document}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        print(
+            f"[v2-nc] URL: {url} (sf_branch={branch_slug}, branch_office={branch_office_name or 'n/a'})",
+            flush=True,
+        )
+        print(f"[v2-nc] JSON payload:\n{json.dumps(payload, ensure_ascii=False, indent=2)}", flush=True)
+
+        t0 = time.time()
+        try:
+            response = requests.post(
+                url,
+                data=json.dumps(payload, ensure_ascii=False),
+                headers=headers,
+                timeout=DTE_V2_HTTP_TIMEOUT,
+            )
+        except requests.Timeout:
+            return {
+                "status": "error",
+                "message": f"NC v2 no respondió a tiempo ({DTE_V2_HTTP_TIMEOUT}s)",
+                "v2_url": url,
+            }
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"Error de conexión NC v2: {exc}", "v2_url": url}
+
+        if response.status_code == 401:
+            try:
+                token = self.fetch_simplefactura_token_from_jisbackend()
+                response = requests.post(
+                    url,
+                    data=json.dumps(payload, ensure_ascii=False),
+                    headers={**headers, "Authorization": f"Bearer {token}"},
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except (ValueError, requests.RequestException) as exc:
+                return {"status": "error", "message": f"No se pudo refrescar token v2: {exc}", "v2_url": url}
+
+        text = (response.text or "").strip()
+        try:
+            body = response.json() if text else {"raw": ""}
+            if not isinstance(body, dict):
+                body = {"raw": text[:500]}
+        except ValueError:
+            body = {"raw": text[:500]}
+
+        print(f"[v2-nc] HTTP {response.status_code} in {time.time() - t0:.2f}s", flush=True)
+
+        if response.status_code >= 400:
+            msg = body.get("message") if isinstance(body, dict) else text[:500]
+            errors = body.get("errors") if isinstance(body, dict) else None
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": f"NC v2 HTTP {response.status_code}: {msg or errors}",
+                "errors": errors,
+                "response": body,
+                "v2_url": url,
+            }
+
+        if isinstance(body, dict) and body.get("status") not in (None, 200):
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": body.get("message") or "NC v2 rechazada",
+                "errors": body.get("errors"),
+                "response": body,
+                "v2_url": url,
+            }
+
+        folio = None
+        data = body.get("data") if isinstance(body, dict) else None
+        if isinstance(data, dict):
+            for key in ("folio", "Folio", "folioDte", "FolioDTE"):
+                if data.get(key) is not None:
+                    folio = data.get(key)
+                    break
+        if folio is None and isinstance(body, dict):
+            for key in ("folio", "Folio"):
+                if body.get(key) is not None:
+                    folio = body.get(key)
+                    break
+
+        return {
+            "status": "success",
+            "http_status": response.status_code,
+            "message": body.get("message") if isinstance(body, dict) else dte_label,
+            "folio": folio,
+            "data": data,
+            "response": body,
+            "v2_url": url,
+        }
+
+    def store_credit_note_v2(self, form_data, ref_dte_type=39, negative_amounts=False):
+        """
+        NC v2 (gateway externo). El folio tipo 61 se reserva en tabla `folios`
+        (document_type_id=61, pool central branch_office_id=0, used_id=0).
+        Igual que boletas (39) y facturas (33) en generate_v2.
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+        if dte.status_id != 4:
+            return {"status": "error", "message": "Solo se puede anular un DTE emitido (status 4)"}
+        if int(dte.dte_type_id) != int(ref_dte_type):
+            return {"status": "error", "message": "Tipo de DTE no coincide"}
+
+        customer = CustomerClass(self.db).get_by_rut(dte.rut)
+        customer_data = json.loads(customer)
+        if "customer_data" not in customer_data:
+            return {"status": "error", "message": "Cliente no encontrado"}
+
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == dte.branch_office_id)
+            .first()
+        )
+        if not branch:
+            return {"status": "error", "message": "Sucursal no encontrada"}
+
+        gross = int(dte.cash_amount) if dte.cash_amount else int(dte.total)
+        ref_date = dte.added_date if dte.added_date else datetime.now()
+
+        # Folio NC desde tabla folios (document_type_id=61), no desde la API.
+        folio_res = FolioClass(self.db).reserve_next_by_document_type(
+            61,
+            branch_office_id=dte.branch_office_id,
+        )
+        if folio_res.get("status") != "success":
+            return folio_res
+
+        reserved_folio = int(folio_res["folio"])
+
+        document = self._build_subscriber_credit_note_document_v2(
+            customer_data,
+            branch,
+            ref_dte_type=ref_dte_type,
+            ref_folio=dte.folio,
+            ref_date=ref_date,
+            gross_amount=gross,
+            nc_folio=reserved_folio,
+        )
+
+        emit_result = self.emit_credit_note_v2(document, branch)
+        if emit_result.get("status") != "success":
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return emit_result
+
+        folio_number = reserved_folio
+
+        dte.status_id = 5
+        dte.reason_id = form_data.reason_id
+        dte.comment = f"Folio de la Nota de Crédito {folio_number}"
+        self.db.add(dte)
+        self.db.commit()
+
+        credit_note_dte = DteModel()
+        credit_note_dte.branch_office_id = dte.branch_office_id
+        credit_note_dte.cashier_id = dte.cashier_id if ref_dte_type == 39 else 0
+        credit_note_dte.dte_type_id = 61
+        credit_note_dte.dte_version_id = DTE_VERSION_V2
+        credit_note_dte.status_id = 5
+        credit_note_dte.chip_id = 0
+        credit_note_dte.rut = customer_data["customer_data"]["rut"]
+        credit_note_dte.folio = folio_number
+        subtotal = round(gross / 1.19)
+        tax = gross - subtotal
+        if negative_amounts:
+            credit_note_dte.cash_amount = -abs(gross)
+            credit_note_dte.card_amount = 0
+            credit_note_dte.subtotal = -abs(subtotal)
+            credit_note_dte.tax = -abs(tax)
+            credit_note_dte.discount = 0
+            credit_note_dte.total = -abs(gross)
+            credit_note_dte.period = datetime.now().strftime("%Y-%m")
+            credit_note_dte.added_date = dte.added_date
+        else:
+            credit_note_dte.cash_amount = gross
+            credit_note_dte.card_amount = 0
+            credit_note_dte.subtotal = subtotal
+            credit_note_dte.tax = tax
+            credit_note_dte.discount = 0
+            credit_note_dte.total = gross
+            credit_note_dte.added_date = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+        credit_note_dte.category_id = 1
+        credit_note_dte.quantity = None
+
+        self.db.add(credit_note_dte)
+        try:
+            self.db.commit()
+            self.db.refresh(credit_note_dte)
+            FolioClass(self.db).bind_folio_to_dte(folio_res["id"], credit_note_dte.id)
+            return {"status": "success", "message": "Credit Note saved successfully"}
+        except Exception as e:
+            self.db.rollback()
+            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            return {"status": "error", "message": f"Error: {str(e)}"}
+
     def _v2_bearer_token(self):
         forced = (os.getenv("DTE_V2_FORCE_TOKEN") or os.getenv("SIMPLEFACTURA_FORCE_TOKEN") or "").strip()
         if forced:
@@ -1972,8 +2306,7 @@ class CustomerTicketClass:
         comments=None,
     ):
         """
-        Envía boleta/factura por correo vía SimpleFactura POST /dte/enviar/mail.
-        Docs: https://documentacion.simplefactura.cl/
+        Envía boleta/factura por correo vía gateway v2 POST /dte/enviar/mail.
         """
         recipients = []
         if isinstance(to_emails, str):
@@ -2070,7 +2403,7 @@ class CustomerTicketClass:
 
     def save_simplefactura_pdf_ticket(self, folio, dte_type_id=39):
         """
-        Descarga PDF desde SimpleFactura getPdf y lo publica en /files/{folio}.pdf
+        Descarga PDF desde gateway v2 getPdf y lo publica en /files/{folio}.pdf
         (mismo path que usa WhatsApp send() con LibreDTE).
         """
         remote_path = f"{int(folio)}.pdf"
@@ -2194,25 +2527,21 @@ class CustomerTicketClass:
         dte.dte_type_id = 39
         dte.dte_version_id = DTE_VERSION_V2
         dte.status_id = status_id
-        dte.chip_id = form_data.chip_id
         dte.rut = form_data.rut
         dte.folio = 0
         cid = getattr(form_data, "category_id", None)
         dte.category_id = cid if cid is not None else 1
-        dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        chip = int(form_data.chip_id or 0)
+        if dte.category_id == 3:
+            chip = 0
+        dte.chip_id = chip
+        gross_base = int(form_data.amount) + (5000 if chip == 1 else 0)
+        dte.cash_amount = gross_base
         dte.card_amount = 0
-        dte.subtotal = (
-            round((form_data.amount + 5000) / 1.19)
-            if form_data.chip_id == 1
-            else round((form_data.amount) / 1.19)
-        )
-        dte.tax = (
-            (form_data.amount + 5000) - round((form_data.amount + 5000) / 1.19)
-            if form_data.chip_id == 1
-            else form_data.amount - round((form_data.amount) / 1.19)
-        )
+        dte.subtotal = round(gross_base / 1.19)
+        dte.tax = gross_base - round(gross_base / 1.19)
         dte.discount = 0
-        dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        dte.total = gross_base
         dte.period = period
         dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -2316,43 +2645,12 @@ class CustomerTicketClass:
             FolioClass(self.db).release_folio_pool(folio_res["id"])
             return detail_lines
 
-        folio_res = FolioClass(self.db).reserve_next_by_document_type(
-            39,
-            branch_office_id=getattr(form_data, "branch_office_id", None),
-            dte_id=getattr(form_data, "id", None),
-        )
-        if folio_res.get("status") != "success":
-            return folio_res
+        category_id = getattr(form_data, "category_id", None)
+        if category_id is None and source_dte is not None:
+            category_id = source_dte.category_id
+        category_id = int(category_id or 1)
 
-        source_dte = self._ticket_source_dte_from_form(form_data)
-        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
-        if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
-            return detail_lines
-
-        formatted_lines = []
-        total_gross = 0
-        for index, line in enumerate(detail_lines, start=1):
-            qty = int(line.get("QtyItem", 1) or 1)
-            unit_gross = int(line.get("PrcItem", 0) or 0)
-            line_gross = line.get("MontoItem")
-            line_gross = int(line_gross) if line_gross is not None else qty * unit_gross
-            total_gross += line_gross
-            line_net = round(line_gross / 1.19)
-            unit_net = round(unit_gross / 1.19)
-            entry = {
-                "NroLinDet": str(index),
-                "NmbItem": line.get("NmbItem", "Item"),
-                "QtyItem": str(qty),
-                "UnmdItem": line.get("UnmdItem") or "un",
-                "PrcItem": unit_net,
-                "MontoItem": line_net,
-            }
-            if line.get("DscItem"):
-                entry["DscItem"] = line["DscItem"]
-            if line.get("CdgItem"):
-                entry["CdgItem"] = line["CdgItem"]
-            formatted_lines.append(entry)
+        formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
         cd = customer_data["customer_data"]
         receiver = {
@@ -2516,35 +2814,18 @@ class CustomerTicketClass:
         if folio_res.get("status") != "success":
             return folio_res
 
-        source_dte = self._ticket_source_dte_from_form(form_data)
+        source_dte = self._ticket_source_dte_from_form(form_data) or dte
         detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
             FolioClass(self.db).release_folio_pool(folio_res["id"])
             return detail_lines
 
-        formatted_lines = []
-        total_gross = 0
-        for index, line in enumerate(detail_lines, start=1):
-            qty = int(line.get("QtyItem", 1) or 1)
-            unit_gross = int(line.get("PrcItem", 0) or 0)
-            line_gross = line.get("MontoItem")
-            line_gross = int(line_gross) if line_gross is not None else qty * unit_gross
-            total_gross += line_gross
-            line_net = round(line_gross / 1.19)
-            unit_net = round(unit_gross / 1.19)
-            entry = {
-                "NroLinDet": str(index),
-                "NmbItem": line.get("NmbItem", "Item"),
-                "QtyItem": str(qty),
-                "UnmdItem": line.get("UnmdItem") or "un",
-                "PrcItem": unit_net,
-                "MontoItem": line_net,
-            }
-            if line.get("DscItem"):
-                entry["DscItem"] = line["DscItem"]
-            if line.get("CdgItem"):
-                entry["CdgItem"] = line["CdgItem"]
-            formatted_lines.append(entry)
+        category_id = getattr(form_data, "category_id", None)
+        if category_id is None and source_dte is not None:
+            category_id = source_dte.category_id
+        category_id = int(category_id or 1)
+
+        formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
         cd = customer_data["customer_data"]
         receiver = {
@@ -2610,19 +2891,6 @@ class CustomerTicketClass:
             }
 
         folio_number = int(folio_res["folio"])
-        if emit_result.get("folio") is not None:
-            try:
-                folio_number = int(emit_result.get("folio"))
-            except (TypeError, ValueError):
-                pass
-        else:
-            id_doc = document.get("Encabezado", {}).get("IdDoc", {})
-            doc_folio = id_doc.get("Folio")
-            if doc_folio is not None:
-                try:
-                    folio_number = int(doc_folio)
-                except (TypeError, ValueError):
-                    pass
 
         dte.folio = folio_number
         dte.status_id = 4

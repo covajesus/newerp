@@ -325,7 +325,7 @@ class WhatsappClass:
 
     def send_v2_invoice(self, dte_data, customer_rut, pdf_url=None, phone_override=None):
         """
-        WhatsApp post-emisión v2 (SimpleFactura + online payment).
+        WhatsApp post-emisión v2 (gateway + online payment).
         Plantilla Meta: envio_dte_v3 (botón → /api/payments/pay/{order_id}).
         """
         from app.backend.classes.payment_gateway_class import PaymentGatewayClass

@@ -104,6 +104,26 @@ class GroupDetailModel(Base):
     id = Column(Integer, primary_key=True)
     group_detail = Column(String(255))
 
+
+class DteLineItemNameModel(Base):
+    """Master names for group DTE line items (tickets/bills v2)."""
+    __tablename__ = 'dte_line_item_names'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_name = Column(String(255), nullable=False)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class DteLineItemDetailModel(Base):
+    """Master details for group DTE line items (tickets/bills v2)."""
+    __tablename__ = 'dte_line_item_details'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_detail = Column(String(255), nullable=False)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
 class ZoneModel(Base):
     __tablename__ = 'zones'
 
@@ -349,6 +369,9 @@ class FolioModel(Base):
     requested_status_id = Column(Integer)
     used_status_id = Column(Integer)
     billed_status_id = Column(Integer)
+    document_type_id = Column(Integer)  # 33 factura, 39 boleta, 61 nota de crédito
+    used_id = Column(Integer)
+    dte_id = Column(Integer)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

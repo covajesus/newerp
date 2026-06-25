@@ -225,8 +225,8 @@ def get_transaction(transaction_id: str):
 @payments.post("/webhooks/validation")
 async def webhook_validation(request: Request):
     """
-    Called by Klap when an order is created (before checkout).
-    Must return 2xx or Klap rejects the order. Apikey is NOT enforced here;
+    Called by the payment gateway when an order is created (before checkout).
+    Must return 2xx or the gateway rejects the order. Apikey is NOT enforced here;
     confirm/reject webhooks enforce apikey for payment notifications.
     """
     payload = await _read_json(request)
@@ -252,7 +252,7 @@ async def webhook_validation(request: Request):
 
 @payments.post("/webhooks/confirm")
 async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
-    """Mandatory Klap webhook: payment completed."""
+    """Mandatory gateway webhook: payment completed."""
     payload = await _read_json(request)
     apikey_status = log_webhook_apikey_status(request)
     reference_id, order_id = _resolve_payment_ids(payload)
@@ -295,7 +295,7 @@ async def webhook_confirm(request: Request, db: Session = Depends(get_db)):
 
 @payments.post("/webhooks/reject")
 async def webhook_reject(request: Request, db: Session = Depends(get_db)):
-    """Klap webhook: payment failed, canceled or expired."""
+    """Gateway webhook: payment failed, canceled or expired."""
     payload = await _read_json(request)
     apikey_status = log_webhook_apikey_status(request)
     reference_id, order_id = _resolve_payment_ids(payload)
@@ -335,7 +335,7 @@ async def webhook_reject(request: Request, db: Session = Depends(get_db)):
 @payments.post("/webhooks/certification-evidence")
 async def webhook_certification_evidence(request: Request):
     """
-    JSON for Klap certification email (integracionweb@klap.cl).
+    JSON for payment provider certification evidence.
     Requires PAYMENTS_WEBHOOK_DEBUG=true and header apikey = PAYMENTS_API_KEY.
     """
     if not _webhook_debug_enabled():
@@ -343,7 +343,7 @@ async def webhook_certification_evidence(request: Request):
     require_webhook_api_key(request)
     payload = await _read_json(request)
     body = {
-        "purpose": "Klap certification: header Apikey matches merchant PAYMENTS_API_KEY",
+        "purpose": "Gateway certification: header Apikey matches merchant PAYMENTS_API_KEY",
         **certification_debug_response(request),
     }
     if payload:
@@ -352,7 +352,7 @@ async def webhook_certification_evidence(request: Request):
 
 
 def _webhook_apikey_optional() -> bool:
-    """Sandbox: Klap webhooks may send apikey that differs from PAYMENTS_API_KEY."""
+    """Sandbox: gateway webhooks may send apikey that differs from PAYMENTS_API_KEY."""
     return payments_env("PAYMENTS_WEBHOOK_STRICT_APIKEY", default="false").strip().lower() not in (
         "1",
         "true",

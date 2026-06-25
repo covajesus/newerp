@@ -2,7 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import desc, cast, Date, func, or_, text
+from sqlalchemy import desc, cast, Date, func, or_, text, bindparam
 from sqlalchemy.dialects import mysql
 from app.backend.db.models import (
     DteModel,
@@ -55,6 +55,18 @@ class CreditNoteFormDataSimulator:
 class DteClass:
     def __init__(self, db):
         self.db = db
+
+    def _v2_folio_pool_dte_ids(self, dte_ids):
+        ids = [int(i) for i in (dte_ids or []) if i not in (None, "", 0)]
+        if not ids:
+            return set()
+        stmt = text(
+            "SELECT DISTINCT dte_id FROM folios "
+            "WHERE dte_id IN :dte_ids AND dte_id > 0 "
+            "AND document_type_id IN (33, 39)"
+        ).bindparams(bindparam("dte_ids", expanding=True))
+        rows = self.db.execute(stmt, {"dte_ids": ids}).scalars().all()
+        return {int(r) for r in rows if r is not None}
 
     def _massive_send_category_filter(self):
         """Envío masivo /send_dtes: solo category_id 1 (estándar) y 3 (grupal)."""
@@ -421,6 +433,8 @@ class DteClass:
             offset = (page - 1) * items_per_page
             data = query.offset(offset).limit(items_per_page).all()
 
+            v2_folio_pool_ids = self._v2_folio_pool_dte_ids([d.id for d in data])
+
             # Mostrar consulta generada
             print(query.statement.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
@@ -444,7 +458,8 @@ class DteClass:
                 "status_id": dte.status_id,
                 "exit_hour": dte.exit_hour,
                 "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                "branch_office": dte.branch_office
+                "branch_office": dte.branch_office,
+                "v2_emit": dte.id in v2_folio_pool_ids,
             } for dte in data]
 
             return {
@@ -1262,6 +1277,32 @@ class DteClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
             
+    def _subscriber_dte_has_credit_note(self, dte) -> bool:
+        """
+        True si el DTE (33/39) ya fue anulado con NC.
+        La NC (tipo 61) guarda el folio anulado en `denied_folio`.
+        """
+        folio = getattr(dte, "folio", None)
+        try:
+            folio_int = int(folio) if folio not in (None, "", 0) else 0
+        except (TypeError, ValueError):
+            folio_int = 0
+        if folio_int <= 0:
+            return False
+
+        folio_keys = {str(folio_int), str(folio).strip()}
+        nc_exists = (
+            self.db.query(DteModel.id)
+            .filter(DteModel.dte_type_id == 61)
+            .filter(DteModel.denied_folio.in_(folio_keys))
+            .first()
+        )
+        if nc_exists:
+            return True
+
+        comment = (getattr(dte, "comment", None) or "").casefold()
+        return "nota de crédito" in comment or "nota de credito" in comment
+
     def open_customer_billing_period(self, period):
         current_period = HelperClass.fix_current_dte_period(period)
 
@@ -1270,12 +1311,16 @@ class DteClass:
         dte_data = (
             self.db.query(DteModel)
             .filter(DteModel.period == last_period)
-            .filter(DteModel.status_id == 5)
+            .filter(DteModel.status_id.in_([4, 5]))
             .filter(DteModel.dte_version_id == 1)
             .filter(DteModel.dte_type_id.in_([33, 39]))
             .filter(DteModel.category_id.in_([3]))
             .all()
         )
+
+        dte_data = [d for d in dte_data if not self._subscriber_dte_has_credit_note(d)]
+
+        period_detail = HelperClass.period_detail_label(current_period)
 
         if dte_data:
             for dte_datum in dte_data:
@@ -1325,7 +1370,7 @@ class DteClass:
                                 quantity=row.quantity,
                                 unit_amount=row.unit_amount,
                                 total_amount=row.total_amount,
-                                description=row.description,
+                                description=period_detail,
                                 item_code=row.item_code,
                                 item_name=row.item_name,
                                 unit_measure=row.unit_measure,

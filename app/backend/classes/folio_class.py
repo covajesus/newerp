@@ -353,7 +353,7 @@ class FolioClass:
     ):
         """
         Reserva folio libre de la pool central (branch_office_id=0, used_id=0).
-        document_type_id: 33 factura, 39 boleta, 61 nota de crédito.
+        Tabla `folios`: document_type_id 33 (factura), 39 (boleta), 61 (nota de crédito).
         Asigna branch_office_id de la sucursal y used_id=1.
         """
         doc_type = int(document_type_id)

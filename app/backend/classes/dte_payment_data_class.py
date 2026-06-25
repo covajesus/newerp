@@ -73,7 +73,7 @@ class DtePaymentDataClass:
         reference_id: str,
         gateway_response: dict | None = None,
     ) -> dict:
-        """Persist a newly created Klap order so folio pay links can retry without a new WhatsApp."""
+        """Persist a newly created gateway order so folio pay links can retry without a new WhatsApp."""
         order_id = (order_id or "").strip()
         reference_id = (reference_id or "").strip()
         if not order_id or not reference_id:

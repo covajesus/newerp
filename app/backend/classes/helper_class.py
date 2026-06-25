@@ -702,3 +702,34 @@ class HelperClass:
         period = period.split('-')
 
         return period[0]  + '-' + period[1] + '-01' + ' 00:00:00'
+
+    _SPANISH_MONTH_NAMES = (
+        "",
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    )
+
+    @staticmethod
+    def period_detail_label(period: str) -> str:
+        """YYYY-MM → detalle legible, p.ej. '2026-06' → 'Junio 2026'."""
+        parts = str(period or "").strip().split("-")
+        if len(parts) < 2:
+            return str(period or "").strip()
+        try:
+            year = int(parts[0])
+            month = int(parts[1])
+        except (TypeError, ValueError):
+            return str(period).strip()
+        if month < 1 or month > 12:
+            return f"{parts[1]} {parts[0]}"
+        return f"{HelperClass._SPANISH_MONTH_NAMES[month]} {year}"

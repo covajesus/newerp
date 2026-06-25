@@ -219,3 +219,16 @@ def pre_accept_v2(id: int, db: Session = Depends(get_db)):
 def reject_v2(id: int, db: Session = Depends(get_db)):
     CustomerTicketClass(db).reject(id)
     return {"message": "success"}
+
+
+@customer_tickets.post("/v2/generate_credit_note")
+def generate_credit_note_v2(
+    customer_credit_note_ticket_inputs: GenerateCustomerCreditNoteTicket,
+    db: Session = Depends(get_db),
+):
+    data = CustomerTicketClass(db).store_credit_note_v2(
+        customer_credit_note_ticket_inputs,
+        ref_dte_type=39,
+        negative_amounts=False,
+    )
+    return {"message": data}

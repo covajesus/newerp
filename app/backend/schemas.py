@@ -1968,6 +1968,28 @@ class UpdateGroupDetail(BaseModel):
     id: int
     group_detail: str
 
+class DteLineItemNameList(BaseModel):
+    page: int
+    items_per_page: int = 10
+
+class StoreDteLineItemName(BaseModel):
+    item_name: str
+
+class UpdateDteLineItemName(BaseModel):
+    id: int
+    item_name: str
+
+class DteLineItemDetailList(BaseModel):
+    page: int
+    items_per_page: int = 10
+
+class StoreDteLineItemDetail(BaseModel):
+    item_detail: str
+
+class UpdateDteLineItemDetail(BaseModel):
+    id: int
+    item_detail: str
+
 class UpdateCollection(BaseModel):
     id: int
     cash_gross_amount: int
@@ -2144,6 +2166,15 @@ class MachineTicketSearch(BaseModel):
     since: Optional[str] = None
     until: Optional[str] = None
     page: int
+
+
+class CashierDteSearch(BaseModel):
+    """Búsqueda de boletas de caja (DB2 / tabla dtes)."""
+    branch_office_id: Optional[int] = None
+    amount: Optional[int] = None
+    since: Optional[str] = None
+    until: Optional[str] = None
+    page: int = 1
 
 class GenerateMachineCreditNoteTicket(BaseModel):
     id: int
