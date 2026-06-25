@@ -939,10 +939,10 @@ class CustomerTicketClass:
             return self.db.query(DteModel).filter(DteModel.id == did_int).first()
         return None
 
-    def _ticket_pre_detalle_lines_from_form(self, form_data, source_dte=None):
+    def _ticket_pre_detalle_lines_from_form(self, form_data, source_dte=None, *, libredte_v1: bool = False):
         """
-        Líneas Detalle para boleta 39 con las mismas reglas que pre_generate_ticket (LibreDTE).
-        Devuelve list[dict] o dict con status error.
+        Líneas Detalle para boleta 39.
+        libredte_v1=True: boleta grupal PXQ envía PrcItem bruto (LibreDTE v1 emitir).
         """
         category_id = getattr(form_data, "category_id", None)
         if category_id is None and source_dte is not None:
@@ -974,7 +974,11 @@ class CustomerTicketClass:
             detail_lines = []
             for item in group_items:
                 detail_lines.append(
-                    libredte_detail_line_from_group_item(item, include_line_amount=False)
+                    libredte_detail_line_from_group_item(
+                        item,
+                        include_line_amount=False,
+                        unit_prices_gross=libredte_v1,
+                    )
                 )
             if form_data.chip_id == 1:
                 detail_lines.append(
@@ -1031,7 +1035,7 @@ class CustomerTicketClass:
         """
         Detalle invoiceV2 (gateway v2).
         Cat. 1: PrcItem en líneas pre-generadas es bruto (como LibreDTE).
-        # Cat. 3 (group): PrcItem is already net from libredte_detail_line_from_group_item.
+        Cat. 3 (group): PrcItem es neto (BD); Totales v2 con IndMntNeto=2.
         """
         prices_are_net = int(category_id or 1) == 3
         formatted_lines: list[dict] = []
@@ -1431,7 +1435,7 @@ class CustomerTicketClass:
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
         source_dte = self._ticket_source_dte_from_form(form_data)
-        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
+        detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte, libredte_v1=True)
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
             return detail_lines
 

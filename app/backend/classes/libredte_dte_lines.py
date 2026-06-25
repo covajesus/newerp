@@ -5,9 +5,15 @@ _NMB_ITEM_MAX = 80
 _DSC_ITEM_MAX = 500
 _VLR_CODIGO_MAX = 64
 _UNMD_MAX = 32
+_IVA_FACTOR = 1.19
 
 
-def libredte_detail_line_from_group_item(item: dict, *, include_line_amount: bool = True) -> dict:
+def libredte_detail_line_from_group_item(
+    item: dict,
+    *,
+    include_line_amount: bool = True,
+    unit_prices_gross: bool = False,
+) -> dict:
     """
     Map a normalized item to a Detalle dict compatible with emitir?normalizar=1.
 
@@ -18,14 +24,23 @@ def libredte_detail_line_from_group_item(item: dict, *, include_line_amount: boo
 
     Electronic ticket (39): use ``include_line_amount=False`` — same keys as a simple
     ticket (QtyItem + PrcItem only). Sending MontoItem with normalizar=1 may duplicate totals.
+
+    ``unit_prices_gross=True``: convierte neto (BD/UI) a bruto para boleta LibreDTE v1,
+    igual que una boleta simple (PrcItem con IVA incluido).
     """
     qty = int(item["quantity"])
     raw_unit = int(item["unit_amount"])
     line_amount = int(item["total_amount"])
     if qty > 0 and line_amount != qty * raw_unit:
-        unit_price = max(0, round(line_amount / qty))
+        unit_price_net = max(0, round(line_amount / qty))
     else:
-        unit_price = raw_unit
+        unit_price_net = raw_unit
+
+    if unit_prices_gross:
+        line_gross = round(line_amount * _IVA_FACTOR)
+        unit_price = max(0, round(line_gross / qty)) if qty > 0 else round(unit_price_net * _IVA_FACTOR)
+    else:
+        unit_price = unit_price_net
 
     detail_text = (item.get("description") or "").strip()
     dsc_column = ""
@@ -54,7 +69,7 @@ def libredte_detail_line_from_group_item(item: dict, *, include_line_amount: boo
         "PrcItem": unit_price,
     }
     if include_line_amount:
-        line["MontoItem"] = line_amount
+        line["MontoItem"] = round(line_amount * _IVA_FACTOR) if unit_prices_gross else line_amount
 
     dsc_out = dsc_column if dsc_column else (detail_text[:_DSC_ITEM_MAX] if detail_text else "")
     if dsc_out and dsc_out.strip() not in ("", "-"):
