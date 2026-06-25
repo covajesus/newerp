@@ -19,6 +19,7 @@ from sqlalchemy.sql import func
 from app.backend.classes.libredte_dte_lines import libredte_detail_line_from_group_item
 from app.backend.classes.folio_class import FolioClass
 from app.backend.classes.setting_class import SettingClass
+from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
 from sqlalchemy import text, bindparam
 
 JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
@@ -82,19 +83,46 @@ def _ticket_total_from_form(form_data):
     return amt
 
 
-def _sync_ticket_dte_amounts_from_form(dte, form_data):
-    """Al asignar folio (emitir), alinear cash_amount/total/subtotal/IVA con el mismo criterio que store."""
-    base = _ticket_total_from_form(form_data)
-    dte.chip_id = form_data.chip_id
-    dte.cash_amount = base
-    dte.total = base
-    dte.subtotal = round(base / 1.19)
-    dte.tax = base - round(base / 1.19)
+def _apply_ticket_draft_amounts(dte, form_data, pxq_items=None):
+    """Persist draft amounts. Boleta grupal (cat 3): neto desde líneas; total/cash_amount con IVA."""
     cid = getattr(form_data, "category_id", None)
-    if cid is not None:
-        dte.category_id = cid
+    if cid is None:
+        cid = getattr(dte, "category_id", None)
+    cid = int(cid or 1)
+    chip = int(getattr(form_data, "chip_id", 0) or 0)
+    if cid == 3:
+        chip = 0
+
+    dte.chip_id = chip
+    dte.category_id = cid
+    dte.discount = 0
+    dte.card_amount = 0
+
+    pxq_net = pxq_net_total_from_items(pxq_items)
+    if cid == 3 and pxq_net is not None:
+        net, tax, gross, cash = dte_totals_from_net(pxq_net)
+        dte.subtotal = net
+        dte.tax = tax
+        dte.total = gross
+        dte.cash_amount = cash
+        return
+
+    raw = int(form_data.amount)
+    gross = raw + (5000 if chip == 1 else 0)
+    net = round(gross / 1.19)
+    tax = gross - net
+    dte.subtotal = net
+    dte.tax = tax
+    dte.total = gross
+    dte.cash_amount = gross
+
+
+def _sync_ticket_dte_amounts_from_form(dte, form_data, pxq_items=None):
+    """Al asignar folio (emitir), alinear cash_amount/total/subtotal/IVA con store."""
+    _apply_ticket_draft_amounts(dte, form_data, pxq_items=pxq_items)
+    cid = getattr(dte, "category_id", None)
     qty = getattr(form_data, "quantity", None)
-    if getattr(dte, "category_id", None) == 3:
+    if cid == 3:
         if qty is not None:
             dte.quantity = int(qty)
     else:
@@ -753,11 +781,7 @@ class CustomerTicketClass:
                 synchronize_session=False
             )
 
-        dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-        dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
-        dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
-        dte.discount = 0
-        dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
+        _apply_ticket_draft_amounts(dte, form_data, pxq_items=group_items if group_items else None)
 
         self.db.commit()
         self.db.refresh(dte)
@@ -1142,8 +1166,10 @@ class CustomerTicketClass:
                 if dte:
                     dte.folio = folio
                     dte.status_id = 4
-                    _sync_ticket_dte_amounts_from_form(dte, form_data)
                     group_items = self._get_group_items_for_generation(form_data, dte)
+                    _sync_ticket_dte_amounts_from_form(
+                        dte, form_data, pxq_items=group_items if group_items else None
+                    )
                     if getattr(dte, "category_id", None) == 3:
                         if group_items:
                             dte.quantity = sum(item["quantity"] for item in group_items)
@@ -1198,15 +1224,8 @@ class CustomerTicketClass:
             cid = getattr(form_data, "category_id", None)
             dte.category_id = cid if cid is not None else 1
 
-            dte.cash_amount = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-            dte.card_amount = 0
-            dte.subtotal = round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else round((form_data.amount)/1.19)
-            dte.tax = (form_data.amount + 5000) - round((form_data.amount + 5000)/1.19) if form_data.chip_id == 1 else form_data.amount - round((form_data.amount)/1.19)
-            dte.discount = 0
-            dte.total = form_data.amount + 5000 if form_data.chip_id == 1 else form_data.amount
-            dte.period = period
-            dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             group_items = self._normalize_group_items(getattr(form_data, "items", []))
+            _apply_ticket_draft_amounts(dte, form_data, pxq_items=group_items if group_items else None)
             qty = getattr(form_data, "quantity", None)
             if dte.category_id == 3 and group_items:
                 dte.quantity = sum(item["quantity"] for item in group_items)
@@ -1214,6 +1233,9 @@ class CustomerTicketClass:
                 dte.quantity = int(qty)
             else:
                 dte.quantity = None
+
+            dte.period = period
+            dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             self.db.add(dte)
 
@@ -2535,17 +2557,11 @@ class CustomerTicketClass:
         if dte.category_id == 3:
             chip = 0
         dte.chip_id = chip
-        gross_base = int(form_data.amount) + (5000 if chip == 1 else 0)
-        dte.cash_amount = gross_base
-        dte.card_amount = 0
-        dte.subtotal = round(gross_base / 1.19)
-        dte.tax = gross_base - round(gross_base / 1.19)
-        dte.discount = 0
-        dte.total = gross_base
+        group_items = self._normalize_group_items(getattr(form_data, "items", []))
+        _apply_ticket_draft_amounts(dte, form_data, pxq_items=group_items if group_items else None)
         dte.period = period
         dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        group_items = self._normalize_group_items(getattr(form_data, "items", []))
         qty = getattr(form_data, "quantity", None)
         if dte.category_id == 3 and group_items:
             dte.quantity = sum(item["quantity"] for item in group_items)
@@ -2896,8 +2912,10 @@ class CustomerTicketClass:
         dte.status_id = 4
         dte.dte_version_id = DTE_VERSION_V2
         dte.updated_date = datetime.now()
-        _sync_ticket_dte_amounts_from_form(dte, form_data)
         group_items = self._get_group_items_for_generation(form_data, dte)
+        _sync_ticket_dte_amounts_from_form(
+            dte, form_data, pxq_items=group_items if group_items else None
+        )
         if getattr(dte, "category_id", None) == 3:
             if group_items:
                 dte.quantity = sum(item["quantity"] for item in group_items)

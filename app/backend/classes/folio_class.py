@@ -347,6 +347,15 @@ class FolioClass:
                     return "No hay folios disponibles en el CAF"
 
     ALLOWED_DOCUMENT_TYPE_IDS = (33, 39, 61)
+    FOLIO_DOC_TYPE_LABELS = {
+        33: "Facturas",
+        39: "Boletas",
+        61: "Notas de Crédito",
+    }
+
+    def _no_folios_pool_message(self, document_type_id: int) -> str:
+        label = self.FOLIO_DOC_TYPE_LABELS.get(int(document_type_id), "documentos")
+        return f"No hay más folios para {label}"
 
     def reserve_next_by_document_type(
         self, document_type_id: int, branch_office_id: int, dte_id=None
@@ -402,10 +411,7 @@ class FolioClass:
             if not row:
                 return {
                     "status": "error",
-                    "message": (
-                        f"No hay folios disponibles para document_type_id {doc_type} "
-                        "(pool central branch_office_id=0)"
-                    ),
+                    "message": self._no_folios_pool_message(doc_type),
                 }
 
             folio_id = int(row["id"])

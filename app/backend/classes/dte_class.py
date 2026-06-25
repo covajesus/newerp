@@ -20,6 +20,7 @@ from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.customer_bill_class import CustomerBillClass
 from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillClass
+from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
 
 
 # Clases auxiliares para simulación de datos de formulario
@@ -1303,6 +1304,25 @@ class DteClass:
         comment = (getattr(dte, "comment", None) or "").casefold()
         return "nota de crédito" in comment or "nota de credito" in comment
 
+    def _period_open_header_amounts(self, source_dte, source_item_rows):
+        """
+        Montos del borrador del nuevo periodo: subtotal (neto), tax (IVA), total/cash_amount (bruto).
+        Prioriza la suma neta de líneas PXQ; si no hay líneas, copia el encabezado del periodo anterior.
+        """
+        if source_item_rows:
+            item_dicts = [{"total_amount": row.total_amount} for row in source_item_rows]
+            pxq_net = pxq_net_total_from_items(item_dicts)
+            if pxq_net is not None:
+                subtotal, tax, total, cash = dte_totals_from_net(pxq_net)
+                return int(cash), int(subtotal), int(tax), int(total)
+
+        return (
+            int(source_dte.cash_amount or 0),
+            int(source_dte.subtotal or 0),
+            int(source_dte.tax or 0),
+            int(source_dte.total or 0),
+        )
+
     def open_customer_billing_period(self, period):
         current_period = HelperClass.fix_current_dte_period(period)
 
@@ -1312,7 +1332,7 @@ class DteClass:
             self.db.query(DteModel)
             .filter(DteModel.period == last_period)
             .filter(DteModel.status_id.in_([4, 5]))
-            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.dte_version_id.in_([1, 2]))
             .filter(DteModel.dte_type_id.in_([33, 39]))
             .filter(DteModel.category_id.in_([3]))
             .all()
@@ -1327,31 +1347,9 @@ class DteClass:
 
                 added_date = HelperClass.create_period_date(period)
                 src_category = int(dte_datum.category_id) if dte_datum.category_id is not None else 1
+                src_version = int(dte_datum.dte_version_id or 1)
 
-                dte = DteModel(
-                        rut=dte_datum.rut,
-                        branch_office_id=dte_datum.branch_office_id,
-                        cashier_id=0,
-                        dte_type_id=dte_datum.dte_type_id,
-                        dte_version_id=1,
-                        expense_type_id=25,
-                        chip_id=dte_datum.chip_id or 0,
-                        status_id=1,
-                        cash_amount=dte_datum.cash_amount,
-                        card_amount=0,
-                        subtotal=dte_datum.subtotal,
-                        tax=dte_datum.tax,
-                        discount=0,
-                        total=dte_datum.total,
-                        period=current_period,
-                        category_id=src_category,
-                        quantity=dte_datum.quantity if src_category == 3 else None,
-                        added_date=added_date
-                    )
-
-                self.db.add(dte)
-                self.db.flush()
-
+                source_items = []
                 if src_category == 3:
                     source_items = (
                         self.db.query(CustomerDteItemModel)
@@ -1362,6 +1360,38 @@ class DteClass:
                         )
                         .all()
                     )
+
+                cash_amount, subtotal, tax, total = self._period_open_header_amounts(
+                    dte_datum, source_items
+                )
+                chip_id = 0 if src_category == 3 else int(dte_datum.chip_id or 0)
+
+                dte = DteModel(
+                        rut=dte_datum.rut,
+                        branch_office_id=dte_datum.branch_office_id,
+                        cashier_id=0,
+                        dte_type_id=dte_datum.dte_type_id,
+                        dte_version_id=src_version,
+                        expense_type_id=25,
+                        chip_id=chip_id,
+                        status_id=1,
+                        folio=0,
+                        cash_amount=cash_amount,
+                        card_amount=0,
+                        subtotal=subtotal,
+                        tax=tax,
+                        discount=0,
+                        total=total,
+                        period=current_period,
+                        category_id=src_category,
+                        quantity=dte_datum.quantity if src_category == 3 else None,
+                        added_date=added_date
+                    )
+
+                self.db.add(dte)
+                self.db.flush()
+
+                if src_category == 3 and source_items:
                     for row in source_items:
                         self.db.add(
                             CustomerDteItemModel(

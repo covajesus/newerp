@@ -17,6 +17,7 @@ from app.backend.classes.libredte_dte_lines import libredte_detail_line_from_gro
 from app.backend.classes.customer_ticket_class import CustomerTicketClass, DTE_VERSION_V2, ticket_v2_issuer, v2_dte_api_date
 from app.backend.classes.folio_class import FolioClass
 from datetime import timedelta
+from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
 
 
 def _bill_total_from_form(form_data, dte_row=None):
@@ -36,8 +37,21 @@ def _bill_total_from_form(form_data, dte_row=None):
     return int(form_data.amount)
 
 
-def _apply_bill_draft_amounts(dte, form_data):
-    """Persist draft amounts. Cat 2: net in form; cat 3 group: gross in form (same as group tickets)."""
+def _bill_gross_for_dte_match(form_data, dte_row=None):
+    """Total bruto (dtes.total / cash_amount) para buscar borrador o DTE emitido."""
+    cid = getattr(form_data, "category_id", None)
+    if cid is None and dte_row is not None:
+        cid = getattr(dte_row, "category_id", None)
+    cid = int(cid or 1)
+    base = int(_bill_total_from_form(form_data, dte_row))
+    if cid == 2:
+        _, _, gross, _ = dte_totals_from_net(base)
+        return gross
+    return base
+
+
+def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
+    """Persist draft amounts. Cat 2: neto; cat 3: bruto en form, neto desde líneas si hay PXQ."""
     cid = getattr(form_data, "category_id", None)
     if cid is None:
         cid = getattr(dte, "category_id", None)
@@ -47,26 +61,33 @@ def _apply_bill_draft_amounts(dte, form_data):
         chip = 0
 
     raw = int(form_data.amount)
+    pxq_net = pxq_net_total_from_items(pxq_items)
+
     dte.discount = 0
     dte.chip_id = chip
     dte.category_id = cid
 
     if cid == 3:
-        gross = raw
-        net = round(gross / 1.19)
+        if pxq_net is not None:
+            net, tax, gross, cash = dte_totals_from_net(pxq_net)
+        else:
+            gross = raw
+            net = round(gross / 1.19)
+            tax = gross - net
+            cash = gross
         dte.subtotal = net
         dte.total = gross
-        dte.tax = gross - net
-        dte.cash_amount = gross
+        dte.tax = tax
+        dte.cash_amount = cash
         return
 
     if cid == 2:
-        net = raw
-        gross = round(net * 1.19)
+        net = pxq_net if pxq_net is not None else raw
+        _, tax, gross, cash = dte_totals_from_net(net)
         dte.subtotal = net
         dte.total = gross
-        dte.tax = gross - net
-        dte.cash_amount = gross
+        dte.tax = tax
+        dte.cash_amount = cash
         return
 
     gross = raw + 5000 if chip == 1 else raw
@@ -76,39 +97,43 @@ def _apply_bill_draft_amounts(dte, form_data):
     dte.total = gross
 
 
-def _sync_bill_dte_amounts_from_form(dte, form_data):
+def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
     """
     Al emitir folio, fijar montos en dtes.
-    - category_id 1: lógica estándar (total = monto base; IVA por división 19 %).
-    - category_id 2/3: regla solicitada en generate_bill:
-      tomar monto base, sumarle 19 % para total, y dejar IVA como diferencia entre
-      el total anterior guardado y el nuevo total.
+    Cat 2/3 con líneas PXQ: subtotal = suma neta, IVA = total − neto, cash_amount/total = bruto.
     """
-    base = int(_bill_total_from_form(form_data))
-    previous_total = int(getattr(dte, "total", 0) or 0)
     cid = getattr(form_data, "category_id", None)
     if cid is None:
         cid = getattr(dte, "category_id", None)
-    if cid is None:
-        cid = 1
+    cid = int(cid or 1)
 
     dte.chip_id = form_data.chip_id
-    if cid == 2:
-        new_total = round(base * 1.19)
-        dte.cash_amount = new_total
-        dte.subtotal = base
-        dte.total = new_total
-        dte.tax = new_total - previous_total
-        dte.category_id = cid
-    elif cid == 3:
-        gross = base
-        net = round(gross / 1.19)
-        dte.cash_amount = gross
+    pxq_net = pxq_net_total_from_items(pxq_items)
+
+    if cid == 3:
+        dte.chip_id = 0
+        if pxq_net is not None:
+            net, tax, gross, cash = dte_totals_from_net(pxq_net)
+        else:
+            gross = int(_bill_total_from_form(form_data))
+            net = round(gross / 1.19)
+            tax = gross - net
+            cash = gross
+        dte.cash_amount = cash
         dte.subtotal = net
         dte.total = gross
-        dte.tax = gross - net
+        dte.tax = tax
+        dte.category_id = cid
+    elif cid == 2:
+        net = pxq_net if pxq_net is not None else int(_bill_total_from_form(form_data))
+        _, tax, gross, cash = dte_totals_from_net(net)
+        dte.cash_amount = cash
+        dte.subtotal = net
+        dte.total = gross
+        dte.tax = tax
         dte.category_id = cid
     else:
+        base = int(_bill_total_from_form(form_data))
         dte.cash_amount = base
         dte.subtotal = round(base / 1.19)
         dte.tax = base - round(base / 1.19)
@@ -524,7 +549,7 @@ class CustomerBillClass:
         Sirve para leer OC en pre_generate cuando el front no manda id (no masivo).
         """
         period_str = datetime.now().strftime("%Y-%m")
-        expected_total = _bill_total_from_form(form_data)
+        expected_total = _bill_gross_for_dte_match(form_data)
         rut_clause = dte_rut_sql_or(DteModel.rut, form_data.rut)
 
         def _q(require_total: bool):
@@ -1134,11 +1159,11 @@ class CustomerBillClass:
         # Actualizar campos
         dte.branch_office_id = form_data.branch_office_id
         dte.rut = form_data.rut
-        _apply_bill_draft_amounts(dte, form_data)
+        items = self._normalize_bill_items(getattr(form_data, "items", []))
+        _apply_bill_draft_amounts(dte, form_data, pxq_items=items if items else None)
         dte.status_id = 2
         qty = getattr(form_data, "quantity", None)
         dte.quantity = int(qty) if qty is not None else None
-        items = self._normalize_bill_items(getattr(form_data, "items", []))
         if items:
             dte.quantity = sum(i["quantity"] for i in items)
 
@@ -1466,7 +1491,7 @@ class CustomerBillClass:
             print(f'PDF guardado como {folio}.pdf')
 
     def generate(self, form_data):
-        expected_total_doc = _bill_total_from_form(form_data)
+        expected_total_doc = _bill_gross_for_dte_match(form_data)
         check_dte_existence = self.db.query(DteModel).filter(
             DteModel.branch_office_id == form_data.branch_office_id,
             DteModel.rut == form_data.rut,
@@ -1502,8 +1527,8 @@ class CustomerBillClass:
                 if dte:
                     dte.folio = folio
                     dte.status_id = 4
-                    _sync_bill_dte_amounts_from_form(dte, form_data)
                     items = self._get_bill_items_for_generation(form_data, dte)
+                    _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=items if items else None)
                     if items:
                         dte.quantity = sum(i["quantity"] for i in items)
                         self._replace_bill_items(dte.id, items)
@@ -1588,7 +1613,7 @@ class CustomerBillClass:
             dte.rut = form_data.rut
             dte.folio = 0
             dte.card_amount = 0
-            _apply_bill_draft_amounts(dte, form_data)
+            _apply_bill_draft_amounts(dte, form_data, pxq_items=items if items else None)
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -2319,7 +2344,7 @@ class CustomerBillClass:
         return CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
 
     def generate_v2(self, form_data):
-        expected_total_doc = _bill_total_from_form(form_data)
+        expected_total_doc = _bill_gross_for_dte_match(form_data)
         check_dte_existence = (
             self.db.query(DteModel)
             .filter(
@@ -2420,8 +2445,8 @@ class CustomerBillClass:
         dte_row.status_id = 4
         dte_row.dte_version_id = DTE_VERSION_V2
         dte_row.updated_date = datetime.now()
-        _sync_bill_dte_amounts_from_form(dte_row, form_data)
         items = self._get_bill_items_for_generation(form_data, dte_row)
+        _sync_bill_dte_amounts_from_form(dte_row, form_data, pxq_items=items if items else None)
         if items:
             dte_row.quantity = sum(i["quantity"] for i in items)
             self._replace_bill_items(dte_row.id, items)
