@@ -146,10 +146,21 @@ class CashierDteClass:
         setting_data = SettingClass(self.db_main).get()
         return (setting_data.get("setting_data") or {}).get("simplefactura_token")
 
+    def _db2_dte_for_pdf(self, dte_id: int):
+        """DB2 `dtes` no tiene category_id ni otras columnas del ERP principal."""
+        return (
+            self.db2.query(DteModel.id, DteModel.folio, DteModel.dte_type_id)
+            .filter(DteModel.id == dte_id)
+            .first()
+        )
+
     def download_pdf(self, dte_id: int):
-        dte = self.db2.query(DteModel).filter(DteModel.id == dte_id).first()
-        if not dte or not dte.folio:
+        row = self._db2_dte_for_pdf(dte_id)
+        if not row or not row.folio:
             return {"status": "error", "message": "DTE no encontrado o sin folio"}
+
+        folio = row.folio
+        dte_type_id = row.dte_type_id or 39
 
         token = self._simplefactura_bearer_token()
         if not token:
@@ -161,8 +172,8 @@ class CashierDteClass:
                 "nombreSucursal": "Casa Matriz",
             },
             "dteReferenciadoExterno": {
-                "folio": int(dte.folio),
-                "codigoTipoDte": int(dte.dte_type_id or 39),
+                "folio": int(folio),
+                "codigoTipoDte": int(dte_type_id),
                 "ambiente": 1,
             },
         }
@@ -197,7 +208,7 @@ class CashierDteClass:
             }
 
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_filename = f"boleta_caja_{dte.folio}_{timestamp}_{uuid.uuid4().hex[:8]}.pdf"
+        unique_filename = f"boleta_caja_{folio}_{timestamp}_{uuid.uuid4().hex[:8]}.pdf"
         remote_path = unique_filename
 
         self.file_class.temporal_upload(response.content, remote_path)
