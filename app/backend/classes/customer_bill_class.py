@@ -1786,14 +1786,7 @@ class CustomerBillClass:
             if ref_lines:
                 data["Referencia"] = []
                 for i, rd in enumerate(ref_lines):
-                    doc_type = _reference_doc_type_from_line_dict(rd)
-                    folio_ref = _folio_ref_for_oc(rd.get("reference_date_id"))
-                    ref_date = rd.get("reference_code") or datetime.now().strftime("%Y-%m-%d")
-                    if str(ref_date).strip() in ("", "null", "None"):
-                        ref_date = datetime.now().strftime("%Y-%m-%d")
-                    ref_reason = rd.get("reference_description")
-                    if ref_reason is None or str(ref_reason).strip() == "":
-                        ref_reason = "Orden de Compra" if doc_type == 801 else "Referencia"
+                    doc_type, folio_ref, ref_date, ref_reason = _reference_line_v2_sii_fields(rd)
                     data["Referencia"].append(
                         {
                             "NroLinRef": i + 1,
