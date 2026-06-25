@@ -2,6 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from types import SimpleNamespace
 from sqlalchemy import desc, cast, Date, func, or_, text, bindparam
 from sqlalchemy.dialects import mysql
 from app.backend.db.models import (
@@ -13,6 +14,7 @@ from app.backend.db.models import (
     CommuneModel,
     TotalDtesToBeSentModel,
     CustomerDteItemModel,
+    DteReferenceModel,
 )
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.customer_class import CustomerClass
@@ -1304,6 +1306,129 @@ class DteClass:
         comment = (getattr(dte, "comment", None) or "").casefold()
         return "nota de crédito" in comment or "nota de credito" in comment
 
+    def _copy_period_open_dte_references(self, source_dte_id, target_dte_id):
+        """Copia todas las filas de dte_references del periodo anterior."""
+        source_refs = (
+            self.db.query(DteReferenceModel)
+            .filter(DteReferenceModel.dte_id == source_dte_id)
+            .order_by(DteReferenceModel.id.asc())
+            .all()
+        )
+        now = datetime.now()
+        for ref in source_refs:
+            self.db.add(
+                DteReferenceModel(
+                    dte_id=target_dte_id,
+                    reference_type_id=ref.reference_type_id,
+                    reference_date_id=ref.reference_date_id,
+                    reference_code=ref.reference_code,
+                    reference_description=ref.reference_description,
+                    added_date=now,
+                )
+            )
+
+    @staticmethod
+    def _pxq_open_line_detail(period_detail: str, item_name) -> str:
+        """Detalle PXQ del nuevo periodo, p.ej. 'Julio 2026' (mismo criterio que create/edit)."""
+        label = (period_detail or "").strip()
+        if label:
+            return label
+        name = (item_name or "").strip()
+        return name or "-"
+
+    @staticmethod
+    def _period_open_net_total_from_dte(source_dte) -> int:
+        """Neto del encabezado dtes cuando no hay customer_dte_items (legacy)."""
+        try:
+            net = int(source_dte.subtotal or 0)
+        except (TypeError, ValueError):
+            net = 0
+        if net > 0:
+            return net
+        try:
+            gross = int(source_dte.cash_amount or source_dte.total or 0)
+        except (TypeError, ValueError):
+            gross = 0
+        return round(gross / 1.19) if gross > 0 else 0
+
+    def _synthesize_legacy_pxq_items(self, source_dte, period_detail):
+        """
+        DTEs antiguos cat. 3 solo tienen montos en dtes (sin filas en customer_dte_items).
+        Reconstruye una línea PXQ mínima para el nuevo borrador.
+        """
+        net_total = self._period_open_net_total_from_dte(source_dte)
+        if net_total <= 0:
+            return []
+
+        qty_raw = getattr(source_dte, "quantity", None)
+        try:
+            qty = int(qty_raw) if qty_raw not in (None, "", 0) else 1
+        except (TypeError, ValueError):
+            qty = 1
+        qty = max(1, qty)
+
+        if qty == 1:
+            unit_amount = net_total
+            total_amount = net_total
+        else:
+            unit_amount = max(1, round(net_total / qty))
+            total_amount = unit_amount * qty
+
+        line_detail = self._pxq_open_line_detail(period_detail, None)
+        return [
+            SimpleNamespace(
+                line_number=1,
+                quantity=qty,
+                unit_amount=unit_amount,
+                total_amount=total_amount,
+                description=line_detail,
+                item_code=None,
+                item_name=None,
+                unit_measure="UN",
+                discount_amount=0,
+                dsc_item=line_detail,
+                status_id=1,
+            )
+        ]
+
+    def _load_period_open_pxq_items(self, source_dte, period_detail):
+        """Líneas PXQ del periodo anterior; si no hay en BD, reconstruye desde el encabezado dtes."""
+        rows = (
+            self.db.query(CustomerDteItemModel)
+            .filter(CustomerDteItemModel.dte_id == source_dte.id)
+            .order_by(
+                CustomerDteItemModel.line_number.asc(),
+                CustomerDteItemModel.id.asc(),
+            )
+            .all()
+        )
+        if rows:
+            return rows
+        return self._synthesize_legacy_pxq_items(source_dte, period_detail)
+
+    def _persist_period_open_pxq_items(self, target_dte_id, source_items, period_detail):
+        now = datetime.now()
+        for row in source_items:
+            line_detail = self._pxq_open_line_detail(period_detail, row.item_name)
+            self.db.add(
+                CustomerDteItemModel(
+                    dte_id=target_dte_id,
+                    line_number=row.line_number,
+                    quantity=row.quantity,
+                    unit_amount=row.unit_amount,
+                    total_amount=row.total_amount,
+                    description=line_detail,
+                    item_code=row.item_code,
+                    item_name=row.item_name,
+                    unit_measure=row.unit_measure,
+                    discount_amount=row.discount_amount or 0,
+                    dsc_item=line_detail,
+                    status_id=row.status_id or 1,
+                    added_date=now,
+                    updated_date=now,
+                )
+            )
+
     def _period_open_header_amounts(self, source_dte, source_item_rows):
         """
         Montos del borrador del nuevo periodo: subtotal (neto), tax (IVA), total/cash_amount (bruto).
@@ -1334,7 +1459,6 @@ class DteClass:
             .filter(DteModel.status_id.in_([4, 5]))
             .filter(DteModel.dte_version_id.in_([1, 2]))
             .filter(DteModel.dte_type_id.in_([33, 39]))
-            .filter(DteModel.category_id.in_([3]))
             .all()
         )
 
@@ -1350,16 +1474,11 @@ class DteClass:
                 src_version = int(dte_datum.dte_version_id or 1)
 
                 source_items = []
+                pxq_quantity = dte_datum.quantity if src_category == 3 else None
                 if src_category == 3:
-                    source_items = (
-                        self.db.query(CustomerDteItemModel)
-                        .filter(CustomerDteItemModel.dte_id == dte_datum.id)
-                        .order_by(
-                            CustomerDteItemModel.line_number.asc(),
-                            CustomerDteItemModel.id.asc(),
-                        )
-                        .all()
-                    )
+                    source_items = self._load_period_open_pxq_items(dte_datum, period_detail)
+                    if source_items:
+                        pxq_quantity = sum(int(row.quantity or 0) for row in source_items)
 
                 cash_amount, subtotal, tax, total = self._period_open_header_amounts(
                     dte_datum, source_items
@@ -1384,7 +1503,7 @@ class DteClass:
                         total=total,
                         period=current_period,
                         category_id=src_category,
-                        quantity=dte_datum.quantity if src_category == 3 else None,
+                        quantity=pxq_quantity if src_category == 3 else None,
                         added_date=added_date
                     )
 
@@ -1392,25 +1511,9 @@ class DteClass:
                 self.db.flush()
 
                 if src_category == 3 and source_items:
-                    for row in source_items:
-                        self.db.add(
-                            CustomerDteItemModel(
-                                dte_id=dte.id,
-                                line_number=row.line_number,
-                                quantity=row.quantity,
-                                unit_amount=row.unit_amount,
-                                total_amount=row.total_amount,
-                                description=period_detail,
-                                item_code=row.item_code,
-                                item_name=row.item_name,
-                                unit_measure=row.unit_measure,
-                                discount_amount=row.discount_amount or 0,
-                                dsc_item=row.dsc_item,
-                                status_id=row.status_id or 1,
-                                added_date=datetime.now(),
-                                updated_date=datetime.now(),
-                            )
-                        )
+                    self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
+
+                self._copy_period_open_dte_references(dte_datum.id, dte.id)
 
                 self.db.commit()
             try:
