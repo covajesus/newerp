@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from types import SimpleNamespace
+from collections import defaultdict
 from sqlalchemy import desc, cast, Date, func, or_, text, bindparam
 from sqlalchemy.dialects import mysql
 from app.backend.db.models import (
@@ -1280,7 +1281,30 @@ class DteClass:
                 error_message = str(e)
                 return f"Error: {error_message}"
             
-    def _subscriber_dte_has_credit_note(self, dte) -> bool:
+    def _subscriber_nc_denied_folio_keys(self, dte_rows) -> set:
+        """Folios (33/39) que ya tienen NC tipo 61 — una sola consulta para todo el lote."""
+        folio_keys = set()
+        for dte in dte_rows:
+            folio = getattr(dte, "folio", None)
+            try:
+                folio_int = int(folio) if folio not in (None, "", 0) else 0
+            except (TypeError, ValueError):
+                folio_int = 0
+            if folio_int > 0:
+                folio_keys.add(str(folio_int))
+                folio_keys.add(str(folio).strip())
+        if not folio_keys:
+            return set()
+
+        denied = (
+            self.db.query(DteModel.denied_folio)
+            .filter(DteModel.dte_type_id == 61)
+            .filter(DteModel.denied_folio.in_(folio_keys))
+            .all()
+        )
+        return {str(row[0]).strip() for row in denied if row[0] not in (None, "")}
+
+    def _subscriber_dte_has_credit_note(self, dte, nc_denied_folios=None) -> bool:
         """
         True si el DTE (33/39) ya fue anulado con NC.
         La NC (tipo 61) guarda el folio anulado en `denied_folio`.
@@ -1290,30 +1314,66 @@ class DteClass:
             folio_int = int(folio) if folio not in (None, "", 0) else 0
         except (TypeError, ValueError):
             folio_int = 0
-        if folio_int <= 0:
-            return False
-
-        folio_keys = {str(folio_int), str(folio).strip()}
-        nc_exists = (
-            self.db.query(DteModel.id)
-            .filter(DteModel.dte_type_id == 61)
-            .filter(DteModel.denied_folio.in_(folio_keys))
-            .first()
-        )
-        if nc_exists:
-            return True
+        if folio_int > 0:
+            folio_keys = {str(folio_int), str(folio).strip()}
+            if nc_denied_folios is not None:
+                if folio_keys & nc_denied_folios:
+                    return True
+            else:
+                nc_exists = (
+                    self.db.query(DteModel.id)
+                    .filter(DteModel.dte_type_id == 61)
+                    .filter(DteModel.denied_folio.in_(folio_keys))
+                    .first()
+                )
+                if nc_exists:
+                    return True
 
         comment = (getattr(dte, "comment", None) or "").casefold()
         return "nota de crédito" in comment or "nota de credito" in comment
 
-    def _copy_period_open_dte_references(self, source_dte_id, target_dte_id):
-        """Copia todas las filas de dte_references del periodo anterior."""
-        source_refs = (
-            self.db.query(DteReferenceModel)
-            .filter(DteReferenceModel.dte_id == source_dte_id)
-            .order_by(DteReferenceModel.id.asc())
+    def _index_pxq_items_by_dte_id(self, dte_ids):
+        if not dte_ids:
+            return {}
+        rows = (
+            self.db.query(CustomerDteItemModel)
+            .filter(CustomerDteItemModel.dte_id.in_(dte_ids))
+            .order_by(
+                CustomerDteItemModel.dte_id.asc(),
+                CustomerDteItemModel.line_number.asc(),
+                CustomerDteItemModel.id.asc(),
+            )
             .all()
         )
+        grouped = defaultdict(list)
+        for row in rows:
+            grouped[row.dte_id].append(row)
+        return grouped
+
+    def _index_dte_references_by_dte_id(self, dte_ids):
+        if not dte_ids:
+            return {}
+        rows = (
+            self.db.query(DteReferenceModel)
+            .filter(DteReferenceModel.dte_id.in_(dte_ids))
+            .order_by(DteReferenceModel.dte_id.asc(), DteReferenceModel.id.asc())
+            .all()
+        )
+        grouped = defaultdict(list)
+        for row in rows:
+            grouped[row.dte_id].append(row)
+        return grouped
+
+    def _copy_period_open_dte_references(self, source_dte_id, target_dte_id, cached_refs=None):
+        """Copia todas las filas de dte_references del periodo anterior."""
+        source_refs = cached_refs
+        if source_refs is None:
+            source_refs = (
+                self.db.query(DteReferenceModel)
+                .filter(DteReferenceModel.dte_id == source_dte_id)
+                .order_by(DteReferenceModel.id.asc())
+                .all()
+            )
         now = datetime.now()
         for ref in source_refs:
             self.db.add(
@@ -1326,6 +1386,24 @@ class DteClass:
                     added_date=now,
                 )
             )
+
+    def _load_period_open_pxq_items(self, source_dte, period_detail, pxq_items_by_dte=None):
+        """Líneas PXQ del periodo anterior; si no hay en BD, reconstruye desde el encabezado dtes."""
+        if pxq_items_by_dte is not None:
+            rows = pxq_items_by_dte.get(source_dte.id, [])
+        else:
+            rows = (
+                self.db.query(CustomerDteItemModel)
+                .filter(CustomerDteItemModel.dte_id == source_dte.id)
+                .order_by(
+                    CustomerDteItemModel.line_number.asc(),
+                    CustomerDteItemModel.id.asc(),
+                )
+                .all()
+            )
+        if rows:
+            return rows
+        return self._synthesize_legacy_pxq_items(source_dte, period_detail)
 
     @staticmethod
     def _pxq_open_line_detail(period_detail: str, item_name) -> str:
@@ -1391,21 +1469,6 @@ class DteClass:
             )
         ]
 
-    def _load_period_open_pxq_items(self, source_dte, period_detail):
-        """Líneas PXQ del periodo anterior; si no hay en BD, reconstruye desde el encabezado dtes."""
-        rows = (
-            self.db.query(CustomerDteItemModel)
-            .filter(CustomerDteItemModel.dte_id == source_dte.id)
-            .order_by(
-                CustomerDteItemModel.line_number.asc(),
-                CustomerDteItemModel.id.asc(),
-            )
-            .all()
-        )
-        if rows:
-            return rows
-        return self._synthesize_legacy_pxq_items(source_dte, period_detail)
-
     def _persist_period_open_pxq_items(self, target_dte_id, source_items, period_detail):
         now = datetime.now()
         for row in source_items:
@@ -1450,25 +1513,38 @@ class DteClass:
 
     def open_customer_billing_period(self, period):
         current_period = HelperClass.fix_current_dte_period(period)
-
         last_period = HelperClass.fix_last_dte_period(period)
 
-        dte_data = (
-            self.db.query(DteModel)
-            .filter(DteModel.period == last_period)
-            .filter(DteModel.status_id.in_([4, 5]))
-            .filter(DteModel.dte_version_id.in_([1, 2]))
-            .filter(DteModel.dte_type_id.in_([33, 39]))
-            .all()
-        )
+        try:
+            dte_data = (
+                self.db.query(DteModel)
+                .filter(DteModel.period == last_period)
+                .filter(DteModel.status_id.in_([4, 5]))
+                .filter(DteModel.dte_version_id.in_([1, 2]))
+                .filter(DteModel.dte_type_id.in_([33, 39]))
+                .filter(DteModel.cashier_id == 0)
+                .all()
+            )
 
-        dte_data = [d for d in dte_data if not self._subscriber_dte_has_credit_note(d)]
+            if not dte_data:
+                return "No data found"
 
-        period_detail = HelperClass.period_detail_label(current_period)
+            nc_denied_folios = self._subscriber_nc_denied_folio_keys(dte_data)
+            dte_data = [
+                d
+                for d in dte_data
+                if not self._subscriber_dte_has_credit_note(d, nc_denied_folios)
+            ]
 
-        if dte_data:
+            if not dte_data:
+                return "No data found"
+
+            period_detail = HelperClass.period_detail_label(current_period)
+            source_ids = [d.id for d in dte_data]
+            pxq_items_by_dte = self._index_pxq_items_by_dte_id(source_ids)
+            refs_by_dte = self._index_dte_references_by_dte_id(source_ids)
+
             for dte_datum in dte_data:
-
                 added_date = HelperClass.create_period_date(period)
                 src_category = int(dte_datum.category_id) if dte_datum.category_id is not None else 1
                 src_version = int(dte_datum.dte_version_id or 1)
@@ -1476,7 +1552,9 @@ class DteClass:
                 source_items = []
                 pxq_quantity = dte_datum.quantity if src_category == 3 else None
                 if src_category == 3:
-                    source_items = self._load_period_open_pxq_items(dte_datum, period_detail)
+                    source_items = self._load_period_open_pxq_items(
+                        dte_datum, period_detail, pxq_items_by_dte=pxq_items_by_dte
+                    )
                     if source_items:
                         pxq_quantity = sum(int(row.quantity or 0) for row in source_items)
 
@@ -1486,26 +1564,26 @@ class DteClass:
                 chip_id = 0 if src_category == 3 else int(dte_datum.chip_id or 0)
 
                 dte = DteModel(
-                        rut=dte_datum.rut,
-                        branch_office_id=dte_datum.branch_office_id,
-                        cashier_id=0,
-                        dte_type_id=dte_datum.dte_type_id,
-                        dte_version_id=src_version,
-                        expense_type_id=25,
-                        chip_id=chip_id,
-                        status_id=1,
-                        folio=0,
-                        cash_amount=cash_amount,
-                        card_amount=0,
-                        subtotal=subtotal,
-                        tax=tax,
-                        discount=0,
-                        total=total,
-                        period=current_period,
-                        category_id=src_category,
-                        quantity=pxq_quantity if src_category == 3 else None,
-                        added_date=added_date
-                    )
+                    rut=dte_datum.rut,
+                    branch_office_id=dte_datum.branch_office_id,
+                    cashier_id=0,
+                    dte_type_id=dte_datum.dte_type_id,
+                    dte_version_id=src_version,
+                    expense_type_id=25,
+                    chip_id=chip_id,
+                    status_id=1,
+                    folio=0,
+                    cash_amount=cash_amount,
+                    card_amount=0,
+                    subtotal=subtotal,
+                    tax=tax,
+                    discount=0,
+                    total=total,
+                    period=current_period,
+                    category_id=src_category,
+                    quantity=pxq_quantity if src_category == 3 else None,
+                    added_date=added_date,
+                )
 
                 self.db.add(dte)
                 self.db.flush()
@@ -1513,17 +1591,17 @@ class DteClass:
                 if src_category == 3 and source_items:
                     self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
 
-                self._copy_period_open_dte_references(dte_datum.id, dte.id)
+                self._copy_period_open_dte_references(
+                    dte_datum.id,
+                    dte.id,
+                    cached_refs=refs_by_dte.get(dte_datum.id, []),
+                )
 
-                self.db.commit()
-            try:
-                return 'Opened period successfully'
-            except Exception as e:
-                error_message = str(e)
-                return f"Error: {error_message}"
-                
-        else:
-            return "No data found"
+            self.db.commit()
+            return "Opened period successfully"
+        except Exception as e:
+            self.db.rollback()
+            return f"Error: {str(e)}"
 
     def resend(self, dte_id, email):
         dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
