@@ -1406,9 +1406,36 @@ class DteClass:
         return self._synthesize_legacy_pxq_items(source_dte, period_detail)
 
     @staticmethod
-    def _period_open_is_pxq_category(category_id) -> bool:
-        """Cat. 2 (referencias + PXQ) y 3 (PXQ grupal). Cat. 1 normal: solo encabezado."""
-        return int(category_id or 1) in (2, 3)
+    def _safe_dte_amount(value) -> int:
+        if value is None or value == "":
+            return 0
+        try:
+            return int(round(float(value)))
+        except (TypeError, ValueError):
+            return 0
+
+    def _period_open_pxq_context(self, source_dte, pxq_items_by_dte, refs_by_dte):
+        """
+        Cat. 2/3 explícitas, o legacy inferido por referencias/líneas/cantidad sin chip.
+        Cat. 1 normal: sin líneas PXQ al aperturar.
+        """
+        cid = int(source_dte.category_id or 1)
+        src_items = pxq_items_by_dte.get(source_dte.id) or []
+        src_refs = refs_by_dte.get(source_dte.id) or []
+
+        if cid in (2, 3):
+            return cid, True
+        if src_refs:
+            return 2, True
+        if src_items:
+            return 3, True
+
+        qty = self._safe_dte_amount(getattr(source_dte, "quantity", None))
+        chip = int(source_dte.chip_id or 0)
+        if qty > 0 and chip == 0 and self._period_open_net_total_from_dte(source_dte) > 0:
+            return 3, True
+
+        return 1, False
 
     @staticmethod
     def _pxq_open_line_detail(period_detail: str, item_name) -> str:
@@ -1422,17 +1449,15 @@ class DteClass:
     @staticmethod
     def _period_open_net_total_from_dte(source_dte) -> int:
         """Neto del encabezado dtes cuando no hay customer_dte_items (legacy)."""
-        try:
-            net = int(source_dte.subtotal or 0)
-        except (TypeError, ValueError):
-            net = 0
-        if net > 0:
-            return net
-        try:
-            gross = int(source_dte.cash_amount or source_dte.total or 0)
-        except (TypeError, ValueError):
-            gross = 0
-        return round(gross / 1.19) if gross > 0 else 0
+        for attr in ("subtotal", "payment_amount"):
+            net = DteClass._safe_dte_amount(getattr(source_dte, attr, None))
+            if net > 0:
+                return net
+        for attr in ("cash_amount", "total"):
+            gross = DteClass._safe_dte_amount(getattr(source_dte, attr, None))
+            if gross > 0:
+                return round(gross / 1.19)
+        return 0
 
     def _synthesize_legacy_pxq_items(self, source_dte, period_detail):
         """
@@ -1552,11 +1577,20 @@ class DteClass:
             pxq_items_by_dte = self._index_pxq_items_by_dte_id(source_ids)
             refs_by_dte = self._index_dte_references_by_dte_id(source_ids)
 
+            stats = {
+                "created": 0,
+                "normal": 0,
+                "pxq_lines": 0,
+                "pxq_no_lines": 0,
+                "refs": 0,
+            }
+
             for dte_datum in dte_data:
                 added_date = HelperClass.create_period_date(period)
-                src_category = int(dte_datum.category_id) if dte_datum.category_id is not None else 1
                 src_version = int(dte_datum.dte_version_id or 1)
-                uses_pxq = self._period_open_is_pxq_category(src_category)
+                target_category, uses_pxq = self._period_open_pxq_context(
+                    dte_datum, pxq_items_by_dte, refs_by_dte
+                )
 
                 source_items = []
                 pxq_quantity = None
@@ -1566,8 +1600,13 @@ class DteClass:
                     )
                     if source_items:
                         pxq_quantity = sum(int(row.quantity or 0) for row in source_items)
-                    elif src_category == 3 and dte_datum.quantity:
-                        pxq_quantity = dte_datum.quantity
+                        stats["pxq_lines"] += 1
+                    else:
+                        stats["pxq_no_lines"] += 1
+                        if target_category == 3 and dte_datum.quantity:
+                            pxq_quantity = dte_datum.quantity
+                else:
+                    stats["normal"] += 1
 
                 cash_amount, subtotal, tax, total = self._period_open_header_amounts(
                     dte_datum, source_items if uses_pxq else []
@@ -1591,26 +1630,37 @@ class DteClass:
                     discount=0,
                     total=total,
                     period=current_period,
-                    category_id=src_category,
+                    category_id=target_category,
                     quantity=pxq_quantity if uses_pxq else None,
                     added_date=added_date,
                 )
 
                 self.db.add(dte)
                 self.db.flush()
+                stats["created"] += 1
 
                 if uses_pxq and source_items:
                     self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
 
-                if src_category == 2:
+                if target_category == 2:
+                    ref_rows = refs_by_dte.get(dte_datum.id, [])
+                    if ref_rows:
+                        stats["refs"] += 1
                     self._copy_period_open_dte_references(
                         dte_datum.id,
                         dte.id,
-                        cached_refs=refs_by_dte.get(dte_datum.id, []),
+                        cached_refs=ref_rows,
                     )
 
             self.db.commit()
-            return "Opened period successfully"
+            return (
+                "Opened period successfully"
+                f"|created={stats['created']}"
+                f"|pxq_lines={stats['pxq_lines']}"
+                f"|pxq_no_lines={stats['pxq_no_lines']}"
+                f"|refs={stats['refs']}"
+                f"|normal={stats['normal']}"
+            )
         except Exception as e:
             self.db.rollback()
             return f"Error: {str(e)}"
