@@ -1406,6 +1406,11 @@ class DteClass:
         return self._synthesize_legacy_pxq_items(source_dte, period_detail)
 
     @staticmethod
+    def _period_open_is_pxq_category(category_id) -> bool:
+        """Cat. 2 (referencias + PXQ) y 3 (PXQ grupal). Cat. 1 normal: solo encabezado."""
+        return int(category_id or 1) in (2, 3)
+
+    @staticmethod
     def _pxq_open_line_detail(period_detail: str, item_name) -> str:
         """Detalle PXQ del nuevo periodo, p.ej. 'Julio 2026' (mismo criterio que create/edit)."""
         label = (period_detail or "").strip()
@@ -1431,8 +1436,8 @@ class DteClass:
 
     def _synthesize_legacy_pxq_items(self, source_dte, period_detail):
         """
-        DTEs antiguos cat. 3 solo tienen montos en dtes (sin filas en customer_dte_items).
-        Reconstruye una línea PXQ mínima para el nuevo borrador.
+        DTEs cat. 2/3 sin filas en customer_dte_items: reconstruye línea(s) PXQ desde dtes.
+        El detalle queda con el mes del periodo que se apertura (p.ej. Julio 2026).
         """
         net_total = self._period_open_net_total_from_dte(source_dte)
         if net_total <= 0:
@@ -1461,7 +1466,7 @@ class DteClass:
                 total_amount=total_amount,
                 description=line_detail,
                 item_code=None,
-                item_name=None,
+                item_name="Estacionamiento",
                 unit_measure="UN",
                 discount_amount=0,
                 dsc_item=line_detail,
@@ -1470,9 +1475,12 @@ class DteClass:
         ]
 
     def _persist_period_open_pxq_items(self, target_dte_id, source_items, period_detail):
+        detail_label = (period_detail or "").strip() or "-"
         now = datetime.now()
         for row in source_items:
-            line_detail = self._pxq_open_line_detail(period_detail, row.item_name)
+            item_name = (getattr(row, "item_name", None) or "").strip()
+            if not item_name:
+                item_name = "Estacionamiento"
             self.db.add(
                 CustomerDteItemModel(
                     dte_id=target_dte_id,
@@ -1480,12 +1488,12 @@ class DteClass:
                     quantity=row.quantity,
                     unit_amount=row.unit_amount,
                     total_amount=row.total_amount,
-                    description=line_detail,
+                    description=detail_label,
                     item_code=row.item_code,
-                    item_name=row.item_name,
-                    unit_measure=row.unit_measure,
+                    item_name=item_name,
+                    unit_measure=row.unit_measure or "UN",
                     discount_amount=row.discount_amount or 0,
-                    dsc_item=line_detail,
+                    dsc_item=detail_label,
                     status_id=row.status_id or 1,
                     added_date=now,
                     updated_date=now,
@@ -1548,20 +1556,23 @@ class DteClass:
                 added_date = HelperClass.create_period_date(period)
                 src_category = int(dte_datum.category_id) if dte_datum.category_id is not None else 1
                 src_version = int(dte_datum.dte_version_id or 1)
+                uses_pxq = self._period_open_is_pxq_category(src_category)
 
                 source_items = []
-                pxq_quantity = dte_datum.quantity if src_category == 3 else None
-                if src_category == 3:
+                pxq_quantity = None
+                if uses_pxq:
                     source_items = self._load_period_open_pxq_items(
                         dte_datum, period_detail, pxq_items_by_dte=pxq_items_by_dte
                     )
                     if source_items:
                         pxq_quantity = sum(int(row.quantity or 0) for row in source_items)
+                    elif src_category == 3 and dte_datum.quantity:
+                        pxq_quantity = dte_datum.quantity
 
                 cash_amount, subtotal, tax, total = self._period_open_header_amounts(
-                    dte_datum, source_items
+                    dte_datum, source_items if uses_pxq else []
                 )
-                chip_id = 0 if src_category == 3 else int(dte_datum.chip_id or 0)
+                chip_id = 0 if uses_pxq else int(dte_datum.chip_id or 0)
 
                 dte = DteModel(
                     rut=dte_datum.rut,
@@ -1581,21 +1592,22 @@ class DteClass:
                     total=total,
                     period=current_period,
                     category_id=src_category,
-                    quantity=pxq_quantity if src_category == 3 else None,
+                    quantity=pxq_quantity if uses_pxq else None,
                     added_date=added_date,
                 )
 
                 self.db.add(dte)
                 self.db.flush()
 
-                if src_category == 3 and source_items:
+                if uses_pxq and source_items:
                     self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
 
-                self._copy_period_open_dte_references(
-                    dte_datum.id,
-                    dte.id,
-                    cached_refs=refs_by_dte.get(dte_datum.id, []),
-                )
+                if src_category == 2:
+                    self._copy_period_open_dte_references(
+                        dte_datum.id,
+                        dte.id,
+                        cached_refs=refs_by_dte.get(dte_datum.id, []),
+                    )
 
             self.db.commit()
             return "Opened period successfully"
