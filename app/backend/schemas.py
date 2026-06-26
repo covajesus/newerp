@@ -2171,6 +2171,7 @@ class MachineTicketSearch(BaseModel):
 class CashierDteSearch(BaseModel):
     """Búsqueda de boletas de caja (DB2 / tabla dtes)."""
     branch_office_id: Optional[int] = None
+    folio: Optional[int] = None
     amount: Optional[int] = None
     since: Optional[str] = None
     until: Optional[str] = None

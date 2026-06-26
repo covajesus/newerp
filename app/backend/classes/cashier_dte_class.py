@@ -23,6 +23,7 @@ class CashierDteClass:
         self,
         *,
         branch_office_id=None,
+        folio=None,
         amount=None,
         since=None,
         until=None,
@@ -38,6 +39,8 @@ class CashierDteClass:
 
             if branch_office_id is not None:
                 filters.append(DteModel.branch_office_id == int(branch_office_id))
+            if folio is not None:
+                filters.append(DteModel.folio == int(folio))
             if amount is not None:
                 filters.append(DteModel.total == int(amount))
             if since:

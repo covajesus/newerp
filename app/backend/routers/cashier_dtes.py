@@ -22,6 +22,7 @@ def search_cashier_dtes(
     del session_user  # auth required
     data = CashierDteClass(db2, db).search(
         branch_office_id=body.branch_office_id,
+        folio=body.folio,
         amount=body.amount,
         since=body.since,
         until=body.until,
