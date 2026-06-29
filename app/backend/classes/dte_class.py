@@ -1414,28 +1414,10 @@ class DteClass:
         except (TypeError, ValueError):
             return 0
 
-    def _period_open_pxq_context(self, source_dte, pxq_items_by_dte, refs_by_dte):
-        """
-        Cat. 2/3 explícitas, o legacy inferido por referencias/líneas/cantidad sin chip.
-        Cat. 1 normal: sin líneas PXQ al aperturar.
-        """
-        cid = int(source_dte.category_id or 1)
-        src_items = pxq_items_by_dte.get(source_dte.id) or []
-        src_refs = refs_by_dte.get(source_dte.id) or []
-
-        if cid in (2, 3):
-            return cid, True
-        if src_refs:
-            return 2, True
-        if src_items:
-            return 3, True
-
-        qty = self._safe_dte_amount(getattr(source_dte, "quantity", None))
-        chip = int(source_dte.chip_id or 0)
-        if qty > 0 and chip == 0 and self._period_open_net_total_from_dte(source_dte) > 0:
-            return 3, True
-
-        return 1, False
+    @staticmethod
+    def _period_open_category_id(source_dte) -> int:
+        """Copia category_id del periodo anterior sin inferir (1→1, 2→2, 3→3)."""
+        return int(source_dte.category_id) if source_dte.category_id is not None else 1
 
     @staticmethod
     def _pxq_open_line_detail(period_detail: str, item_name) -> str:
@@ -1582,15 +1564,15 @@ class DteClass:
                 "normal": 0,
                 "pxq_lines": 0,
                 "pxq_no_lines": 0,
+                "item_rows": 0,
                 "refs": 0,
             }
 
             for dte_datum in dte_data:
                 added_date = HelperClass.create_period_date(period)
                 src_version = int(dte_datum.dte_version_id or 1)
-                target_category, uses_pxq = self._period_open_pxq_context(
-                    dte_datum, pxq_items_by_dte, refs_by_dte
-                )
+                target_category = self._period_open_category_id(dte_datum)
+                uses_pxq = target_category in (2, 3)
 
                 source_items = []
                 pxq_quantity = None
@@ -1611,7 +1593,10 @@ class DteClass:
                 cash_amount, subtotal, tax, total = self._period_open_header_amounts(
                     dte_datum, source_items if uses_pxq else []
                 )
-                chip_id = 0 if uses_pxq else int(dte_datum.chip_id or 0)
+                if target_category in (2, 3):
+                    chip_id = 0
+                else:
+                    chip_id = int(dte_datum.chip_id or 0)
 
                 dte = DteModel(
                     rut=dte_datum.rut,
@@ -1641,6 +1626,7 @@ class DteClass:
 
                 if uses_pxq and source_items:
                     self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
+                    stats["item_rows"] += len(source_items)
 
                 if target_category == 2:
                     ref_rows = refs_by_dte.get(dte_datum.id, [])
@@ -1658,6 +1644,7 @@ class DteClass:
                 f"|created={stats['created']}"
                 f"|pxq_lines={stats['pxq_lines']}"
                 f"|pxq_no_lines={stats['pxq_no_lines']}"
+                f"|item_rows={stats['item_rows']}"
                 f"|refs={stats['refs']}"
                 f"|normal={stats['normal']}"
             )
