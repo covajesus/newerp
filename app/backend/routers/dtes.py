@@ -737,17 +737,23 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
 
 @dtes.get("/total_dtes_to_be_sent/{branch_office_id}")
 @dtes.get("/total_dtes_to_be_sent/{branch_office_id}/{dte_type_id}")
-def total_dtes_to_be_sent(branch_office_id: int, dte_type_id: int = 0, db: Session = Depends(get_db)):
+def total_dtes_to_be_sent(
+    branch_office_id: int,
+    dte_type_id: int = 0,
+    category_id: int = 0,
+    db: Session = Depends(get_db),
+):
     """
     Endpoint para obtener la cantidad total de DTEs que deben ser enviados masivamente por sucursal y tipo
     
     Parámetros:
     - branch_office_id: ID de la sucursal (si es 0, cuenta todas las sucursales)
     - dte_type_id: ID del tipo de DTE (si es 0, cuenta todos los tipos)
+    - category_id: categoría DTE (1 normal, 2 referencias, 3 PXQ; 0 = todas)
     """
     try:
         dte_class = DteClass(db)
-        quantity = dte_class.total_dtes_to_be_sent(branch_office_id, dte_type_id)
+        quantity = dte_class.total_dtes_to_be_sent(branch_office_id, dte_type_id, category_id)
 
         # Obtener período actual para el response
         current_period = datetime.now().strftime('%Y-%m')
@@ -757,8 +763,9 @@ def total_dtes_to_be_sent(branch_office_id: int, dte_type_id: int = 0, db: Sessi
             "quantity": quantity,
             "branch_office_id": branch_office_id,
             "dte_type_id": dte_type_id,
+            "category_id": category_id,
             "period": current_period,
-            "message": f"Total DTEs to be sent for branch {branch_office_id} and type {dte_type_id}: {quantity}"
+            "message": f"Total DTEs to be sent for branch {branch_office_id}, type {dte_type_id}, category {category_id}: {quantity}"
         }
         
     except Exception as e:
@@ -798,14 +805,21 @@ def send_massive_dtes(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en envío masivo de WhatsApp: {str(e)}")
 
+@dtes.get("/send_massive_dtes_stream/{branch_office_id}")
 @dtes.get("/send_massive_dtes_stream/{branch_office_id}/{dte_type_id}")
-def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Session = Depends(get_db)):
+def send_massive_dtes_stream(
+    branch_office_id: int,
+    dte_type_id: int = 0,
+    category_id: int = 0,
+    db: Session = Depends(get_db),
+):
     """
     Endpoint para enviar WhatsApp masivamente con streaming de respuestas en tiempo real
     
     Parámetros:
     - branch_office_id: ID de la sucursal (si es 0, procesa todas las sucursales)
     - dte_type_id: ID del tipo de DTE (si es 0, procesa todos los tipos)
+    - category_id: categoría DTE (1 normal, 2 referencias, 3 PXQ; 0 = todas)
     
     Comportamiento:
     - branch_office_id = 0: Envía DTEs de todas las sucursales
@@ -816,65 +830,11 @@ def send_massive_dtes_stream(branch_office_id: int, dte_type_id: int, db: Sessio
     def generate_dte_stream():
         try:
             dte_class = DteClass(db)
-            whatsapp_class = WhatsappClass(db)
-            
-            # Obtener el período actual
-            current_period = datetime.now().strftime('%Y-%m')
-            
-            # Construir filtro base
-            # Para notas de crédito (dte_type_id=61), buscar status 2 o 14
-            # Para otros tipos de DTE, buscar solo status 2
-            if dte_type_id == 61:
-                status_filter = DteModel.status_id.in_([2, 14])
-            else:
-                status_filter = DteModel.status_id == 2
-            
-            base_filter = [
-                DteModel.period == current_period,
-                status_filter,
-                DteModel.dte_version_id == 1
-            ]
-            
-            # Si branch_office_id es 0, procesar todas las sucursales
-            if branch_office_id != 0:
-                base_filter.append(DteModel.branch_office_id == branch_office_id)
-
-            # Si dte_type_id es mayor que 0, filtrar por tipo de DTE
-            if dte_type_id > 0:
-                base_filter.append(DteModel.dte_type_id == dte_type_id)
-            
-            dtes = db.query(DteModel).filter(*base_filter).all()
-            
-            # Enviar información inicial
-            branch_info = f" de sucursal {branch_office_id}" if branch_office_id != 0 else " de todas las sucursales"
-            dte_type_info = f" de tipo {dte_type_id}" if dte_type_id > 0 else " de todos los tipos"
-            initial_data = {
-                "type": "init",
-                "period": current_period,
-                "total_dtes": len(dtes),
-                "branch_office_id": branch_office_id,
-                "dte_type_id": dte_type_id,
-                "message": f"Iniciando envío masivo para {len(dtes)} DTEs{branch_info}{dte_type_info} del período {current_period}"
-            }
-            yield f"data: {json.dumps(initial_data)}\n\n"
-            
-            if not dtes:
-                branch_scope = f" en sucursal {branch_office_id}" if branch_office_id != 0 else " en todas las sucursales"
-                dte_type_scope = f" de tipo {dte_type_id}" if dte_type_id > 0 else " de todos los tipos"
-                no_data = {
-                    "type": "complete",
-                    "total_dtes": 0,
-                    "successful_sends": 0,
-                    "failed_sends": 0,
-                    "branch_office_id": branch_office_id,
-                    "dte_type_id": dte_type_id,
-                    "message": f"No hay DTEs para procesar{branch_scope}{dte_type_scope}"
-                }
-                yield f"data: {json.dumps(no_data)}\n\n"
-                return
             
             # Procesar DTEs uno por uno usando el generador
-            for progress_data in dte_class.send_massive_dtes_streaming(branch_office_id, dte_type_id):
+            for progress_data in dte_class.send_massive_dtes_streaming(
+                branch_office_id, dte_type_id, category_id
+            ):
                 yield f"data: {json.dumps(progress_data)}\n\n"
             
         except Exception as e:

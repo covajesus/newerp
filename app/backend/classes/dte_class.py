@@ -72,9 +72,12 @@ class DteClass:
         rows = self.db.execute(stmt, {"dte_ids": ids}).scalars().all()
         return {int(r) for r in rows if r is not None}
 
-    def _massive_send_category_filter(self):
-        """Envío masivo /send_dtes: solo category_id 1 (estándar) y 3 (grupal)."""
-        return DteModel.category_id.in_([1, 3])
+    def _massive_send_category_filter(self, category_id=0):
+        """Filtro por categoría DTE: 1 normal, 2 referencias, 3 PXQ. 0 = todas."""
+        cid = int(category_id or 0)
+        if cid > 0:
+            return DteModel.category_id == cid
+        return DteModel.category_id.in_([1, 2, 3])
 
     def _prepare_massive_emit_category(self, dte):
         """Normaliza a categoría 1 salvo facturas/boletas grupales (3), que se conservan."""
@@ -1865,7 +1868,7 @@ class DteClass:
             print(f"Error al procesar folio {dte.folio}: {str(e)}")
             return 2
 
-    def total_dtes_to_be_sent(self, branch_office_id, dte_type_id):
+    def total_dtes_to_be_sent(self, branch_office_id, dte_type_id, category_id=0):
         """
         Obtiene la cantidad total de DTEs que deben ser enviados contando directamente desde DteModel
         con filtros específicos: status_id=2 (o status_id=14 para dte_type_id=61), dte_version_id=1, período actual, branch_office_id y dte_type_id
@@ -1873,6 +1876,7 @@ class DteClass:
         Parámetros:
         - branch_office_id: ID de la sucursal (si es 0, cuenta todas las sucursales)
         - dte_type_id: ID del tipo de DTE (si es 0, cuenta todos los tipos)
+        - category_id: categoría DTE (1 normal, 2 referencias, 3 PXQ; 0 = todas)
         """
         try:
             current_period = datetime.now().strftime('%Y-%m')
@@ -1899,8 +1903,7 @@ class DteClass:
             if dte_type_id > 0:
                 base_filter.append(DteModel.dte_type_id == dte_type_id)
 
-            # Envío masivo: solo category_id 1 (estándar) o 3 (grupal)
-            base_filter.append(self._massive_send_category_filter())
+            base_filter.append(self._massive_send_category_filter(category_id))
             
             quantity = self.db.query(DteModel).filter(*base_filter).count()
             
@@ -2440,7 +2443,7 @@ class DteClass:
         except Exception as e:
             return {"status": "error", "message": f"Error generando DTE: {str(e)}"}
 
-    def send_massive_dtes_streaming(self, branch_office_id, dte_type_id):
+    def send_massive_dtes_streaming(self, branch_office_id, dte_type_id, category_id=0):
         """
         Generador que envía WhatsApp masivamente y produce progreso en tiempo real
         Yields dict con información de progreso para cada DTE procesado
@@ -2448,6 +2451,7 @@ class DteClass:
         Parámetros:
         - branch_office_id: ID de la sucursal (si es 0, procesa todas las sucursales)
         - dte_type_id: ID del tipo de DTE (si es 0, procesa todos los tipos)
+        - category_id: categoría DTE (1 normal, 2 referencias, 3 PXQ; 0 = todas)
         """
         try:
             # Obtener DTEs del período actual
@@ -2465,7 +2469,7 @@ class DteClass:
                 DteModel.period == current_period,
                 status_filter,
                 DteModel.dte_version_id == 1,
-                self._massive_send_category_filter(),
+                self._massive_send_category_filter(category_id),
             ]
             
             # Si branch_office_id es 0, procesar todas las sucursales
@@ -2480,6 +2484,7 @@ class DteClass:
             expected_status = 2
             branch_info = f"sucursal {branch_office_id}" if branch_office_id != 0 else "todas las sucursales"
             type_info = f"tipo {dte_type_id}" if dte_type_id != 0 else "todos los tipos"
+            category_info = f"categoría {category_id}" if int(category_id or 0) > 0 else "todas las categorías"
             
             # Enviar mensaje inicial con información de filtros
             yield {
@@ -2487,8 +2492,9 @@ class DteClass:
                 "period": current_period,
                 "branch_office_id": branch_office_id,
                 "dte_type_id": dte_type_id,
+                "category_id": int(category_id or 0),
                 "expected_status": expected_status,
-                "message": f"Iniciando envío masivo para {type_info} en {branch_info} del período {current_period}"
+                "message": f"Iniciando envío masivo para {type_info}, {category_info} en {branch_info} del período {current_period}"
             }
             
             dtes = self.db.query(DteModel).filter(*base_filter).all()
@@ -2695,12 +2701,15 @@ class DteClass:
                             DteModel.period == current_period,
                             remaining_status_filter,
                             DteModel.dte_version_id == 1,
-                            self._massive_send_category_filter(),
+                            self._massive_send_category_filter(category_id),
                         ]
                         
                         # Si branch_office_id no es 0, filtrar por sucursal específica
                         if branch_office_id != 0:
                             remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        
+                        if dte_type_id > 0:
+                            remaining_filter.append(DteModel.dte_type_id == dte_type_id)
                         
                         remaining_dtes = self.db.query(DteModel).filter(*remaining_filter).count()
                     except:
