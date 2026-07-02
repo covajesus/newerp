@@ -1979,49 +1979,13 @@ class DteClass:
                         form_data_sim = FormDataSimulator(dte, massive_emit=True)
                         
                         # Verificar el tipo de DTE para usar la clase correcta
-                        if dte.dte_type_id == 39:  # Boleta electrónica
-                            # Validar que no exista un DTE duplicado (misma validación que en customer_ticket_class)
-                            check_dte_existence = self.db.query(DteModel).filter(
-                                DteModel.branch_office_id == dte.branch_office_id,
-                                DteModel.rut == dte.rut,
-                                DteModel.total == dte.total,
-                                DteModel.dte_type_id == 39,
-                                DteModel.dte_version_id == 1,
-                                DteModel.status_id == 4,
-                                DteModel.period == datetime.now().strftime('%Y-%m')
-                            ).count()
-                            
-                            if check_dte_existence > 0:
-                                raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
-                            
-                            # Crear instancia de CustomerTicketClass
+                        if dte.dte_type_id == 39:  # Boleta electrónica (emisión v2)
                             customer_ticket_class = CustomerTicketClass(self.db)
-                            
-                            # Pre-generar el ticket
-                            code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
-
-                            if isinstance(code, dict) and code.get("status") == "error":
-                                raise Exception(code.get("message", "Error emitir LibreDTE"))
-
-                            if code is not None and code != 402:
-                                folio, gen_err = customer_ticket_class.generate_ticket(dte.rut, code)
-
-                                if folio:
-                                    # Guardar PDF
-                                    customer_ticket_class.save_pdf_ticket(folio)
-                                    
-                                    # Actualizar DTE con folio y status
-                                    dte.folio = folio
-                                    dte.status_id = 4
-                                    self.db.commit()
-                                    self.db.refresh(dte)
-                                    
-                                    # Enviar WhatsApp y capturar respuesta
-                                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
-                                else:
-                                    raise Exception(gen_err or "No se pudo generar el folio del ticket")
-                            else:
-                                raise Exception("Error en pre-generación del ticket")
+                            result = customer_ticket_class.generate_v2(form_data_sim)
+                            if result.get("status") != "success":
+                                raise Exception(result.get("message") or "Error emitir boleta v2")
+                            self.db.refresh(dte)
+                            whatsapp_response = result.get("whatsapp")
                                 
                         elif dte.dte_type_id == 33:  # Factura electrónica
                             # Validar que no exista un DTE duplicado (misma validación que en customer_bill_class)
@@ -2079,7 +2043,10 @@ class DteClass:
                         whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
                     # Verificar si WhatsApp fue exitoso
-                    if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
+                    if whatsapp_response and (
+                        whatsapp_response.get("whatsapp_accepted") == "accepted"
+                        or whatsapp_response.get("status") == "success"
+                    ):
                         successful_sends += 1
                         
                         # Decrementar contador de DTEs pendientes
@@ -2324,49 +2291,24 @@ class DteClass:
             form_data_sim = FormDataSimulator(dte, massive_emit=True)
             
             # Generar según el tipo de DTE
-            if dte.dte_type_id == 39:  # Boleta electrónica
-                # Validar duplicados
-                check_dte_existence = self.db.query(DteModel).filter(
-                    DteModel.branch_office_id == dte.branch_office_id,
-                    DteModel.rut == dte.rut,
-                    DteModel.total == dte.total,
-                    DteModel.dte_type_id == 39,
-                    DteModel.dte_version_id == 1,
-                    DteModel.status_id == 4,
-                    DteModel.period == datetime.now().strftime('%Y-%m')
-                ).count()
-                
-                if check_dte_existence > 0:
-                    raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
-                
-                # Generar ticket
+            if dte.dte_type_id == 39:  # Boleta electrónica (emisión v2 / SimpleFactura)
                 customer_ticket_class = CustomerTicketClass(self.db)
-                code = customer_ticket_class.pre_generate_ticket(customer_data, form_data_sim)
+                result = customer_ticket_class.generate_v2(form_data_sim)
+                if result.get("status") != "success":
+                    return {
+                        "status": "error",
+                        "message": result.get("message") or "Error emitir boleta v2",
+                        "details": result,
+                    }
+                self.db.refresh(dte)
+                return {
+                    "status": "success",
+                    "message": result.get("message", "Ticket generado exitosamente"),
+                    "whatsapp_sent": True,
+                    "whatsapp_result": result.get("whatsapp"),
+                    "folio": result.get("folio"),
+                }
 
-                if isinstance(code, dict) and code.get("status") == "error":
-                    return {"status": "error", "message": code.get("message", "Error emitir LibreDTE")}
-
-                if code is not None and code != 402:
-                    folio, gen_err = customer_ticket_class.generate_ticket(dte.rut, code)
-                    if folio:
-                        customer_ticket_class.save_pdf_ticket(folio)
-                        # Actualizar DTE
-                        dte.folio = folio
-                        dte.status_id = 4
-                        self.db.commit()
-                        self.db.refresh(dte)
-                        
-                        pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
-                        return {
-                            "status": "success",
-                            "message": "Ticket generado exitosamente",
-                            "pdf_url": pdf_url
-                        }
-                    else:
-                        return {"status": "error", "message": gen_err or "No se pudo generar el folio del ticket"}
-                else:
-                    return {"status": "error", "message": "Error en pre-generación del ticket"}
-                    
             elif dte.dte_type_id == 33:  # Factura electrónica
                 # Validar duplicados
                 check_dte_existence = self.db.query(DteModel).filter(
@@ -2688,9 +2630,12 @@ class DteClass:
                             customer_name = "Cliente no encontrado"
                             customer_phone = "No disponible"
                     
-                    # Enviar WhatsApp
+                    # Enviar WhatsApp (v2 boletas ya lo envían en generate_v2)
                     whatsapp_class = WhatsappClass(self.db)
-                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
+                    if generation_result.get("whatsapp_sent"):
+                        whatsapp_response = generation_result.get("whatsapp_result") or {}
+                    else:
+                        whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
                     # Obtener contador actualizado desde DteModel
                     try:
@@ -2715,7 +2660,10 @@ class DteClass:
                     except:
                         remaining_dtes = 0
                     
-                    if whatsapp_response and whatsapp_response.get("status") == "success":
+                    if whatsapp_response and (
+                        whatsapp_response.get("status") == "success"
+                        or whatsapp_response.get("whatsapp_accepted") == "accepted"
+                    ):
                         successful_sends += 1
                         
                         yield {

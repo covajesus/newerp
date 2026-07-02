@@ -44,7 +44,7 @@ def generate_ticket(customer_ticket_inputs:GenerateCustomerTicket, session_user:
         else:
             CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
-    data = CustomerTicketClass(db).generate(customer_ticket_inputs)
+    data = CustomerTicketClass(db).generate_v2(customer_ticket_inputs)
 
     return {"message": data}
 
@@ -58,7 +58,7 @@ def store(customer_ticket_inputs:GenerateCustomerTicket, session_user: UserLogin
         else:
             CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
-    data = CustomerTicketClass(db).store(customer_ticket_inputs, session_user.rol_id)
+    data = CustomerTicketClass(db).store_v2(customer_ticket_inputs, session_user.rol_id)
 
     return {"message": data}
 
