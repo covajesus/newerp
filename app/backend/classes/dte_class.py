@@ -2175,38 +2175,52 @@ class DteClass:
                 "message": f"Error en envío masivo: {str(e)}"
             }
 
-    def massive_resend_whatsapp(self):
+    def massive_resend_whatsapp(
+        self,
+        period: str | None = None,
+        *,
+        all_periods: bool = False,
+        force: bool = False,
+    ):
         """
-        Reenvía WhatsApp masivamente para DTEs del período actual que cumplan:
-        - period = período actual
-        - dte_type_id = 33 o 39
-        - dte_version_id = 1
-        - status_id = 4
-        - massive_resend_status_id != 1 (o NULL)
+        Reenvía WhatsApp masivamente para DTEs status_id=4 (facturas 33 y boletas 39).
+        Actualiza massive_resend_status_id=1 solo cuando Meta acepta el envío.
+
+        period: YYYY-MM (default mes actual). Ignorado si all_periods=True.
+        all_periods: incluir todos los periodos con status 4.
+        force: reenviar aunque massive_resend_status_id=1.
         """
         try:
-            # Obtener el período actual en formato YYYY-MM
-            current_period = datetime.now().strftime('%Y-%m')
-            
-            # Buscar DTEs que cumplan los criterios
-            dtes = self.db.query(DteModel).filter(
-                DteModel.period == current_period,
+            target_period = (period or datetime.now().strftime("%Y-%m")).strip()
+
+            query = self.db.query(DteModel).filter(
                 DteModel.dte_type_id.in_([33, 39]),
-                DteModel.dte_version_id == 1,
                 DteModel.status_id == 4,
-                or_(
-                    DteModel.massive_resend_status_id != 1,
-                    DteModel.massive_resend_status_id.is_(None)
+            )
+            if not all_periods:
+                query = query.filter(DteModel.period == target_period)
+            if not force:
+                query = query.filter(
+                    or_(
+                        DteModel.massive_resend_status_id != 1,
+                        DteModel.massive_resend_status_id.is_(None),
+                    )
                 )
-            ).all()
-            
+
+            dtes = query.order_by(DteModel.id.asc()).all()
+
             whatsapp_class = WhatsappClass(self.db)
             successful_sends = 0
             failed_sends = 0
             results = []
-            
-            print(f"Reenviando WhatsApp masivo para {len(dtes)} DTEs del período {current_period}")
-            
+
+            scope = "todos los periodos" if all_periods else f"periodo {target_period}"
+            print(
+                f"Reenviando WhatsApp masivo ({scope}, force={force}) "
+                f"para {len(dtes)} DTEs status_id=4",
+                flush=True,
+            )
+
             for dte in dtes:
                 whatsapp_response = None
                 customer_name = "No disponible"
@@ -2246,6 +2260,7 @@ class DteClass:
                         results.append({
                             "dte_id": dte.id,
                             "folio": dte.folio,
+                            "dte_type_id": dte.dte_type_id,
                             "rut": dte.rut,
                             "customer_name": customer_name,
                             "customer_phone": customer_phone,
@@ -2256,17 +2271,25 @@ class DteClass:
                         print(f"✅ WhatsApp reenviado para DTE ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
                     else:
                         failed_sends += 1
+                        err_msg = "Error al reenviar WhatsApp"
+                        if isinstance(whatsapp_response, dict):
+                            err_msg = whatsapp_response.get("message") or err_msg
                         results.append({
                             "dte_id": dte.id,
                             "folio": dte.folio,
+                            "dte_type_id": dte.dte_type_id,
                             "rut": dte.rut,
                             "customer_name": customer_name,
                             "customer_phone": customer_phone,
                             "status": "failed",
-                            "message": "Error al reenviar WhatsApp",
+                            "message": err_msg,
                             "whatsapp_response": whatsapp_response
                         })
-                        print(f"❌ Error al reenviar WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}")
+                        print(
+                            f"❌ Error WhatsApp DTE ID: {dte.id}, Folio: {dte.folio}, "
+                            f"Tipo: {dte.dte_type_id}: {err_msg}",
+                            flush=True,
+                        )
                         
                 except Exception as e:
                     failed_sends += 1
@@ -2285,11 +2308,13 @@ class DteClass:
             
             return {
                 "status": "success",
-                "period": current_period,
+                "period": None if all_periods else target_period,
+                "all_periods": all_periods,
+                "force": force,
                 "total_dtes": len(dtes),
                 "successful_sends": successful_sends,
                 "failed_sends": failed_sends,
-                "results": results
+                "results": results,
             }
             
         except Exception as e:

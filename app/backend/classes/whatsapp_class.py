@@ -621,18 +621,6 @@ class WhatsappClass:
         )
         print(payload, flush=True)
 
-        token_error = validate_whatsapp_access_token()
-        if token_error:
-            print(f"[v2] WhatsApp folio={folio} token check failed: {token_error}", flush=True)
-            token_error["payments"] = {
-                "order_id": order_id,
-                "redirect_url": redirect_url,
-                "payment_link": payment_link,
-                "url_data": url_data,
-                "template": whatsapp_template.title,
-            }
-            return token_error
-
         try:
             response = requests.post(graph_url, json=payload, headers=headers, timeout=45)
             print(response.text, flush=True)
@@ -1022,10 +1010,6 @@ class WhatsappClass:
             return {"status": "error", "message": "Sucursal no encontrada", "whatsapp_accepted": "rejected"}
         if not user:
             return {"status": "error", "message": "Supervisor no encontrado", "whatsapp_accepted": "rejected"}
-
-        token_error = validate_whatsapp_access_token()
-        if token_error:
-            return token_error
 
         token = whatsapp_access_token()
         graph_url = whatsapp_graph_messages_url()

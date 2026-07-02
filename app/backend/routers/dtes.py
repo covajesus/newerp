@@ -1145,21 +1145,32 @@ def received_credit_note_massive_accountability(
         raise HTTPException(status_code=500, detail=f"Error al procesar Notas de Crédito masivamente: {str(e)}")
 
 @dtes.get("/massive_resend_whatsapp")
-def massive_resend_whatsapp(db: Session = Depends(get_db)):
+def massive_resend_whatsapp(
+    period: str | None = None,
+    all_periods: int = 0,
+    force: int = 0,
+    db: Session = Depends(get_db),
+):
     """
-    Endpoint GET para reenviar WhatsApp masivamente a DTEs que cumplan:
-    - period = período actual (YYYY-MM)
-    - dte_type_id = 33 o 39
-    - dte_version_id = 1
-    - status_id = 4
-    - massive_resend_id != 1 (o NULL)
-    
-    Ejemplo de uso:
-    GET /dtes/massive_resend_whatsapp
+    Reenvío masivo WhatsApp — DTEs status_id=4 (facturas 33 + boletas 39).
+
+    Query params:
+      period=2026-07     Mes a procesar (default: mes actual)
+      all_periods=1      Todos los periodos con status 4
+      force=1            Reenviar aunque massive_resend_status_id=1
+
+    Ejemplos:
+      GET /api/dtes/massive_resend_whatsapp
+      GET /api/dtes/massive_resend_whatsapp?period=2026-07
+      GET /api/dtes/massive_resend_whatsapp?all_periods=1&force=1
     """
     try:
         dte_class = DteClass(db)
-        result = dte_class.massive_resend_whatsapp()
+        result = dte_class.massive_resend_whatsapp(
+            period=period,
+            all_periods=bool(all_periods),
+            force=bool(force),
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reenvío masivo de WhatsApp: {str(e)}")
