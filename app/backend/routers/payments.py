@@ -150,6 +150,15 @@ def get_payment_data(order_id: str, db: Session = Depends(get_db)):
     return {"message": data}
 
 
+@payments.get("/document-paid/{folio}")
+def get_paid_document(folio: int, db: Session = Depends(get_db)):
+    """Public: document summary when status_id=5 (already paid page)."""
+    data = DtePaymentDataClass(db).get_paid_document_by_folio(folio)
+    if not data:
+        raise HTTPException(status_code=404, detail="Document not found or not paid")
+    return {"message": data}
+
+
 @payments.get("/pay/{order_id:path}")
 def pay_redirect(order_id: str, db: Session = Depends(get_db)):
     return _pay_redirect_to_gateway(order_id, db)

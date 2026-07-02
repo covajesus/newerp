@@ -276,6 +276,51 @@ class DtePaymentDataClass:
             return None
         return self.serialize(row)
 
+    def get_paid_document_by_folio(self, folio: int) -> dict | None:
+        """Public summary for /payments/already-paid when the DTE is status 5."""
+        dte = self._find_dte(folio, str(folio))
+        if not dte or int(getattr(dte, "status_id", 0) or 0) != 5:
+            return None
+
+        customer = self._resolve_customer(dte)
+        branch_office_name = None
+        if getattr(dte, "branch_office_id", None):
+            branch = (
+                self.db.query(BranchOfficeModel)
+                .filter(BranchOfficeModel.id == dte.branch_office_id)
+                .first()
+            )
+            if branch:
+                branch_office_name = branch.branch_office
+
+        dte_type_id = int(getattr(dte, "dte_type_id", 0) or 0)
+        if dte_type_id == 39:
+            document_type = "Boleta"
+        elif dte_type_id == 33:
+            document_type = "Factura"
+        else:
+            document_type = "Documento tributario"
+
+        payment_type_label = None
+        if getattr(dte, "payment_type_id", None) is not None:
+            payment_type_label = PAYMENT_TYPE_LABELS.get(
+                int(dte.payment_type_id),
+                f"Tipo {dte.payment_type_id}",
+            )
+
+        return {
+            "document_folio": int(dte.folio) if dte.folio is not None else folio,
+            "dte_type_id": dte_type_id,
+            "document_type": document_type,
+            "customer_name": customer.customer if customer else None,
+            "rut": getattr(dte, "rut", None),
+            "branch_office": branch_office_name,
+            "amount": int(getattr(dte, "total", 0) or 0),
+            "payment_type": payment_type_label,
+            "payment_date": getattr(dte, "payment_date", None),
+            "status_id": int(dte.status_id),
+        }
+
     def serialize(self, row: DtePaymentDataModel) -> dict:
         customer_name = None
         if row.customer_id:

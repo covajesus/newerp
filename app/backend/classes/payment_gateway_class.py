@@ -330,6 +330,26 @@ class PaymentGatewayClass:
         qs = urlencode({"referenceId": reference_id, "orderId": order_id})
         return f"{base}?{qs}"
 
+    def _frontend_already_paid_url(self, folio: int) -> str:
+        base = payments_env(
+            "PAYMENTS_ALREADY_PAID_FRONTEND_URL",
+            default="https://intrajis.com/payments/already-paid",
+        ).rstrip("/")
+        qs = urlencode({"folio": folio})
+        return f"{base}?{qs}"
+
+    @staticmethod
+    def _paid_document_redirect(folio: int, db: Session) -> str | None:
+        dte = (
+            db.query(DteModel)
+            .filter(DteModel.folio == folio)
+            .order_by(DteModel.id.desc())
+            .first()
+        )
+        if dte and int(getattr(dte, "status_id", 0) or 0) == 5:
+            return PaymentGatewayClass()._frontend_already_paid_url(int(folio))
+        return None
+
     def _next_reference_id(self, folio: int, db: Session) -> str:
         """Unique gateway reference_id per payment attempt (folio, folio-r2, …)."""
         folio_s = str(folio)
@@ -392,18 +412,10 @@ class PaymentGatewayClass:
         if not dte:
             raise HTTPException(status_code=404, detail="Document not found for payment")
 
-        if int(getattr(dte, "status_id", 0) or 0) == 5:
-            row = (
-                db.query(DtePaymentDataModel)
-                .filter(DtePaymentDataModel.folio == folio)
-                .order_by(DtePaymentDataModel.id.desc())
-                .first()
-            )
-            if row and row.order_id:
-                return self._frontend_success_url(
-                    str(row.reference_id or folio),
-                    str(row.order_id),
-                )
+        paid_redirect = self._paid_document_redirect(folio, db)
+        if paid_redirect:
+            print(f"[payments] pay folio={folio} already paid → frontend", flush=True)
+            return paid_redirect
 
         customer = (
             db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
@@ -478,6 +490,26 @@ class PaymentGatewayClass:
                 return self.checkout_url_for_folio(int(row.folio), db)
             raise
 
+        from app.backend.classes.dte_payment_data_class import document_folio_from_reference_id
+
+        folio_hint = document_folio_from_reference_id(gateway_order.get("reference_id"))
+        if folio_hint is None:
+            row_hint = (
+                db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.order_id == normalized)
+                .first()
+            )
+            if row_hint and row_hint.folio:
+                folio_hint = int(row_hint.folio)
+        if folio_hint is not None:
+            paid_redirect = self._paid_document_redirect(folio_hint, db)
+            if paid_redirect:
+                print(
+                    f"[payments] pay order={normalized} folio={folio_hint} already paid → frontend",
+                    flush=True,
+                )
+                return paid_redirect
+
         checkout = self._order_checkout_url(gateway_order)
         if checkout:
             return checkout
@@ -490,9 +522,7 @@ class PaymentGatewayClass:
             )
 
         if status in _RETRY_ORDER_STATUSES or not gateway_order.get("redirect_url"):
-            from app.backend.classes.dte_payment_data_class import document_folio_from_reference_id
-
-            folio = document_folio_from_reference_id(gateway_order.get("reference_id"))
+            folio = folio_hint
             if folio is None:
                 row = (
                     db.query(DtePaymentDataModel)
