@@ -10,6 +10,10 @@ load_dotenv()
 
 WHATSAPP_GRAPH_PHONE_NUMBER_ID = "101066132689690"
 WHATSAPP_GRAPH_API_VERSION = "v20.0"
+WHATSAPP_TEMPLATE_LIBREDTE_ID = 1
+WHATSAPP_TEMPLATE_LIBREDTE_TITLE = "envio_dte"
+WHATSAPP_TEMPLATE_KLAP_ID = 8
+WHATSAPP_TEMPLATE_KLAP_TITLE = "envio_dte_v3"
 
 
 def whatsapp_access_token() -> str:
@@ -25,6 +29,30 @@ def whatsapp_graph_messages_url() -> str:
     return (
         f"https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/"
         f"{WHATSAPP_GRAPH_PHONE_NUMBER_ID}/messages"
+    )
+
+
+def _whatsapp_template_libredte(db):
+    """Factura LibreDTE: plantilla envio_dte (botón pago LibreDTE)."""
+    return (
+        db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.title == WHATSAPP_TEMPLATE_LIBREDTE_TITLE)
+        .first()
+        or db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.id == WHATSAPP_TEMPLATE_LIBREDTE_ID)
+        .first()
+    )
+
+
+def _whatsapp_template_klap(db):
+    """Boleta SimpleFactura + Klap: plantilla envio_dte_v3 (botón /api/payments/pay/…)."""
+    return (
+        db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.title == WHATSAPP_TEMPLATE_KLAP_TITLE)
+        .first()
+        or db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.id == WHATSAPP_TEMPLATE_KLAP_ID)
+        .first()
     )
 
 
@@ -73,6 +101,76 @@ def payment_proxy_public_url(pay_id: str) -> str:
         default="https://intrajisbackend.com/api/payments/pay",
     ).rstrip("/")
     return f"{base}/{pay_id}"
+
+
+def _whatsapp_document_pdf_url(db, dte_data) -> tuple[str | None, dict | None]:
+    """Public PDF URL for WhatsApp template header; ensures file is in the web-served files dir."""
+    from fastapi import HTTPException
+    from app.backend.classes.file_class import FileClass
+    from app.backend.classes.customer_bill_class import CustomerBillClass
+    from app.backend.classes.customer_ticket_class import CustomerTicketClass
+
+    folio = int(getattr(dte_data, "folio", 0) or 0)
+    if folio <= 0:
+        return None, {"status": "error", "message": "DTE sin folio para PDF WhatsApp"}
+
+    remote_path = f"{folio}.pdf"
+    fc = FileClass(db)
+    try:
+        fc.download(remote_path)
+        return fc.get(remote_path), None
+    except HTTPException:
+        pass
+
+    dte_type_id = int(getattr(dte_data, "dte_type_id", 0) or 0)
+    if dte_type_id == 39:
+        pdf_result = CustomerTicketClass(db).save_simplefactura_pdf_ticket(folio, dte_type_id=dte_type_id)
+    elif dte_type_id == 33:
+        pdf_result = CustomerBillClass(db).save_pdf_bill(folio)
+    else:
+        return None, {"status": "error", "message": f"Tipo DTE {dte_type_id} no soportado para PDF WhatsApp"}
+
+    if not isinstance(pdf_result, dict) or pdf_result.get("status") != "success":
+        return None, pdf_result or {"status": "error", "message": "No se pudo obtener PDF"}
+
+    return pdf_result.get("url") or fc.get(remote_path), None
+
+
+def _parse_whatsapp_graph_response(response) -> dict:
+    try:
+        response_data = response.json() if response.content else {}
+    except Exception as exc:
+        return {
+            "status": "error",
+            "status_code": response.status_code,
+            "response": response.text,
+            "error": str(exc),
+            "whatsapp_accepted": "rejected",
+        }
+
+    graph_error = (response_data.get("error") or {}) if isinstance(response_data, dict) else {}
+    messages = response_data.get("messages") if isinstance(response_data, dict) else None
+    message_status = None
+    if isinstance(messages, list) and messages:
+        message_status = messages[0].get("message_status")
+
+    if response.status_code != 200:
+        return {
+            "status": "error",
+            "status_code": response.status_code,
+            "response": response_data,
+            "message": graph_error.get("message") or "Error al enviar WhatsApp",
+            "whatsapp_error_code": graph_error.get("code"),
+            "whatsapp_accepted": "rejected",
+        }
+
+    return {
+        "status": "success",
+        "status_code": response.status_code,
+        "response": response_data,
+        "message_status": message_status,
+        "whatsapp_accepted": "accepted" if message_status == "accepted" else "pending",
+    }
 
 
 def _payments_whatsapp_url_data(
@@ -193,15 +291,22 @@ class WhatsappClass:
             print(f"[WhatsappClass.send_text_message] {e}")
             return {"status": "error", "error": str(e)}
 
-    def send(self, dte_data, customer_rut): 
+    def send(self, dte_data, customer_rut):
+        if int(getattr(dte_data, "dte_type_id", 0) or 0) == 39:
+            print("[send] Boleta → send_v2_invoice (SimpleFactura/Klap)", flush=True)
+            return self.send_v2_invoice(dte_data, customer_rut)
+
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == customer_rut).first()
-        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
+        whatsapp_template = _whatsapp_template_libredte(self.db)
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
+        pdf_url, pdf_error = _whatsapp_document_pdf_url(self.db, dte_data)
+        if pdf_error:
+            return {**pdf_error, "whatsapp_accepted": "rejected"}
+        image = pdf_url
 
-        token = os.getenv("LIBREDTE_TOKEN")
+        token = whatsapp_access_token()
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -342,23 +447,27 @@ class WhatsappClass:
             result = {"status": "skipped", "message": "Cliente no encontrado"}
             print(f"[v2] WhatsApp folio={folio} skipped: {result['message']}", flush=True)
             return result
-        if not customer.phone or str(customer.phone).strip() == "":
+
+        phone_raw = phone_override if phone_override else customer.phone
+        if not phone_raw or str(phone_raw).strip() == "":
             result = {"status": "skipped", "message": "Cliente sin teléfono"}
             print(f"[v2] WhatsApp folio={folio} skipped: {result['message']} rut={customer_rut}", flush=True)
             return result
 
-        whatsapp_template = (
-            self.db.query(WhatsappTemplateModel)
-            .filter(WhatsappTemplateModel.id == 8)
-            .first()
-        )
+        whatsapp_template = _whatsapp_template_klap(self.db)
         if not whatsapp_template or not whatsapp_template.title:
             result = {
                 "status": "error",
-                "message": "Plantilla WhatsApp id=8 (envio_dte_v3) no encontrada o sin title",
+                "message": f"Plantilla WhatsApp {WHATSAPP_TEMPLATE_KLAP_TITLE} no encontrada",
             }
             print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
             return result
+        if whatsapp_template.title != WHATSAPP_TEMPLATE_KLAP_TITLE:
+            print(
+                f"[v2] WhatsApp folio={folio} warning: template id={whatsapp_template.id} "
+                f"title={whatsapp_template.title!r} (expected {WHATSAPP_TEMPLATE_KLAP_TITLE})",
+                flush=True,
+            )
 
         branch_office = (
             self.db.query(BranchOfficeModel)
@@ -460,7 +569,6 @@ class WhatsappClass:
 
         dte_type = "boleta" if int(dte_data.dte_type_id) == 39 else "factura"
 
-        phone_raw = phone_override if phone_override else customer.phone
         phone_str = str(phone_raw).strip()
         customer_phone = phone_str if phone_str.startswith("56") else "56" + phone_str
 
@@ -850,11 +958,12 @@ class WhatsappClass:
         if not dte_data:
             return {"status": "error", "message": "DTE no encontrado"}
 
-        # Boletas (SimpleFactura v2 + Klap): mismo flujo que emisión v2
+        # Boletas (SimpleFactura v2 + Klap): plantilla envio_dte_v3
         if int(dte_data.dte_type_id or 0) == 39:
-            print("[resend] Boleta → send_v2_invoice (SimpleFactura/Klap)", flush=True)
+            print("[resend] Boleta → send_v2_invoice (envio_dte_v3 / Klap)", flush=True)
             return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
 
+        # Facturas: plantilla envio_dte + pago LibreDTE
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         issued_dte_info_url = (
             "https://libredte.cl/api/dte/dte_emitidos/info/"
@@ -873,16 +982,20 @@ class WhatsappClass:
         )
         libredte_body = (issued_dte_info_response.text or "").strip()
         if issued_dte_info_response.status_code != 200 or "No existe el documento" in libredte_body:
-            print("[resend] DTE no está en LibreDTE → send_v2_invoice (payments)", flush=True)
-            return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
+            return {
+                "status": "error",
+                "message": "Factura no encontrada en LibreDTE para reenvío WhatsApp",
+                "whatsapp_accepted": "rejected",
+            }
 
-        whatsapp_template = self.db.query(WhatsappTemplateModel).filter(WhatsappTemplateModel.id == 1).first()
+        whatsapp_template = _whatsapp_template_libredte(self.db)
         branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == dte_data.branch_office_id).first()
         user = self.db.query(UserModel).filter(UserModel.rut == branch_office.principal_supervisor).first()
 
-        image = "https://intrajisbackend.com/files/" + str(dte_data.folio) + ".pdf"
-
-        token = os.getenv("LIBREDTE_TOKEN")
+        pdf_url, pdf_error = _whatsapp_document_pdf_url(self.db, dte_data)
+        if pdf_error:
+            return {**pdf_error, "whatsapp_accepted": "rejected"}
+        image = pdf_url
 
         print(issued_dte_info_response.text)
         issued_date_for_payment_link = _libredte_issue_date_from_emitido_info(
@@ -898,76 +1011,85 @@ class WhatsappClass:
             + "/"
             + str(dte_data.total)
         )
-    
-        url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
+        if not whatsapp_template or not whatsapp_template.title:
+            return {
+                "status": "error",
+                "message": f"Plantilla WhatsApp {WHATSAPP_TEMPLATE_LIBREDTE_TITLE} no encontrada",
+                "whatsapp_accepted": "rejected",
+            }
+        if not branch_office:
+            return {"status": "error", "message": "Sucursal no encontrada", "whatsapp_accepted": "rejected"}
+        if not user:
+            return {"status": "error", "message": "Supervisor no encontrado", "whatsapp_accepted": "rejected"}
+
+        token_error = validate_whatsapp_access_token()
+        if token_error:
+            return token_error
+
+        token = whatsapp_access_token()
+        graph_url = whatsapp_graph_messages_url()
         headers = {
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json"
-                }
-            
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
         added_date_str = dte_data.added_date.strftime('%d-%m-%Y')
-                
-        if dte_data.dte_type_id == 39:
-            dte_type = "boleta"
-        else:
-            dte_type = "factura"
+        dte_type = "factura"
 
         phone_str = str(phone).strip()
-        if not phone_str.startswith("56"):
-            customer_phone = "56" + phone_str
-        else:
-            customer_phone = phone_str
+        customer_phone = phone_str if phone_str.startswith("56") else "56" + phone_str
 
-        if user:
-            payload = {
-                        "messaging_product": "whatsapp",
-                        "to": f"{customer_phone}",
-                        "type": "template",
-                        "template": {
-                            "name": whatsapp_template.title,
-                            "language": {"code": "es"},
-                            "components": [
-                                {
-                                    "type": "header",
-                                    "parameters": [
-                                        {
-                                            "type": "document",
-                                            "document": {
-                                                "link": image,
-                                                "filename": f"{dte_data.folio}.pdf"
-                                            }
-                                        }
-                                    ]
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": f"{customer_phone}",
+            "type": "template",
+            "template": {
+                "name": whatsapp_template.title,
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "document",
+                                "document": {
+                                    "link": image,
+                                    "filename": f"{dte_data.folio}.pdf",
                                 },
-                                {
-                                    "type": "body",
-                                    "parameters": [
-                                        {"type": "text", "text": str(dte_type)},
-                                        {"type": "text", "text": str(dte_data.folio)},
-                                        {"type": "text", "text": added_date_str},
-                                        {"type": "text", "text": str(dte_data.total)},
-                                        {"type": "text", "text": branch_office.branch_office},
-                                        {"type": "text", "text": user.full_name},
-                                        {"type": "text", "text": user.phone},
-                                        {"type": "text", "text": user.email},
-                                    ]
-                                },
-                                {
-                                    "type": "button",
-                                    "index": "0",
-                                    "sub_type": "url",
-                                    "parameters": [
-                                        {"type": "text", "text": url_data}
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-        print(payload)
-        response = requests.post(url, json=payload, headers=headers)
-
-        print(response.text)
+                            }
+                        ],
+                    },
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": str(dte_type)},
+                            {"type": "text", "text": str(dte_data.folio)},
+                            {"type": "text", "text": added_date_str},
+                            {"type": "text", "text": str(dte_data.total)},
+                            {"type": "text", "text": branch_office.branch_office},
+                            {"type": "text", "text": user.full_name},
+                            {"type": "text", "text": user.phone},
+                            {"type": "text", "text": user.email},
+                        ],
+                    },
+                    {
+                        "type": "button",
+                        "index": "0",
+                        "sub_type": "url",
+                        "parameters": [{"type": "text", "text": url_data}],
+                    },
+                ],
+            },
+        }
+        print(
+            f"[resend] factura folio={dte_data.folio} template={whatsapp_template.title} pdf={image}",
+            flush=True,
+        )
+        print(payload, flush=True)
+        response = requests.post(graph_url, json=payload, headers=headers, timeout=45)
+        print(response.text, flush=True)
+        return _parse_whatsapp_graph_response(response)
 
     def dtes_data(self):
         dtes = (

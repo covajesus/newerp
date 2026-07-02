@@ -1464,31 +1464,34 @@ class CustomerBillClass:
             return f"Error: {error_message}"
     
     def save_pdf_bill(self, folio):
-        folio = folio
+        folio = int(folio)
         tipo_dte = 33
         rut_emisor = '76063822'
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        remote_path = f"{folio}.pdf"
 
-        # URL completa
-        url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/{tipo_dte}/{folio}/{rut_emisor}?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+        url = (
+            f"https://libredte.cl/api/dte/dte_emitidos/pdf/{tipo_dte}/{folio}/{rut_emisor}"
+            f"?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1"
+            f"&cedible=0&compress=0&base64=0"
+        )
 
-        # Headers con token de autenticación
         headers = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {TOKEN}'
         }
 
-        # Realizar la solicitud
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=45)
 
-        # Verificar respuesta
-        if response.status_code != 200:
-            print(f"Error {response.status_code}: {response.text}")
-        else:
-            # Guardar el PDF en disco
-            with open(f'files/{folio}.pdf', 'wb') as f:
-                f.write(response.content)
-            print(f'PDF guardado como {folio}.pdf')
+        if response.status_code != 200 or not response.content:
+            message = f"Error {response.status_code} al descargar PDF LibreDTE folio {folio}"
+            print(message, response.text[:300] if response.text else "")
+            return {"status": "error", "message": message}
+
+        self.file_class.temporal_upload(response.content, remote_path)
+        public_url = self.file_class.get(remote_path)
+        print(f'PDF guardado en {public_url}', flush=True)
+        return {"status": "success", "url": public_url}
 
     def generate(self, form_data):
         expected_total_doc = _bill_gross_for_dte_match(form_data)
