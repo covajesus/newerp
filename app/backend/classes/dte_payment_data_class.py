@@ -260,6 +260,13 @@ class DtePaymentDataClass:
             except Exception as exc:
                 print(f"[payments] notify_payment folio={dte.folio}: {exc}", flush=True)
 
+            try:
+                from app.backend.classes.customer_ticket_class import sync_simplefactura_paid_status_if_applicable
+
+                sync_simplefactura_paid_status_if_applicable(self.db, dte)
+            except Exception as exc:
+                print(f"[payments] simplefactura mark-paid folio={dte.folio}: {exc}", flush=True)
+
         return {
             "status": "success",
             "payment_data": self.serialize(row),

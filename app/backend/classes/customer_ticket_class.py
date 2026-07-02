@@ -31,6 +31,64 @@ DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor externo invoice
 DTE_VERSION_V2_LEGACY = 3  # Borradores v2 creados antes de alinear a dte_version_id=1
 DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
 DTE_V2_HTTP_TIMEOUT = 30
+SIMPLEFACTURA_RUT_EMISOR = "76063822-6"
+SIMPLEFACTURA_SUCURSAL = "Casa Matriz"
+SIMPLEFACTURA_AMBIENTE = 1
+
+
+def _is_simplefactura_v2_dte(db: Session, dte) -> bool:
+    """Ticket issued via invoiceV2 (folio pool or Klap order), not LibreDTE v1."""
+    if int(getattr(dte, "dte_type_id", 0) or 0) != 39:
+        return False
+    dte_id = getattr(dte, "id", None)
+    if dte_id:
+        row = db.execute(
+            text(
+                "SELECT 1 FROM folios "
+                "WHERE dte_id = :dte_id AND dte_id > 0 AND document_type_id IN (33, 39) "
+                "LIMIT 1"
+            ),
+            {"dte_id": int(dte_id)},
+        ).first()
+        if row:
+            return True
+    folio = getattr(dte, "folio", None)
+    if folio:
+        from app.backend.db.models import DtePaymentDataModel
+
+        if (
+            db.query(DtePaymentDataModel.id)
+            .filter(DtePaymentDataModel.folio == int(folio))
+            .first()
+        ):
+            return True
+    return False
+
+
+def sync_simplefactura_paid_status_if_applicable(db: Session, dte) -> dict | None:
+    """Call SimpleFactura POST /dte/marcar-pagado-pendiente when a v2 ticket reaches status 5."""
+    if not dte:
+        return None
+    if not _is_simplefactura_v2_dte(db, dte):
+        return None
+    if int(getattr(dte, "status_id", 0) or 0) != 5:
+        return None
+    if getattr(dte, "reason_id", None):
+        return None
+    folio = getattr(dte, "folio", None)
+    if not folio:
+        return None
+    try:
+        result = CustomerTicketClass(db).mark_simplefactura_paid_status(int(folio), paid=True)
+        print(
+            f"[simplefactura] mark-paid folio={folio} status={result.get('status')} "
+            f"msg={result.get('message')}",
+            flush=True,
+        )
+        return result
+    except Exception as exc:
+        print(f"[simplefactura] mark-paid folio={folio} error: {exc}", flush=True)
+        return {"status": "error", "message": str(exc)}
 
 
 def v2_invoice_branch_display(branch) -> str:
@@ -803,6 +861,7 @@ class CustomerTicketClass:
         self.db.refresh(dte)
 
         self.create_account_asset(dte)
+        sync_simplefactura_paid_status_if_applicable(self.db, dte)
 
     def reject(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
@@ -2498,6 +2557,90 @@ class CustomerTicketClass:
             "status": "success",
             "url": self.file_class.get(remote_path),
             "cached": False,
+        }
+
+    def mark_simplefactura_paid_status(self, folio, dte_type_id=39, paid=True):
+        """
+        SimpleFactura POST /dte/marcar-pagado-pendiente — set document paid/pending flag.
+        API field remains ``pagado`` (bool) per MarcarPagadoOPendienteRequest schema.
+        """
+        token, token_err = self._v2_bearer_token()
+        if not token:
+            return {"status": "error", "message": token_err or "Missing v2 token"}
+
+        payload = {
+            "credenciales": {
+                "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
+            },
+            "dteReferenciadoExterno": {
+                "folio": int(folio),
+                "codigoTipoDte": int(dte_type_id),
+                "ambiente": SIMPLEFACTURA_AMBIENTE,
+            },
+            "pagado": bool(paid),
+        }
+        url = "https://api.simplefactura.cl/dte/marcar-pagado-pendiente"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=DTE_V2_HTTP_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"mark-paid request failed: {exc}"}
+
+        if response.status_code == 401:
+            try:
+                token = self.fetch_simplefactura_token_from_jisbackend()
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers={**headers, "Authorization": f"Bearer {token}"},
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except (ValueError, requests.RequestException) as exc:
+                return {"status": "error", "message": f"Could not refresh v2 token (mark-paid): {exc}"}
+
+        text = (response.text or "").strip()
+        try:
+            body = response.json() if text else {}
+            if not isinstance(body, dict):
+                body = {"raw": text[:500]}
+        except ValueError:
+            body = {"raw": text[:500]}
+
+        if response.status_code >= 400:
+            msg = body.get("message") if isinstance(body, dict) else text[:500]
+            errors = body.get("errors") if isinstance(body, dict) else None
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": f"mark-paid HTTP {response.status_code}: {msg or errors or text[:200]}",
+                "response": body,
+            }
+
+        if isinstance(body, dict) and body.get("status") not in (None, 200, "200"):
+            return {
+                "status": "error",
+                "http_status": response.status_code,
+                "message": body.get("message") or "SimpleFactura rejected mark-paid",
+                "response": body,
+            }
+
+        return {
+            "status": "success",
+            "http_status": response.status_code,
+            "message": body.get("message") if isinstance(body, dict) else "Paid status updated",
+            "response": body,
+            "paid": bool(paid),
+            "folio": int(folio),
         }
 
     def get_all_v2(self, rol_id=None, rut=None, group=1, page=0, items_per_page=10, period=None):

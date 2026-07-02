@@ -335,6 +335,10 @@ async def pay(request: Request, db: Session = Depends(get_db)):
         dte.status_id = 5
         db.commit()
 
+        from app.backend.classes.customer_ticket_class import sync_simplefactura_paid_status_if_applicable
+
+        sync_simplefactura_paid_status_if_applicable(db, dte)
+
     WhatsappClass(db).notify_payment(Cobro["emitido"])
 
     return {"status": "success", "message": "DTE actualizado correctamente"}
