@@ -151,8 +151,25 @@ def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
     # El front suele armar .../976357193/null → no enviar correo a la cadena "null" (LibreDTE: Invalid address)
     parts = []
     if phone != 0:
-        WhatsappClass(db).resend(dte_id, phone)
-        parts.append("WhatsApp: envío solicitado (si falla, revisar token Meta en .env).")
+        wa_result = WhatsappClass(db).resend(dte_id, phone)
+        if isinstance(wa_result, dict):
+            wa_status = wa_result.get("status")
+            if wa_status == "success":
+                parts.append("WhatsApp enviado correctamente.")
+            elif wa_status == "error":
+                raise HTTPException(
+                    status_code=502,
+                    detail=wa_result.get("message") or "Error al enviar WhatsApp",
+                )
+            elif wa_status == "skipped":
+                raise HTTPException(
+                    status_code=400,
+                    detail=wa_result.get("message") or "WhatsApp omitido",
+                )
+            else:
+                parts.append("WhatsApp: envío solicitado (si falla, revisar token Meta en .env).")
+        else:
+            parts.append("WhatsApp: envío solicitado (si falla, revisar token Meta en .env).")
 
     if not _path_param_is_absent(email):
         data = DteClass(db).resend(dte_id, email)

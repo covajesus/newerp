@@ -850,6 +850,11 @@ class WhatsappClass:
         if not dte_data:
             return {"status": "error", "message": "DTE no encontrado"}
 
+        # Boletas (SimpleFactura v2 + Klap): mismo flujo que emisión v2
+        if int(dte_data.dte_type_id or 0) == 39:
+            print("[resend] Boleta → send_v2_invoice (SimpleFactura/Klap)", flush=True)
+            return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
+
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         issued_dte_info_url = (
             "https://libredte.cl/api/dte/dte_emitidos/info/"
