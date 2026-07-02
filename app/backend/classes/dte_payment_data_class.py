@@ -231,9 +231,16 @@ class DtePaymentDataClass:
 
         dte_updated = False
         if dte and payment_status == "completed" and dte.status_id == 4:
+            resolved_payment_type_id = payment_type_id or 2
             dte.status_id = 5
-            dte.payment_type_id = payment_type_id or 2
-            dte.card_amount = amount or dte.total
+            dte.payment_type_id = resolved_payment_type_id
+            if resolved_payment_type_id == 2:
+                # Klap tarjeta: el monto imputado pasa de cash_amount → card_amount
+                paid_amount = int(dte.cash_amount or 0) or int(amount or 0) or int(dte.total or 0)
+                dte.card_amount = paid_amount
+                dte.cash_amount = 0
+            else:
+                dte.card_amount = amount or dte.total
             dte.payment_date = now.strftime("%Y-%m-%d")
             dte.updated_date = now
             dte_updated = True
