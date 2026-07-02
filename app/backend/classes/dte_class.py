@@ -2175,6 +2175,167 @@ class DteClass:
                 "message": f"Error en envío masivo: {str(e)}"
             }
 
+    def _massive_resend_whatsapp_query(
+        self,
+        period: str | None = None,
+        *,
+        all_periods: bool = False,
+        force: bool = False,
+    ):
+        target_period = (period or datetime.now().strftime("%Y-%m")).strip()
+        query = self.db.query(DteModel).filter(
+            DteModel.dte_type_id.in_([33, 39]),
+            DteModel.status_id == 4,
+        )
+        if not all_periods:
+            query = query.filter(DteModel.period == target_period)
+        if not force:
+            query = query.filter(
+                or_(
+                    DteModel.massive_resend_status_id != 1,
+                    DteModel.massive_resend_status_id.is_(None),
+                )
+            )
+        return query.order_by(DteModel.id.asc()), target_period
+
+    @staticmethod
+    def _customer_contact(customer) -> tuple[str, str]:
+        if not customer:
+            return "No disponible", "No disponible"
+        name = (getattr(customer, "customer", None) or "").strip() or "No disponible"
+        phone = (getattr(customer, "phone", None) or "").strip() or "No disponible"
+        return name, phone
+
+    def _massive_resend_whatsapp_send_dte(self, dte, whatsapp_class=None) -> dict:
+        """Envía WhatsApp de un DTE; massive_resend_status_id=1 solo si Meta acepta."""
+        whatsapp_class = whatsapp_class or WhatsappClass(self.db)
+        customer_name, customer_phone = "No disponible", "No disponible"
+
+        if not dte.folio:
+            return {
+                "dte_id": dte.id,
+                "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
+                "rut": dte.rut,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "status": "skipped",
+                "message": "DTE sin folio",
+                "massive_resend_updated": False,
+            }
+
+        customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+        customer_name, customer_phone = self._customer_contact(customer)
+
+        try:
+            whatsapp_response = whatsapp_class.send(dte, dte.rut)
+            if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
+                dte.massive_resend_status_id = 1
+                self.db.commit()
+                self.db.refresh(dte)
+                print(
+                    f"✅ WhatsApp reenviado DTE ID: {dte.id}, Folio: {dte.folio}, "
+                    f"Cliente: {customer_name}",
+                    flush=True,
+                )
+                return {
+                    "dte_id": dte.id,
+                    "folio": dte.folio,
+                    "dte_type_id": dte.dte_type_id,
+                    "rut": dte.rut,
+                    "customer_name": customer_name,
+                    "customer_phone": customer_phone,
+                    "status": "success",
+                    "message": "WhatsApp enviado",
+                    "massive_resend_updated": True,
+                    "whatsapp_response": whatsapp_response,
+                }
+
+            err_msg = "Error al reenviar WhatsApp"
+            if isinstance(whatsapp_response, dict):
+                err_msg = whatsapp_response.get("message") or err_msg
+            print(
+                f"❌ WhatsApp falló DTE ID: {dte.id}, Folio: {dte.folio}, "
+                f"Cliente: {customer_name}: {err_msg}",
+                flush=True,
+            )
+            return {
+                "dte_id": dte.id,
+                "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
+                "rut": dte.rut,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "status": "failed",
+                "message": err_msg,
+                "massive_resend_updated": False,
+                "whatsapp_response": whatsapp_response,
+            }
+        except Exception as exc:
+            error_msg = str(exc)
+            print(
+                f"❌ Excepción WhatsApp DTE ID: {dte.id}, Folio: {dte.folio}: {error_msg}",
+                flush=True,
+            )
+            return {
+                "dte_id": dte.id,
+                "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
+                "rut": dte.rut,
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "status": "error",
+                "message": error_msg,
+                "massive_resend_updated": False,
+                "whatsapp_response": None,
+            }
+
+    def massive_resend_whatsapp_pending(
+        self,
+        period: str | None = None,
+        *,
+        all_periods: bool = False,
+        force: bool = False,
+    ):
+        query, target_period = self._massive_resend_whatsapp_query(
+            period, all_periods=all_periods, force=force
+        )
+        dtes = query.all()
+        items = []
+        for dte in dtes:
+            customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
+            customer_name, customer_phone = self._customer_contact(customer)
+            items.append(
+                {
+                    "dte_id": dte.id,
+                    "folio": dte.folio,
+                    "dte_type_id": dte.dte_type_id,
+                    "rut": dte.rut,
+                    "customer_name": customer_name,
+                    "customer_phone": customer_phone,
+                    "period": dte.period,
+                }
+            )
+        return {
+            "status": "success",
+            "period": None if all_periods else target_period,
+            "all_periods": all_periods,
+            "force": force,
+            "total": len(items),
+            "dtes": items,
+        }
+
+    def massive_resend_whatsapp_send_one(self, dte_id: int) -> dict:
+        dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+        if int(dte.dte_type_id or 0) not in (33, 39):
+            return {"status": "error", "message": "Solo facturas (33) o boletas (39)"}
+        if int(dte.status_id or 0) != 4:
+            return {"status": "error", "message": "DTE no está en status 4 (por pagar)"}
+        result = self._massive_resend_whatsapp_send_dte(dte)
+        return {"status": "success", **result}
+
     def massive_resend_whatsapp(
         self,
         period: str | None = None,
@@ -2191,23 +2352,10 @@ class DteClass:
         force: reenviar aunque massive_resend_status_id=1.
         """
         try:
-            target_period = (period or datetime.now().strftime("%Y-%m")).strip()
-
-            query = self.db.query(DteModel).filter(
-                DteModel.dte_type_id.in_([33, 39]),
-                DteModel.status_id == 4,
+            query, target_period = self._massive_resend_whatsapp_query(
+                period, all_periods=all_periods, force=force
             )
-            if not all_periods:
-                query = query.filter(DteModel.period == target_period)
-            if not force:
-                query = query.filter(
-                    or_(
-                        DteModel.massive_resend_status_id != 1,
-                        DteModel.massive_resend_status_id.is_(None),
-                    )
-                )
-
-            dtes = query.order_by(DteModel.id.asc()).all()
+            dtes = query.all()
 
             whatsapp_class = WhatsappClass(self.db)
             successful_sends = 0
@@ -2222,89 +2370,12 @@ class DteClass:
             )
 
             for dte in dtes:
-                whatsapp_response = None
-                customer_name = "No disponible"
-                customer_phone = "No disponible"
-                
-                try:
-                    # Verificar que el DTE tenga folio
-                    if not dte.folio:
-                        print(f"⚠️ DTE ID {dte.id} no tiene folio, se omite")
-                        failed_sends += 1
-                        results.append({
-                            "dte_id": dte.id,
-                            "folio": dte.folio,
-                            "rut": dte.rut,
-                            "status": "skipped",
-                            "message": "DTE sin folio"
-                        })
-                        continue
-                    
-                    # Obtener datos del cliente
-                    customer = self.db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
-                    if customer:
-                        customer_name = customer.name if hasattr(customer, 'name') else "No disponible"
-                        customer_phone = customer.phone if hasattr(customer, 'phone') else "No disponible"
-                    
-                    # Reenviar WhatsApp
-                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
-                    
-                    # Verificar respuesta
-                    if whatsapp_response and whatsapp_response.get("whatsapp_accepted") == "accepted":
-                        # Actualizar massive_resend_status_id a 1 después de envío exitoso
-                        dte.massive_resend_status_id = 1
-                        self.db.commit()
-                        self.db.refresh(dte)
-                        
-                        successful_sends += 1
-                        results.append({
-                            "dte_id": dte.id,
-                            "folio": dte.folio,
-                            "dte_type_id": dte.dte_type_id,
-                            "rut": dte.rut,
-                            "customer_name": customer_name,
-                            "customer_phone": customer_phone,
-                            "status": "success",
-                            "message": "WhatsApp reenviado exitosamente",
-                            "whatsapp_response": whatsapp_response
-                        })
-                        print(f"✅ WhatsApp reenviado para DTE ID: {dte.id}, Folio: {dte.folio}, Tipo: {dte.dte_type_id}")
-                    else:
-                        failed_sends += 1
-                        err_msg = "Error al reenviar WhatsApp"
-                        if isinstance(whatsapp_response, dict):
-                            err_msg = whatsapp_response.get("message") or err_msg
-                        results.append({
-                            "dte_id": dte.id,
-                            "folio": dte.folio,
-                            "dte_type_id": dte.dte_type_id,
-                            "rut": dte.rut,
-                            "customer_name": customer_name,
-                            "customer_phone": customer_phone,
-                            "status": "failed",
-                            "message": err_msg,
-                            "whatsapp_response": whatsapp_response
-                        })
-                        print(
-                            f"❌ Error WhatsApp DTE ID: {dte.id}, Folio: {dte.folio}, "
-                            f"Tipo: {dte.dte_type_id}: {err_msg}",
-                            flush=True,
-                        )
-                        
-                except Exception as e:
+                item = self._massive_resend_whatsapp_send_dte(dte, whatsapp_class)
+                results.append(item)
+                if item.get("status") == "success":
+                    successful_sends += 1
+                else:
                     failed_sends += 1
-                    error_msg = str(e)
-                    results.append({
-                        "dte_id": dte.id,
-                        "folio": dte.folio,
-                        "rut": dte.rut,
-                        "customer_name": customer_name,
-                        "customer_phone": customer_phone,
-                        "status": "error",
-                        "message": f"Error: {error_msg}",
-                        "whatsapp_response": None
-                    })
-                    print(f"❌ Excepción al reenviar WhatsApp para DTE ID: {dte.id}, Folio: {dte.folio}: {error_msg}")
             
             return {
                 "status": "success",

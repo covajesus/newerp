@@ -1144,6 +1144,30 @@ def received_credit_note_massive_accountability(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al procesar Notas de Crédito masivamente: {str(e)}")
 
+@dtes.get("/massive_resend_whatsapp/pending")
+def massive_resend_whatsapp_pending(
+    period: str | None = None,
+    all_periods: int = 0,
+    force: int = 0,
+    db: Session = Depends(get_db),
+):
+    """Lista DTEs status 4 pendientes de reenvío masivo (sin enviar WhatsApp)."""
+    return DteClass(db).massive_resend_whatsapp_pending(
+        period=period,
+        all_periods=bool(all_periods),
+        force=bool(force),
+    )
+
+
+@dtes.get("/massive_resend_whatsapp/send/{dte_id}")
+def massive_resend_whatsapp_send_one(dte_id: int, db: Session = Depends(get_db)):
+    """Envía WhatsApp de un solo DTE; massive_resend_status_id=1 solo si Meta acepta."""
+    result = DteClass(db).massive_resend_whatsapp_send_one(dte_id)
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
+
 @dtes.get("/massive_resend_whatsapp")
 def massive_resend_whatsapp(
     period: str | None = None,
