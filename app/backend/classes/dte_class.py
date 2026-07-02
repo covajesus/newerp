@@ -1657,8 +1657,34 @@ class DteClass:
 
     def resend(self, dte_id, email):
         dte = self.db.query(DteModel).filter(DteModel.id == dte_id).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
 
-        url = "https://libredte.cl/api/dte/dte_emitidos/enviar_email/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822"
+        if not dte.folio:
+            return {"status": "error", "message": "DTE sin folio para reenvío por correo"}
+
+        # Boleta SimpleFactura v2 → POST /dte/enviar/mail
+        if int(dte.dte_type_id or 0) == 39:
+            print(
+                f"[resend] Boleta correo → SimpleFactura folio={dte.folio} to={email}",
+                flush=True,
+            )
+            return CustomerTicketClass(self.db).send_invoice_v2_email(
+                dte.folio,
+                dte_type_id=39,
+                to_emails=email,
+                pdf=True,
+                xml=False,
+            )
+
+        # Factura LibreDTE (sin cambios)
+        url = (
+            "https://libredte.cl/api/dte/dte_emitidos/enviar_email/"
+            + str(dte.dte_type_id)
+            + "/"
+            + str(dte.folio)
+            + "/76063822"
+        )
 
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 
@@ -1666,7 +1692,7 @@ class DteClass:
             "emails": email,
             "asunto": None,
             "mensaje": None,
-            "pdf": False,
+            "pdf": True,
             "cedible": False,
             "papelContinuo": 0
         })
@@ -1676,11 +1702,17 @@ class DteClass:
             'Authorization': f'Bearer {token}'
         }
 
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=payload, timeout=45)
 
-        print(response.text)
+        print(response.text, flush=True)
 
-    
+        if response.status_code == 200:
+            return {"status": "success", "message": "Correo LibreDTE enviado"}
+
+        return {
+            "status": "error",
+            "message": f"LibreDTE correo HTTP {response.status_code}: {(response.text or '')[:300]}",
+        }
     def get_massive_codes(self):
         period = datetime.now().strftime('%Y-%m')
 

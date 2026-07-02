@@ -172,8 +172,27 @@ def resend(dte_id: int, phone: int, email: str, db: Session = Depends(get_db)):
             parts.append("WhatsApp: envío solicitado (si falla, revisar token Meta en .env).")
 
     if not _path_param_is_absent(email):
-        data = DteClass(db).resend(dte_id, email)
-        parts.append("Correo: envío solicitado." if data is None else str(data))
+        email_result = DteClass(db).resend(dte_id, email)
+        if isinstance(email_result, dict):
+            email_status = email_result.get("status")
+            if email_status == "success":
+                parts.append(email_result.get("message") or "Correo enviado correctamente.")
+            elif email_status == "error":
+                raise HTTPException(
+                    status_code=502,
+                    detail=email_result.get("message") or "Error al enviar correo",
+                )
+            elif email_status == "skipped":
+                raise HTTPException(
+                    status_code=400,
+                    detail=email_result.get("message") or "Correo omitido",
+                )
+            else:
+                parts.append(str(email_result))
+        elif email_result is None:
+            parts.append("Correo: envío solicitado.")
+        else:
+            parts.append(f"Correo: {email_result}")
 
     if not parts:
         return {"message": "Sin acción: teléfono en 0 y correo vacío o 'null' en la URL."}
