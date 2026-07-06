@@ -95,6 +95,37 @@ class DteClass:
         """Compat: delega en _prepare_massive_emit_category."""
         self._prepare_massive_emit_category(dte)
 
+    @staticmethod
+    def _whatsapp_v2_accepted(whatsapp_response) -> bool:
+        if not whatsapp_response or not isinstance(whatsapp_response, dict):
+            return False
+        return (
+            whatsapp_response.get("status") == "success"
+            or whatsapp_response.get("whatsapp_accepted") == "accepted"
+        )
+
+    def _resolve_massive_whatsapp(self, dte, whatsapp_class, generation_result=None):
+        """
+        WhatsApp en envío masivo.
+        generate_v2 ya intenta WhatsApp; si falló (Klap, PDF, etc.) reintentar como reenvío.
+        """
+        generation_result = generation_result or {}
+        whatsapp_class = whatsapp_class or WhatsappClass(self.db)
+
+        if generation_result.get("whatsapp_sent"):
+            whatsapp_response = generation_result.get("whatsapp_result") or {}
+            if not self._whatsapp_v2_accepted(whatsapp_response):
+                msg = whatsapp_response.get("message") or whatsapp_response.get("error") or "falló en emisión"
+                print(
+                    f"[massive] WhatsApp retry folio={getattr(dte, 'folio', None)} "
+                    f"dte_id={getattr(dte, 'id', None)} motivo: {msg}",
+                    flush=True,
+                )
+                whatsapp_response = whatsapp_class.send(dte, dte.rut)
+            return whatsapp_response
+
+        return whatsapp_class.send(dte, dte.rut)
+
     def validate_old_dte(self, folio, rut, dte_version_id):
         try:
             folio_count = self.db.query(DteModel).filter(DteModel.folio == folio).filter(DteModel.rut == rut).filter(DteModel.dte_version_id == dte_version_id).count()
@@ -2020,7 +2051,11 @@ class DteClass:
                             if result.get("status") != "success":
                                 raise Exception(result.get("message") or "Error emitir boleta v2")
                             self.db.refresh(dte)
-                            whatsapp_response = result.get("whatsapp")
+                            whatsapp_response = self._resolve_massive_whatsapp(
+                                dte,
+                                whatsapp_class,
+                                {"whatsapp_sent": True, "whatsapp_result": result.get("whatsapp")},
+                            )
                                 
                         elif dte.dte_type_id == 33:  # Factura electrónica
                             # Validar que no exista un DTE duplicado (misma validación que en customer_bill_class)
@@ -2078,10 +2113,7 @@ class DteClass:
                         whatsapp_response = whatsapp_class.send(dte, dte.rut)
                     
                     # Verificar si WhatsApp fue exitoso
-                    if whatsapp_response and (
-                        whatsapp_response.get("whatsapp_accepted") == "accepted"
-                        or whatsapp_response.get("status") == "success"
-                    ):
+                    if self._whatsapp_v2_accepted(whatsapp_response):
                         successful_sends += 1
                         
                         # Decrementar contador de DTEs pendientes
@@ -2761,12 +2793,11 @@ class DteClass:
                             customer_name = "Cliente no encontrado"
                             customer_phone = "No disponible"
                     
-                    # Enviar WhatsApp (v2 boletas ya lo envían en generate_v2)
+                    # Enviar WhatsApp (v2 boletas ya lo intentan en generate_v2; reintentar si falló)
                     whatsapp_class = WhatsappClass(self.db)
-                    if generation_result.get("whatsapp_sent"):
-                        whatsapp_response = generation_result.get("whatsapp_result") or {}
-                    else:
-                        whatsapp_response = whatsapp_class.send(dte, dte.rut)
+                    whatsapp_response = self._resolve_massive_whatsapp(
+                        dte, whatsapp_class, generation_result
+                    )
                     
                     # Obtener contador actualizado desde DteModel
                     try:
@@ -2791,10 +2822,7 @@ class DteClass:
                     except:
                         remaining_dtes = 0
                     
-                    if whatsapp_response and (
-                        whatsapp_response.get("status") == "success"
-                        or whatsapp_response.get("whatsapp_accepted") == "accepted"
-                    ):
+                    if self._whatsapp_v2_accepted(whatsapp_response):
                         successful_sends += 1
                         
                         yield {

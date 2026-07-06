@@ -2475,7 +2475,8 @@ class CustomerTicketClass:
         comments=None,
     ):
         """
-        Envía boleta/factura por correo vía gateway v2 POST /dte/enviar/mail.
+        DEPRECATED: no usar. SimpleFactura envía plantilla propia.
+        Correo abonados v2 → DteSubscriberEmailClass.
         """
         recipients = []
         if isinstance(to_emails, str):
@@ -2912,11 +2913,8 @@ class CustomerTicketClass:
         commune = cd.get("commune")
         if commune:
             receiver["CmnaRecep"] = str(commune).strip()
-        email = getattr(form_data, "email", None) or cd.get("email")
-        if email:
-            email = str(email).strip()
-            receiver["CorreoRecep"] = email
-            receiver["Contacto"] = email
+        # No CorreoRecep/Contacto: SimpleFactura envía su propio mail al emitir.
+        # El correo al cliente va solo por DteSubscriberEmailClass post-emisión.
         phone = getattr(form_data, "phone", None) or cd.get("phone")
         if phone:
             receiver["TelefonoRecep"] = str(phone).strip()
@@ -3087,11 +3085,7 @@ class CustomerTicketClass:
         commune = cd.get("commune")
         if commune:
             receiver["CmnaRecep"] = str(commune).strip()
-        email = getattr(form_data, "email", None) or cd.get("email")
-        if email:
-            email = str(email).strip()
-            receiver["CorreoRecep"] = email
-            receiver["Contacto"] = email
+        # No CorreoRecep/Contacto en invoiceV2 (evita mail automático SimpleFactura).
         phone = getattr(form_data, "phone", None) or cd.get("phone")
         if phone:
             receiver["TelefonoRecep"] = str(phone).strip()

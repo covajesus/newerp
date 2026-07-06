@@ -2274,9 +2274,7 @@ class CustomerBillClass:
             receiver["DirRecep"] = customer.get("address") or customer.get("region")
         if customer.get("commune"):
             receiver["CmnaRecep"] = customer["commune"]
-        if customer.get("email"):
-            receiver["CorreoRecep"] = customer["email"]
-            receiver["Contacto"] = customer["email"]
+        # No CorreoRecep/Contacto en invoiceV2 (correo solo vía DteSubscriberEmailClass).
 
         id_doc: dict = {
             "TipoDTE": 33,
