@@ -42,19 +42,22 @@ def _bill_total_from_form(form_data, dte_row=None):
     return int(form_data.amount)
 
 
-def _bill_gross_for_dte_match(form_data, dte_row=None):
-    """Total bruto (dtes.total / cash_amount) para buscar borrador o DTE emitido."""
+def _bill_parking_for_dte_match(form_data, dte_row=None):
+    """Estacionamiento (dtes.total) para buscar borrador o DTE emitido."""
     cid = getattr(form_data, "category_id", None)
     if cid is None and dte_row is not None:
         cid = getattr(dte_row, "category_id", None)
     cid = int(cid or 1)
     if cid == 2:
-        base = int(_bill_total_from_form(form_data, dte_row))
-        _, _, gross, _ = dte_totals_from_net(base)
-        return gross
+        return int(_bill_total_from_form(form_data, dte_row))
     if cid == 3:
         return int(_bill_total_from_form(form_data, dte_row))
-    return document_gross_from_form(form_data)
+    return int(form_data.amount)
+
+
+def _bill_gross_for_dte_match(form_data, dte_row=None):
+    """Alias: estacionamiento en dtes.total (chip_id indica +$5.000 al pagar)."""
+    return _bill_parking_for_dte_match(form_data, dte_row)
 
 
 def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
@@ -98,10 +101,11 @@ def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
         return
 
     gross = document_gross_from_form(form_data)
+    parking = int(form_data.amount)
     dte.cash_amount = gross
     dte.subtotal = round(gross / 1.19)
     dte.tax = gross - dte.subtotal
-    dte.total = gross
+    dte.total = parking
 
 
 def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
@@ -141,7 +145,9 @@ def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
         dte.category_id = cid
     else:
         gross = document_gross_from_form(form_data)
+        parking = int(form_data.amount)
         _set_dte_gross_totals(dte, gross)
+        dte.total = parking
         dte.category_id = cid
 
     qty = getattr(form_data, "quantity", None)

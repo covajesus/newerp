@@ -160,20 +160,50 @@ def _ticket_total_from_form(form_data):
     return document_gross_from_form(form_data)
 
 
-def ticket_payment_total(dte) -> int:
-    """
-    Monto Klap / correo / enlace de pago = dte.total.
-    Con chip_id=1 el chip ($5.000) ya está en total; no sumar de nuevo.
-    """
+def parking_gross_from_form(form_data) -> int:
+    """Estacionamiento bruto sin chip (form_data.amount)."""
+    return int(form_data.amount)
+
+
+def parking_gross_from_dte(dte) -> int:
+    """Estacionamiento bruto guardado en dtes.total (sin chip)."""
     return int(getattr(dte, "total", 0) or 0)
 
 
-def _set_dte_gross_totals(dte, gross: int) -> None:
-    gross = int(gross)
-    dte.cash_amount = gross
-    dte.total = gross
-    dte.subtotal = round(gross / 1.19)
-    dte.tax = gross - dte.subtotal
+def ticket_payment_total(dte) -> int:
+    """
+    Monto a pagar (Klap / correo / documento).
+    chip_id=1 → estacionamiento (dte.total) + $5.000, sin importar el monto base.
+    """
+    parking = parking_gross_from_dte(dte)
+    if _chip_applies(getattr(dte, "chip_id", 0), getattr(dte, "category_id", 1)):
+        return parking + DTE_CHIP_AMOUNT_CLP
+    return parking
+
+
+def document_gross_from_dte(dte) -> int:
+    """Bruto documento = ticket_payment_total (estacionamiento + chip si aplica)."""
+    cash = int(getattr(dte, "cash_amount", 0) or 0)
+    if cash > 0:
+        return cash
+    return ticket_payment_total(dte)
+
+
+def _set_dte_gross_totals(dte, document_gross: int) -> None:
+    """
+    document_gross = bruto emitido (estacionamiento + chip si chip_id=1).
+    dte.total = solo estacionamiento; cash_amount = documento completo.
+    """
+    document_gross = int(document_gross)
+    chip = int(getattr(dte, "chip_id", 0) or 0)
+    cid = int(getattr(dte, "category_id", 1) or 1)
+    parking = document_gross
+    if _chip_applies(chip, cid):
+        parking = max(0, document_gross - DTE_CHIP_AMOUNT_CLP)
+    dte.cash_amount = document_gross
+    dte.total = parking
+    dte.subtotal = round(document_gross / 1.19)
+    dte.tax = document_gross - dte.subtotal
 
 
 def _apply_ticket_draft_amounts(dte, form_data, pxq_items=None):
@@ -201,12 +231,13 @@ def _apply_ticket_draft_amounts(dte, form_data, pxq_items=None):
         return
 
     gross = document_gross_from_form(form_data)
+    parking = parking_gross_from_form(form_data)
     net = round(gross / 1.19)
     tax = gross - net
     dte.subtotal = net
     dte.tax = tax
-    dte.total = gross
     dte.cash_amount = gross
+    dte.total = parking
 
 
 def _sync_ticket_dte_amounts_from_form(dte, form_data, pxq_items=None):
@@ -1019,8 +1050,8 @@ class CustomerTicketClass:
             print(f'PDF guardado como {folio}.pdf')
 
     def _expected_total_for_generate(self, form_data) -> int:
-        """Total bruto para ubicar el borrador (misma regla que store; cat. 3 no es especial salvo ítems)."""
-        return _ticket_total_from_form(form_data)
+        """Estacionamiento (dtes.total) para ubicar borrador."""
+        return parking_gross_from_form(form_data)
 
     def _ticket_source_dte_from_form(self, form_data):
         dte_id = getattr(form_data, "id", None)

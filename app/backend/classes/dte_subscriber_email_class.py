@@ -3,8 +3,9 @@ Correo HTML propio para abonados v2 (SimpleFactura): PDF adjunto + enlace Klap.
 Reemplaza POST /dte/enviar/mail de SimpleFactura.
 
 Montos con chip (chip_id=1, cat. distinta de 3):
-  - dte.total / Klap / correo = estacionamiento + $5.000 (una sola vez).
-  - No volver a sumar el chip sobre dte.total.
+  - dtes.total = estacionamiento (cualquier monto: 70.000, 75.000, etc.).
+  - chip_id=1 siempre suma $5.000 al pagar (75.000→80.000, 70.000→75.000).
+  - No inferir si el chip está incluido por el número; solo usa chip_id.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from app.backend.classes.customer_ticket_class import (
     CustomerTicketClass,
     _chip_applies,
     _is_simplefactura_v2_dte,
+    parking_gross_from_dte,
     ticket_payment_total,
 )
 from app.backend.classes.file_class import FileClass
@@ -115,18 +117,17 @@ def _load_brand_logo_bytes() -> bytes | None:
 
 
 def _payable_total(dte) -> int:
-    """Monto a pagar = dte.total (chip ya incluido si chip_id=1)."""
+    """Monto a pagar = estacionamiento + chip si chip_id=1."""
     return ticket_payment_total(dte)
 
 
 def _chip_breakdown_rows(dte) -> str:
-    """Filas HTML estacionamiento + chip cuando aplica (sin sumar chip otra vez)."""
+    """Filas HTML: estacionamiento + chip = total a pagar."""
     chip_id = int(getattr(dte, "chip_id", 0) or 0)
     category_id = int(getattr(dte, "category_id", 1) or 1)
     if not _chip_applies(chip_id, category_id):
         return ""
-    total = _payable_total(dte)
-    parking = max(0, total - DTE_CHIP_AMOUNT_CLP)
+    parking = parking_gross_from_dte(dte)
     parking_s = html.escape(_format_clp(parking))
     chip_s = html.escape(_format_clp(DTE_CHIP_AMOUNT_CLP))
     return f"""
@@ -372,9 +373,10 @@ class DteSubscriberEmailClass:
             int(getattr(dte, "chip_id", 0) or 0),
             int(getattr(dte, "category_id", 1) or 1),
         ):
+            parking = parking_gross_from_dte(dte)
             print(
-                f"[dte-email] folio={folio} chip_id=1 total_pago={total} "
-                f"(estacionamiento {max(0, total - DTE_CHIP_AMOUNT_CLP)} + chip {DTE_CHIP_AMOUNT_CLP})",
+                f"[dte-email] folio={folio} chip_id=1 estacionamiento={parking} "
+                f"+ chip {DTE_CHIP_AMOUNT_CLP} = total_pago {total}",
                 flush=True,
             )
 
