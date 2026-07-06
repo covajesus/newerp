@@ -16,7 +16,7 @@ from app.backend.classes.payments_env import payments_env
 
 
 def expected_webhook_api_key() -> str:
-    return payments_env("PAYMENTS_API_KEY", legacy_name="KLAP_API_KEY").strip()
+    return payments_env("PAYMENTS_API_KEY").strip()
 
 
 def incoming_api_key(request: Request) -> str | None:
