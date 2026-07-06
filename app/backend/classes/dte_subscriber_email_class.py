@@ -10,8 +10,10 @@ import os
 import smtplib
 from email import encoders
 from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -24,6 +26,20 @@ from app.backend.classes.customer_ticket_class import (
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.payments_env import payments_env
 from app.backend.db.models import CustomerModel
+
+# Colores marca JIS Parking (intrajis / vuetify theme)
+JIS_PRIMARY = "#152d8a"
+JIS_PRIMARY_DARK = "#0f2469"
+JIS_PRIMARY_LIGHT = "#e6eaf5"
+JIS_WARNING = "#e58a00"
+JIS_WARNING_DARK = "#de7700"
+JIS_SUCCESS = "#2ca87f"
+JIS_SUCCESS_LIGHT = "#e5f4ef"
+JIS_TEXT = "#1d2630"
+JIS_TEXT_MUTED = "#5b6b79"
+JIS_BORDER = "#e8ebee"
+JIS_BG = "#f8f9fa"
+LOGO_CID = "jisparking-logo"
 
 
 def is_subscriber_v2_dte(db: Session, dte) -> bool:
@@ -71,6 +87,26 @@ def _dte_label(dte_type_id: int) -> str:
     return "boleta" if int(dte_type_id) == 39 else "factura"
 
 
+def _brand_logo_path() -> Path | None:
+    custom = (os.getenv("DTE_EMAIL_LOGO_PATH") or "").strip()
+    if custom:
+        path = Path(custom)
+        if path.is_file():
+            return path
+    default = Path(__file__).resolve().parents[1] / "static" / "logo.png"
+    return default if default.is_file() else None
+
+
+def _load_brand_logo_bytes() -> bytes | None:
+    path = _brand_logo_path()
+    if not path:
+        return None
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
 def _build_html_body(
     *,
     customer_name: str,
@@ -80,6 +116,7 @@ def _build_html_body(
     total_clp: str,
     payment_link: str | None,
     is_paid: bool,
+    has_logo: bool,
 ) -> str:
     name = html.escape(customer_name or "Cliente")
     label = html.escape(dte_label)
@@ -87,33 +124,42 @@ def _build_html_body(
     total_s = html.escape(total_clp)
     folio_s = html.escape(str(folio))
 
+    logo_block = ""
+    if has_logo:
+        logo_block = f"""
+              <img src="cid:{LOGO_CID}" alt="JIS Parking" width="200"
+                   style="display:block;margin:0 auto 14px;max-width:200px;height:auto;border:0;" />
+        """
+
     if is_paid:
-        pay_block = """
-          <p style="margin:24px 0 0;padding:14px 18px;background:#e8f5e9;border-radius:8px;color:#2e7d32;font-size:15px;">
+        pay_block = f"""
+          <p style="margin:24px 0 0;padding:14px 18px;background:{JIS_SUCCESS_LIGHT};border-radius:8px;
+                    color:{JIS_SUCCESS};font-size:15px;border:1px solid #c0e5d9;">
             Este documento ya se encuentra <strong>pagado</strong>. El PDF va adjunto a este correo.
           </p>
         """
     elif payment_link:
         link = html.escape(payment_link, quote=True)
         pay_block = f"""
-          <p style="margin:28px 0 8px;font-size:15px;color:#333;">
-            Puede pagar en línea de forma segura con Klap:
+          <p style="margin:28px 0 10px;font-size:15px;color:{JIS_TEXT};">
+            Puede pagar en línea de forma segura con <strong>Klap</strong>:
           </p>
           <p style="margin:0 0 20px;text-align:center;">
             <a href="{link}"
-               style="display:inline-block;background:#00a651;color:#ffffff;text-decoration:none;
-                      padding:14px 32px;border-radius:8px;font-size:16px;font-weight:bold;">
+               style="display:inline-block;background:{JIS_WARNING};color:#ffffff;text-decoration:none;
+                      padding:14px 36px;border-radius:8px;font-size:16px;font-weight:bold;
+                      box-shadow:0 4px 12px rgba(229,138,0,0.35);">
               Pagar ahora
             </a>
           </p>
-          <p style="margin:0;font-size:12px;color:#777;word-break:break-all;">
+          <p style="margin:0;font-size:12px;color:{JIS_TEXT_MUTED};word-break:break-all;line-height:1.5;">
             Si el botón no funciona, copie este enlace en su navegador:<br>
-            <a href="{link}" style="color:#1a3a5c;">{link}</a>
+            <a href="{link}" style="color:{JIS_PRIMARY};">{link}</a>
           </p>
         """
     else:
-        pay_block = """
-          <p style="margin:24px 0 0;font-size:14px;color:#666;">
+        pay_block = f"""
+          <p style="margin:24px 0 0;font-size:14px;color:{JIS_TEXT_MUTED};">
             El PDF del documento va adjunto a este correo.
           </p>
         """
@@ -121,51 +167,67 @@ def _build_html_body(
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f0f2f5;padding:24px 12px;">
+<body style="margin:0;padding:0;background:{JIS_BG};font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{JIS_BG};padding:28px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0"
-               style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+               style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 4px 20px rgba(21,45,138,0.12);border:1px solid {JIS_BORDER};">
           <tr>
-            <td style="background:#1a3a5c;padding:28px 32px;">
-              <p style="margin:0;font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">JIS Parking</p>
-              <p style="margin:6px 0 0;font-size:13px;color:#b8c9dc;">Documento tributario electrónico</p>
+            <td style="background:linear-gradient(135deg,{JIS_PRIMARY_DARK} 0%,{JIS_PRIMARY} 100%);
+                       padding:28px 32px 22px;text-align:center;">
+              {logo_block}
+              <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.92);letter-spacing:0.3px;
+                        text-transform:uppercase;font-weight:600;">
+                Documento tributario electrónico
+              </p>
             </td>
           </tr>
           <tr>
-            <td style="padding:32px;">
-              <p style="margin:0 0 16px;font-size:16px;color:#333;">Estimado/a <strong>{name}</strong>,</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.5;">
+            <td style="padding:32px 32px 28px;">
+              <p style="margin:0 0 16px;font-size:16px;color:{JIS_TEXT};">
+                Estimado/a <strong style="color:{JIS_PRIMARY};">{name}</strong>,
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:{JIS_TEXT_MUTED};line-height:1.55;">
                 Adjuntamos su {label} electrónica y los datos para su pago.
               </p>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-                     style="background:#f8f9fb;border-radius:8px;border:1px solid #e8eaed;">
+                     style="background:{JIS_PRIMARY_LIGHT};border-radius:10px;border:1px solid {JIS_BORDER};">
                 <tr>
-                  <td style="padding:16px 20px;font-size:14px;color:#555;">Tipo</td>
-                  <td style="padding:16px 20px;font-size:14px;color:#222;text-align:right;text-transform:capitalize;"><strong>{label}</strong></td>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT_MUTED};">Tipo</td>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT};text-align:right;text-transform:capitalize;">
+                    <strong>{label}</strong>
+                  </td>
                 </tr>
                 <tr>
-                  <td style="padding:0 20px 16px;font-size:14px;color:#555;">Folio</td>
-                  <td style="padding:0 20px 16px;font-size:14px;color:#222;text-align:right;"><strong>{folio_s}</strong></td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Folio</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>{folio_s}</strong>
+                  </td>
                 </tr>
                 <tr>
-                  <td style="padding:0 20px 16px;font-size:14px;color:#555;">Fecha</td>
-                  <td style="padding:0 20px 16px;font-size:14px;color:#222;text-align:right;">{date_s}</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Fecha</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">{date_s}</td>
                 </tr>
                 <tr>
-                  <td style="padding:0 20px 16px;font-size:14px;color:#555;">Total</td>
-                  <td style="padding:0 20px 16px;font-size:18px;color:#1a3a5c;text-align:right;font-weight:bold;">{total_s}</td>
+                  <td style="padding:0 20px 18px;font-size:14px;color:{JIS_TEXT_MUTED};">Total</td>
+                  <td style="padding:0 20px 18px;font-size:20px;color:{JIS_PRIMARY};text-align:right;font-weight:bold;">
+                    {total_s}
+                  </td>
                 </tr>
               </table>
               {pay_block}
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 32px;background:#f8f9fb;border-top:1px solid #e8eaed;">
-              <p style="margin:0;font-size:12px;color:#888;line-height:1.5;">
-                JIS Parking SPA · RUT 76.063.822-6<br>
-                Este es un correo automático; ante dudas contacte a su sucursal.
+            <td style="padding:18px 32px;background:{JIS_BG};border-top:3px solid {JIS_WARNING};">
+              <p style="margin:0;font-size:12px;color:{JIS_TEXT_MUTED};line-height:1.55;text-align:center;">
+                <strong style="color:{JIS_PRIMARY};">JIS Parking SPA</strong> · RUT 76.063.822-6<br>
+                Nuestro servicio es un compromiso ·
+                <a href="mailto:contacto@jisparking.com" style="color:{JIS_PRIMARY};text-decoration:none;">
+                  contacto@jisparking.com
+                </a>
               </p>
             </td>
           </tr>
@@ -267,7 +329,8 @@ class DteSubscriberEmailClass:
                 "message": pdf_err or "No se pudo adjuntar el PDF",
             }
 
-        subject = f"JIS Parking — {dte_label.capitalize()} electrónica folio {folio}"
+        subject = f"JIS Parking - {dte_label.capitalize()} electronica folio {folio}"
+        logo_bytes = _load_brand_logo_bytes()
         html_body = _build_html_body(
             customer_name=customer_name,
             dte_label=dte_label,
@@ -276,6 +339,7 @@ class DteSubscriberEmailClass:
             total_clp=_format_clp(total),
             payment_link=payment_link,
             is_paid=is_paid,
+            has_logo=bool(logo_bytes),
         )
 
         msg = MIMEMultipart("mixed")
@@ -283,9 +347,18 @@ class DteSubscriberEmailClass:
         msg["From"] = f"{smtp['from_name']} <{smtp['user']}>"
         msg["To"] = ", ".join(recipients)
 
+        related = MIMEMultipart("related")
         alt = MIMEMultipart("alternative")
         alt.attach(MIMEText(html_body, "html", "utf-8"))
-        msg.attach(alt)
+        related.attach(alt)
+
+        if logo_bytes:
+            logo_part = MIMEImage(logo_bytes, _subtype="png")
+            logo_part.add_header("Content-ID", f"<{LOGO_CID}>")
+            logo_part.add_header("Content-Disposition", "inline", filename="jisparking-logo.png")
+            related.attach(logo_part)
+
+        msg.attach(related)
 
         attachment = MIMEBase("application", "pdf")
         attachment.set_payload(pdf_bytes)
