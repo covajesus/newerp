@@ -2398,7 +2398,14 @@ class CustomerTicketClass:
 
         emit_result = self.emit_credit_note_v2(document, branch)
         if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            FolioClass(self.db).release_folio_pool_after_failed_emit(
+                folio_res["id"],
+                folio_number=reserved_folio,
+                dte_type_id=61,
+                emit_result=emit_result,
+                dte_id=dte.id,
+                branch_office_id=dte.branch_office_id,
+            )
             return emit_result
 
         folio_number = reserved_folio
@@ -2446,11 +2453,23 @@ class CustomerTicketClass:
         try:
             self.db.commit()
             self.db.refresh(credit_note_dte)
-            FolioClass(self.db).bind_folio_to_dte(folio_res["id"], credit_note_dte.id)
+            FolioClass(self.db).bind_folio_to_dte(
+                folio_res["id"],
+                credit_note_dte.id,
+                branch_office_id=dte.branch_office_id,
+            )
             return {"status": "success", "message": "Credit Note saved successfully"}
         except Exception as e:
             self.db.rollback()
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            folio_cls = FolioClass(self.db)
+            if emit_result.get("status") == "success":
+                folio_cls.mark_folio_used(
+                    folio_res["id"],
+                    0,
+                    dte.branch_office_id,
+                )
+            else:
+                folio_cls.release_folio_pool(folio_res["id"])
             return {"status": "error", "message": f"Error: {str(e)}"}
 
     def _v2_bearer_token(self):
@@ -3121,7 +3140,14 @@ class CustomerTicketClass:
         print(f"[v2] emit_result status={emit_result.get('status')}", flush=True)
 
         if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            FolioClass(self.db).release_folio_pool_after_failed_emit(
+                folio_res["id"],
+                folio_number=int(folio_res["folio"]),
+                dte_type_id=39,
+                emit_result=emit_result,
+                dte_id=dte.id,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+            )
             return {
                 "status": "error",
                 "message": emit_result.get("message") or "Emisión v2 no emitió la boleta",
@@ -3156,7 +3182,11 @@ class CustomerTicketClass:
         try:
             self.db.commit()
             self.db.refresh(dte)
-            FolioClass(self.db).bind_folio_to_dte(folio_res["id"], dte.id)
+            FolioClass(self.db).bind_folio_to_dte(
+                folio_res["id"],
+                dte.id,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+            )
 
             from app.backend.classes.dte_subscriber_email_class import DteSubscriberEmailClass
 
@@ -3172,9 +3202,19 @@ class CustomerTicketClass:
                 to_emails=recipient_email,
             )
 
-            print("Empieza envio de whatsapp v2 (payments)", flush=True)
-            whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte, form_data.rut)
-            print(f"[v2] whatsapp_result folio={dte.folio}: {whatsapp_result}", flush=True)
+            if getattr(form_data, "massive_emit", False):
+                print(
+                    f"[v2] WhatsApp diferido (envío masivo) folio={dte.folio}",
+                    flush=True,
+                )
+                whatsapp_result = {
+                    "status": "deferred",
+                    "message": "WhatsApp se envía en la capa masiva",
+                }
+            else:
+                print("Empieza envio de whatsapp v2 (payments)", flush=True)
+                whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte, form_data.rut)
+                print(f"[v2] whatsapp_result folio={dte.folio}: {whatsapp_result}", flush=True)
 
             return {
                 "status": "success",
@@ -3188,7 +3228,15 @@ class CustomerTicketClass:
             }
         except Exception as e:
             self.db.rollback()
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            folio_cls = FolioClass(self.db)
+            if getattr(dte, "folio", None):
+                folio_cls.mark_folio_used(
+                    folio_res["id"],
+                    dte.id,
+                    getattr(form_data, "branch_office_id", None),
+                )
+            else:
+                folio_cls.release_folio_pool(folio_res["id"])
             return {"status": "error", "message": f"Error: {str(e)}"}
 
 

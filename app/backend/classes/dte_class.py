@@ -29,6 +29,7 @@ from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_tot
 # Clases auxiliares para simulación de datos de formulario
 class FormDataSimulator:
     def __init__(self, dte, massive_emit: bool = False):
+        self.massive_emit = bool(massive_emit)
         self.branch_office_id = dte.branch_office_id
         self.rut = dte.rut
         # chip_id en dtes: 1 = con chip (+$5.000 al documento/pago).
@@ -99,30 +100,68 @@ class DteClass:
     def _whatsapp_v2_accepted(whatsapp_response) -> bool:
         if not whatsapp_response or not isinstance(whatsapp_response, dict):
             return False
+        if whatsapp_response.get("whatsapp_accepted") == "accepted":
+            return True
         return (
             whatsapp_response.get("status") == "success"
-            or whatsapp_response.get("whatsapp_accepted") == "accepted"
+            and int(whatsapp_response.get("status_code") or 0) == 200
         )
+
+    def _ensure_v2_whatsapp_pdf(self, dte, max_attempts=4, delay_sec=2):
+        """SimpleFactura puede tardar unos segundos en publicar el PDF tras emitir."""
+        import time
+
+        folio = int(getattr(dte, "folio", 0) or 0)
+        if folio <= 0:
+            return None
+        dte_type_id = int(getattr(dte, "dte_type_id", 39) or 39)
+        ticket_cls = CustomerTicketClass(self.db)
+        last_result = None
+        for attempt in range(1, max_attempts + 1):
+            last_result = ticket_cls.save_simplefactura_pdf_ticket(
+                folio,
+                dte_type_id=dte_type_id,
+            )
+            if last_result.get("status") == "success" and last_result.get("url"):
+                print(
+                    f"[massive] PDF listo folio={folio} intento={attempt}",
+                    flush=True,
+                )
+                return last_result["url"]
+            if attempt < max_attempts:
+                print(
+                    f"[massive] PDF folio={folio} intento={attempt} falló, "
+                    f"reintento en {delay_sec}s: {last_result}",
+                    flush=True,
+                )
+                time.sleep(delay_sec)
+        print(
+            f"[massive] PDF folio={folio} no disponible tras {max_attempts} intentos: {last_result}",
+            flush=True,
+        )
+        return None
 
     def _resolve_massive_whatsapp(self, dte, whatsapp_class, generation_result=None):
         """
-        WhatsApp en envío masivo.
-        generate_v2 ya intenta WhatsApp; si falló (Klap, PDF, etc.) reintentar como reenvío.
+        WhatsApp en envío masivo (una sola vez, tras emisión y PDF).
+        Boletas v2: send_v2_invoice con PDF reintentado y orden Klap reutilizable.
         """
-        generation_result = generation_result or {}
         whatsapp_class = whatsapp_class or WhatsappClass(self.db)
+        try:
+            self.db.refresh(dte)
+        except Exception:
+            pass
 
-        if generation_result.get("whatsapp_sent"):
-            whatsapp_response = generation_result.get("whatsapp_result") or {}
-            if not self._whatsapp_v2_accepted(whatsapp_response):
-                msg = whatsapp_response.get("message") or whatsapp_response.get("error") or "falló en emisión"
-                print(
-                    f"[massive] WhatsApp retry folio={getattr(dte, 'folio', None)} "
-                    f"dte_id={getattr(dte, 'id', None)} motivo: {msg}",
-                    flush=True,
-                )
-                whatsapp_response = whatsapp_class.send(dte, dte.rut)
-            return whatsapp_response
+        dte_type_id = int(getattr(dte, "dte_type_id", 0) or 0)
+        folio = int(getattr(dte, "folio", 0) or 0)
+        if dte_type_id == 39 and folio > 0:
+            pdf_url = self._ensure_v2_whatsapp_pdf(dte)
+            print(
+                f"[massive] WhatsApp v2 folio={folio} dte_id={getattr(dte, 'id', None)} "
+                f"pdf={'OK' if pdf_url else 'MISSING'}",
+                flush=True,
+            )
+            return whatsapp_class.send_v2_invoice(dte, dte.rut, pdf_url=pdf_url)
 
         return whatsapp_class.send(dte, dte.rut)
 
@@ -2464,11 +2503,13 @@ class DteClass:
                         "details": result,
                     }
                 self.db.refresh(dte)
+                whatsapp = result.get("whatsapp") or {}
+                whatsapp_deferred = whatsapp.get("status") == "deferred"
                 return {
                     "status": "success",
                     "message": result.get("message", "Ticket generado exitosamente"),
-                    "whatsapp_sent": True,
-                    "whatsapp_result": result.get("whatsapp"),
+                    "whatsapp_sent": not whatsapp_deferred,
+                    "whatsapp_result": whatsapp,
                     "folio": result.get("folio"),
                 }
 

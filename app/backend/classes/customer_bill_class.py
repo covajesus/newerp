@@ -2432,7 +2432,14 @@ class CustomerBillClass:
         emit_result = CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
 
         if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            FolioClass(self.db).release_folio_pool_after_failed_emit(
+                folio_res["id"],
+                folio_number=int(folio_res["folio"]),
+                dte_type_id=33,
+                emit_result=emit_result,
+                dte_id=dte_row.id,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+            )
             return {
                 "status": "error",
                 "message": emit_result.get("message") or "Emisión v2 no emitió la factura",
@@ -2467,7 +2474,11 @@ class CustomerBillClass:
         try:
             self.db.commit()
             self.db.refresh(dte_row)
-            FolioClass(self.db).bind_folio_to_dte(folio_res["id"], dte_row.id)
+            FolioClass(self.db).bind_folio_to_dte(
+                folio_res["id"],
+                dte_row.id,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+            )
             from app.backend.classes.dte_subscriber_email_class import DteSubscriberEmailClass
 
             recipient_email = (customer_record.get("email") or "").strip()
@@ -2496,7 +2507,15 @@ class CustomerBillClass:
             }
         except Exception as e:
             self.db.rollback()
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
+            folio_cls = FolioClass(self.db)
+            if getattr(dte_row, "folio", None):
+                folio_cls.mark_folio_used(
+                    folio_res["id"],
+                    dte_row.id,
+                    getattr(form_data, "branch_office_id", None),
+                )
+            else:
+                folio_cls.release_folio_pool(folio_res["id"])
             return {"status": "error", "message": f"Error: {str(e)}"}
 
 

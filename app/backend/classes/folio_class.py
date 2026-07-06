@@ -456,26 +456,120 @@ class FolioClass:
             self.db.rollback()
             return {"status": "error", "message": str(exc)}
 
-    def bind_folio_to_dte(self, folio_row_id: int, dte_id: int):
-        """Vincula fila en folios al dte emitido."""
+    def bind_folio_to_dte(self, folio_row_id: int, dte_id: int, branch_office_id=None):
+        """Vincula fila en folios al DTE emitido y asegura used_id=1."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
-            self.db.execute(
-                text(
-                    """
+            params = {
+                "id": int(folio_row_id),
+                "dte_id": int(dte_id),
+                "updated_date": now,
+                "branch_office_id": int(branch_office_id) if branch_office_id not in (None, "", 0) else None,
+            }
+            if params["branch_office_id"]:
+                sql = """
                     UPDATE folios
                     SET dte_id = :dte_id,
+                        used_id = 1,
+                        branch_office_id = :branch_office_id,
                         updated_date = :updated_date
                     WHERE id = :id
-                    """
-                ),
-                {"id": int(folio_row_id), "dte_id": int(dte_id), "updated_date": now},
-            )
+                """
+            else:
+                sql = """
+                    UPDATE folios
+                    SET dte_id = :dte_id,
+                        used_id = 1,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                """
+            self.db.execute(text(sql), params)
             self.db.commit()
             return {"status": "success"}
         except Exception as exc:
             self.db.rollback()
             return {"status": "error", "message": str(exc)}
+
+    def mark_folio_used(self, folio_row_id: int, dte_id: int = 0, branch_office_id=None):
+        """Marca folio como usado (used_id=1) sin liberarlo a la pool."""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            params = {
+                "id": int(folio_row_id),
+                "dte_id": int(dte_id or 0),
+                "updated_date": now,
+                "branch_office_id": int(branch_office_id) if branch_office_id not in (None, "", 0) else None,
+            }
+            if params["branch_office_id"]:
+                sql = """
+                    UPDATE folios
+                    SET used_id = 1,
+                        dte_id = CASE WHEN :dte_id > 0 THEN :dte_id ELSE dte_id END,
+                        branch_office_id = :branch_office_id,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                """
+            else:
+                sql = """
+                    UPDATE folios
+                    SET used_id = 1,
+                        dte_id = CASE WHEN :dte_id > 0 THEN :dte_id ELSE dte_id END,
+                        updated_date = :updated_date
+                    WHERE id = :id
+                """
+            self.db.execute(text(sql), params)
+            self.db.commit()
+            return {"status": "success"}
+        except Exception as exc:
+            self.db.rollback()
+            return {"status": "error", "message": str(exc)}
+
+    def _sf_emit_error_indicates_folio_consumed(self, emit_result, folio_number, dte_type_id=39) -> bool:
+        """True si SimpleFactura ya tiene ese folio (no liberar a la pool)."""
+        if not emit_result or emit_result.get("status") == "success":
+            return False
+        parts = []
+        if emit_result.get("message"):
+            parts.append(str(emit_result["message"]))
+        for err in emit_result.get("errors") or []:
+            parts.append(str(err))
+        text_blob = " ".join(parts).lower()
+        folio_s = str(int(folio_number))
+        if "ya existe" in text_blob and folio_s in text_blob:
+            return True
+        if "ya existe un dte con folio" in text_blob:
+            return True
+        try:
+            from app.backend.classes.customer_ticket_class import CustomerTicketClass
+
+            pdf = CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
+                int(folio_number), dte_type_id=int(dte_type_id)
+            )
+            return pdf.get("status") == "success"
+        except Exception:
+            return False
+
+    def release_folio_pool_after_failed_emit(
+        self,
+        folio_row_id: int,
+        *,
+        folio_number: int,
+        dte_type_id: int,
+        emit_result=None,
+        dte_id=None,
+        branch_office_id=None,
+    ):
+        """
+        Libera folio solo si la emisión falló y SF no consumió el número.
+        Si SF ya emitió (ej. error duplicado), marca used_id=1.
+        """
+        if self._sf_emit_error_indicates_folio_consumed(emit_result, folio_number, dte_type_id):
+            print(
+                f"[folios] folio {folio_number} ya existe en SF; se marca used_id=1 (no liberar)",
+                flush=True,
+            )
+            return self.mark_folio_used(folio_row_id, dte_id or 0, branch_office_id)
+        return self.release_folio_pool(folio_row_id)
 
     def release_folio_pool(self, folio_row_id: int):
         """Libera folio si la emisión falló: branch_office_id→0, used_id→0, dte_id→0."""

@@ -495,11 +495,17 @@ class WhatsappClass:
                 dte_data.folio,
                 dte_type_id=dte_data.dte_type_id,
             )
-            if pdf_result.get("status") != "success":
-                print(f"[v2] PDF para WhatsApp folio={folio}: {pdf_result}", flush=True)
-            document_url = pdf_result.get("url") or (
-                f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
-            )
+            if pdf_result.get("status") != "success" or not pdf_result.get("url"):
+                result = {
+                    "status": "error",
+                    "message": (pdf_result or {}).get("message")
+                    or "PDF no disponible para WhatsApp",
+                    "pdf": pdf_result,
+                    "whatsapp_accepted": "rejected",
+                }
+                print(f"[v2] PDF para WhatsApp folio={folio}: {result}", flush=True)
+                return result
+            document_url = pdf_result["url"]
 
         payment_total = ticket_payment_total(dte_data)
         print(
@@ -507,19 +513,33 @@ class WhatsappClass:
             f"payment_total={payment_total}",
             flush=True,
         )
-        order_result = PaymentGatewayClass().create_subscriber_dte_order(dte_data, customer)
-        if order_result.get("status") != "success":
+        from fastapi import HTTPException
+
+        payment_gw = PaymentGatewayClass()
+        try:
+            pay_info = payment_gw.payment_url_for_dte(dte_data, customer, self.db)
+        except HTTPException as exc:
             result = {
                 "status": "error",
-                "message": order_result.get("message") or "Failed to create payment order",
-                "payments": order_result,
+                "message": str(exc.detail) or "Failed to resolve payment order",
+                "whatsapp_accepted": "rejected",
             }
             print(f"[v2] WhatsApp folio={folio} payment order failed: {result}", flush=True)
             return result
 
-        order_id = order_result.get("order_id")
-        redirect_url = order_result.get("redirect_url")
-        url_data = _payments_whatsapp_url_data(
+        if pay_info.get("status") != "success":
+            result = {
+                "status": "error",
+                "message": pay_info.get("message") or "Failed to resolve payment order",
+                "payments": pay_info,
+                "whatsapp_accepted": "rejected",
+            }
+            print(f"[v2] WhatsApp folio={folio} payment order failed: {result}", flush=True)
+            return result
+
+        order_id = pay_info.get("order_id")
+        redirect_url = pay_info.get("redirect_url")
+        url_data = pay_info.get("whatsapp_url_data") or _payments_whatsapp_url_data(
             order_id,
             redirect_url,
             document_folio=folio,
@@ -528,21 +548,13 @@ class WhatsappClass:
             result = {
                 "status": "error",
                 "message": "Payment order missing order_id/redirect_url for WhatsApp button",
-                "payments": order_result,
+                "payments": pay_info,
+                "whatsapp_accepted": "rejected",
             }
             print(f"[v2] WhatsApp folio={folio} error: {result['message']}", flush=True)
             return result
-        payment_link = payment_proxy_public_url(url_data)
-
-        from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
-
-        DtePaymentDataClass(self.db).record_order_created(
-            dte=dte_data,
-            customer=customer,
-            order_id=str(order_id or ""),
-            reference_id=str(folio),
-            gateway_response=order_result.get("response"),
-        )
+        payment_link = pay_info.get("payment_link") or payment_proxy_public_url(url_data)
+        order_result = pay_info
 
         token = whatsapp_access_token()
         graph_url = whatsapp_graph_messages_url()
