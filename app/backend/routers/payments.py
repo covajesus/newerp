@@ -182,7 +182,7 @@ def dte_payment_url(dte_id: int, db: Session = Depends(get_db)):
     customer = db.query(CustomerModel).filter(CustomerModel.rut == dte.rut).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    result = PaymentGatewayClass().payment_url_for_dte(dte, customer)
+    result = PaymentGatewayClass().payment_url_for_dte(dte, customer, db)
     if result.get("status") != "success":
         raise HTTPException(
             status_code=502,

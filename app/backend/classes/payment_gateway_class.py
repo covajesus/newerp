@@ -289,13 +289,20 @@ class PaymentGatewayClass:
                 result = self._create_order_safe(payload)
         return result
 
-    def payment_url_for_dte(self, dte, customer) -> dict[str, Any]:
-        """Create payment order and return proxy link for WhatsApp / copy."""
-        result = self.create_subscriber_dte_order(dte, customer)
-        if result.get("status") != "success":
-            return result
-        order_id = result.get("order_id")
-        redirect_url = result.get("redirect_url")
+    def payment_url_for_dte(self, dte, customer, db: Session) -> dict[str, Any]:
+        """Ensure gateway order matches current DTE total; return stable folio pay link."""
+        folio = int(getattr(dte, "folio", 0) or 0)
+        if folio <= 0:
+            return {"status": "error", "message": "Invalid document folio for payment link"}
+
+        redirect_url = self.checkout_url_for_folio(folio, db)
+        latest = (
+            db.query(DtePaymentDataModel)
+            .filter(DtePaymentDataModel.folio == folio)
+            .order_by(DtePaymentDataModel.id.desc())
+            .first()
+        )
+        order_id = str(latest.order_id) if latest and latest.order_id else None
         proxy_base = payments_env(
             "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
             default="https://intrajisbackend.com/api/payments/pay",
@@ -312,14 +319,14 @@ class PaymentGatewayClass:
                 else redirect_url
             )
         else:
-            whatsapp_url_data = str(getattr(dte, "folio", "") or order_id or "")
+            whatsapp_url_data = str(folio)
         return {
             "status": "success",
             "order_id": order_id,
             "redirect_url": redirect_url,
             "payment_link": f"{proxy_base}/{whatsapp_url_data}",
             "whatsapp_url_data": whatsapp_url_data,
-            "response": result.get("response"),
+            "amount": self._expected_dte_total(dte),
         }
 
     def _frontend_success_url(self, reference_id: str, order_id: str) -> str:
@@ -392,6 +399,66 @@ class PaymentGatewayClass:
             return str(redirect_url)
         return None
 
+    @staticmethod
+    def _expected_dte_total(dte) -> int:
+        return int(getattr(dte, "total", 0) or 0)
+
+    @staticmethod
+    def _gateway_order_total(gateway_order: dict[str, Any]) -> int | None:
+        amount_block = gateway_order.get("amount") or {}
+        if isinstance(amount_block, dict) and amount_block.get("total") is not None:
+            try:
+                return int(float(amount_block["total"]))
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def _pending_order_matches_dte(
+        self,
+        gateway_order: dict[str, Any],
+        dte,
+        payment_row: DtePaymentDataModel | None = None,
+    ) -> bool:
+        """True only if the gateway pending order amount matches the current DTE total."""
+        expected = self._expected_dte_total(dte)
+        if expected <= 0:
+            return False
+        gateway_total = self._gateway_order_total(gateway_order)
+        if gateway_total is not None:
+            return gateway_total == expected
+        if payment_row is not None and payment_row.amount is not None:
+            return int(payment_row.amount) == expected
+        return False
+
+    def _create_and_record_checkout_order(
+        self,
+        folio: int,
+        dte,
+        customer,
+        db: Session,
+    ) -> str:
+        ref_id = self._next_reference_id(folio, db)
+        print(f"[payments] pay folio={folio} new gateway order reference_id={ref_id}", flush=True)
+        result = self.create_subscriber_dte_order(dte, customer, reference_id=ref_id)
+        if result.get("status") != "success":
+            raise HTTPException(
+                status_code=502,
+                detail=result.get("message") or "Failed to create payment order",
+            )
+        redirect_url = result.get("redirect_url")
+        if not redirect_url:
+            raise HTTPException(status_code=502, detail="Payment gateway missing redirect_url")
+        from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
+
+        DtePaymentDataClass(db).record_order_created(
+            dte=dte,
+            customer=customer,
+            order_id=str(result.get("order_id") or ""),
+            reference_id=ref_id,
+            gateway_response=result.get("response"),
+        )
+        return str(redirect_url)
+
     def checkout_url_for_folio(self, folio: int, db: Session) -> str:
         """Stable pay link by document folio — creates a new gateway order if the last one expired."""
         dte = (
@@ -435,12 +502,21 @@ class PaymentGatewayClass:
             try:
                 gateway_order = self.get_order(str(latest.order_id))
                 checkout = self._order_checkout_url(gateway_order)
-                if checkout:
+                if checkout and self._pending_order_matches_dte(gateway_order, dte, latest):
                     print(
-                        f"[payments] pay folio={folio} reusing pending order={latest.order_id}",
+                        f"[payments] pay folio={folio} reusing pending order={latest.order_id} "
+                        f"amount={self._expected_dte_total(dte)}",
                         flush=True,
                     )
                     return checkout
+                if checkout:
+                    gateway_total = self._gateway_order_total(gateway_order)
+                    print(
+                        f"[payments] pay folio={folio} pending order={latest.order_id} "
+                        f"amount mismatch (gateway={gateway_total}, dte={self._expected_dte_total(dte)}) "
+                        f"→ new order",
+                        flush=True,
+                    )
                 status = str(gateway_order.get("status") or "").lower()
                 if status == "completed":
                     return self._frontend_success_url(
@@ -450,27 +526,7 @@ class PaymentGatewayClass:
             except HTTPException:
                 pass
 
-        ref_id = self._next_reference_id(folio, db)
-        print(f"[payments] pay folio={folio} new gateway order reference_id={ref_id}", flush=True)
-        result = self.create_subscriber_dte_order(dte, customer, reference_id=ref_id)
-        if result.get("status") != "success":
-            raise HTTPException(
-                status_code=502,
-                detail=result.get("message") or "Failed to create payment order",
-            )
-        redirect_url = result.get("redirect_url")
-        if not redirect_url:
-            raise HTTPException(status_code=502, detail="Payment gateway missing redirect_url")
-        from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
-
-        DtePaymentDataClass(db).record_order_created(
-            dte=dte,
-            customer=customer,
-            order_id=str(result.get("order_id") or ""),
-            reference_id=ref_id,
-            gateway_response=result.get("response"),
-        )
-        return str(redirect_url)
+        return self._create_and_record_checkout_order(folio, dte, customer, db)
 
     def checkout_url_for_order_id(self, order_id: str, db: Session) -> str:
         """Legacy WhatsApp links by order_id — recreates checkout if gateway order was rejected."""
@@ -511,6 +567,22 @@ class PaymentGatewayClass:
                 return paid_redirect
 
         checkout = self._order_checkout_url(gateway_order)
+        if checkout and folio_hint is not None:
+            dte = (
+                db.query(DteModel)
+                .filter(DteModel.folio == folio_hint)
+                .order_by(DteModel.id.desc())
+                .first()
+            )
+            row_hint = (
+                db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.order_id == normalized)
+                .first()
+            )
+            if dte and self._pending_order_matches_dte(gateway_order, dte, row_hint):
+                return checkout
+            if dte:
+                return self.checkout_url_for_folio(int(folio_hint), db)
         if checkout:
             return checkout
 
