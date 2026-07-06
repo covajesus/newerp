@@ -15,6 +15,11 @@ from sqlalchemy import or_
 from fastapi import HTTPException
 from app.backend.classes.libredte_dte_lines import libredte_detail_line_from_group_item
 from app.backend.classes.customer_ticket_class import CustomerTicketClass, DTE_VERSION_V2, ticket_v2_issuer, v2_dte_api_date
+from app.backend.classes.customer_ticket_class import (
+    DTE_CHIP_AMOUNT_CLP,
+    _set_dte_gross_totals,
+    document_gross_from_form,
+)
 from app.backend.classes.folio_class import FolioClass
 from datetime import timedelta
 from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
@@ -43,11 +48,13 @@ def _bill_gross_for_dte_match(form_data, dte_row=None):
     if cid is None and dte_row is not None:
         cid = getattr(dte_row, "category_id", None)
     cid = int(cid or 1)
-    base = int(_bill_total_from_form(form_data, dte_row))
     if cid == 2:
+        base = int(_bill_total_from_form(form_data, dte_row))
         _, _, gross, _ = dte_totals_from_net(base)
         return gross
-    return base
+    if cid == 3:
+        return int(_bill_total_from_form(form_data, dte_row))
+    return document_gross_from_form(form_data)
 
 
 def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
@@ -90,7 +97,7 @@ def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
         dte.cash_amount = cash
         return
 
-    gross = raw + 5000 if chip == 1 else raw
+    gross = document_gross_from_form(form_data)
     dte.cash_amount = gross
     dte.subtotal = round(gross / 1.19)
     dte.tax = gross - dte.subtotal
@@ -133,11 +140,8 @@ def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
         dte.tax = tax
         dte.category_id = cid
     else:
-        base = int(_bill_total_from_form(form_data))
-        dte.cash_amount = base
-        dte.subtotal = round(base / 1.19)
-        dte.tax = base - round(base / 1.19)
-        dte.total = base
+        gross = document_gross_from_form(form_data)
+        _set_dte_gross_totals(dte, gross)
         dte.category_id = cid
 
     qty = getattr(form_data, "quantity", None)
@@ -510,17 +514,14 @@ class CustomerBillClass:
                     {
                         "NmbItem": "Chip",
                         "QtyItem": 1,
-                        "PrcItem": 5000,
+                        "PrcItem": DTE_CHIP_AMOUNT_CLP,
                     }
                 )
             return detail_lines
         if form_data.chip_id == 1:
-            if form_data.will_save == 0 or form_data.will_save is None or form_data.will_save == "":
-                amount = form_data.amount - 5000
-            else:
-                amount = form_data.amount
+            parking = int(form_data.amount)
             parking_qty = qty if qty is not None and qty >= 1 else 1
-            parking_unit = round(int(amount) / parking_qty) if parking_qty > 0 else int(amount)
+            parking_unit = round(parking / parking_qty) if parking_qty > 0 else parking
             return [
                 {
                     "NmbItem": " Prestación de estacionamientos. Fecha:" + datetime.now().strftime("%d-%m-%Y"),
@@ -530,7 +531,7 @@ class CustomerBillClass:
                 {
                     "NmbItem": "Chip",
                     "QtyItem": 1,
-                    "PrcItem": 5000,
+                    "PrcItem": DTE_CHIP_AMOUNT_CLP,
                 },
             ]
         bill_qty = qty if qty is not None and qty >= 1 else 1
@@ -1765,7 +1766,7 @@ class CustomerBillClass:
                     {
                         "NmbItem": "Chip",
                         "QtyItem": 1,
-                        "PrcItem": 5000,
+                        "PrcItem": DTE_CHIP_AMOUNT_CLP,
                     }
                 )
             data = {
@@ -2235,7 +2236,7 @@ class CustomerBillClass:
                 }
             detail_lines = [libredte_detail_line_from_group_item(item) for item in bill_items]
             if form_data.chip_id == 1:
-                detail_lines.append({"NmbItem": "Chip", "QtyItem": 1, "PrcItem": 5000})
+                detail_lines.append({"NmbItem": "Chip", "QtyItem": 1, "PrcItem": DTE_CHIP_AMOUNT_CLP})
             return detail_lines
         return self._bill_pre_detail_lines_parking_or_items(form_data, bill_items, qty)
 
@@ -2442,7 +2443,19 @@ class CustomerBillClass:
         dte_row.dte_version_id = DTE_VERSION_V2
         dte_row.updated_date = datetime.now()
         items = self._get_bill_items_for_generation(form_data, dte_row)
-        _sync_bill_dte_amounts_from_form(dte_row, form_data, pxq_items=items if items else None)
+        mnt_total = int(
+            (document.get("Encabezado") or {}).get("Totales", {}).get("MntTotal") or 0
+        )
+        if mnt_total > 0:
+            cid = int(category_id or 1)
+            chip = int(getattr(form_data, "chip_id", 0) or 0)
+            if cid == 3:
+                chip = 0
+            dte_row.chip_id = chip
+            dte_row.category_id = cid
+            _set_dte_gross_totals(dte_row, mnt_total)
+        else:
+            _sync_bill_dte_amounts_from_form(dte_row, form_data, pxq_items=items if items else None)
         if items:
             dte_row.quantity = sum(i["quantity"] for i in items)
             self._replace_bill_items(dte_row.id, items)
@@ -2451,13 +2464,18 @@ class CustomerBillClass:
             self.db.commit()
             self.db.refresh(dte_row)
             FolioClass(self.db).bind_folio_to_dte(folio_res["id"], dte_row.id)
+            from app.backend.classes.dte_subscriber_email_class import DteSubscriberEmailClass
+
             recipient_email = (customer_record.get("email") or "").strip()
-            email_result = CustomerTicketClass(self.db).send_invoice_v2_email(
-                folio_number,
-                dte_type_id=33,
+            customer_obj = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.rut == form_data.rut)
+                .first()
+            )
+            email_result = DteSubscriberEmailClass(self.db).send(
+                dte_row,
+                customer=customer_obj,
                 to_emails=recipient_email,
-                pdf=True,
-                xml=False,
             )
 
             print("Empieza envio de whatsapp v2 (payments)", flush=True)

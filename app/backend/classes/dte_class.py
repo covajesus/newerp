@@ -1663,19 +1663,22 @@ class DteClass:
         if not dte.folio:
             return {"status": "error", "message": "DTE sin folio para reenvío por correo"}
 
-        # Boleta SimpleFactura v2 → POST /dte/enviar/mail
-        if int(dte.dte_type_id or 0) == 39:
+        from app.backend.classes.dte_subscriber_email_class import (
+            DteSubscriberEmailClass,
+            is_subscriber_v2_dte,
+        )
+
+        if is_subscriber_v2_dte(self.db, dte):
             print(
-                f"[resend] Boleta correo → SimpleFactura folio={dte.folio} to={email}",
+                f"[resend] DTE v2 correo HTML folio={dte.folio} tipo={dte.dte_type_id} to={email}",
                 flush=True,
             )
-            return CustomerTicketClass(self.db).send_invoice_v2_email(
-                dte.folio,
-                dte_type_id=39,
-                to_emails=email,
-                pdf=True,
-                xml=False,
+            customer = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.rut == dte.rut)
+                .first()
             )
+            return DteSubscriberEmailClass(self.db).send(dte, customer=customer, to_emails=email)
 
         # Factura LibreDTE (sin cambios)
         url = (

@@ -237,10 +237,20 @@ class PaymentGatewayClass:
         if total <= 0:
             return {"status": "error", "message": "Invalid DTE total for payment order"}
 
+        from app.backend.classes.customer_ticket_class import ticket_payment_total
+
+        payment_total = ticket_payment_total(dte)
+        if payment_total <= 0:
+            return {"status": "error", "message": "Invalid payment total for DTE"}
+
         reference_id = (reference_id or str(document_folio))[:100]
         methods_raw = payments_env("PAYMENTS_METHODS", default="tarjetas")
         methods = normalize_payment_methods(methods_raw)
-        print(f"[payments] create_subscriber_dte_order folio={document_folio} methods={methods}", flush=True)
+        print(
+            f"[payments] create_subscriber_dte_order folio={document_folio} "
+            f"methods={methods} total={payment_total} chip_id={getattr(dte, 'chip_id', 0)}",
+            flush=True,
+        )
 
         user: dict[str, str] = {}
         email = getattr(customer, "email", None)
@@ -265,12 +275,12 @@ class PaymentGatewayClass:
             "reference_id": reference_id,
             "description": f"{document_type_label} folio {document_folio}",
             "methods": methods,
-            "amount": {"currency": "CLP", "total": total},
+            "amount": {"currency": "CLP", "total": payment_total},
             "items": [
                 {
                     "name": f"{document_type_label} folio {document_folio}",
                     "code": str(document_folio),
-                    "price": total,
+                    "price": payment_total,
                     "quantity": 1,
                 }
             ],
@@ -401,7 +411,9 @@ class PaymentGatewayClass:
 
     @staticmethod
     def _expected_dte_total(dte) -> int:
-        return int(getattr(dte, "total", 0) or 0)
+        from app.backend.classes.customer_ticket_class import ticket_payment_total
+
+        return ticket_payment_total(dte)
 
     @staticmethod
     def _gateway_order_total(gateway_order: dict[str, Any]) -> int | None:

@@ -3,6 +3,7 @@ from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, Us
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
+from app.backend.classes.customer_ticket_class import CustomerTicketClass, _is_simplefactura_v2_dte
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import or_
@@ -1054,49 +1055,53 @@ class CustomerTicketBillClass:
         
     def download(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte or not dte.folio:
+            return None
 
-        if dte:
-            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        # Boletas SimpleFactura v2 (invoiceV2) — getPdf, no LibreDTE
+        if int(dte.dte_type_id or 0) == 39 and _is_simplefactura_v2_dte(self.db, dte):
+            return CustomerTicketClass(self.db).download(id)
 
-            # Endpoint para generar un DTE temporal
-            url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        dte_type_id = int(dte.dte_type_id or 33)
+        url = (
+            f"https://libredte.cl/api/dte/dte_emitidos/pdf/{dte_type_id}/"
+            f"{dte.folio}/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1"
+            f"&copias_cedibles=1&cedible=0&compress=0&base64=0"
+        )
 
-            # Enviar solicitud a la API
-            response = requests.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
+        response = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
 
-            # Manejar la respuesta
-            if response.status_code == 200:
-                pdf_content = response.content
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
-                unique_filename = f"{timestamp}_{unique_id}.pdf"
+        if response.status_code == 200:
+            pdf_content = response.content
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]
+            unique_filename = f"{timestamp}_{unique_id}.pdf"
+            remote_path = unique_filename
 
-                # Ruta remota en Azure
-                remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
+            self.file_class.temporal_upload(pdf_content, remote_path)
+            file_contents = self.file_class.download(remote_path)
+            encoded_file = base64.b64encode(file_contents).decode("utf-8")
+            self.file_class.delete(remote_path)
 
-                self.file_class.temporal_upload(pdf_content, remote_path)  # Llamada correcta
+            return {
+                "file_name": unique_filename,
+                "file_data": encoded_file,
+            }
 
-                # Descargar archivo desde Azure File Share
-                file_contents = self.file_class.download(remote_path)
-
-                # Convertir el contenido del archivo a base64
-                encoded_file = base64.b64encode(file_contents).decode('utf-8')
-
-                self.file_class.delete(remote_path)  # Llamada correcta
-
-                # Retornar el nombre del archivo y su contenido como base64
-                return {
-                    "file_name": unique_filename,
-                    "file_data": encoded_file
-                }
-            else:
-                return None
+        print(
+            f"[download] LibreDTE PDF folio={dte.folio} type={dte_type_id} "
+            f"HTTP {response.status_code}",
+            flush=True,
+        )
+        return None
             
     def verify(self, id):
         """

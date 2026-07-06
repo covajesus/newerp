@@ -31,6 +31,7 @@ DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor externo invoice
 DTE_VERSION_V2_LEGACY = 3  # Borradores v2 creados antes de alinear a dte_version_id=1
 DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
 DTE_V2_HTTP_TIMEOUT = 30
+DTE_CHIP_AMOUNT_CLP = 5000
 SIMPLEFACTURA_RUT_EMISOR = "76063822-6"
 SIMPLEFACTURA_SUCURSAL = "Casa Matriz"
 SIMPLEFACTURA_AMBIENTE = 1
@@ -130,15 +131,46 @@ def ticket_v2_issuer(branch):
     return issuer
 
 
+def _chip_applies(chip_id, category_id) -> bool:
+    return int(chip_id or 0) == 1 and int(category_id or 1) != 3
+
+
+def document_gross_from_parking(parking_gross: int, chip_id, category_id) -> int:
+    """Bruto documento = estacionamiento (+ chip si aplica)."""
+    parking = int(parking_gross)
+    if _chip_applies(chip_id, category_id):
+        return parking + DTE_CHIP_AMOUNT_CLP
+    return parking
+
+
+def document_gross_from_form(form_data) -> int:
+    """form_data.amount = monto bruto estacionamiento sin chip."""
+    cid = getattr(form_data, "category_id", None)
+    if cid is None:
+        cid = 1
+    return document_gross_from_parking(
+        int(form_data.amount),
+        getattr(form_data, "chip_id", 0),
+        cid,
+    )
+
+
 def _ticket_total_from_form(form_data):
-    """
-    Total bruto del documento (misma convención que `store`: amount + 5000 si chip).
-    category_id 3 solo cambia ítems/líneas en LibreDTE, no la forma de guardar montos.
-    """
-    amt = int(form_data.amount)
-    if getattr(form_data, "chip_id", None) == 1:
-        return amt + 5000
-    return amt
+    """Total bruto del documento (estacionamiento + chip si aplica)."""
+    return document_gross_from_form(form_data)
+
+
+def ticket_payment_total(dte) -> int:
+    """Monto Klap = dte.total (el chip ya está incluido al guardar)."""
+    return int(getattr(dte, "total", 0) or 0)
+
+
+def _set_dte_gross_totals(dte, gross: int) -> None:
+    gross = int(gross)
+    dte.cash_amount = gross
+    dte.total = gross
+    dte.subtotal = round(gross / 1.19)
+    dte.tax = gross - dte.subtotal
 
 
 def _apply_ticket_draft_amounts(dte, form_data, pxq_items=None):
@@ -165,8 +197,7 @@ def _apply_ticket_draft_amounts(dte, form_data, pxq_items=None):
         dte.cash_amount = cash
         return
 
-    raw = int(form_data.amount)
-    gross = raw + (5000 if chip == 1 else 0)
+    gross = document_gross_from_form(form_data)
     net = round(gross / 1.19)
     tax = gross - net
     dte.subtotal = net
@@ -1044,27 +1075,24 @@ class CustomerTicketClass:
                     {
                         "NmbItem": "Chip",
                         "QtyItem": 1,
-                        "PrcItem": 5000,
+                        "PrcItem": DTE_CHIP_AMOUNT_CLP,
                     }
                 )
             return detail_lines
 
         if form_data.chip_id == 1:
-            if form_data.will_save == 0 or form_data.will_save is None or form_data.will_save == "":
-                amount = form_data.amount - 5000
-            else:
-                amount = form_data.amount
+            parking = int(form_data.amount)
             return [
                 {
                     "NmbItem": " Prestación de estacionamientos. Fecha:"
                     + datetime.now().strftime("%d-%m-%Y"),
                     "QtyItem": 1,
-                    "PrcItem": amount,
+                    "PrcItem": parking,
                 },
                 {
                     "NmbItem": "Chip",
                     "QtyItem": 1,
-                    "PrcItem": 5000,
+                    "PrcItem": DTE_CHIP_AMOUNT_CLP,
                 },
             ]
 
@@ -1766,49 +1794,71 @@ class CustomerTicketClass:
         
     def download(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte or not dte.folio:
+            return None
 
-        if dte:
-            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-            # Endpoint para generar un DTE temporal
-            url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/39/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
-
-            # Enviar solicitud a la API
-            response = requests.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
+        if _is_simplefactura_v2_dte(self.db, dte):
+            pdf_result = self.save_simplefactura_pdf_ticket(
+                dte.folio,
+                dte_type_id=int(dte.dte_type_id or 39),
             )
-
-            # Manejar la respuesta
-            if response.status_code == 200:
-                pdf_content = response.content
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
-                unique_filename = f"{timestamp}_{unique_id}.pdf"
-
-                # Ruta remota en Azure
-                remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
-
-                self.file_class.temporal_upload(pdf_content, remote_path)  # Llamada correcta
-
-                # Descargar archivo desde Azure File Share
-                file_contents = self.file_class.download(remote_path)
-
-                # Convertir el contenido del archivo a base64
-                encoded_file = base64.b64encode(file_contents).decode('utf-8')
-
-                self.file_class.delete(remote_path)  # Llamada correcta
-
-                # Retornar el nombre del archivo y su contenido como base64
-                return {
-                    "file_name": unique_filename,
-                    "file_data": encoded_file
-                }
-            else:
+            if pdf_result.get("status") != "success":
+                print(
+                    f"[download] SimpleFactura PDF folio={dte.folio} failed: {pdf_result}",
+                    flush=True,
+                )
                 return None
+            remote_path = f"{int(dte.folio)}.pdf"
+            try:
+                file_contents = self.file_class.download(remote_path)
+            except HTTPException as exc:
+                print(f"[download] SimpleFactura PDF folio={dte.folio} file error: {exc}", flush=True)
+                return None
+            return {
+                "file_name": f"{dte.folio}.pdf",
+                "file_data": base64.b64encode(file_contents).decode("utf-8"),
+            }
+
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        dte_type_id = int(dte.dte_type_id or 39)
+        url = (
+            f"https://libredte.cl/api/dte/dte_emitidos/pdf/{dte_type_id}/"
+            f"{dte.folio}/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1"
+            f"&copias_cedibles=1&cedible=0&compress=0&base64=0"
+        )
+
+        response = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+            timeout=60,
+        )
+
+        if response.status_code == 200:
+            pdf_content = response.content
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]
+            unique_filename = f"{timestamp}_{unique_id}.pdf"
+            remote_path = unique_filename
+
+            self.file_class.temporal_upload(pdf_content, remote_path)
+            file_contents = self.file_class.download(remote_path)
+            encoded_file = base64.b64encode(file_contents).decode("utf-8")
+            self.file_class.delete(remote_path)
+
+            return {
+                "file_name": unique_filename,
+                "file_data": encoded_file,
+            }
+
+        print(
+            f"[download] LibreDTE PDF folio={dte.folio} type={dte_type_id} "
+            f"HTTP {response.status_code}",
+            flush=True,
+        )
+        return None
             
     def verify(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
@@ -2508,8 +2558,8 @@ class CustomerTicketClass:
 
         payload = {
             "credenciales": {
-                "rutEmisor": "76063822-6",
-                "nombreSucursal": "Casa Matriz",
+                "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
             },
             "dteReferenciadoExterno": {
                 "folio": int(folio),
@@ -3060,10 +3110,14 @@ class CustomerTicketClass:
         dte.dte_version_id = DTE_VERSION_V2
         dte.updated_date = datetime.now()
         group_items = self._get_group_items_for_generation(form_data, dte)
-        _sync_ticket_dte_amounts_from_form(
-            dte, form_data, pxq_items=group_items if group_items else None
-        )
-        if getattr(dte, "category_id", None) == 3:
+        cid = int(getattr(form_data, "category_id", None) or dte.category_id or 1)
+        chip = int(getattr(form_data, "chip_id", 0) or 0)
+        if cid == 3:
+            chip = 0
+        dte.chip_id = chip
+        dte.category_id = cid
+        _set_dte_gross_totals(dte, total_gross)
+        if cid == 3:
             if group_items:
                 dte.quantity = sum(item["quantity"] for item in group_items)
                 if self._normalize_group_items(getattr(form_data, "items", [])):
@@ -3076,13 +3130,18 @@ class CustomerTicketClass:
             self.db.refresh(dte)
             FolioClass(self.db).bind_folio_to_dte(folio_res["id"], dte.id)
 
+            from app.backend.classes.dte_subscriber_email_class import DteSubscriberEmailClass
+
             recipient_email = (getattr(form_data, "email", None) or cd.get("email") or "").strip()
-            email_result = self.send_invoice_v2_email(
-                folio_number,
-                dte_type_id=39,
+            customer_obj = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.rut == form_data.rut)
+                .first()
+            )
+            email_result = DteSubscriberEmailClass(self.db).send(
+                dte,
+                customer=customer_obj,
                 to_emails=recipient_email,
-                pdf=True,
-                xml=False,
             )
 
             print("Empieza envio de whatsapp v2 (payments)", flush=True)
