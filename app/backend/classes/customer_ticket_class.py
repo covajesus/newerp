@@ -161,7 +161,10 @@ def _ticket_total_from_form(form_data):
 
 
 def ticket_payment_total(dte) -> int:
-    """Monto Klap = dte.total (el chip ya está incluido al guardar)."""
+    """
+    Monto Klap / correo / enlace de pago = dte.total.
+    Con chip_id=1 el chip ($5.000) ya está en total; no sumar de nuevo.
+    """
     return int(getattr(dte, "total", 0) or 0)
 
 

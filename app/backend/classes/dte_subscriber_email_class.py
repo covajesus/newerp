@@ -1,6 +1,10 @@
 """
 Correo HTML propio para abonados v2 (SimpleFactura): PDF adjunto + enlace Klap.
 Reemplaza POST /dte/enviar/mail de SimpleFactura.
+
+Montos con chip (chip_id=1, cat. distinta de 3):
+  - dte.total / Klap / correo = estacionamiento + $5.000 (una sola vez).
+  - No volver a sumar el chip sobre dte.total.
 """
 
 from __future__ import annotations
@@ -19,9 +23,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.backend.classes.customer_ticket_class import (
+    DTE_CHIP_AMOUNT_CLP,
     DTE_VERSION_V2,
     CustomerTicketClass,
+    _chip_applies,
     _is_simplefactura_v2_dte,
+    ticket_payment_total,
 )
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.payments_env import payments_env
@@ -107,6 +114,33 @@ def _load_brand_logo_bytes() -> bytes | None:
         return None
 
 
+def _payable_total(dte) -> int:
+    """Monto a pagar = dte.total (chip ya incluido si chip_id=1)."""
+    return ticket_payment_total(dte)
+
+
+def _chip_breakdown_rows(dte) -> str:
+    """Filas HTML estacionamiento + chip cuando aplica (sin sumar chip otra vez)."""
+    chip_id = int(getattr(dte, "chip_id", 0) or 0)
+    category_id = int(getattr(dte, "category_id", 1) or 1)
+    if not _chip_applies(chip_id, category_id):
+        return ""
+    total = _payable_total(dte)
+    parking = max(0, total - DTE_CHIP_AMOUNT_CLP)
+    parking_s = html.escape(_format_clp(parking))
+    chip_s = html.escape(_format_clp(DTE_CHIP_AMOUNT_CLP))
+    return f"""
+                <tr>
+                  <td style="padding:0 20px 10px;font-size:14px;color:{JIS_TEXT_MUTED};">Estacionamiento</td>
+                  <td style="padding:0 20px 10px;font-size:14px;color:{JIS_TEXT};text-align:right;">{parking_s}</td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 10px;font-size:14px;color:{JIS_TEXT_MUTED};">Chip</td>
+                  <td style="padding:0 20px 10px;font-size:14px;color:{JIS_TEXT};text-align:right;">{chip_s}</td>
+                </tr>
+    """
+
+
 def _build_html_body(
     *,
     customer_name: str,
@@ -117,12 +151,16 @@ def _build_html_body(
     payment_link: str | None,
     is_paid: bool,
     has_logo: bool,
+    chip_rows: str = "",
+    status_label: str,
 ) -> str:
     name = html.escape(customer_name or "Cliente")
     label = html.escape(dte_label)
     date_s = html.escape(issue_date)
     total_s = html.escape(total_clp)
     folio_s = html.escape(str(folio))
+    status_s = html.escape(status_label)
+    status_color = JIS_SUCCESS if is_paid else JIS_WARNING
 
     logo_block = ""
     if has_logo:
@@ -178,9 +216,9 @@ def _build_html_body(
             <td style="background:linear-gradient(135deg,{JIS_PRIMARY_DARK} 0%,{JIS_PRIMARY} 100%);
                        padding:28px 32px 22px;text-align:center;">
               {logo_block}
-              <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.92);letter-spacing:0.3px;
-                        text-transform:uppercase;font-weight:600;">
-                Documento tributario electrónico
+              <p style="margin:0;font-size:13px;color:#ffffff;letter-spacing:0.4px;
+                        text-transform:uppercase;font-weight:700;">
+                <span style="color:#ffffff;">Documento tributario electr&oacute;nico</span>
               </p>
             </td>
           </tr>
@@ -211,7 +249,14 @@ def _build_html_body(
                   <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">{date_s}</td>
                 </tr>
                 <tr>
-                  <td style="padding:0 20px 18px;font-size:14px;color:{JIS_TEXT_MUTED};">Total</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Estado</td>
+                  <td style="padding:0 20px 16px;font-size:14px;text-align:right;font-weight:bold;color:{status_color};">
+                    {status_s}
+                  </td>
+                </tr>
+                {chip_rows}
+                <tr>
+                  <td style="padding:0 20px 18px;font-size:14px;color:{JIS_TEXT_MUTED};">Total a pagar</td>
                   <td style="padding:0 20px 18px;font-size:20px;color:{JIS_PRIMARY};text-align:right;font-weight:bold;">
                     {total_s}
                   </td>
@@ -318,9 +363,20 @@ class DteSubscriberEmailClass:
             if getattr(dte, "added_date", None)
             else ""
         )
-        total = int(getattr(dte, "total", 0) or 0)
+        total = _payable_total(dte)
         is_paid = int(getattr(dte, "status_id", 0) or 0) == 5
+        status_label = "Pagado" if is_paid else "Pendiente de pago"
         payment_link = None if is_paid else self._payment_link(dte, customer)
+
+        if _chip_applies(
+            int(getattr(dte, "chip_id", 0) or 0),
+            int(getattr(dte, "category_id", 1) or 1),
+        ):
+            print(
+                f"[dte-email] folio={folio} chip_id=1 total_pago={total} "
+                f"(estacionamiento {max(0, total - DTE_CHIP_AMOUNT_CLP)} + chip {DTE_CHIP_AMOUNT_CLP})",
+                flush=True,
+            )
 
         pdf_bytes, pdf_err = self._fetch_pdf_bytes(dte)
         if not pdf_bytes:
@@ -340,6 +396,8 @@ class DteSubscriberEmailClass:
             payment_link=payment_link,
             is_paid=is_paid,
             has_logo=bool(logo_bytes),
+            chip_rows=_chip_breakdown_rows(dte),
+            status_label=status_label,
         )
 
         msg = MIMEMultipart("mixed")
