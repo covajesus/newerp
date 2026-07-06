@@ -431,7 +431,10 @@ class WhatsappClass:
         Plantilla Meta: envio_dte_v3 (botón → /api/payments/pay/{order_id}).
         """
         from app.backend.classes.payment_gateway_class import PaymentGatewayClass
-        from app.backend.classes.customer_ticket_class import CustomerTicketClass
+        from app.backend.classes.customer_ticket_class import (
+            CustomerTicketClass,
+            ticket_payment_total,
+        )
 
         folio = getattr(dte_data, "folio", None)
 
@@ -498,7 +501,12 @@ class WhatsappClass:
                 f"https://intrajisbackend.com/files/{dte_data.folio}.pdf"
             )
 
-        print(f"[v2] WhatsApp folio={folio} creating payment order total={dte_data.total}", flush=True)
+        payment_total = ticket_payment_total(dte_data)
+        print(
+            f"[v2] WhatsApp folio={folio} parking={dte_data.total} chip_id={getattr(dte_data, 'chip_id', 0)} "
+            f"payment_total={payment_total}",
+            flush=True,
+        )
         order_result = PaymentGatewayClass().create_subscriber_dte_order(dte_data, customer)
         if order_result.get("status") != "success":
             result = {
@@ -549,7 +557,7 @@ class WhatsappClass:
             "DTE type": dte_data.dte_type_id,
             "Folio": dte_data.folio,
             "Date": added_date_str,
-            "Total": dte_data.total,
+            "Total": payment_total,
             "Branch": branch_office.branch_office,
             "Supervisor": user.full_name,
             "Phone": user.phone,
@@ -595,7 +603,7 @@ class WhatsappClass:
                             {"type": "text", "text": str(dte_type)},
                             {"type": "text", "text": str(dte_data.folio)},
                             {"type": "text", "text": added_date_str},
-                            {"type": "text", "text": str(dte_data.total)},
+                            {"type": "text", "text": str(payment_total)},
                             {"type": "text", "text": branch_office.branch_office},
                             {"type": "text", "text": user.full_name},
                             {"type": "text", "text": user.phone},
