@@ -293,7 +293,7 @@ class WhatsappClass:
 
     def send(self, dte_data, customer_rut):
         if int(getattr(dte_data, "dte_type_id", 0) or 0) == 39:
-            print("[send] Boleta → send_v2_invoice (SimpleFactura/Klap)", flush=True)
+            print("[send] Boleta -> send_v2_invoice (SimpleFactura/Klap)", flush=True)
             return self.send_v2_invoice(dte_data, customer_rut)
 
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == customer_rut).first()
@@ -953,7 +953,7 @@ class WhatsappClass:
 
         # Boletas (SimpleFactura v2 + Klap): plantilla envio_dte_v3
         if int(dte_data.dte_type_id or 0) == 39:
-            print("[resend] Boleta → send_v2_invoice (envio_dte_v3 / Klap)", flush=True)
+            print("[resend] Boleta -> send_v2_invoice (envio_dte_v3 / Klap)", flush=True)
             return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
 
         # Facturas: plantilla envio_dte + pago LibreDTE
