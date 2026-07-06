@@ -31,10 +31,10 @@ class FormDataSimulator:
     def __init__(self, dte, massive_emit: bool = False):
         self.branch_office_id = dte.branch_office_id
         self.rut = dte.rut
-        # chip_id viene de la tabla dtes: 1 = con chip, 0 = sin chip. pre_generate usa esto para la línea de $5000.
-        # amount = total (en BD con chip ya es base+5000, sin chip es el monto único).
-        self.amount = dte.cash_amount
-        self.chip_id = dte.chip_id  # 1 con chip, 0 sin chip (campo en dtes)
+        # chip_id en dtes: 1 = con chip (+$5.000 al documento/pago).
+        # amount = estacionamiento bruto (dtes.total), NO cash_amount (documento completo).
+        self.amount = int(getattr(dte, "total", 0) or 0)
+        self.chip_id = int(getattr(dte, "chip_id", 0) or 0)
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
         # Emisión masiva: categoría 1 estándar o 3 grupal (conserva quantity e ítems en BD).
