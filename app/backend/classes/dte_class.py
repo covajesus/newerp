@@ -20,7 +20,7 @@ from app.backend.db.models import (
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.whatsapp_class import WhatsappClass
-from app.backend.classes.customer_ticket_class import CustomerTicketClass
+from app.backend.classes.customer_ticket_class import CustomerTicketClass, is_document_simplefactura_v2
 from app.backend.classes.customer_bill_class import CustomerBillClass
 from app.backend.classes.customer_ticket_bill_class import CustomerTicketBillClass
 from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
@@ -164,6 +164,99 @@ class DteClass:
             return whatsapp_class.send_v2_invoice(dte, dte.rut, pdf_url=pdf_url)
 
         return whatsapp_class.send(dte, dte.rut)
+
+    def _resolve_original_dte_for_nc(self, nc_dte):
+        """DTE boleta/factura (33/39) anulado por una NC pendiente (denied_folio)."""
+        denied = getattr(nc_dte, "denied_folio", None)
+        if denied in (None, "", 0):
+            return None
+        try:
+            denied_int = int(denied)
+        except (TypeError, ValueError):
+            denied_int = None
+        filters = [DteModel.dte_type_id.in_([33, 39])]
+        if denied_int is not None:
+            filters.append(
+                or_(DteModel.folio == denied_int, DteModel.folio == str(denied).strip())
+            )
+        else:
+            filters.append(DteModel.folio == str(denied).strip())
+        q = self.db.query(DteModel).filter(*filters)
+        original = (
+            q.filter(DteModel.status_id == 4)
+            .order_by(DteModel.id.desc())
+            .first()
+        )
+        if not original:
+            original = q.order_by(DteModel.id.desc()).first()
+        return original
+
+    def _generate_massive_credit_note(self, nc_pending_dte):
+        """
+        Emite NC en masivo: SimpleFactura v2 si el documento referenciado es v2
+        (folio pool / Klap / dte_version_id); si no, LibreDTE (ciclo actual).
+        """
+        original_dte = self._resolve_original_dte_for_nc(nc_pending_dte)
+        reason_id = int(getattr(nc_pending_dte, "reason_id", None) or 1)
+
+        if original_dte and is_document_simplefactura_v2(self.db, original_dte):
+            ref_type = int(original_dte.dte_type_id)
+            print(
+                f"[massive-nc] v2 SimpleFactura NC pending_id={nc_pending_dte.id} "
+                f"ref folio={original_dte.folio} tipo={ref_type}",
+                flush=True,
+            )
+            form = CreditNoteFormDataSimulator(original_dte.id, reason_id=reason_id)
+            result = CustomerTicketClass(self.db).store_credit_note_v2(
+                form,
+                ref_dte_type=ref_type,
+                negative_amounts=(ref_type == 33),
+                is_massive_sending=True,
+                pending_nc_dte_id=nc_pending_dte.id,
+            )
+            if result.get("status") != "success":
+                return {
+                    "status": "error",
+                    "message": result.get("message") or "Error emitir NC v2",
+                    "details": result,
+                }
+            self.db.refresh(nc_pending_dte)
+            return {
+                "status": "success",
+                "message": "Nota de crédito v2 generada",
+                "folio": result.get("folio"),
+                "email": result.get("email"),
+                "nc_channel": "simplefactura_v2",
+            }
+
+        print(
+            f"[massive-nc] LibreDTE NC pending_id={nc_pending_dte.id} "
+            f"denied_folio={getattr(nc_pending_dte, 'denied_folio', None)}",
+            flush=True,
+        )
+        customer_ticket_bill_class = CustomerTicketBillClass(self.db)
+        credit_note_form = CreditNoteFormDataSimulator(nc_pending_dte.id, reason_id=reason_id)
+        folio = customer_ticket_bill_class.store_credit_note(
+            credit_note_form,
+            rol_id=1,
+            is_massive_sending=True,
+        )
+        if isinstance(folio, dict) and folio.get("status") == "error":
+            return folio
+        if folio and folio != "Error generating credit note":
+            self.db.refresh(nc_pending_dte)
+            if not nc_pending_dte.folio:
+                nc_pending_dte.folio = folio
+                nc_pending_dte.status_id = 5
+                self.db.commit()
+                self.db.refresh(nc_pending_dte)
+            return {
+                "status": "success",
+                "message": "Nota de crédito LibreDTE generada",
+                "folio": folio,
+                "nc_channel": "libredte",
+            }
+        return {"status": "error", "message": "No se pudo generar la nota de crédito"}
 
     def validate_old_dte(self, folio, rut, dte_version_id):
         try:
@@ -2556,33 +2649,7 @@ class DteClass:
                 else:
                     return {"status": "error", "message": "Error en pre-generación de la factura"}
             elif dte.dte_type_id == 61:  # Nota de crédito electrónica
-                try:
-                    # Para notas de crédito, usar la clase CustomerTicketBillClass
-                    customer_ticket_bill_class = CustomerTicketBillClass(self.db)
-                    
-                    # Crear form_data para nota de crédito
-                    credit_note_form = CreditNoteFormDataSimulator(dte.id)
-                    
-                    # Generar la nota de crédito (rol_id = 1 para envío masivo, is_massive_sending=True)
-                    folio = customer_ticket_bill_class.store_credit_note(credit_note_form, rol_id=1, is_massive_sending=True)
-                except Exception as credit_note_error:
-                    return {"status": "error", "message": f"Error en generación de nota de crédito para DTE {dte.id} (RUT: {dte.rut}): {str(credit_note_error)}"}
-                
-                if folio and folio != "Error generating credit note":
-                    # Actualizar DTE - para notas de crédito cambiar status de 14 a 5
-                    dte.folio = folio
-                    dte.status_id = 5  # Status final para notas de crédito
-                    self.db.commit()
-                    self.db.refresh(dte)
-                    
-                    pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
-                    return {
-                        "status": "success",
-                        "message": "Nota de crédito generada exitosamente",
-                        "pdf_url": pdf_url
-                    }
-                else:
-                    return {"status": "error", "message": "No se pudo generar la nota de crédito"}
+                return self._generate_massive_credit_note(dte)
             else:
                 return {"status": "error", "message": f"Tipo de DTE no soportado: {dte.dte_type_id}"}
                 
@@ -2833,8 +2900,79 @@ class DteClass:
                             # Si hay error parseando el JSON o accediendo a los datos, usar valores por defecto
                             customer_name = "Cliente no encontrado"
                             customer_phone = "No disponible"
+
+                    try:
+                        remaining_status_filter = (
+                            DteModel.status_id.in_([2, 14])
+                            if dte_type_id == 61
+                            else DteModel.status_id == 2
+                        )
+                        remaining_filter = [
+                            DteModel.period == current_period,
+                            remaining_status_filter,
+                            DteModel.dte_version_id == 1,
+                            self._massive_send_category_filter(category_id),
+                        ]
+                        if branch_office_id != 0:
+                            remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        if dte_type_id > 0:
+                            remaining_filter.append(DteModel.dte_type_id == dte_type_id)
+                        remaining_dtes = self.db.query(DteModel).filter(*remaining_filter).count()
+                    except Exception:
+                        remaining_dtes = 0
                     
-                    # Enviar WhatsApp (v2 boletas ya lo intentan en generate_v2; reintentar si falló)
+                    # NC: correo propio en v2; LibreDTE sin WhatsApp de pago
+                    if dte.dte_type_id == 61:
+                        email_result = generation_result.get("email") or {}
+                        email_ok = email_result.get("status") == "success"
+                        channel = generation_result.get("nc_channel") or "unknown"
+                        if channel == "simplefactura_v2" and email_ok:
+                            successful_sends += 1
+                            yield {
+                                "type": "dte_result",
+                                "dte_id": dte.id,
+                                "status": "success",
+                                "message": "NC v2 emitida; correo enviado (sin WhatsApp de pago)",
+                                "customer_name": customer_name,
+                                "customer_phone": customer_phone,
+                                "current": i,
+                                "total": total_dtes,
+                                "remaining_dtes": remaining_dtes,
+                                "email": email_result,
+                                "nc_channel": channel,
+                            }
+                        elif channel == "libredte":
+                            successful_sends += 1
+                            yield {
+                                "type": "dte_result",
+                                "dte_id": dte.id,
+                                "status": "success",
+                                "message": "NC LibreDTE emitida (sin WhatsApp)",
+                                "customer_name": customer_name,
+                                "customer_phone": customer_phone,
+                                "current": i,
+                                "total": total_dtes,
+                                "remaining_dtes": remaining_dtes,
+                                "nc_channel": channel,
+                            }
+                        else:
+                            failed_sends += 1
+                            yield {
+                                "type": "dte_result",
+                                "dte_id": dte.id,
+                                "status": "email_error" if channel == "simplefactura_v2" else "generation_error",
+                                "message": email_result.get("message")
+                                or generation_result.get("message")
+                                or "Error NC masiva",
+                                "current": i,
+                                "total": total_dtes,
+                                "remaining_dtes": remaining_dtes,
+                                "email": email_result,
+                                "nc_channel": channel,
+                            }
+                        continue
+
+                    # Enviar WhatsApp (v2 boletas; reintentar si falló en emisión)
                     whatsapp_class = WhatsappClass(self.db)
                     whatsapp_response = self._resolve_massive_whatsapp(
                         dte, whatsapp_class, generation_result

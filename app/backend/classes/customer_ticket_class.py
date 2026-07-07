@@ -66,6 +66,34 @@ def _is_simplefactura_v2_dte(db: Session, dte) -> bool:
     return False
 
 
+def is_document_simplefactura_v2(db: Session, dte) -> bool:
+    """
+    True si el DTE referenciado (33/39) fue emitido por SimpleFactura v2
+    (pool folios, Klap o dte_version_id v2 en facturas).
+    """
+    if not dte:
+        return False
+    tid = int(getattr(dte, "dte_type_id", 0) or 0)
+    if tid == 39:
+        return _is_simplefactura_v2_dte(db, dte)
+    if tid == 33:
+        if int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2:
+            return True
+        dte_id = getattr(dte, "id", None)
+        if dte_id:
+            row = db.execute(
+                text(
+                    "SELECT 1 FROM folios "
+                    "WHERE dte_id = :dte_id AND dte_id > 0 AND document_type_id = 33 "
+                    "LIMIT 1"
+                ),
+                {"dte_id": int(dte_id)},
+            ).first()
+            if row:
+                return True
+    return False
+
+
 def sync_simplefactura_paid_status_if_applicable(db: Session, dte) -> dict | None:
     """Call SimpleFactura POST /dte/marcar-pagado-pendiente when a v2 ticket reaches status 5."""
     if not dte:
@@ -1201,6 +1229,24 @@ class CustomerTicketClass:
             "CorreoRecep": cd.get("email"),
         }
 
+    def _ticket_receiver_v2_no_email(self, customer_data: dict) -> dict:
+        """Receptor v2 sin CorreoRecep/Contacto (evita mail automático SimpleFactura)."""
+        cd = customer_data["customer_data"]
+        receiver = {
+            "RUTRecep": cd["rut"],
+            "RznSocRecep": cd["customer"],
+        }
+        if cd.get("activity"):
+            receiver["GiroRecep"] = cd["activity"]
+        if cd.get("region"):
+            receiver["DirRecep"] = cd["region"]
+        if cd.get("commune"):
+            receiver["CmnaRecep"] = cd["commune"]
+        phone = cd.get("phone")
+        if phone:
+            receiver["TelefonoRecep"] = str(phone).strip()
+        return receiver
+
     def generate(self, form_data):
         expected_total_doc = self._expected_total_for_generate(form_data)
         check_dte_existence = self.db.query(DteModel).filter(
@@ -2188,7 +2234,7 @@ class CustomerTicketClass:
         gross_amount,
         nc_folio,
     ):
-        receiver = self._ticket_receiver_from_customer(customer_data)
+        receiver = self._ticket_receiver_v2_no_email(customer_data)
         ref_date_str = v2_dte_api_date(ref_date)
         issue_date = v2_dte_api_date()
         gross = int(abs(gross_amount))
@@ -2346,11 +2392,19 @@ class CustomerTicketClass:
             "v2_url": url,
         }
 
-    def store_credit_note_v2(self, form_data, ref_dte_type=39, negative_amounts=False):
+    def store_credit_note_v2(
+        self,
+        form_data,
+        ref_dte_type=39,
+        negative_amounts=False,
+        *,
+        is_massive_sending=False,
+        pending_nc_dte_id=None,
+    ):
         """
         NC v2 (gateway externo). El folio tipo 61 se reserva en tabla `folios`
         (document_type_id=61, pool central branch_office_id=0, used_id=0).
-        Igual que boletas (39) y facturas (33) en generate_v2.
+        Masivo: actualiza el registro NC pendiente (tipo 61) en lugar de insertar otro.
         """
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         if not dte:
@@ -2409,6 +2463,7 @@ class CustomerTicketClass:
             return emit_result
 
         folio_number = reserved_folio
+        ref_folio_original = dte.folio
 
         dte.status_id = 5
         dte.reason_id = form_data.reason_id
@@ -2416,7 +2471,17 @@ class CustomerTicketClass:
         self.db.add(dte)
         self.db.commit()
 
-        credit_note_dte = DteModel()
+        if is_massive_sending and pending_nc_dte_id:
+            credit_note_dte = (
+                self.db.query(DteModel)
+                .filter(DteModel.id == int(pending_nc_dte_id))
+                .first()
+            )
+            if not credit_note_dte:
+                return {"status": "error", "message": "NC pendiente masiva no encontrada"}
+        else:
+            credit_note_dte = DteModel()
+
         credit_note_dte.branch_office_id = dte.branch_office_id
         credit_note_dte.cashier_id = dte.cashier_id if ref_dte_type == 39 else 0
         credit_note_dte.dte_type_id = 61
@@ -2425,6 +2490,8 @@ class CustomerTicketClass:
         credit_note_dte.chip_id = 0
         credit_note_dte.rut = customer_data["customer_data"]["rut"]
         credit_note_dte.folio = folio_number
+        credit_note_dte.denied_folio = ref_folio_original
+        credit_note_dte.reason_id = getattr(form_data, "reason_id", None) or dte.reason_id
         subtotal = round(gross / 1.19)
         tax = gross - subtotal
         if negative_amounts:
@@ -2443,13 +2510,15 @@ class CustomerTicketClass:
             credit_note_dte.tax = tax
             credit_note_dte.discount = 0
             credit_note_dte.total = gross
+            credit_note_dte.period = datetime.now().strftime("%Y-%m")
             credit_note_dte.added_date = datetime.now().replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
         credit_note_dte.category_id = 1
         credit_note_dte.quantity = None
 
-        self.db.add(credit_note_dte)
+        if not is_massive_sending or not pending_nc_dte_id:
+            self.db.add(credit_note_dte)
         try:
             self.db.commit()
             self.db.refresh(credit_note_dte)
@@ -2458,7 +2527,28 @@ class CustomerTicketClass:
                 credit_note_dte.id,
                 branch_office_id=dte.branch_office_id,
             )
-            return {"status": "success", "message": "Credit Note saved successfully"}
+
+            from app.backend.classes.dte_subscriber_email_class import DteSubscriberEmailClass
+
+            customer_obj = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.rut == credit_note_dte.rut)
+                .first()
+            )
+            email_result = DteSubscriberEmailClass(self.db).send(
+                credit_note_dte,
+                customer=customer_obj,
+                ref_folio=ref_folio_original,
+                ref_dte_type_id=ref_dte_type,
+            )
+            print(f"[v2-nc] email_result folio={folio_number}: {email_result}", flush=True)
+
+            return {
+                "status": "success",
+                "message": "Credit Note saved successfully",
+                "folio": folio_number,
+                "email": email_result,
+            }
         except Exception as e:
             self.db.rollback()
             folio_cls = FolioClass(self.db)

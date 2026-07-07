@@ -1,11 +1,8 @@
 """
-Correo HTML propio para abonados v2 (SimpleFactura): PDF adjunto + enlace Klap.
-Reemplaza POST /dte/enviar/mail de SimpleFactura.
-
-Montos con chip (chip_id=1, cat. distinta de 3):
-  - dtes.total = estacionamiento (cualquier monto: 70.000, 75.000, etc.).
-  - chip_id=1 siempre suma $5.000 al pagar (75.000→80.000, 70.000→75.000).
-  - No inferir si el chip está incluido por el número; solo usa chip_id.
+Correo HTML propio para abonados v2 (SimpleFactura):
+- Boleta/factura: PDF + enlace Klap (sin mail SimpleFactura).
+- Nota de crédito v2: plantilla propia sin pago (sin mail SimpleFactura).
+- LibreDTE (v1): reenvío vía API LibreDTE (sin cambios).
 """
 
 from __future__ import annotations
@@ -52,15 +49,25 @@ LOGO_CID = "jisparking-logo"
 
 
 def is_subscriber_v2_dte(db: Session, dte) -> bool:
-    """Boleta/factura emitida vía SimpleFactura invoiceV2 (no LibreDTE v1)."""
+    """Boleta/factura/NC emitida vía SimpleFactura v2 (no LibreDTE v1)."""
     if not dte:
         return False
     dte_type = int(getattr(dte, "dte_type_id", 0) or 0)
+    if dte_type == 61:
+        return int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2
     if dte_type == 39:
         return _is_simplefactura_v2_dte(db, dte)
     if dte_type == 33:
         return int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2
     return False
+
+
+def is_subscriber_v2_credit_note(dte) -> bool:
+    return (
+        dte is not None
+        and int(getattr(dte, "dte_type_id", 0) or 0) == 61
+        and int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2
+    )
 
 
 def _format_clp(amount: int) -> str:
@@ -93,7 +100,10 @@ def _smtp_settings() -> dict[str, Any]:
 
 
 def _dte_label(dte_type_id: int) -> str:
-    return "boleta" if int(dte_type_id) == 39 else "factura"
+    tid = int(dte_type_id)
+    if tid == 61:
+        return "nota de crédito"
+    return "boleta" if tid == 39 else "factura"
 
 
 def _brand_logo_path() -> Path | None:
@@ -285,6 +295,115 @@ def _build_html_body(
 </html>"""
 
 
+def _build_credit_note_html_body(
+    *,
+    customer_name: str,
+    folio: int,
+    issue_date: str,
+    amount_clp: str,
+    ref_folio: int | None,
+    ref_dte_label: str | None,
+    has_logo: bool,
+) -> str:
+    name = html.escape(customer_name or "Cliente")
+    date_s = html.escape(issue_date)
+    amount_s = html.escape(amount_clp)
+    folio_s = html.escape(str(folio))
+    ref_block = ""
+    if ref_folio and ref_dte_label:
+        ref_block = f"""
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Documento anulado</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>{html.escape(ref_dte_label)} folio {html.escape(str(ref_folio))}</strong>
+                  </td>
+                </tr>
+        """
+
+    logo_block = ""
+    if has_logo:
+        logo_block = f"""
+              <img src="cid:{LOGO_CID}" alt="JIS Parking" width="200"
+                   style="display:block;margin:0 auto 14px;max-width:200px;height:auto;border:0;" />
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:{JIS_BG};font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{JIS_BG};padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0"
+               style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 4px 20px rgba(21,45,138,0.12);border:1px solid {JIS_BORDER};">
+          <tr>
+            <td style="background:linear-gradient(135deg,{JIS_PRIMARY_DARK} 0%,{JIS_PRIMARY} 100%);
+                       padding:28px 32px 22px;text-align:center;">
+              {logo_block}
+              <p style="margin:0;font-size:13px;color:#ffffff;letter-spacing:0.4px;
+                        text-transform:uppercase;font-weight:700;">
+                Nota de cr&eacute;dito electr&oacute;nica
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 28px;">
+              <p style="margin:0 0 16px;font-size:16px;color:{JIS_TEXT};">
+                Estimado/a <strong style="color:{JIS_PRIMARY};">{name}</strong>,
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:{JIS_TEXT_MUTED};line-height:1.55;">
+                Adjuntamos su nota de cr&eacute;dito electr&oacute;nica. Este documento anula el DTE referenciado
+                y <strong>no requiere pago</strong>.
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+                     style="background:{JIS_PRIMARY_LIGHT};border-radius:10px;border:1px solid {JIS_BORDER};">
+                <tr>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT_MUTED};">Tipo</td>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>Nota de cr&eacute;dito</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Folio NC</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>{folio_s}</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Fecha</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">{date_s}</td>
+                </tr>
+                {ref_block}
+                <tr>
+                  <td style="padding:0 20px 18px;font-size:14px;color:{JIS_TEXT_MUTED};">Monto NC</td>
+                  <td style="padding:0 20px 18px;font-size:20px;color:{JIS_PRIMARY};text-align:right;font-weight:bold;">
+                    {amount_s}
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 0;font-size:14px;color:{JIS_TEXT_MUTED};line-height:1.55;">
+                El PDF va adjunto a este correo. Si tiene dudas, escr&iacute;banos a
+                <a href="mailto:contacto@jisparking.com" style="color:{JIS_PRIMARY};">contacto@jisparking.com</a>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;background:{JIS_BG};border-top:3px solid {JIS_WARNING};">
+              <p style="margin:0;font-size:12px;color:{JIS_TEXT_MUTED};line-height:1.55;text-align:center;">
+                <strong style="color:{JIS_PRIMARY};">JIS Parking SPA</strong> · RUT 76.063.822-6<br>
+                Nuestro servicio es un compromiso
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
 class DteSubscriberEmailClass:
     def __init__(self, db: Session):
         self.db = db
@@ -334,9 +453,148 @@ class DteSubscriberEmailClass:
         ).rstrip("/")
         return f"{proxy_base}/{folio}"
 
-    def send(self, dte, customer=None, to_emails=None) -> dict[str, Any]:
+    def send(
+        self,
+        dte,
+        customer=None,
+        to_emails=None,
+        *,
+        ref_folio: int | None = None,
+        ref_dte_type_id: int | None = None,
+    ) -> dict[str, Any]:
         """
-        Envía correo HTML con PDF adjunto y enlace Klap (proxy /api/payments/pay/{folio}).
+        Envía correo HTML con PDF adjunto.
+        Boleta/factura v2: enlace Klap. NC v2: plantilla sin pago. LibreDTE: usar resend LibreDTE.
+        """
+        if is_subscriber_v2_credit_note(dte):
+            return self._send_credit_note_v2(
+                dte,
+                customer=customer,
+                to_emails=to_emails,
+                ref_folio=ref_folio,
+                ref_dte_type_id=ref_dte_type_id,
+            )
+        return self._send_payable_document(
+            dte,
+            customer=customer,
+            to_emails=to_emails,
+        )
+
+    def _send_credit_note_v2(
+        self,
+        dte,
+        customer=None,
+        to_emails=None,
+        *,
+        ref_folio: int | None = None,
+        ref_dte_type_id: int | None = None,
+    ) -> dict[str, Any]:
+        if not dte or not getattr(dte, "folio", None):
+            return {"status": "error", "message": "NC sin folio para envío de correo"}
+
+        recipients = _normalize_recipients(to_emails)
+        customer = self._resolve_customer(dte, customer)
+        if not recipients and customer and getattr(customer, "email", None):
+            recipients = _normalize_recipients(customer.email)
+        if not recipients:
+            return {"status": "skipped", "message": "Sin correo destinatario"}
+
+        smtp = _smtp_settings()
+        if not smtp["password"]:
+            return {
+                "status": "error",
+                "message": "SMTP no configurado (DTE_EMAIL_SMTP_PASSWORD o SMTP_PASSWORD)",
+            }
+
+        folio = int(dte.folio)
+        ref_folio = ref_folio or getattr(dte, "denied_folio", None)
+        ref_tid = int(ref_dte_type_id or 39)
+        ref_label = _dte_label(ref_tid) if ref_folio else None
+        customer_name = (getattr(customer, "customer", None) or "Cliente").strip()
+        issue_date = (
+            dte.added_date.strftime("%d-%m-%Y")
+            if getattr(dte, "added_date", None)
+            else ""
+        )
+        amount = abs(int(getattr(dte, "total", 0) or 0))
+
+        pdf_bytes, pdf_err = self._fetch_pdf_bytes(dte)
+        if not pdf_bytes:
+            return {
+                "status": "error",
+                "message": pdf_err or "No se pudo adjuntar el PDF",
+            }
+
+        subject = f"JIS Parking - Nota de crédito electrónica folio {folio}"
+        logo_bytes = _load_brand_logo_bytes()
+        html_body = _build_credit_note_html_body(
+            customer_name=customer_name,
+            folio=folio,
+            issue_date=issue_date,
+            amount_clp=_format_clp(amount),
+            ref_folio=int(ref_folio) if ref_folio else None,
+            ref_dte_label=ref_label,
+            has_logo=bool(logo_bytes),
+        )
+
+        msg = MIMEMultipart("mixed")
+        msg["Subject"] = subject
+        msg["From"] = f"{smtp['from_name']} <{smtp['user']}>"
+        msg["To"] = ", ".join(recipients)
+
+        related = MIMEMultipart("related")
+        alt = MIMEMultipart("alternative")
+        alt.attach(MIMEText(html_body, "html", "utf-8"))
+        related.attach(alt)
+
+        if logo_bytes:
+            logo_part = MIMEImage(logo_bytes, _subtype="png")
+            logo_part.add_header("Content-ID", f"<{LOGO_CID}>")
+            logo_part.add_header("Content-Disposition", "inline", filename="jisparking-logo.png")
+            related.attach(logo_part)
+
+        msg.attach(related)
+
+        attachment = MIMEBase("application", "pdf")
+        attachment.set_payload(pdf_bytes)
+        encoders.encode_base64(attachment)
+        attachment.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=f"nota_credito_{folio}.pdf",
+        )
+        msg.attach(attachment)
+
+        try:
+            with smtplib.SMTP_SSL(smtp["server"], smtp["port"]) as server:
+                server.login(smtp["user"], smtp["password"])
+                server.sendmail(smtp["user"], recipients, msg.as_string())
+        except smtplib.SMTPAuthenticationError:
+            return {"status": "error", "message": "Error de autenticación SMTP"}
+        except smtplib.SMTPException as exc:
+            return {"status": "error", "message": f"Error SMTP: {exc}"}
+        except Exception as exc:
+            return {"status": "error", "message": f"Error al enviar correo: {exc}"}
+
+        print(
+            f"[dte-email-nc] sent folio={folio} to={recipients} ref={ref_label} {ref_folio}",
+            flush=True,
+        )
+        return {
+            "status": "success",
+            "message": "Correo NC enviado",
+            "to": recipients,
+            "subject": subject,
+        }
+
+    def _send_payable_document(
+        self,
+        dte,
+        customer=None,
+        to_emails=None,
+    ) -> dict[str, Any]:
+        """
+        Boleta/factura v2: PDF adjunto + enlace Klap (proxy /api/payments/pay/{folio}).
         """
         if not dte or not getattr(dte, "folio", None):
             return {"status": "error", "message": "DTE sin folio para envío de correo"}
