@@ -4912,7 +4912,8 @@ class DteClass:
         """
         Verifica pagos para DTEs tipo 33 (facturas) y 39 (boletas)
         Llama a los métodos check_payments de CustomerBillClass y CustomerTicketClass
-        (LibreDTE/webpay, dte_version_id=1) y a check_payments_v2 (Klap, dte_version_id=2).
+        (LibreDTE/webpay) y a check_payments_v2 (Klap). Todo sobre EMITIDAS
+        (dte_version_id=1); las recibidas (dte_version_id=2) no se tocan.
         """
         try:
             results = {
@@ -4945,7 +4946,7 @@ class DteClass:
                 print(f"❌ {error_msg}")
                 results["errors"].append(error_msg)
 
-            # Verificar pagos v2 (Klap, dte_version_id=2)
+            # Verificar pagos Klap (emitidas, dte_version_id=1)
             try:
                 print("💳 Verificando pagos Klap (v2)...")
                 results["klap_v2"] = self.check_payments_v2()
@@ -4973,7 +4974,7 @@ class DteClass:
 
     def check_payments_v2(self):
         """
-        Refresca pagos de DTEs v2 (dte_version_id=2, boletas 39 y facturas 33) contra Klap.
+        Refresca pagos de DTEs EMITIDAS (dte_version_id=1, boletas 39 y facturas 33) contra Klap.
         Por cada DTE status_id=4 con orden de pago registrada, consulta el estado en Klap;
         si la orden está 'completed', DtePaymentDataClass.record_payment_return marca el DTE
         como pagado (status_id=5), notifica por WhatsApp y sincroniza SimpleFactura.
@@ -4996,13 +4997,23 @@ class DteClass:
             "details": [],
         }
 
+        # Boletas/facturas EMITIDAS (dte_version_id=1) en status 4 con orden Klap registrada.
+        # dte_version_id: 1 = emitida, 2 = recibida. Los pagos aplican solo a emitidas.
+        folios_with_orders = {
+            row[0]
+            for row in self.db.query(DtePaymentDataModel.folio)
+            .filter(DtePaymentDataModel.folio.isnot(None))
+            .distinct()
+            .all()
+        }
         dtes = (
             self.db.query(DteModel)
             .filter(DteModel.status_id == 4)
             .filter(DteModel.dte_type_id.in_([39, 33]))
-            .filter(DteModel.dte_version_id == 2)
+            .filter(DteModel.dte_version_id == 1)
+            .filter(DteModel.folio.in_(folios_with_orders))
             .all()
-        )
+        ) if folios_with_orders else []
 
         payment_data_class = DtePaymentDataClass(self.db)
 
@@ -5010,13 +5021,17 @@ class DteClass:
             summary["checked"] += 1
             folio = int(getattr(dte, "folio", 0) or 0)
 
-            payment_row = (
+            # Revisar TODAS las órdenes del folio (no solo la última): puede existir
+            # un reintento posterior expirado/rechazado sobre una orden anterior ya pagada.
+            payment_rows = (
                 self.db.query(DtePaymentDataModel)
                 .filter(DtePaymentDataModel.folio == folio)
+                .filter(DtePaymentDataModel.order_id.isnot(None))
+                .filter(DtePaymentDataModel.reference_id.isnot(None))
                 .order_by(DtePaymentDataModel.id.desc())
-                .first()
+                .all()
             )
-            if not payment_row or not payment_row.order_id or not payment_row.reference_id:
+            if not payment_rows:
                 summary["skipped"] += 1
                 summary["details"].append({
                     "folio": folio,
@@ -5025,36 +5040,55 @@ class DteClass:
                 })
                 continue
 
-            try:
-                result = payment_data_class.record_payment_return(
-                    payment_row.reference_id,
-                    payment_row.order_id,
-                    source="check_payments_v2",
-                )
+            paid = False
+            last_status = None
+            error_msg = None
+            for payment_row in payment_rows:
+                try:
+                    result = payment_data_class.record_payment_return(
+                        payment_row.reference_id,
+                        payment_row.order_id,
+                        source="check_payments_v2",
+                    )
+                except Exception as exc:
+                    error_msg = str(exc)
+                    continue
+
                 if result.get("dte_updated"):
-                    summary["paid"] += 1
-                    summary["details"].append({
-                        "folio": folio,
-                        "result": "paid",
-                        "message": "Pago confirmado en Klap → status 5",
-                    })
-                else:
-                    summary["pending"] += 1
-                    payment_status = None
-                    payment_info = result.get("payment_data") or {}
-                    if isinstance(payment_info, dict):
-                        payment_status = payment_info.get("payment_status")
-                    summary["details"].append({
-                        "folio": folio,
-                        "result": "pending",
-                        "message": f"Orden Klap: {payment_status or 'sin pago confirmado'}",
-                    })
-            except Exception as exc:
+                    paid = True
+                    break
+
+                payment_info = result.get("payment_data") or {}
+                if isinstance(payment_info, dict) and payment_info.get("payment_status"):
+                    last_status = payment_info.get("payment_status")
+
+            if paid:
+                summary["paid"] += 1
+                summary["details"].append({
+                    "folio": folio,
+                    "result": "paid",
+                    "message": "Pago confirmado en Klap → status 5",
+                })
+            elif last_status is not None:
+                summary["pending"] += 1
+                summary["details"].append({
+                    "folio": folio,
+                    "result": "pending",
+                    "message": f"Orden Klap: {last_status}",
+                })
+            elif error_msg is not None:
                 summary["skipped"] += 1
                 summary["details"].append({
                     "folio": folio,
                     "result": "error",
-                    "message": str(exc),
+                    "message": error_msg,
+                })
+            else:
+                summary["pending"] += 1
+                summary["details"].append({
+                    "folio": folio,
+                    "result": "pending",
+                    "message": "Orden Klap: sin pago confirmado",
                 })
 
         # 2º paso: sincronizar approval_code Klap en dtes_payment_data + comment
@@ -5063,10 +5097,11 @@ class DteClass:
             self.db.query(DteModel)
             .filter(DteModel.status_id == 5)
             .filter(DteModel.dte_type_id.in_([39, 33]))
-            .filter(DteModel.dte_version_id == 2)
+            .filter(DteModel.dte_version_id == 1)
             .filter(DteModel.payment_type_id == 2)
+            .filter(DteModel.folio.in_(folios_with_orders))
             .all()
-        )
+        ) if folios_with_orders else []
 
         for dte in paid_dtes:
             folio = int(getattr(dte, "folio", 0) or 0)
