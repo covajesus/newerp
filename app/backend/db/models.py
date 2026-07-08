@@ -2293,6 +2293,7 @@ class DtePaymentDataModel(Base):
     reference_id = Column(String(100), nullable=False)
     order_id = Column(String(128), nullable=False, unique=True)
     payment_status = Column(String(32), nullable=True)
+    approval_code = Column(String(32), nullable=True)
     amount = Column(Integer, nullable=True)
     rut = Column(String(32), nullable=True)
     raw_payload = Column(Text, nullable=True)

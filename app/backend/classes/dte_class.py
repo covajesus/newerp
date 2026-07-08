@@ -4912,12 +4912,14 @@ class DteClass:
         """
         Verifica pagos para DTEs tipo 33 (facturas) y 39 (boletas)
         Llama a los métodos check_payments de CustomerBillClass y CustomerTicketClass
+        (LibreDTE/webpay, dte_version_id=1) y a check_payments_v2 (Klap, dte_version_id=2).
         """
         try:
             results = {
                 "status": "success",
                 "facturas_33": None,
                 "boletas_39": None,
+                "klap_v2": None,
                 "errors": []
             }
             
@@ -4942,9 +4944,20 @@ class DteClass:
                 error_msg = f"Error al verificar boletas: {str(e)}"
                 print(f"❌ {error_msg}")
                 results["errors"].append(error_msg)
+
+            # Verificar pagos v2 (Klap, dte_version_id=2)
+            try:
+                print("💳 Verificando pagos Klap (v2)...")
+                results["klap_v2"] = self.check_payments_v2()
+                print("✓ Pagos Klap procesados")
+            except Exception as e:
+                error_msg = f"Error al verificar pagos Klap: {str(e)}"
+                print(f"❌ {error_msg}")
+                results["errors"].append(error_msg)
             
             if results["errors"]:
-                results["status"] = "partial_success" if (results["facturas_33"] or results["boletas_39"]) else "error"
+                any_ok = results["facturas_33"] or results["boletas_39"] or results["klap_v2"]
+                results["status"] = "partial_success" if any_ok else "error"
             
             return results
             
@@ -4954,5 +4967,161 @@ class DteClass:
                 "message": f"Error general en check_payments: {str(e)}",
                 "facturas_33": None,
                 "boletas_39": None,
+                "klap_v2": None,
                 "errors": [str(e)]
             }
+
+    def check_payments_v2(self):
+        """
+        Refresca pagos de DTEs v2 (dte_version_id=2, boletas 39 y facturas 33) contra Klap.
+        Por cada DTE status_id=4 con orden de pago registrada, consulta el estado en Klap;
+        si la orden está 'completed', DtePaymentDataClass.record_payment_return marca el DTE
+        como pagado (status_id=5), notifica por WhatsApp y sincroniza SimpleFactura.
+        """
+        import json as _json
+        from app.backend.classes.dte_payment_data_class import (
+            DtePaymentDataClass,
+            approval_code_from_gateway,
+        )
+        from app.backend.classes.payment_gateway_class import PaymentGatewayClass
+        from app.backend.db.models import DtePaymentDataModel
+
+        summary = {
+            "status": "success",
+            "checked": 0,
+            "paid": 0,
+            "pending": 0,
+            "skipped": 0,
+            "synced": 0,
+            "details": [],
+        }
+
+        dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 4)
+            .filter(DteModel.dte_type_id.in_([39, 33]))
+            .filter(DteModel.dte_version_id == 2)
+            .all()
+        )
+
+        payment_data_class = DtePaymentDataClass(self.db)
+
+        for dte in dtes:
+            summary["checked"] += 1
+            folio = int(getattr(dte, "folio", 0) or 0)
+
+            payment_row = (
+                self.db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.folio == folio)
+                .order_by(DtePaymentDataModel.id.desc())
+                .first()
+            )
+            if not payment_row or not payment_row.order_id or not payment_row.reference_id:
+                summary["skipped"] += 1
+                summary["details"].append({
+                    "folio": folio,
+                    "result": "skipped",
+                    "message": "Sin orden de pago Klap registrada",
+                })
+                continue
+
+            try:
+                result = payment_data_class.record_payment_return(
+                    payment_row.reference_id,
+                    payment_row.order_id,
+                    source="check_payments_v2",
+                )
+                if result.get("dte_updated"):
+                    summary["paid"] += 1
+                    summary["details"].append({
+                        "folio": folio,
+                        "result": "paid",
+                        "message": "Pago confirmado en Klap → status 5",
+                    })
+                else:
+                    summary["pending"] += 1
+                    payment_status = None
+                    payment_info = result.get("payment_data") or {}
+                    if isinstance(payment_info, dict):
+                        payment_status = payment_info.get("payment_status")
+                    summary["details"].append({
+                        "folio": folio,
+                        "result": "pending",
+                        "message": f"Orden Klap: {payment_status or 'sin pago confirmado'}",
+                    })
+            except Exception as exc:
+                summary["skipped"] += 1
+                summary["details"].append({
+                    "folio": folio,
+                    "result": "error",
+                    "message": str(exc),
+                })
+
+        # 2º paso: sincronizar approval_code Klap en dtes_payment_data + comment
+        # para boletas/facturas v2 ya pagadas (status 5) que aún no lo tengan.
+        paid_dtes = (
+            self.db.query(DteModel)
+            .filter(DteModel.status_id == 5)
+            .filter(DteModel.dte_type_id.in_([39, 33]))
+            .filter(DteModel.dte_version_id == 2)
+            .filter(DteModel.payment_type_id == 2)
+            .all()
+        )
+
+        for dte in paid_dtes:
+            folio = int(getattr(dte, "folio", 0) or 0)
+            already_has_comment = bool(dte.comment and "Código de autorización" in str(dte.comment))
+
+            payment_row = (
+                self.db.query(DtePaymentDataModel)
+                .filter(DtePaymentDataModel.folio == folio)
+                .filter(DtePaymentDataModel.payment_status == "completed")
+                .order_by(DtePaymentDataModel.id.desc())
+                .first()
+            )
+            if not payment_row:
+                continue
+            if payment_row.approval_code and already_has_comment:
+                continue
+
+            approval_code = payment_row.approval_code
+            if not approval_code and payment_row.raw_payload:
+                try:
+                    gateway = (_json.loads(payment_row.raw_payload) or {}).get("gateway")
+                    approval_code = approval_code_from_gateway(gateway)
+                except (ValueError, TypeError):
+                    approval_code = None
+            if not approval_code and payment_row.order_id:
+                try:
+                    gateway = PaymentGatewayClass().get_order(payment_row.order_id) or {}
+                    approval_code = approval_code_from_gateway(gateway)
+                except Exception:
+                    approval_code = None
+            if not approval_code:
+                continue
+
+            changed = False
+            if payment_row.approval_code != approval_code:
+                payment_row.approval_code = approval_code
+                changed = True
+            comment_value = f"Código de autorización: {approval_code}"
+            if dte.comment != comment_value:
+                dte.comment = comment_value
+                dte.payment_comment = comment_value
+                changed = True
+            if changed:
+                summary["synced"] += 1
+
+        if summary["synced"]:
+            try:
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                print(f"[check_payments_v2] sync commit error: {exc}", flush=True)
+
+        print(
+            f"[check_payments_v2] checked={summary['checked']} paid={summary['paid']} "
+            f"pending={summary['pending']} skipped={summary['skipped']} synced={summary['synced']}",
+            flush=True,
+        )
+        return summary

@@ -60,6 +60,20 @@ def payment_type_id_from_gateway(gateway_response: dict | None, payment_status: 
     return 2
 
 
+def approval_code_from_gateway(gateway_response: dict | None) -> str | None:
+    """Extract Klap approval_code (código de autorización) from order payment_details."""
+    if not isinstance(gateway_response, dict):
+        return None
+    details = gateway_response.get("payment_details")
+    if not isinstance(details, list):
+        return None
+    for item in details:
+        if isinstance(item, dict) and item.get("key") == "approval_code":
+            value = str(item.get("value") or "").strip()
+            return value or None
+    return None
+
+
 class DtePaymentDataClass:
     def __init__(self, db: Session):
         self.db = db
@@ -181,6 +195,7 @@ class DtePaymentDataClass:
         customer_id = customer.id if customer else None
         branch_office_id = getattr(dte, "branch_office_id", None) if dte else None
         payment_type_id = payment_type_id_from_gateway(gateway_response, payment_status)
+        approval_code = approval_code_from_gateway(gateway_response)
 
         if amount is None and dte and getattr(dte, "total", None):
             amount = int(dte.total)
@@ -207,6 +222,7 @@ class DtePaymentDataClass:
             row.branch_office_id = branch_office_id or row.branch_office_id
             row.folio = document_folio or row.folio
             row.payment_status = payment_status or row.payment_status
+            row.approval_code = approval_code or row.approval_code
             row.amount = amount if amount is not None else row.amount
             row.rut = rut or row.rut
             row.raw_payload = raw_json
@@ -221,6 +237,7 @@ class DtePaymentDataClass:
                 reference_id=reference_id,
                 order_id=order_id,
                 payment_status=payment_status,
+                approval_code=approval_code,
                 amount=amount,
                 rut=rut,
                 raw_payload=raw_json,
@@ -242,6 +259,10 @@ class DtePaymentDataClass:
             else:
                 dte.card_amount = amount or dte.total
             dte.payment_date = now.strftime("%Y-%m-%d")
+            # Código de autorización Klap → comment (igual que flujo LibreDTE/webpay)
+            if approval_code:
+                dte.comment = f"Código de autorización: {approval_code}"
+                dte.payment_comment = f"Código de autorización: {approval_code}"
             dte.updated_date = now
             dte_updated = True
 
@@ -366,6 +387,7 @@ class DtePaymentDataClass:
             "reference_id": row.reference_id,
             "order_id": row.order_id,
             "payment_status": row.payment_status,
+            "approval_code": row.approval_code,
             "amount": row.amount,
             "rut": row.rut,
             "customer_name": customer_name,
