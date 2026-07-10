@@ -33,9 +33,15 @@ class FormDataSimulator:
         self.branch_office_id = dte.branch_office_id
         self.rut = dte.rut
         # chip_id en dtes: 1 = con chip (+$5.000 al documento/pago).
-        # amount = estacionamiento bruto (dtes.total), NO cash_amount (documento completo).
-        self.amount = int(getattr(dte, "total", 0) or 0)
+        # amount = estacionamiento bruto SIN chip (para líneas LibreDTE).
+        # Si dtes.total ya incluye chip, se resta aquí.
+        total = int(getattr(dte, "total", 0) or 0)
         self.chip_id = int(getattr(dte, "chip_id", 0) or 0)
+        category_id = int(getattr(dte, "category_id", 1) or 1)
+        if self.chip_id == 1 and category_id != 3:
+            self.amount = max(0, total - 5000)
+        else:
+            self.amount = total
         self.will_save = 0  # No guardar, solo generar
         self.id = dte.id  # Necesario para customer_bill_class
         # Emisión masiva: categoría 1 estándar o 3 grupal (conserva quantity e ítems en BD).
@@ -1677,7 +1683,10 @@ class DteClass:
         """
         Montos del borrador del nuevo periodo: subtotal (neto), tax (IVA), total/cash_amount (bruto).
         Prioriza la suma neta de líneas PXQ; si no hay líneas, copia el encabezado del periodo anterior.
+        Si el origen tiene chip_id=1, se restan $5.000 (el mes nuevo no hereda el cobro del chip).
         """
+        from app.backend.classes.customer_ticket_class import DTE_CHIP_AMOUNT_CLP
+
         if source_item_rows:
             item_dicts = [{"total_amount": row.total_amount} for row in source_item_rows]
             pxq_net = pxq_net_total_from_items(item_dicts)
@@ -1685,12 +1694,29 @@ class DteClass:
                 subtotal, tax, total, cash = dte_totals_from_net(pxq_net)
                 return int(cash), int(subtotal), int(tax), int(total)
 
-        return (
-            int(source_dte.cash_amount or 0),
-            int(source_dte.subtotal or 0),
-            int(source_dte.tax or 0),
-            int(source_dte.total or 0),
-        )
+        cash = int(source_dte.cash_amount or 0)
+        card = int(source_dte.card_amount or 0)
+        total = int(source_dte.total or 0)
+        subtotal = int(source_dte.subtotal or 0)
+        tax = int(source_dte.tax or 0)
+
+        chip = int(getattr(source_dte, "chip_id", 0) or 0)
+        category = int(getattr(source_dte, "category_id", 1) or 1)
+        if chip == 1 and category != 3:
+            # Bruto con chip (cash, card o total) → quitar chip para el nuevo periodo
+            if card > 0 and cash == 0:
+                gross = card
+            elif cash > 0:
+                gross = cash
+            else:
+                gross = total
+            gross = max(0, int(gross) - int(DTE_CHIP_AMOUNT_CLP))
+            subtotal = round(gross / 1.19)
+            tax = gross - subtotal
+            cash = gross
+            total = gross
+
+        return cash, subtotal, tax, total
 
     def open_customer_billing_period(self, period):
         current_period = HelperClass.fix_current_dte_period(period)
@@ -1759,10 +1785,8 @@ class DteClass:
                 cash_amount, subtotal, tax, total = self._period_open_header_amounts(
                     dte_datum, source_items if uses_pxq else []
                 )
-                if target_category in (2, 3):
-                    chip_id = 0
-                else:
-                    chip_id = int(dte_datum.chip_id or 0)
+                # El mes nuevo no hereda chip: montos ya vienen sin los $5.000 (ver _period_open_header_amounts).
+                chip_id = 0
 
                 dte = DteModel(
                     rut=dte_datum.rut,

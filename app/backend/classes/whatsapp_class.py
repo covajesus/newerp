@@ -322,7 +322,11 @@ class WhatsappClass:
         print(issued_dte_info_response.text)
         issued_date_for_payment_link = _libredte_issue_date_from_emitido_info(issued_dte_info_response, getattr(dte_data, "added_date", None))
 
-        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + issued_date_for_payment_link + '/' + str(dte_data.total)
+        # Monto del link = cash/card/total ya con chip incluido (NO sumar 5000 otra vez)
+        from app.backend.classes.customer_ticket_class import ticket_payment_total
+        payment_amount = ticket_payment_total(dte_data)
+
+        url_data = str(dte_data.dte_type_id) + '/' + str(dte_data.folio) + '/76063822/' + issued_date_for_payment_link + '/' + str(payment_amount)
         url = "https://graph.facebook.com/v20.0/101066132689690/messages"
 
         headers = {
@@ -336,7 +340,7 @@ class WhatsappClass:
             "DTE type": dte_data.dte_type_id,
             "Folio": dte_data.folio,
             "Date": added_date_str,
-            "Total": dte_data.total,
+            "Total": payment_amount,
             "Branch": branch_office.branch_office,
             "Supervisor": user.full_name,
             "Phone": user.phone,
@@ -384,7 +388,7 @@ class WhatsappClass:
                                     {"type": "text", "text": str(dte_type)},
                                     {"type": "text", "text": str(dte_data.folio)},
                                     {"type": "text", "text": added_date_str},
-                                    {"type": "text", "text": str(dte_data.total)},
+                                    {"type": "text", "text": str(payment_amount)},
                                     {"type": "text", "text": branch_office.branch_office},
                                     {"type": "text", "text": user.full_name},
                                     {"type": "text", "text": user.phone},
@@ -509,8 +513,8 @@ class WhatsappClass:
 
         payment_total = ticket_payment_total(dte_data)
         print(
-            f"[v2] WhatsApp folio={folio} parking={dte_data.total} chip_id={getattr(dte_data, 'chip_id', 0)} "
-            f"payment_total={payment_total}",
+            f"[v2] WhatsApp folio={folio} total={dte_data.total} cash={getattr(dte_data, 'cash_amount', 0)} "
+            f"chip_id={getattr(dte_data, 'chip_id', 0)} payment_total={payment_total}",
             flush=True,
         )
         from fastapi import HTTPException
@@ -1007,6 +1011,9 @@ class WhatsappClass:
             issued_dte_info_response, getattr(dte_data, "added_date", None)
         )
 
+        from app.backend.classes.customer_ticket_class import ticket_payment_total
+        payment_amount = ticket_payment_total(dte_data)
+
         url_data = (
             str(dte_data.dte_type_id)
             + "/"
@@ -1014,7 +1021,7 @@ class WhatsappClass:
             + "/76063822/"
             + issued_date_for_payment_link
             + "/"
-            + str(dte_data.total)
+            + str(payment_amount)
         )
 
         if not whatsapp_template or not whatsapp_template.title:
@@ -1067,7 +1074,7 @@ class WhatsappClass:
                             {"type": "text", "text": str(dte_type)},
                             {"type": "text", "text": str(dte_data.folio)},
                             {"type": "text", "text": added_date_str},
-                            {"type": "text", "text": str(dte_data.total)},
+                            {"type": "text", "text": str(payment_amount)},
                             {"type": "text", "text": branch_office.branch_office},
                             {"type": "text", "text": user.full_name},
                             {"type": "text", "text": user.phone},

@@ -127,7 +127,7 @@ def _load_brand_logo_bytes() -> bytes | None:
 
 
 def _payable_total(dte) -> int:
-    """Monto a pagar = estacionamiento + chip si chip_id=1."""
+    """Monto a pagar (cash/card/total). Ya incluye chip si chip_id=1; no suma 5000 otra vez."""
     return ticket_payment_total(dte)
 
 

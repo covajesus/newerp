@@ -101,11 +101,10 @@ def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
         return
 
     gross = document_gross_from_form(form_data)
-    parking = int(form_data.amount)
     dte.cash_amount = gross
     dte.subtotal = round(gross / 1.19)
     dte.tax = gross - dte.subtotal
-    dte.total = parking
+    dte.total = gross
 
 
 def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
