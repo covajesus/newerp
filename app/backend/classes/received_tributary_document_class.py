@@ -214,97 +214,185 @@ class ReceivedTributaryDocumentClass:
             return {"status": "error", "message": error_message}
     
     def refresh(self):
+        """
+        Importa DTEs recibidos desde LibreDTE (ultimos 89 dias).
+        - No aborta el lote si un item viene sin emisor (continue).
+        - Omite items sin folio valido.
+        - Si ya existe el mismo doc con folio=0, actualiza el folio real.
+        - Elimina duplicados folio=0 cuando ya existe el folio correcto.
+        """
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         since = (datetime.now() - timedelta(days=89)).strftime('%Y-%m-%d')
         until = datetime.now().strftime('%Y-%m-%d')
-        
-        data = {
-            "fecha_desde": since,
-            "fecha_hasta": until,
-            "dte": [33, 34, 39, 61]
+
+        summary = {
+            "status": "success",
+            "fetched": 0,
+            "inserted": 0,
+            "updated_folio": 0,
+            "deleted_zero_dupes": 0,
+            "skipped": 0,
+            "errors": [],
         }
 
         try:
-            url = "https://libredte.cl/api/dte/dte_recibidos/buscar/76063822?fecha_desde="+ str(since) +"&fecha_hasta=" + str(until)
-
+            url = (
+                "https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
+                f"?fecha_desde={since}&fecha_hasta={until}"
+            )
             response = requests.get(
                 url,
-                json=data,
+                json={
+                    "fecha_desde": since,
+                    "fecha_hasta": until,
+                    "dte": [33, 34, 39, 61],
+                },
                 headers={
                     "Authorization": f"Bearer {TOKEN}",
                     "Content-Type": "application/json",
                 },
+                timeout=60,
             )
-            
             data = json.loads(response.text)
+            if not isinstance(data, list):
+                summary["status"] = "error"
+                summary["errors"].append(f"Respuesta LibreDTE inesperada: {type(data).__name__}")
+                return summary
 
+            summary["fetched"] = len(data)
+
+            existing_rows = (
+                self.db.query(DteModel)
+                .filter(DteModel.dte_version_id == 2)
+                .filter(DteModel.added_date >= since)
+                .all()
+            )
+            by_correct = {}
+            zeros_by_key = {}
+            for row in existing_rows:
+                folio_i = int(row.folio or 0)
+                key_rt = (str(row.rut), int(row.dte_type_id or 0), int(row.total or 0))
+                if folio_i > 0:
+                    by_correct[(folio_i, str(row.rut), int(row.dte_type_id or 0))] = row
+                else:
+                    zeros_by_key.setdefault(key_rt, []).append(row)
+
+            supplier_ruts = {
+                r[0] for r in self.db.query(SupplierModel.rut).all() if r[0]
+            }
 
             for item in data:
-                # 👉 Filtrar solo DTEs tipo 33 (Facturas) y 39 (Boletas)
                 if item.get('dte') not in [33, 34, 39, 61]:
                     continue
-                
-                # 👉 Validar que el emisor exista
+
                 if not item.get('emisor'):
-                    return 1
+                    summary["skipped"] += 1
+                    continue
+
+                try:
+                    folio = int(item.get('folio')) if item.get('folio') is not None else 0
+                except (TypeError, ValueError):
+                    folio = 0
+                if folio <= 0:
+                    summary["skipped"] += 1
+                    continue
+
+                emisor = item['emisor']
+                if isinstance(emisor, int) and emisor < 10000000:
+                    emisor_body = '0' + str(emisor)
                 else:
-                    if item['emisor'] < 10000000:
-                        item['emisor'] = '0' + str(item['emisor'])
+                    emisor_body = str(emisor)
 
-                    verificator_digit = HelperClass.verificator_digit(item['emisor'])
-                    rut = str(item['emisor']) + '-' + str(verificator_digit)
+                verificator_digit = HelperClass.verificator_digit(emisor_body)
+                rut = str(emisor_body) + '-' + str(verificator_digit)
 
-                    total = item['total'] if item['total'] is not None else 0
-                    net = item['neto'] if item['neto'] is not None else 0
+                total = item['total'] if item['total'] is not None else 0
+                net = item['neto'] if item['neto'] is not None else 0
+                if item['dte'] == 61:
+                    total = -abs(total)
+                    net = -abs(net)
 
-                    # Si es NC (tipo 61), los valores deben ser negativos
-                    if item['dte'] == 61:
-                        total = -abs(total)
-                        net = -abs(net)
+                if rut not in supplier_ruts:
+                    supplier = SupplierModel()
+                    supplier.rut = rut
+                    supplier.supplier = (item.get('razon_social') or '').upper()
+                    self.db.add(supplier)
+                    supplier_ruts.add(rut)
 
-                    validate_supplier_existence = self.db.query(SupplierModel).filter(SupplierModel.rut == rut).count()
-                    if validate_supplier_existence == 0:
-                        supplier = SupplierModel()
-                        supplier.rut = rut
-                        supplier.supplier = item['razon_social'].upper()
-                        self.db.add(supplier)
-                        self.db.commit()
+                correct_key = (folio, rut, int(item['dte']))
+                zero_key = (rut, int(item['dte']), int(total))
+                fecha = str(item.get('fecha') or '')
 
-                    dte_validation = self.db.query(DteModel).filter(
-                        DteModel.folio == item['folio'],
-                        DteModel.rut == rut,
-                        DteModel.dte_type_id == item['dte'],
-                        DteModel.dte_version_id == 2
-                    ).count()
+                if correct_key in by_correct:
+                    for orphan in list(zeros_by_key.get(zero_key, [])):
+                        self.db.delete(orphan)
+                        summary["deleted_zero_dupes"] += 1
+                    zeros_by_key[zero_key] = []
+                    summary["skipped"] += 1
+                    continue
 
-                    if dte_validation == 0:
-                        dte = DteModel()
-                        dte.branch_office_id = 0
-                        dte.cashier_id = 0
-                        dte.dte_type_id = item['dte']
-                        dte.dte_version_id = 2
-                        dte.status_id = 1
-                        dte.chip_id = 0
-                        dte.rut = rut
-                        dte.folio = item['folio']
-                        dte.cash_amount = total
-                        dte.card_amount = 0
-                        dte.subtotal = net
-                        dte.tax = int(total) - int(net)
-                        dte.discount = 0
-                        dte.total = total
-                        dte.added_date = str(item['fecha']) + ' 00:00:00'
+                zero_list = zeros_by_key.get(zero_key, [])
+                if zero_list:
+                    preferred = None
+                    fallback = zero_list[0]
+                    for candidate in zero_list:
+                        cand_fecha = (
+                            candidate.added_date.strftime('%Y-%m-%d')
+                            if candidate.added_date
+                            else ''
+                        )
+                        if fecha and cand_fecha and cand_fecha == fecha:
+                            preferred = candidate
+                            break
+                    target = preferred or fallback
+                    target.folio = folio
+                    if target.subtotal is None:
+                        target.subtotal = net
+                    if target.tax is None:
+                        target.tax = int(total) - int(net)
+                    by_correct[correct_key] = target
+                    zeros_by_key[zero_key] = [z for z in zero_list if z.id != target.id]
+                    summary["updated_folio"] += 1
+                    continue
 
-                        print(item['fecha'])
+                dte = DteModel()
+                dte.branch_office_id = 0
+                dte.cashier_id = 0
+                dte.dte_type_id = item['dte']
+                dte.dte_version_id = 2
+                dte.status_id = 1
+                dte.chip_id = 0
+                dte.rut = rut
+                dte.folio = folio
+                dte.cash_amount = total
+                dte.card_amount = 0
+                dte.subtotal = net
+                dte.tax = int(total) - int(net)
+                dte.discount = 0
+                dte.total = total
+                dte.added_date = fecha + ' 00:00:00' if fecha else datetime.now()
+                self.db.add(dte)
+                by_correct[correct_key] = dte
+                summary["inserted"] += 1
 
-                        self.db.add(dte)
-                        self.db.commit()
+            self.db.commit()
+            print(
+                f"[received_dtes.refresh] fetched={summary['fetched']} "
+                f"inserted={summary['inserted']} updated_folio={summary['updated_folio']} "
+                f"deleted_zero_dupes={summary['deleted_zero_dupes']} "
+                f"skipped={summary['skipped']}",
+                flush=True,
+            )
+            return summary
 
         except Exception as e:
-            print("Error al conectarse a la API:", e)
-            return None
+            self.db.rollback()
+            print("Error al conectarse a la API:", e, flush=True)
+            summary["status"] = "error"
+            summary["errors"].append(str(e))
+            return summary
 
-    
+
     def pay(self, form_data):
         selected_bills = form_data.selected_bills
 
