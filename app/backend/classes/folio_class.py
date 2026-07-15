@@ -535,6 +535,8 @@ class FolioClass:
             parts.append(str(err))
         text_blob = " ".join(parts).lower()
         folio_s = str(int(folio_number))
+        if "consumo existente" in text_blob:
+            return True
         if "ya existe" in text_blob and folio_s in text_blob:
             return True
         if "ya existe un dte con folio" in text_blob:

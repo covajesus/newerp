@@ -2409,8 +2409,38 @@ class CustomerTicketClass:
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
         if not dte:
             return {"status": "error", "message": "DTE no encontrado"}
-        if dte.status_id != 4:
-            return {"status": "error", "message": "Solo se puede anular un DTE emitido (status 4)"}
+        if int(dte.status_id or 0) not in (4, 5):
+            return {
+                "status": "error",
+                "message": "Solo se puede anular un DTE emitido o pagado (status 4 o 5)",
+            }
+        # Status 5 también representa documentos pagados, por lo que deben poder
+        # anularse. Pero si el propio original ya tiene los datos de una NC aplicada,
+        # no se debe emitir una segunda nota sobre el mismo documento.
+        comment = str(getattr(dte, "comment", None) or "").lower()
+        if int(dte.status_id or 0) == 5 and (
+            getattr(dte, "reason_id", None)
+            or "folio de la nota de crédito" in comment
+            or "folio de la nota de credito" in comment
+        ):
+            return {
+                "status": "error",
+                "message": "El DTE original ya fue anulado con una nota de crédito",
+            }
+        completed_nc = (
+            self.db.query(DteModel.id)
+            .filter(
+                DteModel.dte_type_id == 61,
+                DteModel.denied_folio == str(dte.folio),
+                DteModel.status_id == 5,
+            )
+            .first()
+        )
+        if completed_nc:
+            return {
+                "status": "error",
+                "message": "El DTE original ya tiene una nota de crédito emitida",
+            }
         if int(dte.dte_type_id) != int(ref_dte_type):
             return {"status": "error", "message": "Tipo de DTE no coincide"}
 
@@ -2431,28 +2461,44 @@ class CustomerTicketClass:
         ref_date = dte.added_date if dte.added_date else datetime.now()
 
         # Folio NC desde tabla folios (document_type_id=61), no desde la API.
-        folio_res = FolioClass(self.db).reserve_next_by_document_type(
-            61,
-            branch_office_id=dte.branch_office_id,
-        )
-        if folio_res.get("status") != "success":
-            return folio_res
+        # SimpleFactura puede responder "Consumo Existente" cuando ya usó un folio
+        # pero la respuesta anterior no alcanzó a persistirse localmente. En ese caso
+        # el folio se marca usado y se reintenta automáticamente con el siguiente.
+        folio_cls = FolioClass(self.db)
+        folio_res = None
+        emit_result = None
+        reserved_folio = None
+        max_consumed_retries = 5
 
-        reserved_folio = int(folio_res["folio"])
+        for attempt in range(1, max_consumed_retries + 1):
+            folio_res = folio_cls.reserve_next_by_document_type(
+                61,
+                branch_office_id=dte.branch_office_id,
+            )
+            if folio_res.get("status") != "success":
+                return folio_res
 
-        document = self._build_subscriber_credit_note_document_v2(
-            customer_data,
-            branch,
-            ref_dte_type=ref_dte_type,
-            ref_folio=dte.folio,
-            ref_date=ref_date,
-            gross_amount=gross,
-            nc_folio=reserved_folio,
-        )
+            reserved_folio = int(folio_res["folio"])
+            document = self._build_subscriber_credit_note_document_v2(
+                customer_data,
+                branch,
+                ref_dte_type=ref_dte_type,
+                ref_folio=dte.folio,
+                ref_date=ref_date,
+                gross_amount=gross,
+                nc_folio=reserved_folio,
+            )
 
-        emit_result = self.emit_credit_note_v2(document, branch)
-        if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool_after_failed_emit(
+            emit_result = self.emit_credit_note_v2(document, branch)
+            if emit_result.get("status") == "success":
+                break
+
+            folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
+                emit_result,
+                reserved_folio,
+                dte_type_id=61,
+            )
+            folio_cls.release_folio_pool_after_failed_emit(
                 folio_res["id"],
                 folio_number=reserved_folio,
                 dte_type_id=61,
@@ -2460,7 +2506,14 @@ class CustomerTicketClass:
                 dte_id=dte.id,
                 branch_office_id=dte.branch_office_id,
             )
-            return emit_result
+            if not folio_consumed or attempt == max_consumed_retries:
+                return emit_result
+
+            print(
+                f"[v2-nc] folio {reserved_folio} ya consumido; "
+                f"reintento {attempt + 1}/{max_consumed_retries} con el siguiente",
+                flush=True,
+            )
 
         folio_number = reserved_folio
         ref_folio_original = dte.folio
