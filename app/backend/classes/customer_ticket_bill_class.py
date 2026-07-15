@@ -3,7 +3,11 @@ from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, Us
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
-from app.backend.classes.customer_ticket_class import CustomerTicketClass, _is_simplefactura_v2_dte
+from app.backend.classes.customer_ticket_class import (
+    CustomerTicketClass,
+    _is_simplefactura_v2_dte,
+    is_document_simplefactura_v2,
+)
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import or_
@@ -13,6 +17,7 @@ import requests
 import json
 import base64
 import uuid
+from types import SimpleNamespace
 from sqlalchemy.sql import func
 
 class CustomerTicketBillClass:
@@ -628,6 +633,38 @@ class CustomerTicketBillClass:
 
     def store_credit_note(self, form_data, rol_id, is_massive_sending=False):
         dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+
+        # Administradores: los DTE emitidos por SimpleFactura deben generar su NC
+        # por el mismo canal v2. Si se está aprobando una solicitud (tipo 61,
+        # status 14), se actualiza esa fila en vez de crear otra. Este método v2
+        # también envía el mismo correo con PDF usado por el proceso masivo.
+        if int(rol_id or 0) in (1, 2):
+            pending_nc = dte if int(dte.dte_type_id or 0) == 61 else None
+            original_dte = dte if int(dte.dte_type_id or 0) in (33, 39) else None
+            if pending_nc and pending_nc.denied_folio:
+                original_dte = (
+                    self.db.query(DteModel)
+                    .filter(
+                        DteModel.dte_type_id.in_([33, 39]),
+                        DteModel.folio == pending_nc.denied_folio,
+                    )
+                    .order_by(DteModel.id.desc())
+                    .first()
+                )
+            if original_dte and is_document_simplefactura_v2(self.db, original_dte):
+                ref_type = int(original_dte.dte_type_id)
+                return CustomerTicketClass(self.db).store_credit_note_v2(
+                    SimpleNamespace(
+                        id=original_dte.id,
+                        reason_id=int(getattr(form_data, "reason_id", None) or 1),
+                    ),
+                    ref_dte_type=ref_type,
+                    negative_amounts=(ref_type == 33),
+                    is_massive_sending=bool(pending_nc),
+                    pending_nc_dte_id=pending_nc.id if pending_nc else None,
+                )
         
         customer = CustomerClass(self.db).get_by_rut(dte.rut)
         
