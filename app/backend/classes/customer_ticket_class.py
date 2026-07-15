@@ -15,6 +15,8 @@ import base64
 import uuid
 import os
 import time
+from io import BytesIO
+from pypdf import PdfReader
 from sqlalchemy.sql import func
 from app.backend.classes.libredte_dte_lines import libredte_detail_line_from_group_item
 from app.backend.classes.folio_class import FolioClass
@@ -2423,6 +2425,126 @@ class CustomerTicketClass:
             "v2_url": url,
         }
 
+    @staticmethod
+    def _credit_note_emit_requires_recovery_check(emit_result) -> bool:
+        parts = [str((emit_result or {}).get("message") or "")]
+        parts.extend(str(item) for item in ((emit_result or {}).get("errors") or []))
+        message = " ".join(parts).lower()
+        return any(
+            marker in message
+            for marker in (
+                "no respondió a tiempo",
+                "no respondio a tiempo",
+                "consumo existente",
+                "ya existe",
+                "ya estaba anulado",
+                "ya está anulado",
+                "documento que desea anular",
+            )
+        )
+
+    def _find_existing_credit_note_v2(
+        self,
+        reference_dte,
+        current_folio,
+        pending_nc_dte_id=None,
+    ):
+        """
+        Confirma en SimpleFactura una NC ya emitida tras timeout/folio existente.
+        El PDF debe ser tipo 61 y referenciar exactamente al DTE original.
+        """
+        candidates = []
+        if current_folio:
+            candidates.append(int(current_folio))
+
+        linked_ids = [int(reference_dte.id)]
+        if pending_nc_dte_id:
+            linked_ids.append(int(pending_nc_dte_id))
+        linked_ids = list(dict.fromkeys(linked_ids))
+        stmt = text(
+            "SELECT folio FROM folios "
+            "WHERE document_type_id = 61 AND used_id = 1 "
+            "AND dte_id IN :dte_ids ORDER BY id DESC LIMIT 20"
+        ).bindparams(bindparam("dte_ids", expanding=True))
+        try:
+            linked_folios = self.db.execute(stmt, {"dte_ids": linked_ids}).scalars().all()
+            candidates.extend(int(folio) for folio in linked_folios if folio)
+        except Exception as exc:
+            print(f"[v2-nc-recovery] no se pudieron leer folios vinculados: {exc}", flush=True)
+            self.db.rollback()
+
+        candidates = list(dict.fromkeys(candidates))
+        if not candidates:
+            return None
+
+        token, token_err = self._v2_bearer_token()
+        if not token:
+            print(f"[v2-nc-recovery] sin token: {token_err}", flush=True)
+            return None
+
+        expected_ref = str(int(reference_dte.folio))
+        expected_rut = normalize_v2_rut(reference_dte.rut).replace("-", "")
+        payload_base = {
+            "credenciales": {
+                "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
+            },
+            "dteReferenciadoExterno": {
+                "codigoTipoDte": 61,
+                "ambiente": SIMPLEFACTURA_AMBIENTE,
+            },
+        }
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        for retry_delay in (0, 2, 5):
+            if retry_delay:
+                time.sleep(retry_delay)
+            for folio in candidates:
+                payload = json.loads(json.dumps(payload_base))
+                payload["dteReferenciadoExterno"]["folio"] = folio
+                try:
+                    response = requests.post(
+                        "https://api.simplefactura.cl/getPdf",
+                        json=payload,
+                        headers=headers,
+                        timeout=DTE_V2_HTTP_TIMEOUT,
+                    )
+                    if response.status_code != 200 or not response.content.startswith(b"%PDF"):
+                        continue
+                    pdf_text = "\n".join(
+                        page.extract_text() or ""
+                        for page in PdfReader(BytesIO(response.content)).pages
+                    )
+                    normalized = "".join(pdf_text.upper().split()).replace(".", "").replace("-", "")
+                    if (
+                        "NOTADECREDITO" in normalized
+                        and expected_ref in normalized
+                        and expected_rut in normalized
+                    ):
+                        row_id = self.db.execute(
+                            text(
+                                "SELECT id FROM folios "
+                                "WHERE document_type_id = 61 AND folio = :folio "
+                                "ORDER BY id DESC LIMIT 1"
+                            ),
+                            {"folio": folio},
+                        ).scalar()
+                        print(
+                            f"[v2-nc-recovery] confirmada NC {folio} "
+                            f"para referencia {expected_ref}",
+                            flush=True,
+                        )
+                        return {"folio": folio, "folio_row_id": row_id}
+                except Exception as exc:
+                    print(
+                        f"[v2-nc-recovery] verificación folio {folio}: {exc}",
+                        flush=True,
+                    )
+        return None
+
     def store_credit_note_v2(
         self,
         form_data,
@@ -2445,21 +2567,33 @@ class CustomerTicketClass:
                 "status": "error",
                 "message": "Solo se puede anular un DTE emitido o pagado (status 4 o 5)",
             }
+        pre_recovered = None
         # Status 5 también representa documentos pagados, por lo que deben poder
-        # anularse. Pero si el propio original ya tiene los datos de una NC aplicada,
-        # no se debe emitir una segunda nota sobre el mismo documento.
+        # anularse. Si ya contiene datos de anulación, primero se confirma la NC en
+        # SimpleFactura para completar un proceso local que pudo quedar a medias.
         comment = str(getattr(dte, "comment", None) or "").lower()
         if int(dte.status_id or 0) == 5 and (
             getattr(dte, "reason_id", None)
             or "folio de la nota de crédito" in comment
             or "folio de la nota de credito" in comment
         ):
-            return {
-                "status": "error",
-                "message": "El DTE original ya fue anulado con una nota de crédito",
-            }
+            comment_folio = None
+            for token in reversed(comment.replace("#", " ").split()):
+                if token.isdigit():
+                    comment_folio = int(token)
+                    break
+            pre_recovered = self._find_existing_credit_note_v2(
+                dte,
+                comment_folio,
+                pending_nc_dte_id=pending_nc_dte_id,
+            )
+            if not pre_recovered:
+                return {
+                    "status": "error",
+                    "message": "El DTE original figura anulado, pero no se pudo verificar su NC en SimpleFactura",
+                }
         completed_nc = (
-            self.db.query(DteModel.id)
+            self.db.query(DteModel)
             .filter(
                 DteModel.dte_type_id == 61,
                 DteModel.denied_folio == str(dte.folio),
@@ -2469,8 +2603,10 @@ class CustomerTicketClass:
         )
         if completed_nc:
             return {
-                "status": "error",
-                "message": "El DTE original ya tiene una nota de crédito emitida",
+                "status": "success",
+                "message": "El DTE original y su nota de crédito ya están anulados",
+                "folio": completed_nc.folio,
+                "already_completed": True,
             }
         if int(dte.dte_type_id) != int(ref_dte_type):
             return {"status": "error", "message": "Tipo de DTE no coincide"}
@@ -2502,6 +2638,24 @@ class CustomerTicketClass:
         max_consumed_retries = 5
 
         for attempt in range(1, max_consumed_retries + 1):
+            if pre_recovered:
+                recovered_folio = int(pre_recovered["folio"])
+                recovered_row_id = pre_recovered.get("folio_row_id")
+                if not recovered_row_id:
+                    return {
+                        "status": "error",
+                        "message": f"NC {recovered_folio} existe, pero no está en la pool local",
+                    }
+                reserved_folio = recovered_folio
+                folio_res = {"id": int(recovered_row_id), "folio": recovered_folio}
+                emit_result = {
+                    "status": "success",
+                    "message": "NC ya emitida confirmada en SimpleFactura",
+                    "folio": recovered_folio,
+                    "recovered": True,
+                }
+                break
+
             folio_res = folio_cls.reserve_next_by_document_type(
                 61,
                 branch_office_id=dte.branch_office_id,
@@ -2522,6 +2676,42 @@ class CustomerTicketClass:
 
             emit_result = self.emit_credit_note_v2(document, branch)
             if emit_result.get("status") == "success":
+                break
+
+            recovered = None
+            if self._credit_note_emit_requires_recovery_check(emit_result):
+                recovered = self._find_existing_credit_note_v2(
+                    dte,
+                    reserved_folio,
+                    pending_nc_dte_id=pending_nc_dte_id,
+                )
+            if recovered:
+                recovered_folio = int(recovered["folio"])
+                if recovered_folio != reserved_folio:
+                    folio_cls.release_folio_pool_after_failed_emit(
+                        folio_res["id"],
+                        folio_number=reserved_folio,
+                        dte_type_id=61,
+                        emit_result=emit_result,
+                        dte_id=dte.id,
+                        branch_office_id=dte.branch_office_id,
+                    )
+                recovered_row_id = recovered.get("folio_row_id")
+                if recovered_folio == reserved_folio:
+                    recovered_row_id = recovered_row_id or folio_res["id"]
+                if not recovered_row_id:
+                    return {
+                        "status": "error",
+                        "message": f"NC {recovered_folio} existe, pero no está en la pool local",
+                    }
+                reserved_folio = recovered_folio
+                folio_res = {"id": int(recovered_row_id), "folio": recovered_folio}
+                emit_result = {
+                    "status": "success",
+                    "message": "NC ya emitida confirmada en SimpleFactura",
+                    "folio": recovered_folio,
+                    "recovered": True,
+                }
                 break
 
             folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
