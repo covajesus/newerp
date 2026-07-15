@@ -464,16 +464,14 @@ class DteSubscriberEmailClass:
     ) -> dict[str, Any]:
         """
         Envía correo HTML con PDF adjunto.
-        Boleta/factura v2: enlace Klap. NC v2: plantilla sin pago. LibreDTE: usar resend LibreDTE.
+        Boleta/factura v2: enlace Klap. NC v2: correo deshabilitado.
+        LibreDTE: usar resend LibreDTE.
         """
         if is_subscriber_v2_credit_note(dte):
-            return self._send_credit_note_v2(
-                dte,
-                customer=customer,
-                to_emails=to_emails,
-                ref_folio=ref_folio,
-                ref_dte_type_id=ref_dte_type_id,
-            )
+            return {
+                "status": "skipped",
+                "message": "Correo deshabilitado para notas de crédito v2",
+            }
         return self._send_payable_document(
             dte,
             customer=customer,

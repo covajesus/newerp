@@ -2948,18 +2948,17 @@ class DteClass:
                     except Exception:
                         remaining_dtes = 0
                     
-                    # NC: correo propio en v2; LibreDTE sin WhatsApp de pago
+                    # NC: sin correo ni WhatsApp; solo se informa la emisión.
                     if dte.dte_type_id == 61:
                         email_result = generation_result.get("email") or {}
-                        email_ok = email_result.get("status") == "success"
                         channel = generation_result.get("nc_channel") or "unknown"
-                        if channel == "simplefactura_v2" and email_ok:
+                        if channel == "simplefactura_v2":
                             successful_sends += 1
                             yield {
                                 "type": "dte_result",
                                 "dte_id": dte.id,
                                 "status": "success",
-                                "message": "NC v2 emitida; correo enviado (sin WhatsApp de pago)",
+                                "message": "NC v2 emitida (sin correo ni WhatsApp)",
                                 "customer_name": customer_name,
                                 "customer_phone": customer_phone,
                                 "current": i,
