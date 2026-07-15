@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from types import SimpleNamespace
 from collections import defaultdict
-from sqlalchemy import desc, cast, Date, func, or_, text, bindparam
+from sqlalchemy import desc, cast, Date, func, or_, and_, text, bindparam
 from sqlalchemy.dialects import mysql
 from app.backend.db.models import (
     DteModel,
@@ -85,6 +85,24 @@ class DteClass:
         if cid > 0:
             return DteModel.category_id == cid
         return DteModel.category_id.in_([1, 2, 3])
+
+    def _massive_send_status_filter(self, dte_type_id=0):
+        """Status pendientes por tipo; 0 incluye documentos normales y NC."""
+        tid = int(dte_type_id or 0)
+        if tid == 61:
+            return DteModel.status_id.in_([2, 14])
+        if tid == 0:
+            return or_(
+                and_(
+                    DteModel.dte_type_id == 61,
+                    DteModel.status_id.in_([2, 14]),
+                ),
+                and_(
+                    DteModel.dte_type_id.in_([33, 39]),
+                    DteModel.status_id == 2,
+                ),
+            )
+        return DteModel.status_id == 2
 
     def _prepare_massive_emit_category(self, dte):
         """Normaliza a categoría 1 salvo facturas/boletas grupales (3), que se conservan."""
@@ -2109,13 +2127,7 @@ class DteClass:
                 DteModel.dte_version_id == 1
             ]
             
-            # Aplicar filtro de status según el tipo de DTE
-            if dte_type_id == 61:
-                # Para notas de crédito, buscar status 2 o 14
-                base_filter.append(DteModel.status_id.in_([2, 14]))
-            else:
-                # Para otros tipos de DTE, buscar status 2
-                base_filter.append(DteModel.status_id == 2)
+            base_filter.append(self._massive_send_status_filter(dte_type_id))
             
             # Si branch_office_id no es 0, filtrar por sucursal específica
             if branch_office_id != 0:
@@ -2695,12 +2707,7 @@ class DteClass:
             current_period = datetime.now().strftime('%Y-%m')
             
             # Construir filtro base
-            # Para notas de crédito (dte_type_id=61), buscar status 2 o 14
-            # Para otros tipos de DTE, buscar solo status 2
-            if dte_type_id == 61:
-                status_filter = DteModel.status_id.in_([2, 14])
-            else:
-                status_filter = DteModel.status_id == 2
+            status_filter = self._massive_send_status_filter(dte_type_id)
             
             base_filter = [
                 DteModel.period == current_period,
@@ -2926,11 +2933,7 @@ class DteClass:
                             customer_phone = "No disponible"
 
                     try:
-                        remaining_status_filter = (
-                            DteModel.status_id.in_([2, 14])
-                            if dte_type_id == 61
-                            else DteModel.status_id == 2
-                        )
+                        remaining_status_filter = self._massive_send_status_filter(dte_type_id)
                         remaining_filter = [
                             DteModel.period == current_period,
                             remaining_status_filter,
@@ -3005,7 +3008,7 @@ class DteClass:
                     # Obtener contador actualizado desde DteModel
                     try:
                         # Usar la misma lógica de filtro que al inicio
-                        remaining_status_filter = DteModel.status_id == 2
+                        remaining_status_filter = self._massive_send_status_filter(dte_type_id)
                         
                         remaining_filter = [
                             DteModel.period == current_period,
@@ -3064,17 +3067,20 @@ class DteClass:
                     # Obtener contador actualizado incluso en errores
                     try:
                         # Usar la misma lógica de filtro que al inicio
-                        error_status_filter = DteModel.status_id == 2
+                        error_status_filter = self._massive_send_status_filter(dte_type_id)
                         
                         error_remaining_filter = [
                             DteModel.period == current_period,
                             error_status_filter,
-                            DteModel.dte_version_id == 1
+                            DteModel.dte_version_id == 1,
+                            self._massive_send_category_filter(category_id),
                         ]
                         
                         # Si branch_office_id no es 0, filtrar por sucursal específica
                         if branch_office_id != 0:
                             error_remaining_filter.append(DteModel.branch_office_id == branch_office_id)
+                        if dte_type_id > 0:
+                            error_remaining_filter.append(DteModel.dte_type_id == dte_type_id)
                         
                         remaining_dtes = self.db.query(DteModel).filter(*error_remaining_filter).count()
                     except:
@@ -3109,18 +3115,13 @@ class DteClass:
             # Obtener contador actualizado desde DteModel
             try:
                 # Usar la misma lógica de filtro que al inicio
-                if dte_type_id == 61:
-                    final_status_filter = DteModel.status_id == 14
-                else:
-                    if dte_type_id == 0:
-                        final_status_filter = DteModel.status_id.in_([2, 14])
-                    else:
-                        final_status_filter = DteModel.status_id == 2
+                final_status_filter = self._massive_send_status_filter(dte_type_id)
                 
                 final_remaining_filter = [
                     DteModel.period == current_period,
                     final_status_filter,
-                    DteModel.dte_version_id == 1
+                    DteModel.dte_version_id == 1,
+                    self._massive_send_category_filter(category_id),
                 ]
                 
                 # Si branch_office_id no es 0, filtrar por sucursal específica

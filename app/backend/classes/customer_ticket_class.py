@@ -159,6 +159,29 @@ def ticket_v2_issuer(branch):
     return issuer
 
 
+def credit_note_v2_issuer(branch):
+    """Emisor requerido por invoiceCreditDebitNotesV2 (schema DTE tipo 61)."""
+    issuer = ticket_v2_issuer(branch)
+    issuer["RznSoc"] = issuer.pop("RznSocEmisor")
+    return issuer
+
+
+def normalize_v2_rut(rut) -> str:
+    """RUT compatible con SII RUTType: sin puntos y DV K en mayúscula."""
+    raw = str(rut or "").strip().replace(".", "").replace(" ", "").upper()
+    if not raw:
+        return raw
+    if "-" in raw:
+        number, verifier = raw.rsplit("-", 1)
+    else:
+        number, verifier = raw[:-1], raw[-1:]
+    if number.isdigit() and len(verifier) == 1 and (
+        verifier.isdigit() or verifier == "K"
+    ):
+        return f"{number}-{verifier}"
+    return raw
+
+
 def _chip_applies(chip_id, category_id) -> bool:
     return int(chip_id or 0) == 1 and int(category_id or 1) != 3
 
@@ -1233,7 +1256,7 @@ class CustomerTicketClass:
         """Receptor v2 sin CorreoRecep/Contacto (evita mail automático SimpleFactura)."""
         cd = customer_data["customer_data"]
         receiver = {
-            "RUTRecep": cd["rut"],
+            "RUTRecep": normalize_v2_rut(cd["rut"]),
             "RznSocRecep": cd["customer"],
         }
         if cd.get("activity"):
@@ -2247,7 +2270,7 @@ class CustomerTicketClass:
                     "FchEmis": issue_date,
                     "Folio": int(nc_folio),
                 },
-                "Emisor": ticket_v2_issuer(branch),
+                "Emisor": credit_note_v2_issuer(branch),
                 "Receptor": receiver,
                 "Totales": {
                     "MntNeto": net,
