@@ -161,8 +161,16 @@ def ticket_v2_issuer(branch):
 
 def credit_note_v2_issuer(branch):
     """Emisor requerido por invoiceCreditDebitNotesV2 (schema DTE tipo 61)."""
-    issuer = ticket_v2_issuer(branch)
-    issuer["RznSoc"] = issuer.pop("RznSocEmisor")
+    issuer = {
+        "RUTEmisor": "76063822-6",
+        "RznSoc": "Jisparking SpA",
+        "GiroEmis": "EXPLOTACION DE ESTACIONAMIENTOS DE VEHICULOS AUTOMOTORES Y PARQUIMETROS",
+        "Acteco": [522120],
+    }
+    if branch is not None and getattr(branch, "dte_code", None) is not None:
+        issuer["CdgSIISucur"] = branch.dte_code
+    issuer["DirOrigen"] = "Matucana 40"
+    issuer["CmnaOrigen"] = "Santiago"
     return issuer
 
 
