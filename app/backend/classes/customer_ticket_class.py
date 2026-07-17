@@ -1607,12 +1607,15 @@ class CustomerTicketClass:
             credit_note_dte.chip_id = 0
             credit_note_dte.rut = customer_data['customer_data']['rut']
             credit_note_dte.folio = folio
-            credit_note_dte.cash_amount = dte.cash_amount
+            gross = abs(int(dte.cash_amount or dte.total or 0))
+            subtotal = round(gross / 1.19)
+            tax = gross - subtotal
+            credit_note_dte.cash_amount = -gross
             credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = round(dte.cash_amount/1.19)
-            credit_note_dte.tax = (dte.cash_amount) - round((dte.cash_amount)/1.19)
+            credit_note_dte.subtotal = -subtotal
+            credit_note_dte.tax = -tax
             credit_note_dte.discount = 0
-            credit_note_dte.total = dte.cash_amount
+            credit_note_dte.total = -gross
             credit_note_dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             credit_note_dte.category_id = 1
             credit_note_dte.quantity = None
@@ -2766,25 +2769,19 @@ class CustomerTicketClass:
         credit_note_dte.folio = folio_number
         credit_note_dte.denied_folio = ref_folio_original
         credit_note_dte.reason_id = getattr(form_data, "reason_id", None) or dte.reason_id
-        subtotal = round(gross / 1.19)
-        tax = gross - subtotal
+        # NC siempre se persiste con montos negativos al quedar emitida (status 5).
+        subtotal = round(abs(gross) / 1.19)
+        tax = abs(gross) - subtotal
+        credit_note_dte.cash_amount = -abs(gross)
+        credit_note_dte.card_amount = 0
+        credit_note_dte.subtotal = -abs(subtotal)
+        credit_note_dte.tax = -abs(tax)
+        credit_note_dte.discount = 0
+        credit_note_dte.total = -abs(gross)
+        credit_note_dte.period = datetime.now().strftime("%Y-%m")
         if negative_amounts:
-            credit_note_dte.cash_amount = -abs(gross)
-            credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = -abs(subtotal)
-            credit_note_dte.tax = -abs(tax)
-            credit_note_dte.discount = 0
-            credit_note_dte.total = -abs(gross)
-            credit_note_dte.period = datetime.now().strftime("%Y-%m")
             credit_note_dte.added_date = dte.added_date
         else:
-            credit_note_dte.cash_amount = gross
-            credit_note_dte.card_amount = 0
-            credit_note_dte.subtotal = subtotal
-            credit_note_dte.tax = tax
-            credit_note_dte.discount = 0
-            credit_note_dte.total = gross
-            credit_note_dte.period = datetime.now().strftime("%Y-%m")
             credit_note_dte.added_date = datetime.now().replace(
                 hour=0, minute=0, second=0, microsecond=0
             )

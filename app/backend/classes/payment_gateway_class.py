@@ -7,6 +7,7 @@ Auth: header `apikey`.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 from urllib.parse import unquote, urlencode
 
@@ -18,6 +19,33 @@ from app.backend.classes.payments_env import payments_env
 from app.backend.db.models import CustomerModel, DteModel, DtePaymentDataModel
 
 _GATEWAY_ORDER_ID_RE = re.compile(r"^[0-9][0-9A-Za-z]{20,}$")
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+
+
+def _ascii_fold(value: str) -> str:
+    """Strip accents/diacritics so gateway validators accept the value."""
+    normalized = unicodedata.normalize("NFKD", value or "")
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def sanitize_gateway_email(email: str | None) -> str | None:
+    """
+    Klap/Multicaja rejects emails with accents (e.g. Óscar@...).
+    Fold to ASCII and keep only if the result looks like a valid email.
+    """
+    raw = str(email or "").strip()
+    if not raw:
+        return None
+    folded = _ascii_fold(raw).strip().lower()
+    if not _EMAIL_RE.match(folded):
+        return None
+    return folded
+
+
+def sanitize_gateway_person_name(value: str | None, fallback: str) -> str:
+    folded = _ascii_fold(str(value or "")).strip()
+    cleaned = re.sub(r"[^A-Za-z0-9 .'\-]", "", folded).strip()
+    return cleaned or fallback
 _UNIQUE_ONLY_METHODS = frozenset({"*", "tarjetas_api"})
 _DEFAULT_METHOD_EXPIRATION_METHODS = ("tarjetas", "sodexo", "edenred")
 _RETRY_ORDER_STATUSES = frozenset(
@@ -253,9 +281,15 @@ class PaymentGatewayClass:
         )
 
         user: dict[str, str] = {}
-        email = getattr(customer, "email", None)
-        if email and str(email).strip():
-            user["email"] = str(email).strip()
+        email = sanitize_gateway_email(getattr(customer, "email", None))
+        if email:
+            user["email"] = email
+        elif getattr(customer, "email", None):
+            print(
+                f"[payments] omit email for folio={document_folio}: "
+                f"invalid gateway email {getattr(customer, 'email', None)!r}",
+                flush=True,
+            )
         rut = getattr(customer, "rut", None)
         if rut and str(rut).strip():
             user["rut"] = str(rut).strip()
@@ -265,8 +299,11 @@ class PaymentGatewayClass:
         customer_name = getattr(customer, "customer", None)
         if customer_name and str(customer_name).strip():
             parts = str(customer_name).strip().split(None, 1)
-            user["first_name"] = parts[0]
-            user["last_name"] = parts[1] if len(parts) > 1 else "Customer"
+            user["first_name"] = sanitize_gateway_person_name(parts[0], "Customer")
+            user["last_name"] = sanitize_gateway_person_name(
+                parts[1] if len(parts) > 1 else "Customer",
+                "Customer",
+            )
         else:
             user["first_name"] = "Customer"
             user["last_name"] = "Jisparking"
@@ -296,6 +333,17 @@ class PaymentGatewayClass:
                     flush=True,
                 )
                 payload["methods"] = ["*"]
+                result = self._create_order_safe(payload)
+        if result.get("status") != "success" and "email" in user:
+            msg = str(result.get("message", "")).lower()
+            if "email" in msg and ("invalid" in msg or "conflicts" in msg):
+                print(
+                    f"[payments] retry folio={document_folio} without email "
+                    f"after: {result.get('message')}",
+                    flush=True,
+                )
+                user.pop("email", None)
+                payload["user"] = user
                 result = self._create_order_safe(payload)
         return result
 
