@@ -18,7 +18,9 @@ SF_FOLIOS_CONSULTAR_TIMEOUT = int(os.getenv("SF_FOLIOS_CONSULTAR_TIMEOUT", "180"
 # Piso de asignación de folios de boleta (39): los CAF anteriores a este número
 # fueron consumidos parcialmente por canales que no registran en DB1/DB2, así que
 # solo se asigna desde el CAF 32.180.031–32.680.030 (2026-07-21) hacia arriba.
-FOLIO_ALLOCATION_MIN_39 = int(os.getenv("FOLIO_ALLOCATION_MIN_39", "32180031"))
+# Piso boleta: solo asignar desde este folio hacia arriba (nunca CAFs viejos).
+# Tras agotar 32.180.031–32.680.030 el siguiente CAF válido empieza en 32.680.031+.
+FOLIO_ALLOCATION_MIN_39 = int(os.getenv("FOLIO_ALLOCATION_MIN_39", "32680031"))
 
 class FolioClass:
     def __init__(self, db):
@@ -836,10 +838,20 @@ class FolioClass:
 
         warning = None
         if total_assignable < quantity:
-            warning = (
-                f"Solo hay {total_assignable} folios libres en los CAF de SimpleFactura "
-                f"(cruzando DB1+DB2). Se solicitaron {quantity}."
-            )
+            if int(dte_type_id) == 39 and floor > 0 and total_assignable == 0:
+                warning = (
+                    f"No hay folios libres desde el piso {floor:,} hacia arriba "
+                    f"(CAF nuevo agotado en DB1+DB2). Pide un CAF en SimpleFactura "
+                    f"que empiece sobre {floor - 1:,} y vuelve a previsualizar. "
+                    f"Se solicitaron {quantity}."
+                ).replace(",", ".")
+            else:
+                warning = (
+                    f"Solo hay {total_assignable} folios libres en los CAF de SimpleFactura "
+                    f"(cruzando DB1+DB2"
+                    + (f", piso boleta {floor:,}".replace(",", ".") if floor else "")
+                    + f"). Se solicitaron {quantity}."
+                )
         elif any(len(a["blocks"]) > 1 for a in caf_allocations):
             warning = (
                 "Algunos CAF tienen gaps (folios ya cargados en DB1/DB2); "
@@ -853,6 +865,7 @@ class FolioClass:
             "requested": quantity,
             "assignable": total_assignable,
             "shortfall": max(0, quantity - total_assignable),
+            "allocation_floor": floor if int(dte_type_id) == 39 else None,
             "cafs": caf_allocations,
             "caf_remaining_after": sum(
                 int(a.get("libres_caf_despues") or 0) for a in caf_allocations
