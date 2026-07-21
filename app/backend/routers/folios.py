@@ -485,7 +485,12 @@ def allocate_folios_preview(
         raise HTTPException(status_code=400, detail="destination debe ser db1 o db2")
     if body.quantity is None or int(body.quantity) <= 0:
         raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
+    dte_type_id = int(body.dte_type_id or 39)
+    if dte_type_id not in (33, 39, 61):
+        raise HTTPException(status_code=400, detail="dte_type_id debe ser 33 (factura), 39 (boleta) o 61 (nota de crédito)")
     if destination == "db2":
+        if dte_type_id != 39:
+            raise HTTPException(status_code=400, detail="A DB2 (máquinas) solo se pueden cargar folios de boleta (39)")
         if body.folio_segment_id is None:
             raise HTTPException(status_code=400, detail="Seleccione un segmento")
         if int(body.folio_segment_id) not in (1, 2, 3):
@@ -494,7 +499,7 @@ def allocate_folios_preview(
     result = FolioClass(db).build_folio_allocation(
         int(body.quantity),
         db2=db2,
-        dte_type_id=int(body.dte_type_id or 39),
+        dte_type_id=dte_type_id,
         destination=destination,
     )
     if result.get("status") != "success":
@@ -518,13 +523,18 @@ def allocate_folios_confirm(
         raise HTTPException(status_code=400, detail="destination debe ser db1 o db2")
     if body.quantity is None or int(body.quantity) <= 0:
         raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
+    dte_type_id = int(body.dte_type_id or 39)
+    if dte_type_id not in (33, 39, 61):
+        raise HTTPException(status_code=400, detail="dte_type_id debe ser 33 (factura), 39 (boleta) o 61 (nota de crédito)")
+    if destination == "db2" and dte_type_id != 39:
+        raise HTTPException(status_code=400, detail="A DB2 (máquinas) solo se pueden cargar folios de boleta (39)")
 
     result = FolioClass(db).confirm_folio_allocation(
         int(body.quantity),
         destination=destination,
         folio_segment_id=body.folio_segment_id,
         db2=db2,
-        dte_type_id=int(body.dte_type_id or 39),
+        dte_type_id=dte_type_id,
     )
     if result.get("status") != "success":
         raise HTTPException(status_code=400, detail=result.get("message") or "Error al cargar folios")

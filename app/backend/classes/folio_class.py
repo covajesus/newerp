@@ -796,7 +796,9 @@ class FolioClass:
                 self.db, desde, hasta, document_type_id=dte_type_id
             )
             used_db2 = []
-            if db2 is not None:
+            # DB2 solo almacena folios de boleta (39); para otros tipos el folio
+            # es una serie SII independiente y no debe cruzarse contra máquinas.
+            if db2 is not None and int(dte_type_id) == 39:
                 used_db2 = self._existing_folios_in_range(db2, desde, hasta)
             used_merged = sorted(set(used_db1) | set(used_db2))
             blocks, taken = self._free_blocks_from_used(desde, hasta, used_merged, remaining)
