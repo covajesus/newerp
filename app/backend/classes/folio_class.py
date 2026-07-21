@@ -3,9 +3,18 @@ from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.alert_class import AlertClass
 from sqlalchemy import text
 import json
+import os
 import requests
 import pytz
 import datetime
+
+SIMPLEFACTURA_RUT_EMISOR = "76063822-6"
+SIMPLEFACTURA_SUCURSAL = "Casa Matriz"
+JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
+    "JISBACKEND_SETTINGS_TOKEN_URL",
+    "https://jisbackend.com/api/settings/get_token",
+)
+SF_FOLIOS_CONSULTAR_TIMEOUT = int(os.getenv("SF_FOLIOS_CONSULTAR_TIMEOUT", "180"))
 
 class FolioClass:
     def __init__(self, db):
@@ -595,3 +604,373 @@ class FolioClass:
         except Exception as exc:
             self.db.rollback()
             return {"status": "error", "message": str(exc)}
+
+    # --- Asignación desde CAF SimpleFactura (DB1 Intrajis / DB2 máquinas) ---
+
+    def _fetch_simplefactura_bearer_token(self) -> str:
+        response = requests.get(JISBACKEND_SETTINGS_TOKEN_URL, timeout=15)
+        if response.status_code != 200:
+            raise ValueError(
+                f"jisbackend get_token HTTP {response.status_code}: {(response.text or '')[:200]}"
+            )
+        body = response.json()
+        message = body.get("message")
+        if not isinstance(message, dict):
+            raise ValueError("jisbackend get_token: respuesta sin message")
+        token = message.get("simplefactura_token")
+        if not token:
+            raise ValueError("jisbackend get_token: simplefactura_token vacío")
+        return token
+
+    def fetch_simplefactura_cafs(self, dte_type_id: int = 39):
+        """
+        Lista CAF de boletas/facturas/NC desde SimpleFactura.
+        Endpoint: POST /folios/consultar
+        """
+        token = self._fetch_simplefactura_bearer_token()
+        payload = {
+            "credenciales": {
+                "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
+            },
+            "codigoTipoDte": int(dte_type_id),
+            "ambiente": 1,
+        }
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        response = requests.post(
+            "https://api.simplefactura.cl/folios/consultar",
+            json=payload,
+            headers=headers,
+            timeout=SF_FOLIOS_CONSULTAR_TIMEOUT,
+        )
+        if response.status_code == 401:
+            token = self._fetch_simplefactura_bearer_token()
+            headers["Authorization"] = f"Bearer {token}"
+            response = requests.post(
+                "https://api.simplefactura.cl/folios/consultar",
+                json=payload,
+                headers=headers,
+                timeout=SF_FOLIOS_CONSULTAR_TIMEOUT,
+            )
+        if response.status_code != 200:
+            raise ValueError(
+                f"SimpleFactura folios/consultar HTTP {response.status_code}: "
+                f"{(response.text or '')[:400]}"
+            )
+        body = response.json() if response.text else {}
+        data = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(data, list):
+            raise ValueError("SimpleFactura folios/consultar: respuesta sin lista de CAF")
+
+        cafs = []
+        for row in data:
+            if not isinstance(row, dict):
+                continue
+            try:
+                desde = int(row.get("desde"))
+                hasta = int(row.get("hasta"))
+            except (TypeError, ValueError):
+                continue
+            if desde <= 0 or hasta < desde:
+                continue
+            cafs.append(
+                {
+                    "desde": desde,
+                    "hasta": hasta,
+                    "folios_disponibles_sf": int(row.get("foliosDisponibles") or 0),
+                    "fecha_ingreso": row.get("fechaIngreso"),
+                    "fecha_vencimiento": row.get("fechaVencimiento"),
+                    "tipo_dte": row.get("tipoDte") or f"DTE {dte_type_id}",
+                    "codigo_sii": int(row.get("codigoSii") or dte_type_id),
+                }
+            )
+
+        # Más nuevos primero (fechaIngreso desc).
+        cafs.sort(key=lambda item: item.get("fecha_ingreso") or "1970-01-01", reverse=True)
+        return cafs
+
+    @staticmethod
+    def _free_blocks_from_used(desde: int, hasta: int, used_sorted: list[int], quantity_needed: int):
+        """
+        Arma bloques continuos libres dentro de [desde, hasta] saltando used_sorted.
+        Detiene al completar quantity_needed.
+        """
+        blocks = []
+        taken = 0
+        cursor = int(desde)
+        end = int(hasta)
+        used = [int(u) for u in used_sorted if int(desde) <= int(u) <= int(hasta)]
+
+        def _push(block_from: int, block_to: int):
+            nonlocal taken
+            if block_to < block_from or taken >= quantity_needed:
+                return
+            available = block_to - block_from + 1
+            need = quantity_needed - taken
+            use = min(available, need)
+            real_to = block_from + use - 1
+            blocks.append(
+                {
+                    "desde": block_from,
+                    "hasta": real_to,
+                    "cantidad": use,
+                }
+            )
+            taken += use
+
+        for folio in used:
+            if folio > cursor:
+                _push(cursor, folio - 1)
+                if taken >= quantity_needed:
+                    return blocks, taken
+            cursor = max(cursor, folio + 1)
+        if cursor <= end and taken < quantity_needed:
+            _push(cursor, end)
+        return blocks, taken
+
+    def _existing_folios_in_range(self, db_session, desde: int, hasta: int, *, document_type_id=None):
+        """Folios ya cargados en una BD dentro del rango (ordenados, únicos)."""
+        if document_type_id is not None:
+            rows = db_session.execute(
+                text(
+                    """
+                    SELECT DISTINCT folio AS folio
+                    FROM folios
+                    WHERE document_type_id = :doc_type
+                      AND folio BETWEEN :desde AND :hasta
+                    ORDER BY folio ASC
+                    """
+                ),
+                {"doc_type": int(document_type_id), "desde": int(desde), "hasta": int(hasta)},
+            ).mappings().all()
+        else:
+            rows = db_session.execute(
+                text(
+                    """
+                    SELECT DISTINCT folio AS folio
+                    FROM folios
+                    WHERE folio BETWEEN :desde AND :hasta
+                    ORDER BY folio ASC
+                    """
+                ),
+                {"desde": int(desde), "hasta": int(hasta)},
+            ).mappings().all()
+        return [int(r["folio"]) for r in rows]
+
+    def build_folio_allocation(
+        self,
+        quantity: int,
+        *,
+        db2=None,
+        dte_type_id: int = 39,
+        destination: str = "db2",
+    ):
+        """
+        Calcula bloques libres por CAF cruzando DB1 + DB2.
+        destination solo afecta el resumen (quién recibirá la carga).
+        """
+        quantity = int(quantity)
+        if quantity <= 0:
+            return {
+                "status": "error",
+                "message": "quantity debe ser mayor que 0",
+            }
+
+        try:
+            cafs = self.fetch_simplefactura_cafs(dte_type_id)
+        except (ValueError, requests.RequestException) as exc:
+            return {"status": "error", "message": str(exc)}
+
+        remaining = quantity
+        caf_allocations = []
+        total_assignable = 0
+
+        for caf in cafs:
+            if remaining <= 0:
+                break
+            desde, hasta = caf["desde"], caf["hasta"]
+            used_db1 = self._existing_folios_in_range(
+                self.db, desde, hasta, document_type_id=dte_type_id
+            )
+            used_db2 = []
+            if db2 is not None:
+                used_db2 = self._existing_folios_in_range(db2, desde, hasta)
+            used_merged = sorted(set(used_db1) | set(used_db2))
+            blocks, taken = self._free_blocks_from_used(desde, hasta, used_merged, remaining)
+            if not blocks:
+                continue
+            existing_count = len(used_merged)
+            caf_allocations.append(
+                {
+                    "caf_desde": desde,
+                    "caf_hasta": hasta,
+                    "fecha_ingreso": caf.get("fecha_ingreso"),
+                    "fecha_vencimiento": caf.get("fecha_vencimiento"),
+                    "existentes_db1": len(used_db1),
+                    "existentes_db2": len(used_db2),
+                    "existentes_total": existing_count,
+                    "blocks": blocks,
+                    "cantidad": taken,
+                }
+            )
+            total_assignable += taken
+            remaining -= taken
+
+        warning = None
+        if total_assignable < quantity:
+            warning = (
+                f"Solo hay {total_assignable} folios libres en los CAF de SimpleFactura "
+                f"(cruzando DB1+DB2). Se solicitaron {quantity}."
+            )
+        elif any(len(a["blocks"]) > 1 for a in caf_allocations):
+            warning = (
+                "Algunos CAF tienen gaps (folios ya cargados en DB1/DB2); "
+                "se tomaron bloques discontinuos."
+            )
+
+        return {
+            "status": "success",
+            "destination": destination,
+            "dte_type_id": int(dte_type_id),
+            "requested": quantity,
+            "assignable": total_assignable,
+            "shortfall": max(0, quantity - total_assignable),
+            "cafs": caf_allocations,
+            "warning": warning,
+        }
+
+    def confirm_folio_allocation(
+        self,
+        quantity: int,
+        *,
+        destination: str,
+        folio_segment_id=None,
+        db2=None,
+        dte_type_id: int = 39,
+    ):
+        """
+        Recalcula la asignación e inserta en DB1 (Intrajis) o DB2 (máquinas).
+        """
+        destination = (destination or "").strip().lower()
+        if destination not in ("db1", "db2"):
+            return {"status": "error", "message": "destination debe ser db1 o db2"}
+        if destination == "db2":
+            if db2 is None:
+                return {"status": "error", "message": "DB2 no disponible"}
+            try:
+                segment_id = int(folio_segment_id)
+            except (TypeError, ValueError):
+                return {"status": "error", "message": "Seleccione un segmento"}
+            if segment_id not in (1, 2, 3):
+                return {"status": "error", "message": "Segmento debe ser 1, 2 o 3"}
+        else:
+            segment_id = None
+
+        plan = self.build_folio_allocation(
+            quantity,
+            db2=db2,
+            dte_type_id=dte_type_id,
+            destination=destination,
+        )
+        if plan.get("status") != "success":
+            return plan
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        folio_numbers = []
+        for caf in plan.get("cafs") or []:
+            for block in caf.get("blocks") or []:
+                folio_numbers.extend(range(int(block["desde"]), int(block["hasta"]) + 1))
+
+        inserted = 0
+        try:
+            if destination == "db1":
+                insert_sql = text(
+                    """
+                    INSERT IGNORE INTO folios (
+                        folio, dte_id, used_id, document_type_id, branch_office_id,
+                        added_date, updated_date
+                    ) VALUES (
+                        :folio, 0, 0, :document_type_id, 0,
+                        :added_date, :updated_date
+                    )
+                    """
+                )
+                rows = [
+                    {
+                        "folio": folio,
+                        "document_type_id": int(dte_type_id),
+                        "added_date": now,
+                        "updated_date": now,
+                    }
+                    for folio in folio_numbers
+                ]
+                for offset in range(0, len(rows), 1000):
+                    result = self.db.execute(insert_sql, rows[offset : offset + 1000])
+                    if result.rowcount and result.rowcount > 0:
+                        inserted += int(result.rowcount)
+                self.db.commit()
+            else:
+                insert_sql = text(
+                    """
+                    INSERT IGNORE INTO folios (
+                        folio, branch_office_id, cashier_id, folio_segment_id,
+                        requested_status_id, used_status_id, billed_status_id,
+                        added_date, updated_date
+                    ) VALUES (
+                        :folio, 0, 0, :folio_segment_id,
+                        0, 0, 0,
+                        :added_date, :updated_date
+                    )
+                    """
+                )
+                rows = [
+                    {
+                        "folio": folio,
+                        "folio_segment_id": int(segment_id),
+                        "added_date": now,
+                        "updated_date": now,
+                    }
+                    for folio in folio_numbers
+                ]
+                for offset in range(0, len(rows), 1000):
+                    result = db2.execute(insert_sql, rows[offset : offset + 1000])
+                    if result.rowcount and result.rowcount > 0:
+                        inserted += int(result.rowcount)
+                db2.commit()
+        except Exception as exc:
+            if destination == "db1":
+                self.db.rollback()
+            elif db2 is not None:
+                db2.rollback()
+            return {"status": "error", "message": str(exc)}
+
+        requested = int(plan["requested"])
+        skipped = max(0, requested - inserted)
+        warning = plan.get("warning")
+        if skipped and inserted:
+            warning = (
+                f"Se solicitaron {requested}, se cargaron {inserted} y se omitieron {skipped} "
+                f"(ya existían o no había más libres en CAF)."
+            )
+        elif skipped and not inserted:
+            warning = (
+                f"No se cargó ningún folio. Solicitados: {requested}. "
+                f"Revisa CAFs libres y choques con DB1/DB2."
+            )
+
+        return {
+            "status": "success",
+            "message": "OK",
+            "destination": destination,
+            "folio_segment_id": segment_id,
+            "dte_type_id": int(dte_type_id),
+            "requested": requested,
+            "inserted": inserted,
+            "skipped_existing": skipped,
+            "assignable": plan.get("assignable"),
+            "cafs": plan.get("cafs"),
+            "warning": warning,
+        }

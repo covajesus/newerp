@@ -3431,18 +3431,9 @@ class CustomerTicketClass:
                 "message": "No hay borrador v2 en dtes para emitir (status 1 o 2, folio 0).",
             }
 
-        folio_res = FolioClass(self.db).reserve_next_by_document_type(
-            39,
-            branch_office_id=getattr(form_data, "branch_office_id", None),
-            dte_id=dte.id,
-        )
-        if folio_res.get("status") != "success":
-            return folio_res
-
         source_dte = self._ticket_source_dte_from_form(form_data) or dte
         detail_lines = self._ticket_pre_detalle_lines_from_form(form_data, source_dte)
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
             return detail_lines
 
         category_id = getattr(form_data, "category_id", None)
@@ -3475,50 +3466,84 @@ class CustomerTicketClass:
         due_date = v2_dte_api_date(base_date + timedelta(days=30))
         net_amount = round(total_gross / 1.19)
         tax_amount = total_gross - net_amount
-        document = {
-            "Encabezado": {
-                "IdDoc": {
-                    "TipoDTE": 39,
-                    "FchEmis": issue_date,
-                    "FchVenc": due_date,
-                    "Folio": int(folio_res["folio"]),
-                    "IndServicio": 3,
-                    "IndMntNeto": 2,
+
+        # Igual que en NC v2: si SimpleFactura ya consumió el folio (ej. boletas de
+        # máquinas emitidas fuera de la pool local), se marca usado y se reintenta
+        # con el siguiente folio libre.
+        folio_cls = FolioClass(self.db)
+        # Las máquinas pueden consumir rachas largas de folios seguidos, por eso
+        # se permite más reintentos que en NC.
+        max_consumed_retries = 10
+        emit_result = None
+        document = None
+        folio_number = None
+
+        for attempt in range(1, max_consumed_retries + 1):
+            folio_res = folio_cls.reserve_next_by_document_type(
+                39,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+                dte_id=dte.id,
+            )
+            if folio_res.get("status") != "success":
+                return folio_res
+
+            folio_number = int(folio_res["folio"])
+            document = {
+                "Encabezado": {
+                    "IdDoc": {
+                        "TipoDTE": 39,
+                        "FchEmis": issue_date,
+                        "FchVenc": due_date,
+                        "Folio": folio_number,
+                        "IndServicio": 3,
+                        "IndMntNeto": 2,
+                    },
+                    "Emisor": ticket_v2_issuer(branch),
+                    "Receptor": receiver,
+                    "Totales": {
+                        "MntNeto": net_amount,
+                        "IVA": tax_amount,
+                        "MntTotal": total_gross,
+                    },
                 },
-                "Emisor": ticket_v2_issuer(branch),
-                "Receptor": receiver,
-                "Totales": {
-                    "MntNeto": net_amount,
-                    "IVA": tax_amount,
-                    "MntTotal": total_gross,
-                },
-            },
-            "Detalle": formatted_lines,
-        }
+                "Detalle": formatted_lines,
+            }
 
-        emit_result = self.emit_invoice_v2(document, branch, "Boleta")
+            emit_result = self.emit_invoice_v2(document, branch, "Boleta")
 
-        print(f"[v2] emit_result status={emit_result.get('status')}", flush=True)
+            print(f"[v2] emit_result status={emit_result.get('status')}", flush=True)
 
-        if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool_after_failed_emit(
+            if emit_result.get("status") == "success":
+                break
+
+            folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
+                emit_result,
+                folio_number,
+                dte_type_id=39,
+            )
+            folio_cls.release_folio_pool_after_failed_emit(
                 folio_res["id"],
-                folio_number=int(folio_res["folio"]),
+                folio_number=folio_number,
                 dte_type_id=39,
                 emit_result=emit_result,
                 dte_id=dte.id,
                 branch_office_id=getattr(form_data, "branch_office_id", None),
             )
-            return {
-                "status": "error",
-                "message": emit_result.get("message") or "Emisión v2 no emitió la boleta",
-                "errors": emit_result.get("errors"),
-                "response": emit_result.get("response"),
-                "v2_url": emit_result.get("v2_url"),
-                "v2_payload": {"Documento": document},
-            }
+            if not folio_consumed or attempt == max_consumed_retries:
+                return {
+                    "status": "error",
+                    "message": emit_result.get("message") or "Emisión v2 no emitió la boleta",
+                    "errors": emit_result.get("errors"),
+                    "response": emit_result.get("response"),
+                    "v2_url": emit_result.get("v2_url"),
+                    "v2_payload": {"Documento": document},
+                }
 
-        folio_number = int(folio_res["folio"])
+            print(
+                f"[v2] folio {folio_number} ya consumido en SF; "
+                f"reintento {attempt + 1}/{max_consumed_retries} con el siguiente",
+                flush=True,
+            )
 
         dte.folio = folio_number
         dte.status_id = 4

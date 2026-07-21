@@ -7,7 +7,7 @@ from app.backend.classes.whatsapp_class import WhatsappClass
 from app.backend.db.database import get_db, get_db2
 from sqlalchemy.orm import Session
 from app.backend.db.models import FolioModel, CashierModel
-from app.backend.schemas import FolioList, FolioDb2Store, UserLogin
+from app.backend.schemas import FolioList, FolioDb2Store, FolioAllocateRequest, UserLogin
 from app.backend.auth.auth_user import get_current_active_user
 from datetime import datetime
 
@@ -469,38 +469,104 @@ async def release_folios_csv(
     }
 
 
-@folios.post("/db2/store")
-def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
+@folios.post("/allocate/preview")
+def allocate_folios_preview(
+    body: FolioAllocateRequest,
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+    _session_user: UserLogin = Depends(get_current_active_user),
+):
     """
-    Inserta en DB2 (tabla folios) por:
-    - rango explícito (`start_folio` + `end_folio`), o
-    - `quantity` (calcula correlativo desde MAX(folio) del segmento + 1).
+    Previsualiza bloques libres por CAF (SimpleFactura) cruzando DB1+DB2.
+    No inserta nada.
+    """
+    destination = (body.destination or "").strip().lower()
+    if destination not in ("db1", "db2"):
+        raise HTTPException(status_code=400, detail="destination debe ser db1 o db2")
+    if body.quantity is None or int(body.quantity) <= 0:
+        raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
+    if destination == "db2":
+        if body.folio_segment_id is None:
+            raise HTTPException(status_code=400, detail="Seleccione un segmento")
+        if int(body.folio_segment_id) not in (1, 2, 3):
+            raise HTTPException(status_code=400, detail="Segmento debe ser 1, 2 o 3")
+
+    result = FolioClass(db).build_folio_allocation(
+        int(body.quantity),
+        db2=db2,
+        dte_type_id=int(body.dte_type_id or 39),
+        destination=destination,
+    )
+    if result.get("status") != "success":
+        raise HTTPException(status_code=400, detail=result.get("message") or "Error al previsualizar")
+    result["folio_segment_id"] = body.folio_segment_id if destination == "db2" else None
+    return {"message": result}
+
+
+@folios.post("/allocate/confirm")
+def allocate_folios_confirm(
+    body: FolioAllocateRequest,
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+    _session_user: UserLogin = Depends(get_current_active_user),
+):
+    """
+    Recalcula e inserta folios libres de CAF en DB1 (Intrajis) o DB2 (máquinas).
+    """
+    destination = (body.destination or "").strip().lower()
+    if destination not in ("db1", "db2"):
+        raise HTTPException(status_code=400, detail="destination debe ser db1 o db2")
+    if body.quantity is None or int(body.quantity) <= 0:
+        raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
+
+    result = FolioClass(db).confirm_folio_allocation(
+        int(body.quantity),
+        destination=destination,
+        folio_segment_id=body.folio_segment_id,
+        db2=db2,
+        dte_type_id=int(body.dte_type_id or 39),
+    )
+    if result.get("status") != "success":
+        raise HTTPException(status_code=400, detail=result.get("message") or "Error al cargar folios")
+    return result
+
+
+@folios.post("/db2/store")
+def store_folios_db2(
+    body: FolioDb2Store,
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+    _session_user: UserLogin = Depends(get_current_active_user),
+):
+    """
+    Inserta en DB2 (tabla folios).
+    - Si viene `quantity`: usa asignación por CAF SimpleFactura (cruza DB1+DB2).
+    - Si viene rango explícito (`start_folio` + `end_folio`): inserta ese rango con INSERT IGNORE.
     """
     if body.folio_segment_id is None:
         raise HTTPException(status_code=400, detail="Seleccione un segmento")
     if body.quantity is not None:
-        if body.quantity <= 0:
-            raise HTTPException(status_code=400, detail="quantity debe ser mayor que 0")
-        max_folio_q = text("""
-            SELECT COALESCE(MAX(folio), 0) AS max_folio
-            FROM folios
-            WHERE folio_segment_id = :seg
-        """)
-        max_row = db2.execute(max_folio_q, {"seg": body.folio_segment_id}).mappings().first()
-        max_folio = int(max_row["max_folio"]) if max_row and max_row.get("max_folio") is not None else 0
-        start_folio = max_folio + 1
-        end_folio = max_folio + int(body.quantity)
-    else:
-        if body.start_folio is None or body.end_folio is None:
-            raise HTTPException(status_code=400, detail="Debe enviar start_folio y end_folio, o quantity")
-        if body.start_folio > body.end_folio:
-            raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
-        start_folio = int(body.start_folio)
-        end_folio = int(body.end_folio)
-    count = end_folio - start_folio + 1
+        result = FolioClass(db).confirm_folio_allocation(
+            int(body.quantity),
+            destination="db2",
+            folio_segment_id=body.folio_segment_id,
+            db2=db2,
+            dte_type_id=39,
+        )
+        if result.get("status") != "success":
+            raise HTTPException(status_code=400, detail=result.get("message") or "Error al cargar folios")
+        return result
+
+    if body.start_folio is None or body.end_folio is None:
+        raise HTTPException(status_code=400, detail="Debe enviar start_folio y end_folio, o quantity")
+    if body.start_folio > body.end_folio:
+        raise HTTPException(status_code=400, detail="start_folio no puede ser mayor que end_folio")
+    start_folio = int(body.start_folio)
+    end_folio = int(body.end_folio)
+    requested_count = end_folio - start_folio + 1
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     insert_sql = text("""
-        INSERT INTO folios (
+        INSERT IGNORE INTO folios (
             folio, branch_office_id, cashier_id, folio_segment_id,
             requested_status_id, used_status_id, billed_status_id,
             added_date, updated_date
@@ -510,25 +576,38 @@ def store_folios_db2(body: FolioDb2Store, db2: Session = Depends(get_db2)):
             :added_date, :updated_date
         )
     """)
+    inserted_count = 0
     try:
-        for folio_number in range(start_folio, end_folio + 1):
-            db2.execute(
-                insert_sql,
-                {
-                    "folio": folio_number,
-                    "folio_segment_id": body.folio_segment_id,
-                    "added_date": now,
-                    "updated_date": now,
-                },
-            )
+        rows = [
+            {
+                "folio": folio_number,
+                "folio_segment_id": body.folio_segment_id,
+                "added_date": now,
+                "updated_date": now,
+            }
+            for folio_number in range(start_folio, end_folio + 1)
+        ]
+        for offset in range(0, len(rows), 1000):
+            result = db2.execute(insert_sql, rows[offset:offset + 1000])
+            if result.rowcount and result.rowcount > 0:
+                inserted_count += int(result.rowcount)
         db2.commit()
     except Exception as e:
         db2.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+    skipped_existing = requested_count - inserted_count
     return {
         "message": "OK",
-        "inserted": count,
+        "requested": requested_count,
+        "inserted": inserted_count,
+        "skipped_existing": skipped_existing,
         "start_folio": start_folio,
         "end_folio": end_folio,
         "folio_segment_id": body.folio_segment_id,
+        "warning": (
+            f"Se omitieron {skipped_existing} folios porque ya existían en DB2."
+            if skipped_existing
+            else None
+        ),
     }

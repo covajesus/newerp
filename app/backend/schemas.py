@@ -2282,6 +2282,13 @@ class FolioDb2Store(BaseModel):
     end_folio: Optional[int] = None
     quantity: Optional[int] = None
 
+class FolioAllocateRequest(BaseModel):
+    """Asignación de folios desde CAF SimpleFactura hacia DB1 (Intrajis) o DB2 (máquinas)."""
+    destination: str  # db1 | db2
+    quantity: int
+    folio_segment_id: Optional[int] = None
+    dte_type_id: Optional[int] = 39
+
 class CafList(BaseModel):
     page: int
 
