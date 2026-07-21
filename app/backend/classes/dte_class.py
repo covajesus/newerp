@@ -86,23 +86,44 @@ class DteClass:
             return DteModel.category_id == cid
         return DteModel.category_id.in_([1, 2, 3])
 
+    @staticmethod
+    def _massive_send_nc_periods(months_back=2):
+        """Período actual y `months_back` meses hacia atrás (para NC pendientes)."""
+        now = datetime.now()
+        year, month = now.year, now.month
+        periods = []
+        for _ in range(months_back + 1):
+            periods.append(f"{year:04d}-{month:02d}")
+            month -= 1
+            if month == 0:
+                month = 12
+                year -= 1
+        return periods
+
     def _massive_send_status_filter(self, dte_type_id=0):
-        """Status pendientes por tipo; 0 incluye documentos normales y NC."""
+        """
+        Status y período pendientes por tipo; 0 incluye documentos normales y NC.
+        Boletas/facturas: solo período actual. NC: período actual y 2 meses atrás,
+        porque una NC pendiente de un mes anterior sigue siendo trabajo pendiente.
+        """
         tid = int(dte_type_id or 0)
+        current_period = datetime.now().strftime('%Y-%m')
+        nc_condition = and_(
+            DteModel.status_id.in_([2, 14]),
+            DteModel.period.in_(self._massive_send_nc_periods()),
+        )
         if tid == 61:
-            return DteModel.status_id.in_([2, 14])
+            return nc_condition
         if tid == 0:
             return or_(
-                and_(
-                    DteModel.dte_type_id == 61,
-                    DteModel.status_id.in_([2, 14]),
-                ),
+                and_(DteModel.dte_type_id == 61, nc_condition),
                 and_(
                     DteModel.dte_type_id.in_([33, 39]),
                     DteModel.status_id == 2,
+                    DteModel.period == current_period,
                 ),
             )
-        return DteModel.status_id == 2
+        return and_(DteModel.status_id == 2, DteModel.period == current_period)
 
     def _prepare_massive_emit_category(self, dte):
         """Normaliza a categoría 1 salvo facturas/boletas grupales (3), que se conservan."""
@@ -2119,11 +2140,8 @@ class DteClass:
         - category_id: categoría DTE (1 normal, 2 referencias, 3 PXQ; 0 = todas)
         """
         try:
-            current_period = datetime.now().strftime('%Y-%m')
-            
-            # Construir filtro base
+            # El período va dentro del filtro de status (NC admite meses anteriores)
             base_filter = [
-                DteModel.period == current_period,
                 DteModel.dte_version_id == 1
             ]
             
@@ -2706,11 +2724,11 @@ class DteClass:
             # Obtener DTEs del período actual
             current_period = datetime.now().strftime('%Y-%m')
             
-            # Construir filtro base
+            # Construir filtro base (el período va dentro del filtro de status;
+            # NC admite hasta 2 meses anteriores)
             status_filter = self._massive_send_status_filter(dte_type_id)
             
             base_filter = [
-                DteModel.period == current_period,
                 status_filter,
                 DteModel.dte_version_id == 1,
                 self._massive_send_category_filter(category_id),
@@ -2935,7 +2953,6 @@ class DteClass:
                     try:
                         remaining_status_filter = self._massive_send_status_filter(dte_type_id)
                         remaining_filter = [
-                            DteModel.period == current_period,
                             remaining_status_filter,
                             DteModel.dte_version_id == 1,
                             self._massive_send_category_filter(category_id),
@@ -3010,7 +3027,6 @@ class DteClass:
                         remaining_status_filter = self._massive_send_status_filter(dte_type_id)
                         
                         remaining_filter = [
-                            DteModel.period == current_period,
                             remaining_status_filter,
                             DteModel.dte_version_id == 1,
                             self._massive_send_category_filter(category_id),
@@ -3069,7 +3085,6 @@ class DteClass:
                         error_status_filter = self._massive_send_status_filter(dte_type_id)
                         
                         error_remaining_filter = [
-                            DteModel.period == current_period,
                             error_status_filter,
                             DteModel.dte_version_id == 1,
                             self._massive_send_category_filter(category_id),
@@ -3117,7 +3132,6 @@ class DteClass:
                 final_status_filter = self._massive_send_status_filter(dte_type_id)
                 
                 final_remaining_filter = [
-                    DteModel.period == current_period,
                     final_status_filter,
                     DteModel.dte_version_id == 1,
                     self._massive_send_category_filter(category_id),
