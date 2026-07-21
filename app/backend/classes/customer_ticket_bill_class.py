@@ -782,16 +782,36 @@ class CustomerTicketBillClass:
 
         # Proceso completo para roles 1 y 2
         elif rol_id == 1 or rol_id == 2:
-            # Si el folio es 0, usar la fecha del DTE desde la base de datos
-            if dte.folio == 0:
+            # Total y fecha reales del DTE emitido en LibreDTE: la NC de anulación
+            # debe calzar exactamente (el monto local puede incluir chip +5000).
+            emitted_info = None
+            if original_dte_folio and original_dte_folio > 0 and original_dte_type_id:
+                emitted_info = self.get_dte_info(original_dte_type_id, original_dte_folio)
+
+            if emitted_info and emitted_info.get("fecha"):
+                dte_date = emitted_info["fecha"]
+            elif dte.folio == 0:
+                # Si el folio es 0, usar la fecha del DTE desde la base de datos
                 dte_date = dte.added_date.strftime('%Y-%m-%d') if dte.added_date else datetime.now().strftime('%Y-%m-%d')
             else:
                 dte_date = self.get_dte_date(dte.dte_type_id, dte.folio)
+
+            nc_amount = dte.cash_amount
+            if emitted_info and emitted_info.get("total"):
+                emitted_total = abs(int(emitted_info["total"]))
+                if emitted_total and emitted_total != abs(int(dte.cash_amount or 0)):
+                    print(
+                        f"[nc] total local {dte.cash_amount} != total emitido {emitted_total} "
+                        f"(folio {original_dte_folio}); se usa el emitido",
+                        flush=True,
+                    )
+                nc_amount = emitted_total or nc_amount
+
             # Obtener el dte_code de la sucursal para incluir en la nota de crédito
             branch_office_for_dte = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id_to_use).first()
             dte_code = branch_office_for_dte.dte_code if branch_office_for_dte else None
             
-            code = self.pre_generate_credit_note_ticket(customer_data, original_dte_type_id, original_dte_folio, dte.cash_amount, dte_date, dte_code)
+            code = self.pre_generate_credit_note_ticket(customer_data, original_dte_type_id, original_dte_folio, nc_amount, dte_date, dte_code)
             folio = None
 
             # Error devuelto por LibreDTE (ej. 400 validación)
@@ -949,6 +969,36 @@ class CustomerTicketBillClass:
         response_data = response.json()
 
         return response_data['fecha']
+
+    def get_dte_info(self, dte_type_id, folio):
+        """
+        Fecha y total reales del DTE emitido en LibreDTE. La NC debe anular
+        exactamente el total emitido (el monto local puede diferir, ej. chip +5000).
+        """
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+        url = (
+            f"https://libredte.cl/api/dte/dte_emitidos/info/{int(dte_type_id)}/{int(folio)}/76063822"
+            "?getXML=0&getDetalle=0&getDatosDte=0&getTed=0&getResolucion=0"
+            "&getEmailEnviados=0&getLinks=0&getReceptor=0&getSucursal=0&getUsuario=0"
+        )
+        try:
+            response = requests.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                timeout=30,
+            )
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            if not isinstance(data, dict):
+                return None
+            return {"fecha": data.get("fecha"), "total": data.get("total")}
+        except Exception as exc:
+            print(f"[nc] get_dte_info {dte_type_id}/{folio} error: {exc}", flush=True)
+            return None
 
     def pre_generate_credit_note_ticket(self, customer_data, dte_type_id, folio, cash_amount, added_date, dte_code=None):  # Added self as the first argument
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"

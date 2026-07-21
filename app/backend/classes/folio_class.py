@@ -15,6 +15,10 @@ JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
     "https://jisbackend.com/api/settings/get_token",
 )
 SF_FOLIOS_CONSULTAR_TIMEOUT = int(os.getenv("SF_FOLIOS_CONSULTAR_TIMEOUT", "180"))
+# Piso de asignación de folios de boleta (39): los CAF anteriores a este número
+# fueron consumidos parcialmente por canales que no registran en DB1/DB2, así que
+# solo se asigna desde el CAF 32.180.031–32.680.030 (2026-07-21) hacia arriba.
+FOLIO_ALLOCATION_MIN_39 = int(os.getenv("FOLIO_ALLOCATION_MIN_39", "32180031"))
 
 class FolioClass:
     def __init__(self, db):
@@ -784,6 +788,9 @@ class FolioClass:
         except (ValueError, requests.RequestException) as exc:
             return {"status": "error", "message": str(exc)}
 
+        # Boletas: nunca asignar bajo el piso (CAFs viejos con consumo fantasma).
+        floor = FOLIO_ALLOCATION_MIN_39 if int(dte_type_id) == 39 else 0
+
         remaining = quantity
         caf_allocations = []
         total_assignable = 0
@@ -792,6 +799,9 @@ class FolioClass:
             if remaining <= 0:
                 break
             desde, hasta = caf["desde"], caf["hasta"]
+            if hasta < floor:
+                continue
+            desde = max(desde, floor)
             used_db1 = self._existing_folios_in_range(
                 self.db, desde, hasta, document_type_id=dte_type_id
             )
@@ -805,6 +815,7 @@ class FolioClass:
             if not blocks:
                 continue
             existing_count = len(used_merged)
+            libres_antes = (hasta - desde + 1) - existing_count
             caf_allocations.append(
                 {
                     "caf_desde": desde,
@@ -816,6 +827,8 @@ class FolioClass:
                     "existentes_total": existing_count,
                     "blocks": blocks,
                     "cantidad": taken,
+                    "libres_caf_antes": libres_antes,
+                    "libres_caf_despues": libres_antes - taken,
                 }
             )
             total_assignable += taken
@@ -841,6 +854,9 @@ class FolioClass:
             "assignable": total_assignable,
             "shortfall": max(0, quantity - total_assignable),
             "cafs": caf_allocations,
+            "caf_remaining_after": sum(
+                int(a.get("libres_caf_despues") or 0) for a in caf_allocations
+            ),
             "warning": warning,
         }
 
@@ -974,5 +990,6 @@ class FolioClass:
             "skipped_existing": skipped,
             "assignable": plan.get("assignable"),
             "cafs": plan.get("cafs"),
+            "caf_remaining_after": plan.get("caf_remaining_after"),
             "warning": warning,
         }

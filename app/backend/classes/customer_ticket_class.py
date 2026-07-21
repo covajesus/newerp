@@ -2214,10 +2214,13 @@ class CustomerTicketClass:
         if response.status_code >= 400:
             msg = body.get("message") if isinstance(body, dict) else text[:500]
             errors = body.get("errors") if isinstance(body, dict) else None
+            detail = str(msg or "")
+            if errors:
+                detail = f"{detail} | {errors}" if detail else str(errors)
             return {
                 "status": "error",
                 "http_status": response.status_code,
-                "message": f"Emisión v2 HTTP {response.status_code}: {msg or errors}",
+                "message": f"Emisión v2 HTTP {response.status_code}: {detail}",
                 "errors": errors,
                 "response": body,
                 "v2_url": url,
@@ -2445,6 +2448,69 @@ class CustomerTicketClass:
                 "documento que desea anular",
             )
         )
+
+    @staticmethod
+    def _emit_says_reference_already_annulled(emit_result) -> bool:
+        """True si SimpleFactura respondió que el documento a anular ya estaba anulado."""
+        parts = [str((emit_result or {}).get("message") or "")]
+        parts.extend(str(item) for item in ((emit_result or {}).get("errors") or []))
+        message = " ".join(parts).lower()
+        return any(
+            marker in message
+            for marker in (
+                "ya estaba anulado",
+                "ya está anulado",
+                "ya esta anulado",
+                "documento que desea anular",
+            )
+        )
+
+    def _complete_already_annulled_locally(
+        self,
+        dte,
+        form_data,
+        pending_nc_dte_id=None,
+    ):
+        """
+        SF confirma que el documento ya está anulado: se pasa a status 5 el DTE
+        original y la NC pendiente (si existe), sin emitir nada nuevo.
+        """
+        dte.status_id = 5
+        dte.reason_id = getattr(form_data, "reason_id", None) or dte.reason_id
+        if not dte.comment:
+            dte.comment = "Documento ya anulado en SimpleFactura"
+        self.db.add(dte)
+
+        nc_folio = None
+        if pending_nc_dte_id:
+            credit_note_dte = (
+                self.db.query(DteModel)
+                .filter(DteModel.id == int(pending_nc_dte_id))
+                .first()
+            )
+            if credit_note_dte:
+                credit_note_dte.status_id = 5
+                credit_note_dte.denied_folio = credit_note_dte.denied_folio or dte.folio
+                credit_note_dte.cash_amount = -abs(int(credit_note_dte.cash_amount or 0))
+                credit_note_dte.card_amount = -abs(int(credit_note_dte.card_amount or 0))
+                credit_note_dte.subtotal = -abs(int(credit_note_dte.subtotal or 0))
+                credit_note_dte.tax = -abs(int(credit_note_dte.tax or 0))
+                credit_note_dte.total = -abs(int(credit_note_dte.total or 0))
+                self.db.add(credit_note_dte)
+                nc_folio = credit_note_dte.folio
+
+        self.db.commit()
+        print(
+            f"[v2-nc] DTE {dte.id} ya estaba anulado en SF; "
+            f"original y NC pendiente pasados a status 5",
+            flush=True,
+        )
+        return {
+            "status": "success",
+            "message": "El documento ya estaba anulado en SimpleFactura; se marcó como anulado localmente",
+            "folio": nc_folio,
+            "already_annulled": True,
+        }
 
     def _find_existing_credit_note_v2(
         self,
@@ -2716,6 +2782,17 @@ class CustomerTicketClass:
                     "recovered": True,
                 }
                 break
+
+            # SF dice que el documento ya estaba anulado y no se encontró una NC
+            # propia que recuperar: liberar el folio y cerrar el ciclo localmente
+            # (original y NC pendiente a status 5).
+            if self._emit_says_reference_already_annulled(emit_result):
+                folio_cls.release_folio_pool(folio_res["id"])
+                return self._complete_already_annulled_locally(
+                    dte,
+                    form_data,
+                    pending_nc_dte_id=pending_nc_dte_id,
+                )
 
             folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
                 emit_result,
@@ -3282,7 +3359,7 @@ class CustomerTicketClass:
 
         cd = customer_data["customer_data"]
         receiver = {
-            "RUTRecep": (getattr(form_data, "rut", None) or cd.get("rut") or "").strip(),
+            "RUTRecep": normalize_v2_rut(getattr(form_data, "rut", None) or cd.get("rut")),
             "RznSocRecep": (
                 (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
             ).strip(),
@@ -3445,7 +3522,7 @@ class CustomerTicketClass:
 
         cd = customer_data["customer_data"]
         receiver = {
-            "RUTRecep": (getattr(form_data, "rut", None) or cd.get("rut") or "").strip(),
+            "RUTRecep": normalize_v2_rut(getattr(form_data, "rut", None) or cd.get("rut")),
             "RznSocRecep": (
                 (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
             ).strip(),
