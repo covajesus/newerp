@@ -2243,50 +2243,17 @@ class DteClass:
                                 {"whatsapp_sent": True, "whatsapp_result": result.get("whatsapp")},
                             )
                                 
-                        elif dte.dte_type_id == 33:  # Factura electrónica
-                            # Validar que no exista un DTE duplicado (misma validación que en customer_bill_class)
-                            check_dte_existence = self.db.query(DteModel).filter(
-                                DteModel.branch_office_id == dte.branch_office_id,
-                                DteModel.rut == dte.rut,
-                                DteModel.total == dte.total,
-                                DteModel.dte_type_id == 33,
-                                DteModel.dte_version_id == 1,
-                                DteModel.status_id == 4,
-                                DteModel.period == datetime.now().strftime('%Y-%m')
-                            ).count()
-                            
-                            if check_dte_existence > 0:
-                                raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
-                            
-                            # Crear instancia de CustomerBillClass
+                        elif dte.dte_type_id == 33:  # Factura electrónica (emisión v2)
                             customer_bill_class = CustomerBillClass(self.db)
-                            
-                            # Pre-generar la factura
-                            code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
-
-                            if isinstance(code, dict) and code.get("status") == "error":
-                                raise Exception(code.get("message", "Error emitir LibreDTE"))
-
-                            if code is not None and code != 402:
-                                # Generar la factura con folio
-                                folio = customer_bill_class.generate_bill(dte.rut, code)
-                                
-                                if folio:
-                                    # Guardar PDF
-                                    customer_bill_class.save_pdf_bill(folio)
-                                    
-                                    # Actualizar DTE con folio y status
-                                    dte.folio = folio
-                                    dte.status_id = 4
-                                    self.db.commit()
-                                    self.db.refresh(dte)
-                                    
-                                    # Enviar WhatsApp y capturar respuesta
-                                    whatsapp_response = whatsapp_class.send(dte, dte.rut)
-                                else:
-                                    raise Exception("No se pudo generar el folio de la factura")
-                            else:
-                                raise Exception("Error en pre-generación de la factura")
+                            result = customer_bill_class.generate_v2(form_data_sim)
+                            if result.get("status") != "success":
+                                raise Exception(result.get("message") or "Error emitir factura v2")
+                            self.db.refresh(dte)
+                            whatsapp_response = self._resolve_massive_whatsapp(
+                                dte,
+                                whatsapp_class,
+                                {"whatsapp_sent": True, "whatsapp_result": result.get("whatsapp")},
+                            )
                         else:
                             raise Exception(f"Tipo de DTE no soportado: {dte.dte_type_id}")
                             
@@ -2660,48 +2627,25 @@ class DteClass:
                     "folio": result.get("folio"),
                 }
 
-            elif dte.dte_type_id == 33:  # Factura electrónica
-                # Validar duplicados
-                check_dte_existence = self.db.query(DteModel).filter(
-                    DteModel.branch_office_id == dte.branch_office_id,
-                    DteModel.rut == dte.rut,
-                    DteModel.total == dte.total,
-                    DteModel.dte_type_id == 33,
-                    DteModel.dte_version_id == 1,
-                    DteModel.status_id == 4,
-                    DteModel.period == datetime.now().strftime('%Y-%m')
-                ).count()
-                
-                if check_dte_existence > 0:
-                    raise Exception("Ya existe un DTE duplicado para este cliente en el período actual")
-                
-                # Generar factura
+            elif dte.dte_type_id == 33:  # Factura electrónica (emisión v2 / SimpleFactura)
                 customer_bill_class = CustomerBillClass(self.db)
-                code = customer_bill_class.pre_generate_bill(customer_data, form_data_sim)
-
-                if isinstance(code, dict) and code.get("status") == "error":
-                    return {"status": "error", "message": code.get("message", "Error emitir LibreDTE")}
-
-                if code is not None and code != 402:
-                    folio = customer_bill_class.generate_bill(dte.rut, code)
-                    if folio:
-                        customer_bill_class.save_pdf_bill(folio)
-                        # Actualizar DTE
-                        dte.folio = folio
-                        dte.status_id = 4
-                        self.db.commit()
-                        self.db.refresh(dte)
-                        
-                        pdf_url = f"https://jisparking.com/api/backend/dtes/download_pdf/{folio}/{dte.dte_type_id}"
-                        return {
-                            "status": "success",
-                            "message": "Factura generada exitosamente",
-                            "pdf_url": pdf_url
-                        }
-                    else:
-                        return {"status": "error", "message": "No se pudo generar el folio de la factura"}
-                else:
-                    return {"status": "error", "message": "Error en pre-generación de la factura"}
+                result = customer_bill_class.generate_v2(form_data_sim)
+                if result.get("status") != "success":
+                    return {
+                        "status": "error",
+                        "message": result.get("message") or "Error emitir factura v2",
+                        "details": result,
+                    }
+                self.db.refresh(dte)
+                whatsapp = result.get("whatsapp") or {}
+                whatsapp_deferred = whatsapp.get("status") == "deferred"
+                return {
+                    "status": "success",
+                    "message": result.get("message", "Factura generada exitosamente"),
+                    "whatsapp_sent": not whatsapp_deferred,
+                    "whatsapp_result": whatsapp,
+                    "folio": result.get("folio"),
+                }
             elif dte.dte_type_id == 61:  # Nota de crédito electrónica
                 return self._generate_massive_credit_note(dte)
             else:

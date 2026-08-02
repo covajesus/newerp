@@ -36,6 +36,7 @@ def search(customer_bills:CustomerBillSearch, session_user: UserLogin = Depends(
 
 @customer_bills.post("/store")
 def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Legacy path: same as /v2/store (SimpleFactura), igual que boletas."""
     try:
         existence_data = CustomerClass(db).check_existence(customer_ticket_inputs.rut)
 
@@ -45,7 +46,7 @@ def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin =
             else:
                 CustomerClass(db).update(customer_ticket_inputs.rut, customer_ticket_inputs)
 
-        data = CustomerBillClass(db).store(customer_ticket_inputs, session_user.rol_id)
+        data = CustomerBillClass(db).store_v2(customer_ticket_inputs, session_user.rol_id)
 
         return {"message": data}
     except Exception as e:
@@ -55,6 +56,7 @@ def store(customer_ticket_inputs:GenerateCustomerBill, session_user: UserLogin =
 
 @customer_bills.post("/generate_bill")
 def generate_bill(customer_bill_inputs:GenerateCustomerBill, db: Session = Depends(get_db)):
+    """Legacy path: same as /v2/generate_bill (SimpleFactura), igual que boletas."""
     existence_data = CustomerClass(db).check_existence(customer_bill_inputs.rut)
 
     if customer_bill_inputs.will_save == 1:
@@ -63,7 +65,7 @@ def generate_bill(customer_bill_inputs:GenerateCustomerBill, db: Session = Depen
         else:
             CustomerClass(db).update(customer_bill_inputs.rut, customer_bill_inputs)
 
-    data = CustomerBillClass(db).generate(customer_bill_inputs)
+    data = CustomerBillClass(db).generate_v2(customer_bill_inputs)
 
     return {"message": data}
 
@@ -89,7 +91,8 @@ def generated_tickets(customer_bill_inputs:GeneratedCustomerBillList, db: Sessio
 
 @customer_bills.post("/generate_credit_note")
 def generate_credit_note(customer_credit_note_bill_inputs:GenerateCustomerCreditNoteBill, db: Session = Depends(get_db)):
-    data = CustomerBillClass(db).store_credit_note(customer_credit_note_bill_inputs)
+    """Legacy path: NC SimpleFactura si el original es v2; LibreDTE si no."""
+    data = CustomerBillClass(db).store_credit_note_smart(customer_credit_note_bill_inputs)
 
     return {"message": data}
 

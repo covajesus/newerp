@@ -70,8 +70,9 @@ def _is_simplefactura_v2_dte(db: Session, dte) -> bool:
 
 def is_document_simplefactura_v2(db: Session, dte) -> bool:
     """
-    True si el DTE referenciado (33/39) fue emitido por SimpleFactura v2
-    (pool folios, Klap o dte_version_id v2 en facturas).
+    True si el DTE referenciado (33/39) fue emitido por SimpleFactura v2.
+    Facturas y boletas: solo pool de folios / Klap (no dte_version_id=1,
+    porque LibreDTE histórico también usa version 1).
     """
     if not dte:
         return False
@@ -79,8 +80,6 @@ def is_document_simplefactura_v2(db: Session, dte) -> bool:
     if tid == 39:
         return _is_simplefactura_v2_dte(db, dte)
     if tid == 33:
-        if int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2:
-            return True
         dte_id = getattr(dte, "id", None)
         if dte_id:
             row = db.execute(
@@ -92,6 +91,16 @@ def is_document_simplefactura_v2(db: Session, dte) -> bool:
                 {"dte_id": int(dte_id)},
             ).first()
             if row:
+                return True
+        folio = getattr(dte, "folio", None)
+        if folio:
+            from app.backend.db.models import DtePaymentDataModel
+
+            if (
+                db.query(DtePaymentDataModel.id)
+                .filter(DtePaymentDataModel.folio == int(folio))
+                .first()
+            ):
                 return True
     return False
 

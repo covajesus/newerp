@@ -19,6 +19,8 @@ from app.backend.classes.customer_ticket_class import (
     DTE_CHIP_AMOUNT_CLP,
     _set_dte_gross_totals,
     document_gross_from_form,
+    is_document_simplefactura_v2,
+    normalize_v2_rut,
 )
 from app.backend.classes.folio_class import FolioClass
 from datetime import timedelta
@@ -1728,6 +1730,13 @@ class CustomerBillClass:
             negative_amounts=True,
         )
 
+    def store_credit_note_smart(self, form_data):
+        """NC SimpleFactura si el DTE original está en pool/Klap; si no, LibreDTE."""
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if dte and is_document_simplefactura_v2(self.db, dte):
+            return self.store_credit_note_v2(form_data)
+        return self.store_credit_note(form_data)
+
     def pre_generate_bill(self, customer_data, form_data):  # Added self as the first argument
         branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()
 
@@ -2028,50 +2037,73 @@ class CustomerBillClass:
         
     def download(self, id):
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte or not dte.folio:
+            return None
 
-        if dte:
-            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-            # Endpoint para generar un DTE temporal
-            url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/33/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
-
-            # Enviar solicitud a la API
-            response = requests.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
+        if is_document_simplefactura_v2(self.db, dte):
+            pdf_result = CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
+                dte.folio,
+                dte_type_id=33,
             )
-            print(response.status_code)
-            
-            # Manejar la respuesta
-            if response.status_code == 200:
-                pdf_content = response.content
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
-                unique_filename = f"{timestamp}_{unique_id}.pdf"
-
-                # Ruta remota en Azure
-                remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
-
-                self.file_class.temporal_upload(pdf_content, remote_path)  # Llamada correcta
-
-                # Descargar archivo desde Azure File Share
-                file_contents = self.file_class.download(remote_path)
-
-                # Convertir el contenido del archivo a base64
-                encoded_file = base64.b64encode(file_contents).decode('utf-8')
-
-                self.file_class.delete(remote_path)  # Llamada correcta
-
-                # Retornar el nombre del archivo y su contenido como base64
-                return {
-                    "file_name": unique_filename,
-                    "file_data": encoded_file
-                }
-            else:
+            if pdf_result.get("status") != "success":
+                print(
+                    f"[download] SimpleFactura PDF factura folio={dte.folio} failed: {pdf_result}",
+                    flush=True,
+                )
                 return None
+            remote_path = f"{int(dte.folio)}.pdf"
+            try:
+                file_contents = self.file_class.download(remote_path)
+            except HTTPException as exc:
+                print(f"[download] SimpleFactura PDF factura folio={dte.folio} file error: {exc}", flush=True)
+                return None
+            return {
+                "file_name": f"{dte.folio}.pdf",
+                "file_data": base64.b64encode(file_contents).decode("utf-8"),
+            }
+
+        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+
+        # Endpoint para generar un DTE temporal (LibreDTE histórico)
+        url = f"https://libredte.cl/api/dte/dte_emitidos/pdf/33/"+ str(dte.folio) +"/76063822-6?formato=general&papelContinuo=0&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+
+        # Enviar solicitud a la API
+        response = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {TOKEN}",
+                "Content-Type": "application/json",
+            },
+        )
+        print(response.status_code)
+        
+        # Manejar la respuesta
+        if response.status_code == 200:
+            pdf_content = response.content
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
+            unique_filename = f"{timestamp}_{unique_id}.pdf"
+
+            # Ruta remota en Azure
+            remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
+
+            self.file_class.temporal_upload(pdf_content, remote_path)  # Llamada correcta
+
+            # Descargar archivo desde Azure File Share
+            file_contents = self.file_class.download(remote_path)
+
+            # Convertir el contenido del archivo a base64
+            encoded_file = base64.b64encode(file_contents).decode('utf-8')
+
+            self.file_class.delete(remote_path)  # Llamada correcta
+
+            # Retornar el nombre del archivo y su contenido como base64
+            return {
+                "file_name": unique_filename,
+                "file_data": encoded_file
+            }
+        else:
+            return None
             
     def verify(self, id):
         """
@@ -2264,7 +2296,7 @@ class CustomerBillClass:
 
         issuer = ticket_v2_issuer(branch)
         receiver = {
-            "RUTRecep": customer["rut"],
+            "RUTRecep": normalize_v2_rut(customer.get("rut")),
             "RznSocRecep": customer.get("customer") or customer["rut"],
         }
         if customer.get("activity"):
@@ -2399,14 +2431,6 @@ class CustomerBillClass:
                 "message": "No hay borrador v2 en dtes para emitir (status 1 o 2, folio 0).",
             }
 
-        folio_res = FolioClass(self.db).reserve_next_by_document_type(
-            33,
-            branch_office_id=getattr(form_data, "branch_office_id", None),
-            dte_id=dte_row.id,
-        )
-        if folio_res.get("status") != "success":
-            return folio_res
-
         bill_items = self._get_bill_items_for_generation(form_data, dte_row)
         category_id = _bill_category_id(form_data, dte_row)
         qty = getattr(form_data, "quantity", None)
@@ -2416,37 +2440,65 @@ class CustomerBillClass:
 
         detail_lines = self._bill_v2_detail_lines(form_data, dte_row, bill_items, category_id, qty)
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
-            FolioClass(self.db).release_folio_pool(folio_res["id"])
             return detail_lines
 
-        document = self._build_bill_document_v2(
-            customer_record,
-            form_data,
-            detail_lines,
-            branch,
-            folio=int(folio_res["folio"]),
-            category_id=category_id,
-            dte_row=dte_row,
-        )
-        emit_result = CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
+        folio_cls = FolioClass(self.db)
+        max_consumed_retries = 10
+        emit_result = None
+        document = None
+        folio_number = None
+        folio_res = None
 
-        if emit_result.get("status") != "success":
-            FolioClass(self.db).release_folio_pool_after_failed_emit(
+        for attempt in range(1, max_consumed_retries + 1):
+            folio_res = folio_cls.reserve_next_by_document_type(
+                33,
+                branch_office_id=getattr(form_data, "branch_office_id", None),
+                dte_id=dte_row.id,
+            )
+            if folio_res.get("status") != "success":
+                return folio_res
+
+            folio_number = int(folio_res["folio"])
+            document = self._build_bill_document_v2(
+                customer_record,
+                form_data,
+                detail_lines,
+                branch,
+                folio=folio_number,
+                category_id=category_id,
+                dte_row=dte_row,
+            )
+            emit_result = CustomerTicketClass(self.db).emit_invoice_v2(document, branch, "Factura")
+
+            if emit_result.get("status") == "success":
+                break
+
+            folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
+                emit_result,
+                folio_number,
+                dte_type_id=33,
+            )
+            folio_cls.release_folio_pool_after_failed_emit(
                 folio_res["id"],
-                folio_number=int(folio_res["folio"]),
+                folio_number=folio_number,
                 dte_type_id=33,
                 emit_result=emit_result,
                 dte_id=dte_row.id,
                 branch_office_id=getattr(form_data, "branch_office_id", None),
             )
-            return {
-                "status": "error",
-                "message": emit_result.get("message") or "Emisión v2 no emitió la factura",
-                "errors": emit_result.get("errors"),
-                "response": emit_result.get("response"),
-            }
+            if not folio_consumed or attempt == max_consumed_retries:
+                return {
+                    "status": "error",
+                    "message": emit_result.get("message") or "Emisión v2 no emitió la factura",
+                    "errors": emit_result.get("errors"),
+                    "response": emit_result.get("response"),
+                }
 
-        folio_number = int(folio_res["folio"])
+            print(
+                f"[v2 factura] folio {folio_number} ya consumido en SF; "
+                f"reintento {attempt + 1}/{max_consumed_retries} con el siguiente",
+                flush=True,
+            )
 
         dte_row.folio = folio_number
         dte_row.status_id = 4
