@@ -556,14 +556,33 @@ class FolioClass:
             return True
         if "ya existe un dte con folio" in text_blob:
             return True
+        # SF a veces responde HTTP 500 genérico de EF cuando el folio ya está guardado.
+        entity_save_error = (
+            "saving the entity changes" in text_blob
+            or "error al facturar desde api" in text_blob
+        )
         try:
             from app.backend.classes.customer_ticket_class import CustomerTicketClass
 
             pdf = CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
                 int(folio_number), dte_type_id=int(dte_type_id)
             )
-            return pdf.get("status") == "success"
-        except Exception:
+            if pdf.get("status") == "success":
+                return True
+            # Si hay error genérico de guardado y no hay PDF, no asumir consumo.
+            if entity_save_error:
+                print(
+                    f"[folios] HTTP500 entity-save folio={folio_number} sin PDF en SF; "
+                    f"no se marca consumido. pdf={pdf}",
+                    flush=True,
+                )
+            return False
+        except Exception as exc:
+            if entity_save_error:
+                print(
+                    f"[folios] no se pudo verificar PDF folio={folio_number}: {exc}",
+                    flush=True,
+                )
             return False
 
     def release_folio_pool_after_failed_emit(

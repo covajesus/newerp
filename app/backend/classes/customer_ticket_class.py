@@ -164,27 +164,44 @@ def ticket_v2_issuer(branch, dte_type_id: int = 39):
     - Factura 33: RznSoc / GiroEmis (+ Acteco) (schema factura / SII).
     """
     tipo = int(dte_type_id or 39)
+    giro = "ESTACIONAMIENTO DE VEHICULOS Y PARQUIMETROS, VENTA DE PRODUCTOS FARMACEUTICOS"
     if tipo == 33:
         issuer = {
             "RUTEmisor": "76063822-6",
             "RznSoc": "Jisparking SpA",
-            "GiroEmis": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+            "GiroEmis": giro[:80],
             "Acteco": [522120],
             "DirOrigen": "Matucana 40",
             "CmnaOrigen": "Santiago",
         }
     else:
-        # Boleta: no usar RznSoc/GiroEmis/Acteco (provoca HTTP 500 en SimpleFactura).
+        # Boleta: schema distinto a factura; Acteco/RznSoc rompen con HTTP 500 en SF.
         issuer = {
             "RUTEmisor": "76063822-6",
             "RznSocEmisor": "Jisparking SpA",
-            "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+            "GiroEmisor": giro[:80],
             "DirOrigen": "Matucana 40",
             "CmnaOrigen": "Santiago",
         }
-    if branch is not None and getattr(branch, "dte_code", None) is not None:
-        issuer["CdgSIISucur"] = branch.dte_code
+    if branch is not None and getattr(branch, "dte_code", None) not in (None, ""):
+        try:
+            issuer["CdgSIISucur"] = int(branch.dte_code)
+        except (TypeError, ValueError):
+            pass
     return issuer
+
+
+def ticket_v2_receiver_boleta(rut, name, address=None, commune=None) -> dict:
+    """Receptor mínimo para boleta invoiceV2 (sin TelefonoRecep/CorreoRecep)."""
+    receiver = {
+        "RUTRecep": normalize_v2_rut(rut),
+        "RznSocRecep": (str(name or rut or "Cliente").strip() or "Cliente")[:100],
+    }
+    if address and str(address).strip():
+        receiver["DirRecep"] = str(address).strip()[:70]
+    if commune and str(commune).strip():
+        receiver["CmnaRecep"] = str(commune).strip()[:20]
+    return receiver
 
 
 def credit_note_v2_issuer(branch):
@@ -1305,9 +1322,6 @@ class CustomerTicketClass:
             receiver["DirRecep"] = cd["region"]
         if cd.get("commune"):
             receiver["CmnaRecep"] = cd["commune"]
-        phone = cd.get("phone")
-        if phone:
-            receiver["TelefonoRecep"] = str(phone).strip()
         return receiver
 
     def generate(self, form_data):
@@ -3405,23 +3419,12 @@ class CustomerTicketClass:
         formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
         cd = customer_data["customer_data"]
-        receiver = {
-            "RUTRecep": normalize_v2_rut(getattr(form_data, "rut", None) or cd.get("rut")),
-            "RznSocRecep": (
-                (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
-            ).strip(),
-        }
-        address = getattr(form_data, "address", None) or cd.get("address") or cd.get("region")
-        if address:
-            receiver["DirRecep"] = str(address).strip()
-        commune = cd.get("commune")
-        if commune:
-            receiver["CmnaRecep"] = str(commune).strip()
-        # No CorreoRecep/Contacto: SimpleFactura envía su propio mail al emitir.
-        # El correo al cliente va solo por DteSubscriberEmailClass post-emisión.
-        phone = getattr(form_data, "phone", None) or cd.get("phone")
-        if phone:
-            receiver["TelefonoRecep"] = str(phone).strip()
+        receiver = ticket_v2_receiver_boleta(
+            getattr(form_data, "rut", None) or cd.get("rut"),
+            getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut"),
+            address=getattr(form_data, "address", None) or cd.get("address") or cd.get("region"),
+            commune=cd.get("commune"),
+        )
 
         issue_date = v2_dte_api_date()
         due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
@@ -3440,9 +3443,9 @@ class CustomerTicketClass:
                 "Emisor": ticket_v2_issuer(branch, dte_type_id=39),
                 "Receptor": receiver,
                 "Totales": {
-                    "MntNeto": net_amount,
-                    "IVA": tax_amount,
-                    "MntTotal": total_gross,
+                    "MntNeto": int(net_amount),
+                    "IVA": int(tax_amount),
+                    "MntTotal": int(total_gross),
                 },
             },
             "Detalle": formatted_lines,
@@ -3568,22 +3571,12 @@ class CustomerTicketClass:
         formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
         cd = customer_data["customer_data"]
-        receiver = {
-            "RUTRecep": normalize_v2_rut(getattr(form_data, "rut", None) or cd.get("rut")),
-            "RznSocRecep": (
-                (getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut") or "")
-            ).strip(),
-        }
-        address = getattr(form_data, "address", None) or cd.get("address") or cd.get("region")
-        if address:
-            receiver["DirRecep"] = str(address).strip()
-        commune = cd.get("commune")
-        if commune:
-            receiver["CmnaRecep"] = str(commune).strip()
-        # No CorreoRecep/Contacto en invoiceV2 (evita mail automático SimpleFactura).
-        phone = getattr(form_data, "phone", None) or cd.get("phone")
-        if phone:
-            receiver["TelefonoRecep"] = str(phone).strip()
+        receiver = ticket_v2_receiver_boleta(
+            getattr(form_data, "rut", None) or cd.get("rut"),
+            getattr(form_data, "customer", None) or cd.get("customer") or cd.get("rut"),
+            address=getattr(form_data, "address", None) or cd.get("address") or cd.get("region"),
+            commune=cd.get("commune"),
+        )
 
         base_date = dte.added_date if dte.added_date else datetime.now()
         issue_date = v2_dte_api_date(base_date)
@@ -3625,9 +3618,9 @@ class CustomerTicketClass:
                     "Emisor": ticket_v2_issuer(branch, dte_type_id=39),
                     "Receptor": receiver,
                     "Totales": {
-                        "MntNeto": net_amount,
-                        "IVA": tax_amount,
-                        "MntTotal": total_gross,
+                        "MntNeto": int(net_amount),
+                        "IVA": int(tax_amount),
+                        "MntTotal": int(total_gross),
                     },
                 },
                 "Detalle": formatted_lines,
