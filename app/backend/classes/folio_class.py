@@ -556,10 +556,16 @@ class FolioClass:
             return True
         if "ya existe un dte con folio" in text_blob:
             return True
-        # SF a veces responde HTTP 500 genérico de EF cuando el folio ya está guardado.
+        # SF a menudo responde HTTP 500 EF ("entity changes") por folio ya usado
+        # (unique constraint) sin mensaje claro. Si el PDF existe → consumido.
+        # Si no hay PDF pero el error es ese genérico, igual saltamos el folio
+        # (reintento con el siguiente) para no quedar atrapados en un folio muerto.
         entity_save_error = (
             "saving the entity changes" in text_blob
-            or "error al facturar desde api" in text_blob
+            or (
+                "error al facturar desde api" in text_blob
+                and int(emit_result.get("http_status") or 0) >= 500
+            )
         )
         try:
             from app.backend.classes.customer_ticket_class import CustomerTicketClass
@@ -569,20 +575,22 @@ class FolioClass:
             )
             if pdf.get("status") == "success":
                 return True
-            # Si hay error genérico de guardado y no hay PDF, no asumir consumo.
             if entity_save_error:
                 print(
-                    f"[folios] HTTP500 entity-save folio={folio_number} sin PDF en SF; "
-                    f"no se marca consumido. pdf={pdf}",
+                    f"[folios] HTTP500 entity-save folio={folio_number} sin PDF; "
+                    f"se marca consumido para reintentar con el siguiente. pdf={pdf}",
                     flush=True,
                 )
+                return True
             return False
         except Exception as exc:
             if entity_save_error:
                 print(
-                    f"[folios] no se pudo verificar PDF folio={folio_number}: {exc}",
+                    f"[folios] HTTP500 entity-save folio={folio_number}; "
+                    f"PDF no verificable ({exc}); se marca consumido para reintento",
                     flush=True,
                 )
+                return True
             return False
 
     def release_folio_pool_after_failed_emit(

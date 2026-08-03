@@ -160,7 +160,8 @@ def v2_dte_api_date(dt=None) -> str:
 def ticket_v2_issuer(branch, dte_type_id: int = 39):
     """
     Emisor para invoiceV2 vía SimpleFactura.
-    - Boleta 39: RznSocEmisor / GiroEmisor (schema boleta).
+    - Boleta 39: RznSocEmisor / GiroEmisor (schema boleta). Sin CdgSIISucur
+      (si el código no existe en SF, responde HTTP 500 EF "entity changes").
     - Factura 33: RznSoc / GiroEmis (+ Acteco) (schema factura / SII).
     """
     tipo = int(dte_type_id or 39)
@@ -174,8 +175,13 @@ def ticket_v2_issuer(branch, dte_type_id: int = 39):
             "DirOrigen": "Matucana 40",
             "CmnaOrigen": "Santiago",
         }
+        if branch is not None and getattr(branch, "dte_code", None) not in (None, ""):
+            try:
+                issuer["CdgSIISucur"] = int(branch.dte_code)
+            except (TypeError, ValueError):
+                pass
     else:
-        # Boleta: schema distinto a factura; Acteco/RznSoc rompen con HTTP 500 en SF.
+        # Boleta: payload alineado al SDK SimpleFactura (sin CdgSIISucur/Acteco).
         issuer = {
             "RUTEmisor": "76063822-6",
             "RznSocEmisor": "Jisparking SpA",
@@ -183,16 +189,11 @@ def ticket_v2_issuer(branch, dte_type_id: int = 39):
             "DirOrigen": "Matucana 40",
             "CmnaOrigen": "Santiago",
         }
-    if branch is not None and getattr(branch, "dte_code", None) not in (None, ""):
-        try:
-            issuer["CdgSIISucur"] = int(branch.dte_code)
-        except (TypeError, ValueError):
-            pass
     return issuer
 
 
 def ticket_v2_receiver_boleta(rut, name, address=None, commune=None) -> dict:
-    """Receptor mínimo para boleta invoiceV2 (sin TelefonoRecep/CorreoRecep)."""
+    """Receptor mínimo para boleta invoiceV2 (sin TelefonoRecep)."""
     receiver = {
         "RUTRecep": normalize_v2_rut(rut),
         "RznSocRecep": (str(name or rut or "Cliente").strip() or "Cliente")[:100],
@@ -202,6 +203,43 @@ def ticket_v2_receiver_boleta(rut, name, address=None, commune=None) -> dict:
     if commune and str(commune).strip():
         receiver["CmnaRecep"] = str(commune).strip()[:20]
     return receiver
+
+
+def _v2_boleta_stringify_amounts(document: dict) -> dict:
+    """
+    SimpleFactura boleta invoiceV2 tipa Totales/Detalle como string en su SDK.
+    Enviar ints a veces termina en HTTP 500 al persistir.
+    """
+    if not isinstance(document, dict):
+        return document
+    encabezado = document.get("Encabezado") or {}
+    totales = encabezado.get("Totales") or {}
+    for key in ("MntNeto", "IVA", "MntTotal", "MntExe"):
+        if key in totales and totales[key] is not None:
+            totales[key] = str(int(round(float(totales[key]))))
+    encabezado["Totales"] = totales
+    id_doc = encabezado.get("IdDoc") or {}
+    if "Folio" in id_doc and id_doc["Folio"] is not None:
+        id_doc["Folio"] = int(id_doc["Folio"])
+    encabezado["IdDoc"] = id_doc
+    document["Encabezado"] = encabezado
+
+    detail = document.get("Detalle") or []
+    for line in detail:
+        if not isinstance(line, dict):
+            continue
+        for key in ("PrcItem", "MontoItem", "DescuentoMonto", "RecargoMonto"):
+            if key in line and line[key] is not None:
+                try:
+                    line[key] = str(int(round(float(line[key]))))
+                except (TypeError, ValueError):
+                    line[key] = str(line[key])
+        if "QtyItem" in line and line["QtyItem"] is not None:
+            line["QtyItem"] = str(line["QtyItem"])
+        if "NroLinDet" in line and line["NroLinDet"] is not None:
+            line["NroLinDet"] = str(line["NroLinDet"])
+    document["Detalle"] = detail
+    return document
 
 
 def credit_note_v2_issuer(branch):
@@ -2215,10 +2253,24 @@ class CustomerTicketClass:
         ).strip() or "Casa_Matriz"
 
         # Gateway v2 invoiceV2 URL uses the registered branch slug (Casa_Matriz).
-        # The parking location is sent in Emisor.CdgSIISucur via ticket_v2_issuer(branch).
+        # Factura 33 puede llevar Emisor.CdgSIISucur; boleta 39 no (FK/EF 500 en SF).
         branch_office_name = v2_invoice_branch_display(branch)
         branch_slug = default_branch
         url = f"https://api.simplefactura.cl/invoiceV2/{branch_slug}"
+
+        # Boleta: tipar montos como string (SDK SimpleFactura) y IdDoc mínimo.
+        try:
+            tipo_dte = int((((document or {}).get("Encabezado") or {}).get("IdDoc") or {}).get("TipoDTE") or 0)
+        except (TypeError, ValueError):
+            tipo_dte = 0
+        if tipo_dte == 39 and isinstance(document, dict):
+            document = _v2_boleta_stringify_amounts(document)
+            id_doc = (document.get("Encabezado") or {}).get("IdDoc") or {}
+            # IndMntNeto=2 = detalle en neto (nuestro formateo). Si SF rechaza el campo, quitar vía env.
+            if (os.getenv("DTE_V2_BOLETA_OMIT_IND_MNT_NETO") or "").strip() in ("1", "true", "True"):
+                id_doc.pop("IndMntNeto", None)
+                document.setdefault("Encabezado", {})["IdDoc"] = id_doc
+
         payload = {"Documento": document}
         payload_json = json.dumps(payload, ensure_ascii=False, indent=2)
         headers = {
