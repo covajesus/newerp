@@ -30,29 +30,159 @@ class TransbankStatementClass:
     def _normalize_header_line(line: str) -> str:
         return (line or "").replace("\ufeff", "").strip().strip('"').strip("'")
 
+    @staticmethod
+    def _normalize_column_name(name: str) -> str:
+        text = str(name or "").replace("\ufeff", "").strip().strip('"').strip("'")
+        text = re.sub(r"\s+", " ", text)
+        return text.lower()
+
+    # Alias por campo lógico → variantes legacy y formato nuevo Transbank.
+    _COLUMN_ALIASES = {
+        "fecha": (
+            "Fecha Venta",
+            "Fecha de movimiento",
+            "Fecha de abono",
+            "Fecha de venta",
+        ),
+        "local_id": (
+            "Local",
+            "Codigo de comercio",
+            "Código de comercio",
+        ),
+        "local_name": (
+            "Identificación Local",
+            "Identificacion Local",
+            "Nombre local",
+        ),
+        "sale_type": (
+            "Tipo Movimiento",
+            "Tipo de movimiento",
+        ),
+        "payment_type": (
+            "Tipo Tarjeta",
+            "Tipo de tarjeta",
+            "Medio de pago",
+        ),
+        "card_number": (
+            "Identificador",
+            "Numero de tarjeta",
+            "Número de tarjeta",
+        ),
+        "sale_description": (
+            "Tipo Cuota",
+            "Estado de movimiento",
+            "Medio de pago",
+        ),
+        "monto_afecto": (
+            "Monto Afecto",
+            "Monto afecto",
+            "Monto original de la venta",
+        ),
+        "monto_exento": (
+            "Monto Exento",
+            "Monto exento",
+        ),
+        "auth_code": (
+            "Código Autorización",
+            "Codigo Autorizacion",
+            "Codigo de autorizacion",
+            "Código de autorización",
+        ),
+        "cuotas": (
+            "N° Cuotas",
+            "N Cuotas",
+            "Numero de cuotas",
+            "Número de cuotas",
+        ),
+    }
+
+    @classmethod
+    def _build_column_map(cls, columns) -> dict:
+        """Mapa campo lógico → nombre real de columna en el DataFrame."""
+        by_norm = {cls._normalize_column_name(col): col for col in columns}
+        resolved = {}
+        for field, aliases in cls._COLUMN_ALIASES.items():
+            for alias in aliases:
+                key = cls._normalize_column_name(alias)
+                if key in by_norm:
+                    resolved[field] = by_norm[key]
+                    break
+        return resolved
+
+    @classmethod
+    def _row_get(cls, row, colmap: dict, field: str, default: str = "") -> str:
+        col = colmap.get(field)
+        if not col:
+            return default
+        value = row.get(col, default)
+        if value is None:
+            return default
+        return str(value).strip()
+
+    @staticmethod
+    def _parse_amount(raw: str) -> int:
+        text = (raw or "").strip()
+        if text in ("", "-", "None"):
+            return 0
+        # "12.345" o "12345,00" → entero CLP
+        text = text.replace(".", "").replace(",", "")
+        try:
+            return int(float(text))
+        except (TypeError, ValueError):
+            return 0
+
+    @classmethod
+    def _parse_transbank_date(cls, raw_date: str):
+        text = (raw_date or "").strip().lstrip("*")
+        if not text:
+            return None
+        for fmt in (
+            "%d/%m/%Y %H:%M",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+            "%d-%m-%Y %H:%M",
+            "%d-%m-%Y",
+        ):
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+        return None
+
     @classmethod
     def _is_transbank_header_line(cls, line: str) -> bool:
         """
         True si la fila parece el encabezado de detalle Transbank.
-        Acepta BOM, comillas y variantes ('Fecha Venta' / 'Fecha de Venta').
+        Soporta formato legacy ('Fecha Venta;Local;...') y nuevo
+        ('Tipo de movimiento;...;Fecha de movimiento;...;Codigo de comercio;...').
         """
         normalized = cls._normalize_header_line(line)
-        if not normalized:
+        if not normalized or ";" not in normalized:
             return False
         lower = normalized.lower()
-        has_fecha = ("fecha venta" in lower) or ("fecha de venta" in lower)
-        # Debe verse como fila CSV con ';' (no un título suelto).
-        return has_fecha and (";" in normalized)
+        legacy = ("fecha venta" in lower) and ("local" in lower)
+        modern = (
+            ("fecha de movimiento" in lower or "fecha de abono" in lower)
+            and ("codigo de comercio" in lower or "código de comercio" in lower)
+        )
+        return legacy or modern
 
     @classmethod
     def _find_transbank_header_index(cls, lines) -> int | None:
         for i, line in enumerate(lines):
             if cls._is_transbank_header_line(line):
                 return i
-        # Fallback: alguna línea contiene 'Fecha Venta' aunque no tenga ';'.
         for i, line in enumerate(lines):
             lower = cls._normalize_header_line(line).lower()
-            if "fecha venta" in lower or "fecha de venta" in lower:
+            if (
+                "fecha venta" in lower
+                or "fecha de movimiento" in lower
+                or "codigo de comercio" in lower
+                or "código de comercio" in lower
+            ) and ";" in lower:
                 return i
         return None
 
@@ -199,7 +329,9 @@ class TransbankStatementClass:
             local_urls = [
                 "https://intrajisbackend.com/files",
                 "http://127.0.0.1:8000/files",
-                "http://localhost:8000/files"
+                "http://localhost:8000/files",
+                "http://127.0.0.1:8085/files",
+                "http://localhost:8085/files",
             ]
             
             # Si es una URL local, leer directamente del filesystem
@@ -236,7 +368,8 @@ class TransbankStatementClass:
                     status_code=400,
                     detail=(
                         "El archivo .dat no contiene encabezado de datos. "
-                        "Se espera una fila que incluya 'Fecha Venta' (separada por ';'). "
+                        "Se espera formato Transbank con 'Fecha Venta' (legacy) "
+                        "o 'Fecha de movimiento' + 'Codigo de comercio' (nuevo). "
                         f"Vista previa: {preview}"
                     ),
                 )
@@ -256,12 +389,14 @@ class TransbankStatementClass:
                 for col in df.columns
             ]
 
-            if "Fecha Venta" not in df.columns:
+            colmap = self._build_column_map(df.columns)
+            if "fecha" not in colmap or "local_id" not in colmap:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "Se encontró una fila de encabezado, pero no la columna 'Fecha Venta'. "
-                        f"Columnas leídas: {list(df.columns)[:12]}"
+                        "Encabezado Transbank incompleto: faltan fecha y/o código de local. "
+                        f"Columnas leídas: {list(df.columns)[:15]} | "
+                        f"Mapeadas: {colmap}"
                     ),
                 )
             
@@ -287,8 +422,9 @@ class TransbankStatementClass:
                 if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
                     progress_callback(progress_percent, f"⚡ Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
                 
-                # Ahora las columnas están correctamente mapeadas
-                local_id = str(row.get("Local", "") or "").strip()  # ID del local
+                local_id = self._row_get(row, colmap, "local_id")
+                if not local_id:
+                    continue
                 
                 # Usar cache para branch offices
                 if local_id not in branch_office_cache:
@@ -300,34 +436,25 @@ class TransbankStatementClass:
                     branch_office_transbank_statement = branch_office_cache[local_id]
 
                 if branch_office_transbank_statement:
-                    # La fecha está en la columna "Fecha Venta"
-                    raw_date = str(row.get("Fecha Venta", "") or "").strip().lstrip("*")
-
-                    # Try parsing the date with possible formats
-                    parsed_date = None
-                    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y"):
-                        try:
-                            parsed_date = datetime.strptime(raw_date, fmt)
-                            break
-                        except ValueError:
-                            continue
+                    raw_date = self._row_get(row, colmap, "fecha")
+                    parsed_date = self._parse_transbank_date(raw_date)
 
                     if not parsed_date:
                         raise ValueError(f"Invalid date format: '{raw_date}'")
 
                     formatted_date = parsed_date.strftime("%Y-%m-%d")
                     
-                    # Crear una clave única para evitar duplicados
-                    monto_afecto = row.get("Monto Afecto", "0")
-                    if monto_afecto == "" or monto_afecto == "-":
-                        monto_afecto = "0"
+                    monto_afecto_raw = self._row_get(row, colmap, "monto_afecto", "0")
+                    amount = self._parse_amount(monto_afecto_raw)
+                    card_number = self._row_get(row, colmap, "card_number")
+                    auth_code = self._row_get(row, colmap, "auth_code")
                     
                     transaction_key = (
                         local_id,
                         formatted_date,
-                        row.get("Identificador", ""),
-                        row.get("Código Autorización", ""),
-                        monto_afecto
+                        card_number,
+                        auth_code,
+                        amount,
                     )
                     
                     # Evitar duplicados en el mismo archivo
@@ -340,9 +467,9 @@ class TransbankStatementClass:
                     existing_transaction = self.db.query(TransbankStatementModel).filter(
                         TransbankStatementModel.code == local_id,
                         TransbankStatementModel.original_date == formatted_date,
-                        TransbankStatementModel.card_number == row.get("Identificador", ""),
-                        TransbankStatementModel.value_3 == row.get("Código Autorización", ""),
-                        TransbankStatementModel.amount == int(monto_afecto.replace(".", "").replace(",", ""))
+                        TransbankStatementModel.card_number == card_number,
+                        TransbankStatementModel.value_3 == auth_code,
+                        TransbankStatementModel.amount == amount,
                     ).first()
                     
                     if existing_transaction:
@@ -351,17 +478,17 @@ class TransbankStatementClass:
                     transbank_statement = TransbankStatementModel()
                     transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
                     transbank_statement.original_date = formatted_date
-                    transbank_statement.code = local_id  # ID del local
-                    transbank_statement.branch_office_name = row.get("Identificación Local", "")  # Nombre del local
-                    transbank_statement.sale_type = row.get("Tipo Movimiento", "")
-                    transbank_statement.payment_type = row.get("Tipo Tarjeta", "")
-                    transbank_statement.card_number = row.get("Identificador", "")
-                    transbank_statement.sale_description = row.get("Tipo Cuota", "")
-                    transbank_statement.amount = int(monto_afecto.replace(".", "").replace(",", ""))
-                    transbank_statement.value_1 = row.get("Monto Afecto", "")
-                    transbank_statement.value_2 = row.get("Monto Exento", "")
-                    transbank_statement.value_3 = row.get("Código Autorización", "")
-                    transbank_statement.value_4 = row.get("N° Cuotas", "")
+                    transbank_statement.code = local_id
+                    transbank_statement.branch_office_name = self._row_get(row, colmap, "local_name")
+                    transbank_statement.sale_type = self._row_get(row, colmap, "sale_type")
+                    transbank_statement.payment_type = self._row_get(row, colmap, "payment_type")
+                    transbank_statement.card_number = card_number
+                    transbank_statement.sale_description = self._row_get(row, colmap, "sale_description")
+                    transbank_statement.amount = amount
+                    transbank_statement.value_1 = monto_afecto_raw
+                    transbank_statement.value_2 = self._row_get(row, colmap, "monto_exento")
+                    transbank_statement.value_3 = auth_code
+                    transbank_statement.value_4 = self._row_get(row, colmap, "cuotas")
                     transbank_statement.added_date = formatted_date
                     self.db.add(transbank_statement)
                     
