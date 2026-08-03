@@ -40,15 +40,23 @@ class TransbankStatementClass:
                 )
 
                 total_items = data_query.count()
-                total_pages = (total_items + items_per_page - 1) // items_per_page
+                total_pages = (total_items + items_per_page - 1) // items_per_page if total_items else 0
+
+                # Tabla vacía: devolver listado vacío (no "Invalid page number").
+                if total_items == 0:
+                    return {
+                        "total_items": 0,
+                        "total_pages": 0,
+                        "current_page": page if page >= 1 else 1,
+                        "items_per_page": items_per_page,
+                        "data": [],
+                        "total_available_receipts": 0,
+                    }
 
                 if page < 1 or page > total_pages:
                     return "Invalid page number"
 
                 data = data_query.offset((page - 1) * items_per_page).limit(items_per_page).all()
-
-                if not data:
-                    return "No data found"
 
                 serialized_data = [{
                         "id": transbank_statement.id,
