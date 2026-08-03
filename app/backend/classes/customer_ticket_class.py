@@ -157,19 +157,31 @@ def v2_dte_api_date(dt=None) -> str:
     return dt.strftime("%Y-%m-%d")
 
 
-def ticket_v2_issuer(branch):
+def ticket_v2_issuer(branch, dte_type_id: int = 39):
     """
-    Emisor para invoiceV2 (boleta 39 / factura 33) vía SimpleFactura.
-    Schema SII DTE: RznSoc y GiroEmis (no RznSocEmisor / GiroEmisor).
+    Emisor para invoiceV2 vía SimpleFactura.
+    - Boleta 39: RznSocEmisor / GiroEmisor (schema boleta).
+    - Factura 33: RznSoc / GiroEmis (+ Acteco) (schema factura / SII).
     """
-    issuer = {
-        "RUTEmisor": "76063822-6",
-        "RznSoc": "Jisparking SpA",
-        "GiroEmis": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
-        "Acteco": [522120],
-        "DirOrigen": "Matucana 40",
-        "CmnaOrigen": "Santiago",
-    }
+    tipo = int(dte_type_id or 39)
+    if tipo == 33:
+        issuer = {
+            "RUTEmisor": "76063822-6",
+            "RznSoc": "Jisparking SpA",
+            "GiroEmis": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+            "Acteco": [522120],
+            "DirOrigen": "Matucana 40",
+            "CmnaOrigen": "Santiago",
+        }
+    else:
+        # Boleta: no usar RznSoc/GiroEmis/Acteco (provoca HTTP 500 en SimpleFactura).
+        issuer = {
+            "RUTEmisor": "76063822-6",
+            "RznSocEmisor": "Jisparking SpA",
+            "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+            "DirOrigen": "Matucana 40",
+            "CmnaOrigen": "Santiago",
+        }
     if branch is not None and getattr(branch, "dte_code", None) is not None:
         issuer["CdgSIISucur"] = branch.dte_code
     return issuer
@@ -3330,7 +3342,7 @@ class CustomerTicketClass:
                     "IndServicio": 3,
                     "IndMntNeto": 2,
                 },
-                "Emisor": ticket_v2_issuer(branch),
+                "Emisor": ticket_v2_issuer(branch, dte_type_id=39),
                 "Receptor": {
                     "RUTRecep": "66666666-6",
                     "RznSocRecep": "Cliente en Sucursal",
@@ -3425,7 +3437,7 @@ class CustomerTicketClass:
                     "IndServicio": 3,
                     "IndMntNeto": 2,
                 },
-                "Emisor": ticket_v2_issuer(branch),
+                "Emisor": ticket_v2_issuer(branch, dte_type_id=39),
                 "Receptor": receiver,
                 "Totales": {
                     "MntNeto": net_amount,
@@ -3610,7 +3622,7 @@ class CustomerTicketClass:
                         "IndServicio": 3,
                         "IndMntNeto": 2,
                     },
-                    "Emisor": ticket_v2_issuer(branch),
+                    "Emisor": ticket_v2_issuer(branch, dte_type_id=39),
                     "Receptor": receiver,
                     "Totales": {
                         "MntNeto": net_amount,

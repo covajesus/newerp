@@ -292,8 +292,12 @@ class WhatsappClass:
             return {"status": "error", "error": str(e)}
 
     def send(self, dte_data, customer_rut):
-        if int(getattr(dte_data, "dte_type_id", 0) or 0) == 39:
-            print("[send] Boleta -> send_v2_invoice (SimpleFactura/Klap)", flush=True)
+        dte_type_id = int(getattr(dte_data, "dte_type_id", 0) or 0)
+        if dte_type_id in (33, 39):
+            print(
+                f"[send] DTE tipo={dte_type_id} -> send_v2_invoice (SimpleFactura/Klap)",
+                flush=True,
+            )
             return self.send_v2_invoice(dte_data, customer_rut)
 
         customer = self.db.query(CustomerModel).filter(CustomerModel.rut == customer_rut).first()

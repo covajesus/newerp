@@ -189,7 +189,7 @@ class DteClass:
     def _resolve_massive_whatsapp(self, dte, whatsapp_class, generation_result=None):
         """
         WhatsApp en envío masivo (una sola vez, tras emisión y PDF).
-        Boletas v2: send_v2_invoice con PDF reintentado y orden Klap reutilizable.
+        Boletas/facturas v2: send_v2_invoice con PDF reintentado y orden Klap.
         """
         whatsapp_class = whatsapp_class or WhatsappClass(self.db)
         try:
@@ -199,11 +199,11 @@ class DteClass:
 
         dte_type_id = int(getattr(dte, "dte_type_id", 0) or 0)
         folio = int(getattr(dte, "folio", 0) or 0)
-        if dte_type_id == 39 and folio > 0:
+        if dte_type_id in (33, 39) and folio > 0:
             pdf_url = self._ensure_v2_whatsapp_pdf(dte)
             print(
-                f"[massive] WhatsApp v2 folio={folio} dte_id={getattr(dte, 'id', None)} "
-                f"pdf={'OK' if pdf_url else 'MISSING'}",
+                f"[massive] WhatsApp v2 folio={folio} tipo={dte_type_id} "
+                f"dte_id={getattr(dte, 'id', None)} pdf={'OK' if pdf_url else 'MISSING'}",
                 flush=True,
             )
             return whatsapp_class.send_v2_invoice(dte, dte.rut, pdf_url=pdf_url)
@@ -2237,10 +2237,15 @@ class DteClass:
                             if result.get("status") != "success":
                                 raise Exception(result.get("message") or "Error emitir boleta v2")
                             self.db.refresh(dte)
+                            whatsapp = result.get("whatsapp") or {}
                             whatsapp_response = self._resolve_massive_whatsapp(
                                 dte,
                                 whatsapp_class,
-                                {"whatsapp_sent": True, "whatsapp_result": result.get("whatsapp")},
+                                {
+                                    "whatsapp_sent": whatsapp.get("status") != "deferred",
+                                    "whatsapp_result": whatsapp,
+                                    "email": result.get("email"),
+                                },
                             )
                                 
                         elif dte.dte_type_id == 33:  # Factura electrónica (emisión v2)
@@ -2249,10 +2254,15 @@ class DteClass:
                             if result.get("status") != "success":
                                 raise Exception(result.get("message") or "Error emitir factura v2")
                             self.db.refresh(dte)
+                            whatsapp = result.get("whatsapp") or {}
                             whatsapp_response = self._resolve_massive_whatsapp(
                                 dte,
                                 whatsapp_class,
-                                {"whatsapp_sent": True, "whatsapp_result": result.get("whatsapp")},
+                                {
+                                    "whatsapp_sent": whatsapp.get("status") != "deferred",
+                                    "whatsapp_result": whatsapp,
+                                    "email": result.get("email"),
+                                },
                             )
                         else:
                             raise Exception(f"Tipo de DTE no soportado: {dte.dte_type_id}")
@@ -2624,6 +2634,7 @@ class DteClass:
                     "message": result.get("message", "Ticket generado exitosamente"),
                     "whatsapp_sent": not whatsapp_deferred,
                     "whatsapp_result": whatsapp,
+                    "email": result.get("email"),
                     "folio": result.get("folio"),
                 }
 
@@ -2644,6 +2655,7 @@ class DteClass:
                     "message": result.get("message", "Factura generada exitosamente"),
                     "whatsapp_sent": not whatsapp_deferred,
                     "whatsapp_result": whatsapp,
+                    "email": result.get("email"),
                     "folio": result.get("folio"),
                 }
             elif dte.dte_type_id == 61:  # Nota de crédito electrónica

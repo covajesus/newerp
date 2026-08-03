@@ -2297,7 +2297,7 @@ class CustomerBillClass:
             detail_lines, category_id
         )
 
-        issuer = ticket_v2_issuer(branch)
+        issuer = ticket_v2_issuer(branch, dte_type_id=33)
         receiver = {
             "RUTRecep": normalize_v2_rut(customer.get("rut")),
             "RznSocRecep": customer.get("customer") or customer["rut"],
@@ -2548,9 +2548,19 @@ class CustomerBillClass:
                 to_emails=recipient_email,
             )
 
-            print("Empieza envio de whatsapp v2 (payments)", flush=True)
-            whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte_row, form_data.rut)
-            print(f"[v2] whatsapp_result folio={dte_row.folio}: {whatsapp_result}", flush=True)
+            if getattr(form_data, "massive_emit", False):
+                print(
+                    f"[v2 factura] WhatsApp diferido (envío masivo) folio={dte_row.folio}",
+                    flush=True,
+                )
+                whatsapp_result = {
+                    "status": "deferred",
+                    "message": "WhatsApp se envía en la capa masiva",
+                }
+            else:
+                print("Empieza envio de whatsapp v2 (payments)", flush=True)
+                whatsapp_result = WhatsappClass(self.db).send_v2_invoice(dte_row, form_data.rut)
+                print(f"[v2] whatsapp_result folio={dte_row.folio}: {whatsapp_result}", flush=True)
 
             return {
                 "status": "success",
