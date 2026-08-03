@@ -70,7 +70,12 @@ def pre_accept(id:int, db: Session = Depends(get_db)):
 
 @customer_tickets.post("/generate_credit_note")
 def generate_credit_note(customer_credit_note_ticket_inputs:GenerateCustomerCreditNoteTicket, db: Session = Depends(get_db)):
-    data = CustomerTicketClass(db).store_credit_note(customer_credit_note_ticket_inputs)
+    """Mix: SimpleFactura si el original es v2; LibreDTE si es histórico."""
+    data = CustomerTicketClass(db).store_credit_note_smart(
+        customer_credit_note_ticket_inputs,
+        ref_dte_type=39,
+        negative_amounts=False,
+    )
 
     return {"message": data}
 
@@ -226,7 +231,8 @@ def generate_credit_note_v2(
     customer_credit_note_ticket_inputs: GenerateCustomerCreditNoteTicket,
     db: Session = Depends(get_db),
 ):
-    data = CustomerTicketClass(db).store_credit_note_v2(
+    """Mix: SimpleFactura si el original es v2; LibreDTE si es histórico."""
+    data = CustomerTicketClass(db).store_credit_note_smart(
         customer_credit_note_ticket_inputs,
         ref_dte_type=39,
         negative_amounts=False,

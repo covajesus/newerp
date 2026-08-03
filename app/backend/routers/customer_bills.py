@@ -231,5 +231,6 @@ def generate_credit_note_v2(
     customer_credit_note_bill_inputs: GenerateCustomerCreditNoteBill,
     db: Session = Depends(get_db),
 ):
-    data = CustomerBillClass(db).store_credit_note_v2(customer_credit_note_bill_inputs)
+    """Mix: SimpleFactura si el original es v2; LibreDTE si es histórico."""
+    data = CustomerBillClass(db).store_credit_note_smart(customer_credit_note_bill_inputs)
     return {"message": data}

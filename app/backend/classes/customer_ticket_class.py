@@ -158,10 +158,15 @@ def v2_dte_api_date(dt=None) -> str:
 
 
 def ticket_v2_issuer(branch):
+    """
+    Emisor para invoiceV2 (boleta 39 / factura 33) vía SimpleFactura.
+    Schema SII DTE: RznSoc y GiroEmis (no RznSocEmisor / GiroEmisor).
+    """
     issuer = {
         "RUTEmisor": "76063822-6",
-        "RznSocEmisor": "Jisparking SpA",
-        "GiroEmisor": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+        "RznSoc": "Jisparking SpA",
+        "GiroEmis": "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS  FARMACEUTICOS",
+        "Acteco": [522120],
         "DirOrigen": "Matucana 40",
         "CmnaOrigen": "Santiago",
     }
@@ -1056,6 +1061,8 @@ class CustomerTicketClass:
                     for r in item_rows
                 ]
 
+                dte_row = self.db.query(DteModel).filter(DteModel.id == id).first()
+                v2_emit = is_document_simplefactura_v2(self.db, dte_row)
                 customer_ticket_data = {
                     "id": data_query.id,
                     "rut": data_query.rut,
@@ -1075,6 +1082,8 @@ class CustomerTicketClass:
                     "branch_office": data_query.branch_office,
                     "category_id": data_query.category_id,
                     "items": items_payload,
+                    "v2_emit": v2_emit,
+                    "emission_channel": "SimpleFactura" if v2_emit else "LibreDTE",
                 }
 
                 result = {
@@ -1640,6 +1649,23 @@ class CustomerTicketClass:
                 return {"status": "error", "message": f"Error: {str(e)}"}
         else:
             return "Creditnote was not created"
+
+    def store_credit_note_smart(self, form_data, *, ref_dte_type=39, negative_amounts=False):
+        """
+        Mix NC: SimpleFactura si el original está en pool/Klap; LibreDTE si es histórico.
+        Igual criterio para boletas (39) y facturas (33).
+        """
+        dte = self.db.query(DteModel).filter(DteModel.id == form_data.id).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+        tid = int(getattr(dte, "dte_type_id", 0) or ref_dte_type or 39)
+        if is_document_simplefactura_v2(self.db, dte):
+            return self.store_credit_note_v2(
+                form_data,
+                ref_dte_type=tid if tid in (33, 39) else int(ref_dte_type),
+                negative_amounts=bool(negative_amounts) or tid == 33,
+            )
+        return self.store_credit_note(form_data)
         
     def pre_generate_ticket(self, customer_data, form_data):  # Added self as the first argument
         branch_office_data = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == form_data.branch_office_id).first()

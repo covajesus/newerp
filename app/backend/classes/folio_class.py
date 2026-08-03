@@ -790,6 +790,18 @@ class FolioClass:
         except (ValueError, requests.RequestException) as exc:
             return {"status": "error", "message": str(exc)}
 
+        tipo_nombre = {33: "factura", 39: "boleta", 61: "nota de crédito"}.get(
+            int(dte_type_id), f"DTE {dte_type_id}"
+        )
+        if not cafs:
+            return {
+                "status": "error",
+                "message": (
+                    f"SimpleFactura no tiene CAF de {tipo_nombre} (tipo {int(dte_type_id)}). "
+                    f"Ingresa el CAF en SimpleFactura y vuelve a previsualizar."
+                ),
+            }
+
         # Boletas: nunca asignar bajo el piso (CAFs viejos con consumo fantasma).
         floor = FOLIO_ALLOCATION_MIN_39 if int(dte_type_id) == 39 else 0
 

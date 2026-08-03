@@ -1407,7 +1407,8 @@ class CustomerBillClass:
                     .order_by(DteReferenceModel.id)
                     .all()
                 )
-                is_v2_bill = int(getattr(data_query, "dte_version_id", 0) or 0) == DTE_VERSION_V2
+                dte_row = self.db.query(DteModel).filter(DteModel.id == id).first()
+                v2_emit = is_document_simplefactura_v2(self.db, dte_row)
                 # Serializar los datos del empleado
                 customer_bill_data = {
                     "id": data_query.id,
@@ -1427,6 +1428,8 @@ class CustomerBillClass:
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
                     "branch_office": data_query.branch_office,
                     "category_id": data_query.category_id,
+                    "v2_emit": v2_emit,
+                    "emission_channel": "SimpleFactura" if v2_emit else "LibreDTE",
                     "references": [
                         _reference_line_canonical(
                             {
@@ -1436,7 +1439,7 @@ class CustomerBillClass:
                                 "reference_description": x.reference_description,
                             }
                         )
-                        if is_v2_bill
+                        if v2_emit
                         else {
                             "reference_type_id": x.reference_type_id,
                             "reference_date_id": x.reference_date_id,
@@ -2335,11 +2338,12 @@ class CustomerBillClass:
             document["Referencia"] = []
             for i, rd in enumerate(ref_lines):
                 doc_type, folio_ref, ref_date, ref_reason = _reference_line_v2_sii_fields(rd)
+                # SimpleFactura invoiceV2 tipa TpoDocRef/FolioRef como string.
                 document["Referencia"].append(
                     {
                         "NroLinRef": i + 1,
-                        "TpoDocRef": doc_type,
-                        "FolioRef": folio_ref,
+                        "TpoDocRef": str(doc_type),
+                        "FolioRef": str(folio_ref) if folio_ref is not None else "",
                         "FchRef": ref_date,
                         "RazonRef": ref_reason,
                     }
