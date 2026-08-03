@@ -121,13 +121,36 @@ class TransbankStatementClass:
 
     @staticmethod
     def _parse_amount(raw: str) -> int:
+        """
+        Convierte montos Transbank a entero CLP.
+        Formato nuevo: '150,00' / '2.350,00' (miles con punto, decimales con coma).
+        Legacy: '12345' o '12.345' (punto como miles, sin decimales).
+        """
         text = (raw or "").strip()
         if text in ("", "-", "None"):
             return 0
-        # "12.345" o "12345,00" → entero CLP
-        text = text.replace(".", "").replace(",", "")
+        negative = text.startswith("-")
+        text = text.lstrip("-").strip().replace(" ", "")
+        if not text:
+            return 0
         try:
-            return int(float(text))
+            if "," in text:
+                # Chileno: quitar puntos de miles; coma = decimal (p.ej. 2.350,00 → 2350)
+                int_part, _, dec_part = text.partition(",")
+                int_part = int_part.replace(".", "")
+                value = float(f"{int_part}.{dec_part}") if dec_part else float(int_part)
+            elif "." in text:
+                parts = text.split(".")
+                # Un solo punto y 1–2 decimales → decimal estilo US (89500.00)
+                if len(parts) == 2 and 1 <= len(parts[1]) <= 2 and parts[0].isdigit() and parts[1].isdigit():
+                    value = float(text)
+                else:
+                    # Puntos como separador de miles (12.345 o 1.234.567)
+                    value = float(text.replace(".", ""))
+            else:
+                value = float(text)
+            amount = int(round(value))
+            return -amount if negative else amount
         except (TypeError, ValueError):
             return 0
 
