@@ -14,6 +14,62 @@ class TransbankStatementClass:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _decode_transbank_bytes(raw: bytes) -> str:
+        """Decodifica .dat Transbank (UTF-8 con BOM o latin1)."""
+        if not raw:
+            return ""
+        for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin1"):
+            try:
+                return raw.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return raw.decode("latin1", errors="replace")
+
+    @staticmethod
+    def _normalize_header_line(line: str) -> str:
+        return (line or "").replace("\ufeff", "").strip().strip('"').strip("'")
+
+    @classmethod
+    def _is_transbank_header_line(cls, line: str) -> bool:
+        """
+        True si la fila parece el encabezado de detalle Transbank.
+        Acepta BOM, comillas y variantes ('Fecha Venta' / 'Fecha de Venta').
+        """
+        normalized = cls._normalize_header_line(line)
+        if not normalized:
+            return False
+        lower = normalized.lower()
+        has_fecha = ("fecha venta" in lower) or ("fecha de venta" in lower)
+        # Debe verse como fila CSV con ';' (no un título suelto).
+        return has_fecha and (";" in normalized)
+
+    @classmethod
+    def _find_transbank_header_index(cls, lines) -> int | None:
+        for i, line in enumerate(lines):
+            if cls._is_transbank_header_line(line):
+                return i
+        # Fallback: alguna línea contiene 'Fecha Venta' aunque no tenga ';'.
+        for i, line in enumerate(lines):
+            lower = cls._normalize_header_line(line).lower()
+            if "fecha venta" in lower or "fecha de venta" in lower:
+                return i
+        return None
+
+    @staticmethod
+    def _transbank_file_preview(lines, max_lines: int = 8) -> str:
+        preview_lines = []
+        for line in lines:
+            text = (line or "").replace("\ufeff", "").strip()
+            if not text:
+                continue
+            preview_lines.append(text[:160])
+            if len(preview_lines) >= max_lines:
+                break
+        if not preview_lines:
+            return "(archivo vacío)"
+        return " | ".join(preview_lines)
+
     def get_all(self, page=1, items_per_page=10):
         try:
             if page != 0:
@@ -160,30 +216,54 @@ class TransbankStatementClass:
                 # Leer el archivo directamente del filesystem usando FileClass
                 file_class = FileClass(self.db)
                 file_content = file_class.download(remote_path)
-                content = file_content.decode('latin1')
+                content = self._decode_transbank_bytes(file_content)
             else:
                 # Si es una URL externa, usar requests
                 response = requests.get(file_url)
                 response.raise_for_status()
-                content = response.content.decode('latin1')
+                content = self._decode_transbank_bytes(response.content)
             
             lines = content.splitlines()
             
             if progress_callback:
                 progress_callback(25, "Analizando estructura del archivo...")
                 
-            start_index = None
-            for i, line in enumerate(lines):
-                if line.startswith("Fecha Venta"):
-                    start_index = i
-                    break
+            start_index = self._find_transbank_header_index(lines)
 
             if start_index is None:
-                raise HTTPException(status_code=400, detail="El archivo .dat no contiene encabezado de datos.")
+                preview = self._transbank_file_preview(lines)
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "El archivo .dat no contiene encabezado de datos. "
+                        "Se espera una fila que incluya 'Fecha Venta' (separada por ';'). "
+                        f"Vista previa: {preview}"
+                    ),
+                )
 
             data_lines = "\n".join(lines[start_index:])
-            df = pd.read_csv(StringIO(data_lines), delimiter=";", dtype=str, index_col=False)
+            df = pd.read_csv(
+                StringIO(data_lines),
+                delimiter=";",
+                dtype=str,
+                index_col=False,
+                quotechar='"',
+            )
             df = df.fillna("")
+            # Normalizar nombres de columnas (BOM, espacios, comillas).
+            df.columns = [
+                str(col).replace("\ufeff", "").strip().strip('"').strip("'")
+                for col in df.columns
+            ]
+
+            if "Fecha Venta" not in df.columns:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Se encontró una fila de encabezado, pero no la columna 'Fecha Venta'. "
+                        f"Columnas leídas: {list(df.columns)[:12]}"
+                    ),
+                )
             
             total_rows = len(df)
             if progress_callback:
@@ -208,7 +288,7 @@ class TransbankStatementClass:
                     progress_callback(progress_percent, f"⚡ Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
                 
                 # Ahora las columnas están correctamente mapeadas
-                local_id = row.get("Local", "")  # ID del local
+                local_id = str(row.get("Local", "") or "").strip()  # ID del local
                 
                 # Usar cache para branch offices
                 if local_id not in branch_office_cache:
@@ -221,7 +301,7 @@ class TransbankStatementClass:
 
                 if branch_office_transbank_statement:
                     # La fecha está en la columna "Fecha Venta"
-                    raw_date = row.get("Fecha Venta", "").strip().lstrip("*")
+                    raw_date = str(row.get("Fecha Venta", "") or "").strip().lstrip("*")
 
                     # Try parsing the date with possible formats
                     parsed_date = None
