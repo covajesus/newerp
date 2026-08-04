@@ -1153,14 +1153,20 @@ def massive_resend_whatsapp_pending(
     period: str | None = None,
     all_periods: int = 0,
     force: int = 0,
+    dte_type_id: int | None = None,
     db: Session = Depends(get_db),
 ):
-    """Lista DTEs status 4 pendientes de reenvío masivo (sin enviar WhatsApp)."""
-    return DteClass(db).massive_resend_whatsapp_pending(
-        period=period,
-        all_periods=bool(all_periods),
-        force=bool(force),
-    )
+    """Lista DTEs status 4 pendientes de reenvío masivo (sin enviar WhatsApp).
+    dte_type_id=33 solo facturas, 39 solo boletas; omitir = ambos."""
+    try:
+        return DteClass(db).massive_resend_whatsapp_pending(
+            period=period,
+            all_periods=bool(all_periods),
+            force=bool(force),
+            dte_type_id=dte_type_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @dtes.get("/massive_resend_whatsapp/send/{dte_id}")
@@ -1177,20 +1183,22 @@ def massive_resend_whatsapp(
     period: str | None = None,
     all_periods: int = 0,
     force: int = 0,
+    dte_type_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     """
-    Reenvío masivo WhatsApp — DTEs status_id=4 (facturas 33 + boletas 39).
+    Reenvío masivo WhatsApp + correo — DTEs status_id=4 (facturas 33 y/ o boletas 39).
 
     Query params:
       period=2026-07     Mes a procesar (default: mes actual)
       all_periods=1      Todos los periodos con status 4
       force=1            Reenviar aunque massive_resend_status_id=1
+      dte_type_id=33     Solo facturas (39 = solo boletas)
 
     Ejemplos:
-      GET /api/dtes/massive_resend_whatsapp
-      GET /api/dtes/massive_resend_whatsapp?period=2026-07
-      GET /api/dtes/massive_resend_whatsapp?all_periods=1&force=1
+      GET /api/dtes/massive_resend_whatsapp?dte_type_id=33
+      GET /api/dtes/massive_resend_whatsapp?period=2026-07&dte_type_id=33
+      GET /api/dtes/massive_resend_whatsapp?all_periods=1&force=1&dte_type_id=33
     """
     try:
         dte_class = DteClass(db)
@@ -1198,7 +1206,10 @@ def massive_resend_whatsapp(
             period=period,
             all_periods=bool(all_periods),
             force=bool(force),
+            dte_type_id=dte_type_id,
         )
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reenvío masivo de WhatsApp: {str(e)}")
