@@ -2012,7 +2012,7 @@ class CustomerTicketClass:
         if not dte or not dte.folio:
             return None
 
-        if _is_simplefactura_v2_dte(self.db, dte):
+        if is_document_simplefactura_v2(self.db, dte):
             pdf_result = self.save_simplefactura_pdf_ticket(
                 dte.folio,
                 dte_type_id=int(dte.dte_type_id or 39),

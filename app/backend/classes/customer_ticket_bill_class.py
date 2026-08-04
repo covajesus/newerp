@@ -1145,8 +1145,8 @@ class CustomerTicketBillClass:
         if not dte or not dte.folio:
             return None
 
-        # Boletas SimpleFactura v2 (invoiceV2) — getPdf, no LibreDTE
-        if int(dte.dte_type_id or 0) == 39 and _is_simplefactura_v2_dte(self.db, dte):
+        # Boletas/facturas SimpleFactura v2 — getPdf (mismo flujo que boletas)
+        if is_document_simplefactura_v2(self.db, dte):
             return CustomerTicketClass(self.db).download(id)
 
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
