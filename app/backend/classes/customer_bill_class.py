@@ -2338,7 +2338,11 @@ class CustomerBillClass:
             "Folio": int(folio),
             # SimpleFactura tipa FmaPago como enum numérico: 1 Contado, 2 Crédito
             "FmaPago": payment_term_id,
+            # "Condiciones Vta." del PDF; sin glosa el SII/SimpleFactura imprime "No Aplica"
+            "TermPagoGlosa": "Crédito 30 días" if payment_term_id == 2 else "Contado",
         }
+        if payment_term_id == 2:
+            id_doc["TermPagoDias"] = 30
         if int(category_id or 1) == 1:
             id_doc["MntBruto"] = 1
 
