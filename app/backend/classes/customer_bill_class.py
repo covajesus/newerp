@@ -2336,8 +2336,8 @@ class CustomerBillClass:
             "FchEmis": issue_date,
             "FchVenc": due_date,
             "Folio": int(folio),
-            # SII FmaPago: 1 Contado, 2 Crédito (mismo estilo string que NC LibreDTE)
-            "FmaPago": str(payment_term_id),
+            # SimpleFactura tipa FmaPago como enum numérico: 1 Contado, 2 Crédito
+            "FmaPago": payment_term_id,
         }
         if int(category_id or 1) == 1:
             id_doc["MntBruto"] = 1
@@ -2354,8 +2354,6 @@ class CustomerBillClass:
                 },
             },
             "Detalle": formatted_lines,
-            # SimpleFactura SDK también acepta TipoPago en raíz del documento
-            "TipoPago": "CREDITO" if payment_term_id == 2 else "CONTADO",
         }
 
         ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
