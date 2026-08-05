@@ -57,6 +57,9 @@ class FormDataSimulator:
             # Orden de compra (factura 33): pre_generate_bill necesita los mismos datos que store/generate
             self.category_id = getattr(dte, "category_id", None)
             self.quantity = getattr(dte, "quantity", None)
+        self.payment_term_id = int(getattr(dte, "payment_term_id", None) or 1)
+        if self.payment_term_id not in (1, 2):
+            self.payment_term_id = 1
 
 class CreditNoteFormDataSimulator:
     def __init__(self, dte_id, reason_id=1):
@@ -1845,6 +1848,7 @@ class DteClass:
                     total=total,
                     period=current_period,
                     category_id=target_category,
+                    payment_term_id=int(getattr(dte_datum, "payment_term_id", None) or 1),
                     quantity=pxq_quantity if uses_pxq else None,
                     added_date=added_date,
                 )

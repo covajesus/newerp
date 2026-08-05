@@ -27,6 +27,18 @@ from datetime import timedelta
 from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
 
 
+def _bill_payment_term_id(form_data=None, dte_row=None) -> int:
+    """SII FmaPago: 1 Contado, 2 Crédito. Default Contado."""
+    raw = getattr(form_data, "payment_term_id", None) if form_data is not None else None
+    if raw is None and dte_row is not None:
+        raw = getattr(dte_row, "payment_term_id", None)
+    try:
+        tid = int(raw if raw is not None else 1)
+    except (TypeError, ValueError):
+        tid = 1
+    return tid if tid in (1, 2) else 1
+
+
 def _bill_total_from_form(form_data, dte_row=None):
     """Amount for draft lookup / emit. Cat 2: net; cat 3 group: gross; cat 1: gross (± chip)."""
     cid = getattr(form_data, "category_id", None)
@@ -1169,6 +1181,7 @@ class CustomerBillClass:
         dte.rut = form_data.rut
         items = self._normalize_bill_items(getattr(form_data, "items", []))
         _apply_bill_draft_amounts(dte, form_data, pxq_items=items if items else None)
+        dte.payment_term_id = _bill_payment_term_id(form_data, dte)
         dte.status_id = 2
         qty = getattr(form_data, "quantity", None)
         dte.quantity = int(qty) if qty is not None else None
@@ -1395,6 +1408,7 @@ class CustomerBillClass:
                 DteModel.added_date,
                 BranchOfficeModel.branch_office,
                 DteModel.category_id,
+                DteModel.payment_term_id,
                 DteModel.dte_version_id,
             ).outerjoin(BranchOfficeModel, BranchOfficeModel.id == DteModel.branch_office_id).outerjoin(
                 CustomerModel, CustomerModel.rut == DteModel.rut
@@ -1428,6 +1442,7 @@ class CustomerBillClass:
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
                     "branch_office": data_query.branch_office,
                     "category_id": data_query.category_id,
+                    "payment_term_id": int(getattr(data_query, "payment_term_id", None) or 1),
                     "v2_emit": v2_emit,
                     "emission_channel": "SimpleFactura" if v2_emit else "LibreDTE",
                     "references": [
@@ -1628,6 +1643,7 @@ class CustomerBillClass:
             dte.folio = 0
             dte.card_amount = 0
             _apply_bill_draft_amounts(dte, form_data, pxq_items=items if items else None)
+            dte.payment_term_id = _bill_payment_term_id(form_data)
             dte.period = period
             dte.added_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -2292,7 +2308,12 @@ class CustomerBillClass:
         dte_row=None,
     ):
         issue_date = v2_dte_api_date()
-        due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
+        payment_term_id = _bill_payment_term_id(form_data, dte_row)
+        # Contado: vencimiento = emisión; Crédito: +30 días
+        if payment_term_id == 2:
+            due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
+        else:
+            due_date = issue_date
         formatted_lines, net_amount, tax_amount, total_amount = self._v2_format_bill_detail_lines(
             detail_lines, category_id
         )
@@ -2315,6 +2336,8 @@ class CustomerBillClass:
             "FchEmis": issue_date,
             "FchVenc": due_date,
             "Folio": int(folio),
+            # SII FmaPago: 1 Contado, 2 Crédito (mismo estilo string que NC LibreDTE)
+            "FmaPago": str(payment_term_id),
         }
         if int(category_id or 1) == 1:
             id_doc["MntBruto"] = 1
@@ -2331,6 +2354,8 @@ class CustomerBillClass:
                 },
             },
             "Detalle": formatted_lines,
+            # SimpleFactura SDK también acepta TipoPago en raíz del documento
+            "TipoPago": "CREDITO" if payment_term_id == 2 else "CONTADO",
         }
 
         ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
@@ -2519,9 +2544,11 @@ class CustomerBillClass:
                 chip = 0
             dte_row.chip_id = chip
             dte_row.category_id = cid
+            dte_row.payment_term_id = _bill_payment_term_id(form_data, dte_row)
             _set_dte_gross_totals(dte_row, mnt_total)
         else:
             _sync_bill_dte_amounts_from_form(dte_row, form_data, pxq_items=items if items else None)
+            dte_row.payment_term_id = _bill_payment_term_id(form_data, dte_row)
         if items:
             dte_row.quantity = sum(i["quantity"] for i in items)
             self._replace_bill_items(dte_row.id, items)

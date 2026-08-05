@@ -479,6 +479,8 @@ class DteModel(Base):
     status_id = Column(Integer)
     expense_type_id = Column(Integer)
     payment_type_id = Column(Integer)
+    # SII FmaPago: 1 Contado, 2 Crédito (no confundir con payment_type_id / medio de pago)
+    payment_term_id = Column(Integer, default=1)
     reason_id = Column(Integer)
     payment_date = Column(String)
     rut = Column(String)
