@@ -46,6 +46,43 @@ def sanitize_gateway_person_name(value: str | None, fallback: str) -> str:
     folded = _ascii_fold(str(value or "")).strip()
     cleaned = re.sub(r"[^A-Za-z0-9 .'\-]", "", folded).strip()
     return cleaned or fallback
+
+
+def sanitize_gateway_phone(phone: str | None) -> str | None:
+    """
+    Normalize Chilean phone for Klap/Multicaja (digits only, country code 56).
+
+    Accepts common local forms: 912345678, +56912345678, 56 9 1234 5678, 0912345678.
+    Returns None when the value is empty/placeholder/invalid so the field is omitted.
+    """
+    raw = str(phone or "").strip()
+    if not raw:
+        return None
+    lowered = raw.lower()
+    if lowered in {"0", "00", "-", "n/a", "na", "none", "null", "sin telefono", "sin teléfono", "s/t"}:
+        return None
+
+    digits = re.sub(r"\D+", "", raw)
+    if not digits:
+        return None
+    # Drop leading trunk 0 (e.g. 0912345678 → 912345678)
+    if digits.startswith("0") and not digits.startswith("56"):
+        digits = digits.lstrip("0")
+    if not digits:
+        return None
+
+    if digits.startswith("56"):
+        national = digits[2:]
+    else:
+        national = digits
+        digits = "56" + national
+
+    # Chile mobile: 9 + 8 digits → 569XXXXXXXX (11 digits total)
+    if len(digits) == 11 and digits.startswith("569") and national.isdigit():
+        return digits
+    return None
+
+
 _UNIQUE_ONLY_METHODS = frozenset({"*", "tarjetas_api"})
 _DEFAULT_METHOD_EXPIRATION_METHODS = ("tarjetas", "sodexo", "edenred")
 _RETRY_ORDER_STATUSES = frozenset(
@@ -293,9 +330,15 @@ class PaymentGatewayClass:
         rut = getattr(customer, "rut", None)
         if rut and str(rut).strip():
             user["rut"] = str(rut).strip()
-        phone = getattr(customer, "phone", None)
-        if phone and str(phone).strip():
-            user["phone"] = str(phone).strip().lstrip("+")
+        phone = sanitize_gateway_phone(getattr(customer, "phone", None))
+        if phone:
+            user["phone"] = phone
+        elif getattr(customer, "phone", None):
+            print(
+                f"[payments] omit phone for folio={document_folio}: "
+                f"invalid gateway phone {getattr(customer, 'phone', None)!r}",
+                flush=True,
+            )
         customer_name = getattr(customer, "customer", None)
         if customer_name and str(customer_name).strip():
             parts = str(customer_name).strip().split(None, 1)
@@ -343,6 +386,17 @@ class PaymentGatewayClass:
                     flush=True,
                 )
                 user.pop("email", None)
+                payload["user"] = user
+                result = self._create_order_safe(payload)
+        if result.get("status") != "success" and "phone" in user:
+            msg = str(result.get("message", "")).lower()
+            if "phone" in msg and ("invalid" in msg or "conflicts" in msg):
+                print(
+                    f"[payments] retry folio={document_folio} without phone "
+                    f"after: {result.get('message')}",
+                    flush=True,
+                )
+                user.pop("phone", None)
                 payload["user"] = user
                 result = self._create_order_safe(payload)
         return result
