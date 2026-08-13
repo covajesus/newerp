@@ -116,8 +116,25 @@ class UserClass:
         
     def get_supervisors(self):
         try:
-            data = self.db.query(UserModel).order_by(UserModel.nickname).filter(UserModel.rol_id == 3).all()
-            return data
+            # Supervisores de sucursal: rol 4 (principal_supervisor). No existe nickname en users.
+            rows = (
+                self.db.query(UserModel)
+                .filter(UserModel.rol_id == 4)
+                .order_by(UserModel.full_name)
+                .all()
+            )
+            return [
+                {
+                    "id": row.id,
+                    "rut": row.rut,
+                    "full_name": row.full_name,
+                    # Alias para selects del frontend que aún usan item-title="nickname"
+                    "nickname": row.full_name,
+                    "rol_id": row.rol_id,
+                    "branch_office_id": row.branch_office_id,
+                }
+                for row in rows
+            ]
         except Exception as e:
             error_message = str(e)
             return f"Error: {error_message}"  
