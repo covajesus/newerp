@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.classes.file_class import FileClass
@@ -10,6 +11,8 @@ from fastapi import UploadFile, File, HTTPException
 from datetime import datetime
 import uuid
 import json
+import os
+import mimetypes
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.schemas import UserLogin
 import pymysql
@@ -205,6 +208,34 @@ def payment_support(id: int, db: Session = Depends(get_db)):
     file = FileClass(db).get(remote_path)
 
     return {"message": file}
+
+
+@capitulations.get("/payment_support/{id}/download")
+def payment_support_download(id: int, db: Session = Depends(get_db)):
+    """Descarga forzada del comprobante de pago (imagen/PDF)."""
+    capitulation = CapitulationClass(db).get(id)
+    if not isinstance(capitulation, str):
+        raise HTTPException(status_code=500, detail="Respuesta inválida al obtener capitulación")
+    if capitulation.startswith("Error:"):
+        raise HTTPException(status_code=500, detail=capitulation)
+
+    capitulation_data = json.loads(capitulation)
+    remote_path = capitulation_data["capitulation_data"].get("payment_support")
+    if not remote_path:
+        raise HTTPException(status_code=404, detail="Comprobante de pago no encontrado")
+
+    content = FileClass(db).download(remote_path)
+    filename = os.path.basename(str(remote_path)) or f"comprobante_pago_{id}"
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 @capitulations.get("/report/paid_summary")
 def report_paid_summary(

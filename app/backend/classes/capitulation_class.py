@@ -1173,17 +1173,30 @@ class CapitulationClass:
 
     @staticmethod
     def _payment_month_filter(year: int, month: int):
-        """Filtro flexible sobre payment_date (YYYY-MM-DD o DD-MM-YYYY / DD/MM/YYYY)."""
+        """
+        Filtra estrictamente por mes/año de payment_date (fecha de pago),
+        no por document_date / added_date / period (fecha de carga o imputación).
+        Soporta YYYY-MM-DD, DD-MM-YYYY y DD/MM/YYYY.
+        """
         y = int(year)
         m = int(month)
         ym = f"{y:04d}-{m:02d}"
-        dmy_slash = f"%/{m:02d}/{y:04d}"
-        dmy_dash = f"%-{m:02d}-{y:04d}"
-        return or_(
-            CapitulationModel.payment_date.like(f"{ym}%"),
-            CapitulationModel.payment_date.like(dmy_slash),
-            CapitulationModel.payment_date.like(dmy_dash),
+        y_str = f"{y:04d}"
+        m_str = f"{m:02d}"
+
+        # Formato principal en BD: YYYY-MM-DD (ej. 2026-08-05)
+        ymd_prefix = CapitulationModel.payment_date.like(f"{ym}-%")
+        ymd_exact_month = and_(
+            func.substr(CapitulationModel.payment_date, 1, 4) == y_str,
+            func.substr(CapitulationModel.payment_date, 6, 2) == m_str,
+            func.substr(CapitulationModel.payment_date, 5, 1) == "-",
         )
+
+        # Alternativos: DD-MM-YYYY / DD/MM/YYYY
+        dmy_slash = CapitulationModel.payment_date.like(f"%/{m_str}/{y_str}")
+        dmy_dash = CapitulationModel.payment_date.like(f"%-{m_str}-{y_str}")
+
+        return or_(ymd_prefix, ymd_exact_month, dmy_slash, dmy_dash)
 
     def report_paid_summary(self, supervisor_rut: str, year: int, month: int):
         """
