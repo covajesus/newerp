@@ -1,0 +1,16 @@
+from dotenv import load_dotenv
+import os, pymysql
+load_dotenv()
+c2=pymysql.connect(host=os.getenv('DB2_HOST'),port=int(os.getenv('DB2_PORT','3307')),user=os.getenv('DB2_USER'),password=os.getenv('DB2_PASSWORD'),database=os.getenv('DB2_NAME','jisparking'),connect_timeout=20)
+cur=c2.cursor()
+cur.execute("SELECT folio_segment_id, requested_status_id, COUNT(*) AS c FROM folios WHERE requested_status_id='0' GROUP BY folio_segment_id, requested_status_id")
+print('DB2 free:')
+for r in cur.fetchall(): print(r)
+cur.execute("SELECT COUNT(*) AS c FROM folios")
+print('DB2 total:', cur.fetchone()[0])
+c2.close()
+c1=pymysql.connect(host=os.getenv('DB_HOST','127.0.0.1'),port=int(os.getenv('DB_PORT','3309')),user=os.getenv('DB_USER'),password=os.getenv('DB_PASSWORD'),database=os.getenv('DB_NAME','jisparking'),connect_timeout=20)
+cur=c1.cursor()
+cur.execute("SELECT COUNT(*) AS c FROM folios WHERE used_id=0 AND document_type_id=39")
+print('DB1 unused 39:', cur.fetchone()[0])
+c1.close()

@@ -2331,20 +2331,23 @@ class CustomerBillClass:
             receiver["CmnaRecep"] = customer["commune"]
         # No CorreoRecep/Contacto en invoiceV2 (correo solo vía DteSubscriberEmailClass).
 
+        # Orden estricto schema SII IdDoc (SimpleFactura valida secuencia XSD):
+        # TipoDTE → Folio → FchEmis → … → MntBruto → FmaPago →
+        # TermPagoCdg → TermPagoGlosa → TermPagoDias → FchVenc
+        # (TermPagoGlosa antes de FchVenc / fuera de orden → HTTP 400 TipoFactEsp).
         id_doc: dict = {
             "TipoDTE": 33,
-            "FchEmis": issue_date,
-            "FchVenc": due_date,
             "Folio": int(folio),
-            # SimpleFactura tipa FmaPago como enum numérico: 1 Contado, 2 Crédito
-            "FmaPago": payment_term_id,
-            # "Condiciones Vta." del PDF; sin glosa el SII/SimpleFactura imprime "No Aplica"
-            "TermPagoGlosa": "Crédito 30 días" if payment_term_id == 2 else "Contado",
+            "FchEmis": issue_date,
         }
-        if payment_term_id == 2:
-            id_doc["TermPagoDias"] = 30
         if int(category_id or 1) == 1:
             id_doc["MntBruto"] = 1
+        id_doc["FmaPago"] = payment_term_id
+        if payment_term_id == 2:
+            id_doc["TermPagoCdg"] = 1
+            id_doc["TermPagoGlosa"] = "Credito 30 dias"
+            id_doc["TermPagoDias"] = 30
+        id_doc["FchVenc"] = due_date
 
         document: dict = {
             "Encabezado": {
