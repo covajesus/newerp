@@ -1235,13 +1235,15 @@ class CapitulationClass:
         supervisor_rut: str,
         year: int,
         month: int,
+        date_type: str = "payment",
         document_year: int = None,
         document_month: int = None,
     ):
         """
-        Informe: pagos de rendiciones por supervisor y mes/año de payment_date.
-        Opcional: filtrar también por mes/año de document_date.
-        Agrupa por beneficiario + fecha pago + nº pago.
+        Informe: pagos de rendiciones por supervisor.
+        date_type:
+          - payment: filtra por mes/año de payment_date
+          - document: filtra por mes/año de document_date
         """
         try:
             if not supervisor_rut or not year or not month:
@@ -1249,18 +1251,30 @@ class CapitulationClass:
             if month < 1 or month > 12:
                 return {"status": "error", "message": "month inválido"}
 
+            date_type = (date_type or "payment").strip().lower()
+            if date_type not in ("payment", "document"):
+                return {"status": "error", "message": "date_type debe ser payment o document"}
+
+            # Compatibilidad con params antiguos document_year/document_month
+            if document_year and document_month:
+                date_type = "document"
+                year = int(document_year)
+                month = int(document_month)
+
             filters = [
                 BranchOfficeModel.principal_supervisor == supervisor_rut,
                 CapitulationModel.status_id.in_([5, 13]),
                 CapitulationModel.payment_date.isnot(None),
                 CapitulationModel.payment_date != "",
-                self._payment_month_filter(year, month),
             ]
 
-            if document_year and document_month:
-                doc_filter = self._document_month_filter(int(document_year), int(document_month))
-                if doc_filter is not None:
-                    filters.append(doc_filter)
+            if date_type == "document":
+                doc_filter = self._document_month_filter(int(year), int(month))
+                if doc_filter is None:
+                    return {"status": "error", "message": "month inválido"}
+                filters.append(doc_filter)
+            else:
+                filters.append(self._payment_month_filter(year, month))
 
             rows = (
                 self.db.query(
@@ -1306,6 +1320,7 @@ class CapitulationClass:
                 "data": data,
                 "total_amount": sum(item["total"] for item in data),
                 "total_payments": len(data),
+                "date_type": date_type,
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
@@ -1318,6 +1333,7 @@ class CapitulationClass:
         user_rut: str,
         payment_date: str,
         payment_number: str = "",
+        date_type: str = "payment",
         document_year: int = None,
         document_month: int = None,
     ):
@@ -1328,6 +1344,12 @@ class CapitulationClass:
                     "status": "error",
                     "message": "supervisor_rut, year, month, user_rut y payment_date son obligatorios",
                 }
+
+            date_type = (date_type or "payment").strip().lower()
+            if document_year and document_month:
+                date_type = "document"
+                year = int(document_year)
+                month = int(document_month)
 
             payment_number = payment_number or ""
             number_filter = (
@@ -1352,12 +1374,14 @@ class CapitulationClass:
                 CapitulationModel.user_rut == user_rut,
                 CapitulationModel.payment_date == payment_date,
                 number_filter,
-                self._payment_month_filter(year, month),
             ]
-            if document_year and document_month:
-                doc_filter = self._document_month_filter(int(document_year), int(document_month))
+
+            if date_type == "document":
+                doc_filter = self._document_month_filter(int(year), int(month))
                 if doc_filter is not None:
                     filters.append(doc_filter)
+            else:
+                filters.append(self._payment_month_filter(year, month))
 
             rows = (
                 self.db.query(

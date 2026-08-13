@@ -242,16 +242,18 @@ def report_paid_summary(
     supervisor_rut: str,
     year: int,
     month: int,
+    date_type: str = "payment",
     document_year: int = None,
     document_month: int = None,
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Informe: resumen de pagos por supervisor, mes/año de pago y opcional mes/año documento."""
+    """Informe: resumen de pagos. date_type=payment|document define qué fecha filtra mes/año."""
     data = CapitulationClass(db).report_paid_summary(
         supervisor_rut,
         year,
         month,
+        date_type=date_type,
         document_year=document_year,
         document_month=document_month,
     )
@@ -268,6 +270,7 @@ def report_paid_detail(
     user_rut: str,
     payment_date: str,
     payment_number: str = "",
+    date_type: str = "payment",
     document_year: int = None,
     document_month: int = None,
     session_user: UserLogin = Depends(get_current_active_user),
@@ -281,6 +284,7 @@ def report_paid_detail(
         user_rut=user_rut,
         payment_date=payment_date,
         payment_number=payment_number or "",
+        date_type=date_type,
         document_year=document_year,
         document_month=document_month,
     )
