@@ -206,6 +206,46 @@ def payment_support(id: int, db: Session = Depends(get_db)):
 
     return {"message": file}
 
+@capitulations.get("/report/paid_summary")
+def report_paid_summary(
+    supervisor_rut: str,
+    year: int,
+    month: int,
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Informe: resumen de pagos de rendiciones por supervisor y mes/año."""
+    data = CapitulationClass(db).report_paid_summary(supervisor_rut, year, month)
+    if isinstance(data, dict) and data.get("status") == "error":
+        raise HTTPException(status_code=400, detail=data.get("message") or "Error en informe")
+    return {"message": data}
+
+
+@capitulations.get("/report/paid_detail")
+def report_paid_detail(
+    supervisor_rut: str,
+    year: int,
+    month: int,
+    user_rut: str,
+    payment_date: str,
+    payment_number: str = "",
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Informe: detalle de un lote de pago de rendiciones."""
+    data = CapitulationClass(db).report_paid_detail(
+        supervisor_rut=supervisor_rut,
+        year=year,
+        month=month,
+        user_rut=user_rut,
+        payment_date=payment_date,
+        payment_number=payment_number or "",
+    )
+    if isinstance(data, dict) and data.get("status") == "error":
+        raise HTTPException(status_code=400, detail=data.get("message") or "Error en informe")
+    return {"message": data}
+
+
 @capitulations.get("/total_accepted_capitulations")
 def total_accepted_capitulations(rut: str = None, db: Session = Depends(get_db)):
     capitulations = CapitulationClass(db).total_accepted_capitulations(rut=rut)

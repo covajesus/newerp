@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import requests
 import json
-from sqlalchemy import cast, String, case, or_
+from sqlalchemy import cast, String, case, or_, func, and_
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -1170,3 +1170,193 @@ class CapitulationClass:
             "total_found": len(capitulations),
             "errors": errors
         }
+
+    @staticmethod
+    def _payment_month_filter(year: int, month: int):
+        """Filtro flexible sobre payment_date (YYYY-MM-DD o DD-MM-YYYY / DD/MM/YYYY)."""
+        y = int(year)
+        m = int(month)
+        ym = f"{y:04d}-{m:02d}"
+        dmy_slash = f"%/{m:02d}/{y:04d}"
+        dmy_dash = f"%-{m:02d}-{y:04d}"
+        return or_(
+            CapitulationModel.payment_date.like(f"{ym}%"),
+            CapitulationModel.payment_date.like(dmy_slash),
+            CapitulationModel.payment_date.like(dmy_dash),
+        )
+
+    def report_paid_summary(self, supervisor_rut: str, year: int, month: int):
+        """
+        Informe: pagos de rendiciones por supervisor (sucursales) y mes/año de payment_date.
+        Agrupa por beneficiario + fecha pago + nº pago.
+        """
+        try:
+            if not supervisor_rut or not year or not month:
+                return {"status": "error", "message": "supervisor_rut, year y month son obligatorios"}
+            if month < 1 or month > 12:
+                return {"status": "error", "message": "month inválido"}
+
+            rows = (
+                self.db.query(
+                    CapitulationModel.user_rut,
+                    UserModel.full_name,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                    func.sum(CapitulationModel.amount).label("total"),
+                    func.count(CapitulationModel.id).label("items_count"),
+                )
+                .outerjoin(
+                    BranchOfficeModel,
+                    BranchOfficeModel.id == CapitulationModel.branch_office_id,
+                )
+                .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
+                .filter(
+                    BranchOfficeModel.principal_supervisor == supervisor_rut,
+                    CapitulationModel.status_id.in_([5, 13]),
+                    CapitulationModel.payment_date.isnot(None),
+                    CapitulationModel.payment_date != "",
+                    self._payment_month_filter(year, month),
+                )
+                .group_by(
+                    CapitulationModel.user_rut,
+                    UserModel.full_name,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                )
+                .order_by(
+                    CapitulationModel.payment_date.desc(),
+                    UserModel.full_name.asc(),
+                )
+                .all()
+            )
+
+            data = [
+                {
+                    "user_rut": row.user_rut,
+                    "full_name": row.full_name or row.user_rut or "",
+                    "payment_date": row.payment_date,
+                    "payment_number": row.payment_number or "",
+                    "total": int(row.total or 0),
+                    "items_count": int(row.items_count or 0),
+                }
+                for row in rows
+            ]
+            return {
+                "status": "success",
+                "data": data,
+                "total_amount": sum(item["total"] for item in data),
+                "total_payments": len(data),
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def report_paid_detail(
+        self,
+        supervisor_rut: str,
+        year: int,
+        month: int,
+        user_rut: str,
+        payment_date: str,
+        payment_number: str = "",
+    ):
+        """Detalle de un lote de pago del informe de rendiciones."""
+        try:
+            if not supervisor_rut or not year or not month or not user_rut or not payment_date:
+                return {
+                    "status": "error",
+                    "message": "supervisor_rut, year, month, user_rut y payment_date son obligatorios",
+                }
+
+            payment_number = payment_number or ""
+            number_filter = (
+                or_(
+                    CapitulationModel.payment_number == payment_number,
+                    and_(
+                        CapitulationModel.payment_number.is_(None),
+                        payment_number == "",
+                    ),
+                    and_(
+                        CapitulationModel.payment_number == "",
+                        payment_number == "",
+                    ),
+                )
+                if payment_number == ""
+                else (CapitulationModel.payment_number == payment_number)
+            )
+
+            rows = (
+                self.db.query(
+                    CapitulationModel.id,
+                    CapitulationModel.document_date,
+                    CapitulationModel.supplier_rut,
+                    CapitulationModel.document_number,
+                    CapitulationModel.document_type_id,
+                    CapitulationModel.description,
+                    CapitulationModel.amount,
+                    CapitulationModel.status_id,
+                    CapitulationModel.payment_date,
+                    CapitulationModel.payment_number,
+                    CapitulationModel.payment_support,
+                    CapitulationModel.period,
+                    CapitulationModel.user_rut,
+                    BranchOfficeModel.branch_office,
+                    ExpenseTypeModel.expense_type,
+                    UserModel.full_name,
+                )
+                .outerjoin(
+                    BranchOfficeModel,
+                    BranchOfficeModel.id == CapitulationModel.branch_office_id,
+                )
+                .outerjoin(
+                    ExpenseTypeModel,
+                    ExpenseTypeModel.id == CapitulationModel.expense_type_id,
+                )
+                .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
+                .filter(
+                    BranchOfficeModel.principal_supervisor == supervisor_rut,
+                    CapitulationModel.status_id.in_([5, 13]),
+                    CapitulationModel.user_rut == user_rut,
+                    CapitulationModel.payment_date == payment_date,
+                    number_filter,
+                    self._payment_month_filter(year, month),
+                )
+                .order_by(CapitulationModel.id.asc())
+                .all()
+            )
+
+            def _fmt_doc_date(value):
+                if value is None:
+                    return ""
+                if hasattr(value, "strftime"):
+                    return value.strftime("%d-%m-%Y")
+                return str(value)
+
+            data = [
+                {
+                    "id": row.id,
+                    "document_date": _fmt_doc_date(row.document_date),
+                    "supplier_rut": row.supplier_rut,
+                    "document_number": row.document_number,
+                    "document_type_id": row.document_type_id,
+                    "description": row.description,
+                    "amount": int(row.amount or 0),
+                    "status_id": row.status_id,
+                    "payment_date": row.payment_date,
+                    "payment_number": row.payment_number or "",
+                    "payment_support": row.payment_support,
+                    "period": row.period,
+                    "user_rut": row.user_rut,
+                    "branch_office": row.branch_office,
+                    "expense_type": row.expense_type,
+                    "full_name": row.full_name or row.user_rut or "",
+                }
+                for row in rows
+            ]
+            return {
+                "status": "success",
+                "data": data,
+                "total_amount": sum(item["amount"] for item in data),
+                "items_count": len(data),
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
