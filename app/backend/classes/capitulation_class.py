@@ -1198,9 +1198,49 @@ class CapitulationClass:
 
         return or_(ymd_prefix, ymd_exact_month, dmy_slash, dmy_dash)
 
-    def report_paid_summary(self, supervisor_rut: str, year: int, month: int):
+    @staticmethod
+    def _document_month_filter(year: int, month: int):
         """
-        Informe: pagos de rendiciones por supervisor (sucursales) y mes/año de payment_date.
+        Filtra por mes/año de document_date (fecha del documento).
+        document_date en BD suele ser DATE o string YYYY-MM-DD.
+        """
+        y = int(year)
+        m = int(month)
+        if m < 1 or m > 12:
+            return None
+
+        start = f"{y:04d}-{m:02d}-01"
+        if m == 12:
+            end = f"{y + 1:04d}-01-01"
+        else:
+            end = f"{y:04d}-{m + 1:02d}-01"
+
+        y_str = f"{y:04d}"
+        m_str = f"{m:02d}"
+        doc = CapitulationModel.document_date
+
+        # Rango lexicográfico / DATE (YYYY-MM-DD)
+        range_filter = and_(doc >= start, doc < end)
+        # Prefijo string YYYY-MM
+        like_ymd = cast(doc, String).like(f"{y_str}-{m_str}%")
+        # DD-MM-YYYY / DD/MM/YYYY
+        like_dmy = or_(
+            cast(doc, String).like(f"%-{m_str}-{y_str}"),
+            cast(doc, String).like(f"%/{m_str}/{y_str}"),
+        )
+        return or_(range_filter, like_ymd, like_dmy)
+
+    def report_paid_summary(
+        self,
+        supervisor_rut: str,
+        year: int,
+        month: int,
+        document_year: int = None,
+        document_month: int = None,
+    ):
+        """
+        Informe: pagos de rendiciones por supervisor y mes/año de payment_date.
+        Opcional: filtrar también por mes/año de document_date.
         Agrupa por beneficiario + fecha pago + nº pago.
         """
         try:
@@ -1208,6 +1248,19 @@ class CapitulationClass:
                 return {"status": "error", "message": "supervisor_rut, year y month son obligatorios"}
             if month < 1 or month > 12:
                 return {"status": "error", "message": "month inválido"}
+
+            filters = [
+                BranchOfficeModel.principal_supervisor == supervisor_rut,
+                CapitulationModel.status_id.in_([5, 13]),
+                CapitulationModel.payment_date.isnot(None),
+                CapitulationModel.payment_date != "",
+                self._payment_month_filter(year, month),
+            ]
+
+            if document_year and document_month:
+                doc_filter = self._document_month_filter(int(document_year), int(document_month))
+                if doc_filter is not None:
+                    filters.append(doc_filter)
 
             rows = (
                 self.db.query(
@@ -1223,13 +1276,7 @@ class CapitulationClass:
                     BranchOfficeModel.id == CapitulationModel.branch_office_id,
                 )
                 .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
-                .filter(
-                    BranchOfficeModel.principal_supervisor == supervisor_rut,
-                    CapitulationModel.status_id.in_([5, 13]),
-                    CapitulationModel.payment_date.isnot(None),
-                    CapitulationModel.payment_date != "",
-                    self._payment_month_filter(year, month),
-                )
+                .filter(*filters)
                 .group_by(
                     CapitulationModel.user_rut,
                     UserModel.full_name,
@@ -1271,6 +1318,8 @@ class CapitulationClass:
         user_rut: str,
         payment_date: str,
         payment_number: str = "",
+        document_year: int = None,
+        document_month: int = None,
     ):
         """Detalle de un lote de pago del informe de rendiciones."""
         try:
@@ -1296,6 +1345,19 @@ class CapitulationClass:
                 if payment_number == ""
                 else (CapitulationModel.payment_number == payment_number)
             )
+
+            filters = [
+                BranchOfficeModel.principal_supervisor == supervisor_rut,
+                CapitulationModel.status_id.in_([5, 13]),
+                CapitulationModel.user_rut == user_rut,
+                CapitulationModel.payment_date == payment_date,
+                number_filter,
+                self._payment_month_filter(year, month),
+            ]
+            if document_year and document_month:
+                doc_filter = self._document_month_filter(int(document_year), int(document_month))
+                if doc_filter is not None:
+                    filters.append(doc_filter)
 
             rows = (
                 self.db.query(
@@ -1325,14 +1387,7 @@ class CapitulationClass:
                     ExpenseTypeModel.id == CapitulationModel.expense_type_id,
                 )
                 .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
-                .filter(
-                    BranchOfficeModel.principal_supervisor == supervisor_rut,
-                    CapitulationModel.status_id.in_([5, 13]),
-                    CapitulationModel.user_rut == user_rut,
-                    CapitulationModel.payment_date == payment_date,
-                    number_filter,
-                    self._payment_month_filter(year, month),
-                )
+                .filter(*filters)
                 .order_by(CapitulationModel.id.asc())
                 .all()
             )

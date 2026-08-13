@@ -242,11 +242,19 @@ def report_paid_summary(
     supervisor_rut: str,
     year: int,
     month: int,
+    document_year: int = None,
+    document_month: int = None,
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Informe: resumen de pagos de rendiciones por supervisor y mes/año."""
-    data = CapitulationClass(db).report_paid_summary(supervisor_rut, year, month)
+    """Informe: resumen de pagos por supervisor, mes/año de pago y opcional mes/año documento."""
+    data = CapitulationClass(db).report_paid_summary(
+        supervisor_rut,
+        year,
+        month,
+        document_year=document_year,
+        document_month=document_month,
+    )
     if isinstance(data, dict) and data.get("status") == "error":
         raise HTTPException(status_code=400, detail=data.get("message") or "Error en informe")
     return {"message": data}
@@ -260,6 +268,8 @@ def report_paid_detail(
     user_rut: str,
     payment_date: str,
     payment_number: str = "",
+    document_year: int = None,
+    document_month: int = None,
     session_user: UserLogin = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -271,6 +281,8 @@ def report_paid_detail(
         user_rut=user_rut,
         payment_date=payment_date,
         payment_number=payment_number or "",
+        document_year=document_year,
+        document_month=document_month,
     )
     if isinstance(data, dict) and data.get("status") == "error":
         raise HTTPException(status_code=400, detail=data.get("message") or "Error en informe")
