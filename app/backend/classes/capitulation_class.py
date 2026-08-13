@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import aliased
 import requests
 import json
-from sqlalchemy import cast, String, case, or_, func, and_
+from sqlalchemy import cast, String, case, or_, func, and_, extract
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -1200,35 +1200,24 @@ class CapitulationClass:
 
     @staticmethod
     def _document_month_filter(year: int, month: int):
-        """
-        Filtra por mes/año de document_date (fecha del documento).
-        document_date en BD suele ser DATE o string YYYY-MM-DD.
-        """
+        """Filtra estrictamente por mes/año de document_date (DATE)."""
         y = int(year)
         m = int(month)
         if m < 1 or m > 12:
             return None
-
-        start = f"{y:04d}-{m:02d}-01"
-        if m == 12:
-            end = f"{y + 1:04d}-01-01"
-        else:
-            end = f"{y:04d}-{m + 1:02d}-01"
-
-        y_str = f"{y:04d}"
-        m_str = f"{m:02d}"
         doc = CapitulationModel.document_date
+        return and_(extract("year", doc) == y, extract("month", doc) == m)
 
-        # Rango lexicográfico / DATE (YYYY-MM-DD)
-        range_filter = and_(doc >= start, doc < end)
-        # Prefijo string YYYY-MM
-        like_ymd = cast(doc, String).like(f"{y_str}-{m_str}%")
-        # DD-MM-YYYY / DD/MM/YYYY
-        like_dmy = or_(
-            cast(doc, String).like(f"%-{m_str}-{y_str}"),
-            cast(doc, String).like(f"%/{m_str}/{y_str}"),
-        )
-        return or_(range_filter, like_ymd, like_dmy)
+    @staticmethod
+    def _fmt_doc_date(value):
+        if value is None:
+            return ""
+        if hasattr(value, "strftime"):
+            return value.strftime("%d-%m-%Y")
+        raw = str(value).strip().split(" ")[0]
+        if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
+            return f"{raw[8:10]}-{raw[5:7]}-{raw[0:4]}"
+        return raw
 
     def report_paid_summary(
         self,
@@ -1240,10 +1229,9 @@ class CapitulationClass:
         document_month: int = None,
     ):
         """
-        Informe: pagos de rendiciones por supervisor.
-        date_type:
-          - payment: filtra por mes/año de payment_date
-          - document: filtra por mes/año de document_date
+        Informe de rendiciones pagadas.
+        - payment: agrupa por lote de pago (mes/año payment_date)
+        - document: lista ítems del mes/año document_date (sin mezclar meses de un mismo pago)
         """
         try:
             if not supervisor_rut or not year or not month:
@@ -1255,13 +1243,12 @@ class CapitulationClass:
             if date_type not in ("payment", "document"):
                 return {"status": "error", "message": "date_type debe ser payment o document"}
 
-            # Compatibilidad con params antiguos document_year/document_month
             if document_year and document_month:
                 date_type = "document"
                 year = int(document_year)
                 month = int(document_month)
 
-            filters = [
+            base_filters = [
                 BranchOfficeModel.principal_supervisor == supervisor_rut,
                 CapitulationModel.status_id.in_([5, 13]),
                 CapitulationModel.payment_date.isnot(None),
@@ -1272,9 +1259,63 @@ class CapitulationClass:
                 doc_filter = self._document_month_filter(int(year), int(month))
                 if doc_filter is None:
                     return {"status": "error", "message": "month inválido"}
-                filters.append(doc_filter)
-            else:
-                filters.append(self._payment_month_filter(year, month))
+
+                rows = (
+                    self.db.query(
+                        CapitulationModel.id,
+                        CapitulationModel.document_date,
+                        CapitulationModel.document_number,
+                        CapitulationModel.description,
+                        CapitulationModel.amount,
+                        CapitulationModel.status_id,
+                        CapitulationModel.payment_date,
+                        CapitulationModel.payment_number,
+                        CapitulationModel.payment_support,
+                        CapitulationModel.user_rut,
+                        BranchOfficeModel.branch_office,
+                        ExpenseTypeModel.expense_type,
+                        UserModel.full_name,
+                    )
+                    .outerjoin(
+                        BranchOfficeModel,
+                        BranchOfficeModel.id == CapitulationModel.branch_office_id,
+                    )
+                    .outerjoin(
+                        ExpenseTypeModel,
+                        ExpenseTypeModel.id == CapitulationModel.expense_type_id,
+                    )
+                    .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
+                    .filter(*base_filters, doc_filter)
+                    .order_by(CapitulationModel.document_date.asc(), CapitulationModel.id.asc())
+                    .all()
+                )
+
+                data = [
+                    {
+                        "id": row.id,
+                        "document_date": self._fmt_doc_date(row.document_date),
+                        "document_number": row.document_number,
+                        "description": row.description,
+                        "amount": int(row.amount or 0),
+                        "status_id": row.status_id,
+                        "payment_date": row.payment_date,
+                        "payment_number": row.payment_number or "",
+                        "payment_support": row.payment_support,
+                        "user_rut": row.user_rut,
+                        "full_name": row.full_name or row.user_rut or "",
+                        "branch_office": row.branch_office,
+                        "expense_type": row.expense_type,
+                    }
+                    for row in rows
+                ]
+                return {
+                    "status": "success",
+                    "data": data,
+                    "total_amount": sum(item["amount"] for item in data),
+                    "total_payments": len(data),
+                    "date_type": "document",
+                    "view_mode": "documents",
+                }
 
             rows = (
                 self.db.query(
@@ -1290,7 +1331,7 @@ class CapitulationClass:
                     BranchOfficeModel.id == CapitulationModel.branch_office_id,
                 )
                 .outerjoin(UserModel, UserModel.rut == CapitulationModel.user_rut)
-                .filter(*filters)
+                .filter(*base_filters, self._payment_month_filter(year, month))
                 .group_by(
                     CapitulationModel.user_rut,
                     UserModel.full_name,
@@ -1320,7 +1361,8 @@ class CapitulationClass:
                 "data": data,
                 "total_amount": sum(item["total"] for item in data),
                 "total_payments": len(data),
-                "date_type": date_type,
+                "date_type": "payment",
+                "view_mode": "payments",
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
