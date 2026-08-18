@@ -1,12 +1,89 @@
 from app.backend.db.models import CustomerModel, RegionModel, CommuneModel
 import json
 from sqlalchemy.dialects import mysql
+from sqlalchemy import or_
 from datetime import datetime
 from fastapi import HTTPException
 
 class CustomerClass:
     def __init__(self, db):
         self.db = db
+
+    @staticmethod
+    def _rut_body_and_dv(rut):
+        s = str(rut or "").strip().upper().replace(".", "").replace(" ", "")
+        if not s:
+            return "", ""
+        if "-" in s:
+            left, right = s.split("-", 1)
+            body = "".join(c for c in left if c.isdigit())
+            dv = (right.strip()[:1] or "").upper()
+            return body, dv
+        if s.endswith("K"):
+            return "".join(c for c in s if c.isdigit()), "K"
+        digits = "".join(c for c in s if c.isdigit())
+        return digits, ""
+
+    def _customer_rut_filter(self, rut):
+        """Match 60803000, 60803000-K, 60803000K, 60.803.000-K, etc."""
+        raw = str(rut or "").strip()
+        body, dv = self._rut_body_and_dv(raw)
+        variants = {raw, raw.upper().replace(".", "").replace(" ", "")}
+        if body:
+            variants.add(body)
+            if dv:
+                variants.add(f"{body}-{dv}")
+                variants.add(f"{body}-{dv.lower()}")
+                variants.add(f"{body}{dv}")
+                variants.add(f"{body}{dv.lower()}")
+        clauses = [CustomerModel.rut == v for v in variants if v]
+        if body:
+            clauses.append(CustomerModel.rut.like(f"{body}-%"))
+            clauses.append(CustomerModel.rut.like(f"{body}%"))
+        if not clauses:
+            return CustomerModel.rut == raw
+        return or_(*clauses)
+
+    def _pick_customer_row(self, rows, requested_rut):
+        if not rows:
+            return None
+        body, dv = self._rut_body_and_dv(requested_rut)
+        exact = str(requested_rut or "").strip()
+
+        def score(row):
+            rut = str(row.rut or "")
+            s = 0
+            if rut == exact:
+                s += 100
+            rb, rd = self._rut_body_and_dv(rut)
+            if dv and rd == dv and rb == body:
+                s += 50
+            if rd == "K" and rb == body:
+                s += 20
+            return s
+
+        return max(rows, key=score)
+
+    def _customer_lookup_row(self, rut):
+        rows = (
+            self.db.query(
+                CustomerModel.rut,
+                RegionModel.region,
+                CommuneModel.commune,
+                CustomerModel.customer,
+                CustomerModel.phone,
+                CustomerModel.email,
+                CustomerModel.region_id,
+                CustomerModel.commune_id,
+                CustomerModel.activity,
+                CustomerModel.address,
+            )
+            .outerjoin(RegionModel, RegionModel.id == CustomerModel.region_id)
+            .outerjoin(CommuneModel, CommuneModel.id == CustomerModel.commune_id)
+            .filter(self._customer_rut_filter(rut))
+            .all()
+        )
+        return self._pick_customer_row(rows, rut)
 
     def get_all(self, rut = None, page = 1, items_per_page = 10):
         try:
@@ -95,11 +172,7 @@ class CustomerClass:
 
     def get_by_rut(self, rut):
         try:
-            data_query = self.db.query(CustomerModel.rut, RegionModel.region, CommuneModel.commune, CustomerModel.customer, CustomerModel.phone, CustomerModel.email, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.address). \
-                        outerjoin(RegionModel, RegionModel.id == CustomerModel.region_id). \
-                        outerjoin(CommuneModel, CommuneModel.id == CustomerModel.commune_id). \
-                        filter(CustomerModel.rut == rut). \
-                        first()
+            data_query = self._customer_lookup_row(rut)
 
             if data_query:
                 # Serializar los datos del empleado
@@ -168,11 +241,7 @@ class CustomerClass:
     
     def check_existence(self, rut):
         try:
-            data_query = self.db.query(CustomerModel.rut, RegionModel.region, CommuneModel.commune, CustomerModel.customer, CustomerModel.phone, CustomerModel.email, CustomerModel.region_id, CustomerModel.commune_id, CustomerModel.activity, CustomerModel.address). \
-                        outerjoin(RegionModel, RegionModel.id == CustomerModel.region_id). \
-                        outerjoin(CommuneModel, CommuneModel.id == CustomerModel.commune_id). \
-                        filter(CustomerModel.rut == rut). \
-                        first()
+            data_query = self._customer_lookup_row(rut)
 
             if data_query:
                 # Serializar los datos del empleado
