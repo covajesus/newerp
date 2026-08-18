@@ -556,6 +556,8 @@ class FolioClass:
             return True
         if "ya existe un dte con folio" in text_blob:
             return True
+        if "no respondió a tiempo" in text_blob or "no respondio a tiempo" in text_blob:
+            return True
         # SF a menudo responde HTTP 500 EF ("entity changes") por folio ya usado
         # (unique constraint) sin mensaje claro. Si el PDF existe → consumido.
         # Si no hay PDF pero el error es ese genérico, igual saltamos el folio

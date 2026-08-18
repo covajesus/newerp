@@ -33,6 +33,9 @@ DTE_VERSION_V2 = 1  # Abonados (mismo que LibreDTE); v2 = emisor externo invoice
 DTE_VERSION_V2_LEGACY = 3  # Borradores v2 creados antes de alinear a dte_version_id=1
 DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
 DTE_V2_HTTP_TIMEOUT = 30
+# SimpleFactura NC v2 suele tardar más que invoiceV2 y a veces no responde a 30s
+# aunque sí emite el DTE. Timeout propio para no cortar ni reciclar el folio.
+DTE_V2_NC_HTTP_TIMEOUT = int(os.getenv("DTE_V2_NC_HTTP_TIMEOUT", "90"))
 DTE_CHIP_AMOUNT_CLP = 5000
 SIMPLEFACTURA_RUT_EMISOR = "76063822-6"
 SIMPLEFACTURA_SUCURSAL = "Casa Matriz"
@@ -2466,12 +2469,14 @@ class CustomerTicketClass:
                 url,
                 data=json.dumps(payload, ensure_ascii=False),
                 headers=headers,
-                timeout=DTE_V2_HTTP_TIMEOUT,
+                timeout=DTE_V2_NC_HTTP_TIMEOUT,
             )
         except requests.Timeout:
             return {
                 "status": "error",
-                "message": f"NC v2 no respondió a tiempo ({DTE_V2_HTTP_TIMEOUT}s)",
+                "timeout": True,
+                "message": f"NC v2 no respondió a tiempo ({DTE_V2_NC_HTTP_TIMEOUT}s)",
+                "errors": [f"NC v2 no respondió a tiempo ({DTE_V2_NC_HTTP_TIMEOUT}s)"],
                 "v2_url": url,
             }
         except requests.RequestException as exc:
@@ -2484,8 +2489,16 @@ class CustomerTicketClass:
                     url,
                     data=json.dumps(payload, ensure_ascii=False),
                     headers={**headers, "Authorization": f"Bearer {token}"},
-                    timeout=DTE_V2_HTTP_TIMEOUT,
+                    timeout=DTE_V2_NC_HTTP_TIMEOUT,
                 )
+            except requests.Timeout:
+                return {
+                    "status": "error",
+                    "timeout": True,
+                    "message": f"NC v2 no respondió a tiempo ({DTE_V2_NC_HTTP_TIMEOUT}s)",
+                    "errors": [f"NC v2 no respondió a tiempo ({DTE_V2_NC_HTTP_TIMEOUT}s)"],
+                    "v2_url": url,
+                }
             except (ValueError, requests.RequestException) as exc:
                 return {"status": "error", "message": f"No se pudo refrescar token v2: {exc}", "v2_url": url}
 
@@ -2545,15 +2558,24 @@ class CustomerTicketClass:
         }
 
     @staticmethod
+    def _emit_says_timeout(emit_result) -> bool:
+        if (emit_result or {}).get("timeout"):
+            return True
+        parts = [str((emit_result or {}).get("message") or "")]
+        parts.extend(str(item) for item in ((emit_result or {}).get("errors") or []))
+        message = " ".join(parts).lower()
+        return "no respondió a tiempo" in message or "no respondio a tiempo" in message
+
+    @staticmethod
     def _credit_note_emit_requires_recovery_check(emit_result) -> bool:
+        if CustomerTicketClass._emit_says_timeout(emit_result):
+            return True
         parts = [str((emit_result or {}).get("message") or "")]
         parts.extend(str(item) for item in ((emit_result or {}).get("errors") or []))
         message = " ".join(parts).lower()
         return any(
             marker in message
             for marker in (
-                "no respondió a tiempo",
-                "no respondio a tiempo",
                 "consumo existente",
                 "ya existe",
                 "ya estaba anulado",
@@ -2630,6 +2652,7 @@ class CustomerTicketClass:
         reference_dte,
         current_folio,
         pending_nc_dte_id=None,
+        retry_delays=(0, 2, 5),
     ):
         """
         Confirma en SimpleFactura una NC ya emitida tras timeout/folio existente.
@@ -2681,7 +2704,7 @@ class CustomerTicketClass:
             "Content-Type": "application/json",
         }
 
-        for retry_delay in (0, 2, 5):
+        for retry_delay in retry_delays:
             if retry_delay:
                 time.sleep(retry_delay)
             for folio in candidates:
@@ -2861,11 +2884,13 @@ class CustomerTicketClass:
                 break
 
             recovered = None
+            timed_out = self._emit_says_timeout(emit_result)
             if self._credit_note_emit_requires_recovery_check(emit_result):
                 recovered = self._find_existing_credit_note_v2(
                     dte,
                     reserved_folio,
                     pending_nc_dte_id=pending_nc_dte_id,
+                    retry_delays=(2, 5, 10, 20) if timed_out else (0, 2, 5),
                 )
             if recovered:
                 recovered_folio = int(recovered["folio"])
@@ -2906,6 +2931,30 @@ class CustomerTicketClass:
                     form_data,
                     pending_nc_dte_id=pending_nc_dte_id,
                 )
+
+            # Timeout: SF suele emitir igual sin devolver HTTP. No reciclar el folio
+            # ni emitir otra NC con el siguiente número.
+            if timed_out:
+                folio_cls.mark_folio_used(
+                    folio_res["id"],
+                    dte_id=pending_nc_dte_id or 0,
+                    branch_office_id=dte.branch_office_id,
+                )
+                print(
+                    f"[v2-nc] timeout folio {reserved_folio}; se marca usado y no se reintenta otro",
+                    flush=True,
+                )
+                return {
+                    "status": "error",
+                    "timeout": True,
+                    "folio": reserved_folio,
+                    "message": (
+                        f"{emit_result.get('message')}. "
+                        "El folio se dejó usado porque SimpleFactura puede haber emitido igual. "
+                        "Reintenta esta misma NC para recuperarla."
+                    ),
+                    "v2_url": emit_result.get("v2_url"),
+                }
 
             folio_consumed = folio_cls._sf_emit_error_indicates_folio_consumed(
                 emit_result,
