@@ -2336,10 +2336,9 @@ class CustomerBillClass:
             receiver["CmnaRecep"] = customer["commune"]
         # No CorreoRecep/Contacto en invoiceV2 (correo solo vía DteSubscriberEmailClass).
 
-        # Orden estricto schema SII IdDoc (SimpleFactura valida secuencia XSD):
-        # TipoDTE → Folio → FchEmis → … → MntBruto → FmaPago →
-        # TermPagoCdg → TermPagoGlosa → TermPagoDias → FchVenc
-        # (TermPagoGlosa antes de FchVenc / fuera de orden → HTTP 400 TipoFactEsp).
+        # Orden SII IdDoc: FmaPago y luego FchVenc.
+        # No enviar TermPagoGlosa/TermPagoDias/TermPagoCdg: el XSD espera
+        # TipoFactEsp en esa posición y SimpleFactura responde HTTP 400.
         id_doc: dict = {
             "TipoDTE": 33,
             "Folio": int(folio),
@@ -2348,13 +2347,6 @@ class CustomerBillClass:
         if int(category_id or 1) == 1:
             id_doc["MntBruto"] = 1
         id_doc["FmaPago"] = payment_term_id
-        if payment_term_id == 2:
-            # No enviar TermPagoCdg numérico: el SII espera código ALFA (FRF/FEM),
-            # y SimpleFactura rechaza o ignora el Crédito si llega `1`.
-            id_doc["TermPagoGlosa"] = "Credito 30 dias"
-            id_doc["TermPagoDias"] = 30
-        else:
-            id_doc["TermPagoGlosa"] = "Contado"
         id_doc["FchVenc"] = due_date
 
         document: dict = {
