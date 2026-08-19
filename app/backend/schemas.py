@@ -2114,8 +2114,8 @@ class ToBeAcceptedCustomerBill(BaseModel):
     address: Optional[str] = None
     will_save: Optional[int] = 0
     category_id: Optional[int] = None
-    # SII FmaPago: 1 Contado, 2 Crédito
-    payment_term_id: Optional[int] = 1
+    # SII FmaPago: 1 Contado, 2 Crédito. None = usar el valor persistido del DTE.
+    payment_term_id: Optional[int] = None
     quantity: Optional[int] = None
     items: List[CustomerTicketItemInput] = Field(default_factory=list)
     references: List[CustomerBillReferenceLine] = Field(default_factory=list)
@@ -2270,8 +2270,8 @@ class GenerateCustomerBill(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     category_id: Optional[int] = None
-    # SII FmaPago: 1 Contado, 2 Crédito
-    payment_term_id: Optional[int] = 1
+    # SII FmaPago: 1 Contado, 2 Crédito. None = usar el valor persistido del DTE.
+    payment_term_id: Optional[int] = None
     quantity: Optional[int] = None
     items: List[CustomerBillItemInput] = Field(default_factory=list)
     references: List[CustomerBillReferenceLine] = Field(default_factory=list)

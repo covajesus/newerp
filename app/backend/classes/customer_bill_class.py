@@ -28,7 +28,11 @@ from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_tot
 
 
 def _bill_payment_term_id(form_data=None, dte_row=None) -> int:
-    """SII FmaPago: 1 Contado, 2 Crédito. Default Contado."""
+    """SII FmaPago: 1 Contado, 2 Crédito. Default Contado.
+
+    Si el formulario no envía el campo (None), se usa el valor persistido del DTE.
+    No usar default 1 en el schema de generate: pisa Crédito al aceptar desde el listado.
+    """
     raw = getattr(form_data, "payment_term_id", None) if form_data is not None else None
     if raw is None and dte_row is not None:
         raw = getattr(dte_row, "payment_term_id", None)
@@ -1596,6 +1600,7 @@ class CustomerBillClass:
             items = self._normalize_bill_items(raw_item_list)
             # Debug: consola del servidor (uvicorn/gunicorn) — si llegan items vacíos o se pierden al normalizar
             print("[customer_bills/store] category_id=", getattr(form_data, "category_id", None), end=" ")
+            print("payment_term_id=", getattr(form_data, "payment_term_id", None), end=" ")
             print("raw_len=", len(raw_item_list), "normalized_len=", len(items))
             try:
                 for idx, raw in enumerate(raw_item_list):
@@ -2344,9 +2349,12 @@ class CustomerBillClass:
             id_doc["MntBruto"] = 1
         id_doc["FmaPago"] = payment_term_id
         if payment_term_id == 2:
-            id_doc["TermPagoCdg"] = 1
+            # No enviar TermPagoCdg numérico: el SII espera código ALFA (FRF/FEM),
+            # y SimpleFactura rechaza o ignora el Crédito si llega `1`.
             id_doc["TermPagoGlosa"] = "Credito 30 dias"
             id_doc["TermPagoDias"] = 30
+        else:
+            id_doc["TermPagoGlosa"] = "Contado"
         id_doc["FchVenc"] = due_date
 
         document: dict = {
