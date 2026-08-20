@@ -35,6 +35,12 @@ def refresh(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@received_tributary_documents.get("/refresh_simplefactura")
+def refresh_simplefactura(db: Session = Depends(get_db)):
+    data = ReceivedTributaryDocumentClass(db).refresh_simplefactura()
+
+    return {"message": data}
+
 @received_tributary_documents.post("/change_status")
 def change_status(received_tributary_document_inputs:ChangeStatusReceivedTributaryDocument, db: Session = Depends(get_db)):
     data = ReceivedTributaryDocumentClass(db).change_status(received_tributary_document_inputs)

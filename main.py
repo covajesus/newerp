@@ -53,6 +53,7 @@ from app.backend.routers.cashier_dtes import cashier_dtes
 from app.backend.routers.supervisors import supervisors
 from app.backend.routers.expense_types import expense_types
 from app.backend.routers.received_tributary_documents import received_tributary_documents
+from app.backend.routers.received_inbox import received_inbox
 from app.backend.routers.customer_tickets_bills import customer_tickets_bills
 from app.backend.routers.cashiers import cashiers
 from app.backend.routers.biller_data import biller_data
@@ -182,6 +183,7 @@ app.include_router(cashier_dtes)
 app.include_router(supervisors)
 app.include_router(expense_types)
 app.include_router(received_tributary_documents)
+app.include_router(received_inbox)
 app.include_router(customer_tickets_bills)
 app.include_router(cashiers)
 app.include_router(biller_data)

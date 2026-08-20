@@ -2554,3 +2554,10 @@ class DeliveryAddressTagResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReceivedInboxAcknowledgment(BaseModel):
+    id: int
+    action: str  # accept | reject
+    comment: Optional[str] = None
+    rejection_type_id: Optional[int] = 1

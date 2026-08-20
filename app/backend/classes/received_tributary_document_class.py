@@ -392,6 +392,9 @@ class ReceivedTributaryDocumentClass:
             summary["errors"].append(str(e))
             return summary
 
+    def refresh_simplefactura(self):
+        from app.backend.classes.received_inbox_class import ReceivedInboxClass
+        return ReceivedInboxClass(self.db).refresh()
 
     def pay(self, form_data):
         selected_bills = form_data.selected_bills

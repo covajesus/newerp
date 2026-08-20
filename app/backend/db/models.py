@@ -1,5 +1,5 @@
 from app.backend.db.database import Base
-from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, Float, Boolean, Text, Numeric
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, Float, Boolean, Text, Numeric, BigInteger, UniqueConstraint
 from datetime import datetime
 
 class BranchOfficeModel(Base):
@@ -511,6 +511,32 @@ class DteModel(Base):
     category_id = Column(Integer)
     quantity = Column(Integer)
     massive_resend_status_id = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class ReceivedInboxModel(Base):
+    __tablename__ = 'received_inbox'
+    __table_args__ = (
+        UniqueConstraint('folio', 'rut', 'dte_type_id', name='uq_received_inbox_folio_rut_type'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rut = Column(String(32), nullable=False)
+    supplier = Column(String(255))
+    branch_office_id = Column(Integer, default=0)
+    folio = Column(Integer, nullable=False)
+    dte_type_id = Column(Integer, nullable=False)
+    status_id = Column(Integer, nullable=False, default=1)
+    subtotal = Column(Integer, default=0)
+    tax = Column(Integer, default=0)
+    total = Column(Integer, default=0)
+    ambiente = Column(String(32))
+    estado = Column(String(64))
+    estado_sii = Column(String(64))
+    estado_acuse = Column(String(64))
+    track_id = Column(BigInteger)
+    document_date = Column(Date)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 
