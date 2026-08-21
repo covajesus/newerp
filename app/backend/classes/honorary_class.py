@@ -241,6 +241,8 @@ class HonoraryClass:
             # Solo marca Aceptado (2) si no requiere BTE. Con RUT queda Solicitado (14)
             # hasta que el SII confirme la emisión.
             honorary.status_id = 14 if should_emit_sii else 2
+            if blocked_rut:
+                honorary.bte_emitted = 0
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
             honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
@@ -289,10 +291,16 @@ class HonoraryClass:
                 "message": "Sin RUT del trabajador: no se emite BTE en SII",
             }
         if self.is_bte_sii_blocked_rut(honorary.replacement_employee_rut):
+            # No emitir al SII, pero dejar el honorario Aceptado (2) para no trabarlo.
+            honorary.status_id = 2
+            honorary.bte_emitted = 0
+            honorary.updated_date = datetime.now()
+            self.db.commit()
             return {
                 "status": "skipped",
-                "message": "RUT excluido: no se emite BTE en SII",
+                "message": "RUT excluido: no se emite BTE en SII (honorario aceptado)",
                 "bte_emitted": 0,
+                "status_id": 2,
             }
         return self.send(honorary)
         
@@ -572,10 +580,22 @@ class HonoraryClass:
         honorary_id = getattr(data, "id", None)
         beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
         if self.is_bte_sii_blocked_rut(beneficiary_rut):
+            if honorary_id:
+                row = (
+                    self.db.query(HonoraryModel)
+                    .filter(HonoraryModel.id == honorary_id)
+                    .first()
+                )
+                if row:
+                    row.status_id = 2
+                    row.bte_emitted = 0
+                    row.updated_date = datetime.now()
+                    self.db.commit()
             return {
                 "status": "skipped",
-                "message": "RUT excluido: no se emite BTE en SII",
+                "message": "RUT excluido: no se emite BTE en SII (honorario aceptado)",
                 "bte_emitted": 0,
+                "status_id": 2,
             }
         try:
             from app.backend.classes.sii.bte import emit_bte
