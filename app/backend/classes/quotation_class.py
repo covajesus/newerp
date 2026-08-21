@@ -150,17 +150,36 @@ class QuotationClass:
         return {"name": name, "phone": phone, "email": email}
 
     def _logo_path(self) -> Optional[str]:
+        env_logo = (os.getenv("DTE_EMAIL_LOGO_PATH") or "").strip()
+        here = os.path.dirname(os.path.abspath(__file__))
         candidates = [
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "logo.png"),
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", "files", "logo.png"),
+            env_logo,
+            # app/backend/static/logo.png (ruta real del proyecto)
+            os.path.join(here, "..", "static", "logo.png"),
+            os.path.join(here, "..", "..", "..", "static", "logo.png"),
+            os.path.join(here, "..", "..", "..", "files", "logo.png"),
+            "/var/www/intrajisbackend.com/public_html/app/backend/static/logo.png",
             "/var/www/intrajisbackend.com/public_html/files/logo.png",
             "/var/www/intrajisbackend.com/public_html/assets/logo.png",
         ]
         for path in candidates:
+            if not path:
+                continue
             full = os.path.abspath(path)
             if os.path.isfile(full):
                 return full
         return None
+
+    def _logo_flowable(self, width_cm: float = 2.4, height_cm: float = 2.4):
+        logo_path = self._logo_path()
+        if not logo_path:
+            return ""
+        try:
+            img = Image(logo_path, width=width_cm * cm, height=height_cm * cm)
+            img.hAlign = "LEFT"
+            return img
+        except Exception:
+            return ""
 
     def _normalize_items(self, items) -> list[dict]:
         normalized = []
@@ -281,6 +300,11 @@ class QuotationClass:
             "quotation_number": q.quotation_number,
             "branch_office_id": q.branch_office_id,
             "branch_office": branch.branch_office if branch else None,
+            "branch_office_address": (
+                (getattr(branch, "address", None) or "").strip() or None
+            )
+            if branch
+            else None,
             "rut": q.rut,
             "customer": q.customer,
             "email": q.email,
@@ -537,197 +561,351 @@ class QuotationClass:
         )
         contact = self._branch_contact(branch)
         branch_name = (getattr(branch, "branch_office", None) or "—") if branch else "—"
-        branch_address = (getattr(branch, "address", None) or "") if branch else ""
+        branch_address = (getattr(branch, "address", None) or "").strip() if branch else ""
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer,
             pagesize=letter,
-            leftMargin=1.4 * cm,
-            rightMargin=1.4 * cm,
-            topMargin=1.0 * cm,
+            leftMargin=1.5 * cm,
+            rightMargin=1.5 * cm,
+            topMargin=1.1 * cm,
             bottomMargin=1.2 * cm,
         )
         styles = getSampleStyleSheet()
         company = ParagraphStyle(
             "q_company",
-            parent=styles["Heading1"],
-            fontSize=13,
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=14,
             textColor=colors.HexColor(JIS_PRIMARY),
             alignment=TA_LEFT,
-            spaceAfter=2,
-            leading=16,
+            spaceAfter=3,
+            leading=17,
         )
-        small = ParagraphStyle("q_small", parent=styles["Normal"], fontSize=8.5, leading=11)
-        tiny = ParagraphStyle("q_tiny", parent=styles["Normal"], fontSize=7.5, leading=9)
-        right = ParagraphStyle("q_right", parent=styles["Normal"], fontSize=8.5, alignment=TA_RIGHT, leading=11)
-        center = ParagraphStyle("q_center", parent=styles["Normal"], fontSize=9, alignment=TA_CENTER, leading=11)
-        center_b = ParagraphStyle(
-            "q_center_b",
+        giro_style = ParagraphStyle(
+            "q_giro",
             parent=styles["Normal"],
-            fontSize=11,
+            fontName="Helvetica-Bold",
+            fontSize=7.5,
+            leading=9.5,
+            textColor=colors.black,
+        )
+        tiny = ParagraphStyle(
+            "q_tiny",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10.5,
+            textColor=colors.black,
+        )
+        tiny_b = ParagraphStyle(
+            "q_tiny_b",
+            parent=tiny,
+            fontName="Helvetica-Bold",
+        )
+        small = ParagraphStyle(
+            "q_small",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11,
+        )
+        small_b = ParagraphStyle("q_small_b", parent=small, fontName="Helvetica-Bold")
+        label = ParagraphStyle(
+            "q_label",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+        )
+        right = ParagraphStyle(
+            "q_right",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            alignment=TA_RIGHT,
+            leading=11,
+        )
+        center = ParagraphStyle(
+            "q_center",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
             alignment=TA_CENTER,
             leading=13,
-            textColor=colors.HexColor(JIS_PRIMARY),
+        )
+        center_rut = ParagraphStyle(
+            "q_center_rut",
+            parent=center,
+            fontSize=11,
+            textColor=colors.HexColor("#c62828"),
+            leading=14,
+        )
+        center_title = ParagraphStyle(
+            "q_center_title",
+            parent=center,
+            fontSize=12,
+            textColor=colors.black,
+            leading=15,
+        )
+        item_main = ParagraphStyle(
+            "q_item_main",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11,
+        )
+        item_sub = ParagraphStyle(
+            "q_item_sub",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=7.5,
+            leading=9.5,
+            textColor=colors.HexColor("#333333"),
         )
 
         story = []
+        usable_w = letter[0] - doc.leftMargin - doc.rightMargin
 
-        logo_cell: Any = ""
-        logo_path = self._logo_path()
-        if logo_path:
-            try:
-                logo_cell = Image(logo_path, width=2.2 * cm, height=2.2 * cm)
-            except Exception:
-                logo_cell = ""
-
+        # ----- Header: logo + emisor | caja RUT/COTIZACIÓN/N° -----
+        logo_cell = self._logo_flowable(2.35, 2.35)
         issuer_lines = [
-            Paragraph(f"<b>{html.escape(ISSUER_NAME)}</b>", company),
-            Paragraph(html.escape(ISSUER_GIRO), tiny),
-            Paragraph(html.escape(branch_address or ISSUER_HQ), tiny),
+            Paragraph(html.escape(ISSUER_NAME), company),
+            Paragraph(html.escape(ISSUER_GIRO), giro_style),
+            Paragraph(html.escape(branch_address or "—"), tiny),
             Paragraph(f"Sucursal: {html.escape(str(branch_name))}", tiny),
             Paragraph(html.escape(ISSUER_HQ), tiny),
-            Paragraph(f"{html.escape(ISSUER_PHONE)} / {html.escape(ISSUER_EMAIL)}", tiny),
+            Paragraph(
+                f"<b>{html.escape(ISSUER_PHONE)} / {html.escape(ISSUER_EMAIL)}</b>",
+                tiny,
+            ),
         ]
-        header_left = Table([[logo_cell, issuer_lines]], colWidths=[2.4 * cm, 9.2 * cm])
+        header_left = Table(
+            [[logo_cell, issuer_lines]],
+            colWidths=[2.55 * cm, usable_w - 2.55 * cm - 6.1 * cm],
+        )
         header_left.setStyle(
             TableStyle(
                 [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (0, 0), 8),
+                    ("RIGHTPADDING", (1, 0), (1, 0), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+
+        box_data = [
+            [Paragraph(f"R.U.T.: {html.escape(ISSUER_RUT)}", center_rut)],
+            [Paragraph("COTIZACIÓN", center_title)],
+            [Paragraph(f"N° {html.escape(q.quotation_number or '')}", center)],
+        ]
+        box = Table(box_data, colWidths=[6.0 * cm])
+        box.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 1.6, colors.black),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        top = Table(
+            [[header_left, box]],
+            colWidths=[usable_w - 6.1 * cm, 6.1 * cm],
+        )
+        top.setStyle(
+            TableStyle(
+                [
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ]
+            )
+        )
+        story.append(top)
+        story.append(Spacer(1, 14))
+
+        # ----- Cliente (izq) + meta (der), como en la foto -----
+        phone_show = (q.phone or "").strip()
+        email_show = (q.email or "").strip()
+        contacto_cliente = " / ".join([p for p in [phone_show, email_show] if p]) or "—"
+        period_label = HelperClass.period_detail_label(q.period or "") or (q.period or "—")
+        fecha_larga = self._format_date_long(q.added_date)
+
+        receptor_rows = [
+            [Paragraph("R.U.T.", label), Paragraph(html.escape(q.rut or "—"), small)],
+            [Paragraph("Razón social", label), Paragraph(html.escape(q.customer or "—"), small)],
+            [Paragraph("Giro", label), Paragraph(html.escape(q.activity or "—"), small)],
+            [Paragraph("Dirección", label), Paragraph(html.escape(q.address or "—"), small)],
+            [Paragraph("Contacto", label), Paragraph(html.escape(contacto_cliente), small)],
+            [Paragraph("Período", label), Paragraph(html.escape(period_label), small)],
+        ]
+        rec_table = Table(receptor_rows, colWidths=[2.6 * cm, 8.2 * cm])
+        rec_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
                     ("LEFTPADDING", (0, 0), (-1, -1), 0),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ]
             )
         )
 
-        box_data = [
-            [Paragraph(f"<b>R.U.T.: {html.escape(ISSUER_RUT)}</b>", center)],
-            [Paragraph("<b>COTIZACIÓN</b>", center_b)],
-            [Paragraph(f"<b>N° {html.escape(q.quotation_number or '')}</b>", center)],
+        meta_rows = [
+            [Paragraph(html.escape(fecha_larga), right)],
+            [Paragraph("Venta: crédito", right)],
+            [Paragraph(f"Vendedor: {html.escape(contact['email'])}", right)],
         ]
-        box = Table(box_data, colWidths=[5.8 * cm])
-        box.setStyle(
+        meta_table = Table(meta_rows, colWidths=[7.0 * cm])
+        meta_table.setStyle(
             TableStyle(
                 [
-                    ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#f3f5f9")),
+                    ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ]
             )
         )
-        top = Table([[header_left, box]], colWidths=[11.6 * cm, 6 * cm])
-        top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        story.append(top)
-        story.append(Spacer(1, 8))
 
-        fecha_larga = self._format_date_long(q.added_date)
-        meta = Table(
-            [
-                [Paragraph(html.escape(fecha_larga), right)],
-                [Paragraph("Venta: crédito", right)],
-                [Paragraph(f"Vendedor: {html.escape(contact['email'])}", right)],
-            ],
-            colWidths=[17.6 * cm],
-        )
-        meta.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "RIGHT")]))
-        story.append(meta)
-        story.append(Spacer(1, 6))
-
-        phone_show = q.phone or ""
-        email_show = q.email or ""
-        contacto_cliente = " / ".join([p for p in [phone_show, email_show] if p]) or "—"
-        receptor = [
-            [Paragraph("<b>R.U.T.</b>", small), Paragraph(html.escape(q.rut or "—"), small)],
-            [Paragraph("<b>Razón social</b>", small), Paragraph(html.escape(q.customer or "—"), small)],
-            [Paragraph("<b>Giro</b>", small), Paragraph(html.escape(q.activity or "—"), small)],
-            [Paragraph("<b>Dirección</b>", small), Paragraph(html.escape(q.address or "—"), small)],
-            [Paragraph("<b>Contacto</b>", small), Paragraph(html.escape(contacto_cliente), small)],
-            [
-                Paragraph("<b>Período</b>", small),
-                Paragraph(html.escape(HelperClass.period_detail_label(q.period or "")), small),
-            ],
-        ]
-        rec_table = Table(receptor, colWidths=[3.2 * cm, 14.4 * cm])
-        rec_table.setStyle(
+        mid = Table([[rec_table, meta_table]], colWidths=[10.9 * cm, 7.0 * cm])
+        mid.setStyle(
             TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ]
             )
         )
-        story.append(rec_table)
-        story.append(Spacer(1, 10))
+        story.append(mid)
+        story.append(Spacer(1, 14))
 
+        # ----- Tabla de ítems -----
+        th = ParagraphStyle("q_th", parent=small_b, alignment=TA_CENTER)
+        th_left = ParagraphStyle("q_th_l", parent=small_b, alignment=TA_LEFT)
         rows = [
             [
-                Paragraph("<b>Item</b>", small),
-                Paragraph("<b>Cant.</b>", center),
-                Paragraph("<b>Unidad</b>", center),
-                Paragraph("<b>P. unitario</b>", right),
-                Paragraph("<b>Total item</b>", right),
+                Paragraph("Item", th_left),
+                Paragraph("Cant.", th),
+                Paragraph("Unidad", th),
+                Paragraph("P. unitario", th),
+                Paragraph("Total item", th),
             ]
         ]
         for it in items:
-            name = html.escape(it.item_name or "—")
-            detail = html.escape(it.description or "")
-            item_html = f"<b>{name}</b>"
-            if detail and detail != name:
-                item_html += f"<br/><font size='7'>{detail}</font>"
+            main_txt = (it.description or it.dsc_item or it.item_name or "—").strip()
+            sub_txt = (it.item_name or "").strip()
+            if sub_txt and sub_txt.lower() == main_txt.lower():
+                sub_txt = ""
+            if not (it.description or it.dsc_item) and sub_txt:
+                # Si solo hay nombre, úsalo como línea principal
+                main_txt = sub_txt
+                sub_txt = ""
+            parts = [Paragraph(html.escape(main_txt), item_main)]
+            if sub_txt:
+                parts.append(Paragraph(html.escape(sub_txt), item_sub))
+            item_cell = parts if len(parts) > 1 else parts[0]
+            if isinstance(item_cell, list):
+                item_inner = Table([[p] for p in parts], colWidths=[8.0 * cm])
+                item_inner.setStyle(
+                    TableStyle(
+                        [
+                            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                            ("TOPPADDING", (0, 0), (-1, -1), 0),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                        ]
+                    )
+                )
+                item_cell = item_inner
             rows.append(
                 [
-                    Paragraph(item_html, small),
-                    Paragraph(str(it.quantity or 0), center),
-                    Paragraph(html.escape(it.unit_measure or "1"), center),
+                    item_cell,
+                    Paragraph(str(it.quantity or 0), ParagraphStyle("qc", parent=small, alignment=TA_CENTER)),
+                    Paragraph(
+                        html.escape(str(it.unit_measure or "1")),
+                        ParagraphStyle("qu", parent=small, alignment=TA_CENTER),
+                    ),
                     Paragraph(self._format_clp_plain(it.unit_amount or 0), right),
                     Paragraph(self._format_clp_plain(it.total_amount or 0), right),
                 ]
             )
-        items_table = Table(rows, colWidths=[8.2 * cm, 1.8 * cm, 2.0 * cm, 2.8 * cm, 2.8 * cm])
+
+        items_table = Table(
+            rows,
+            colWidths=[8.0 * cm, 1.7 * cm, 2.0 * cm, 2.9 * cm, 3.2 * cm],
+            repeatRows=1,
+        )
         items_table.setStyle(
             TableStyle(
                 [
-                    ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, -1), 5),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ("ALIGN", (1, 0), (2, -1), "CENTER"),
+                    ("ALIGN", (3, 0), (4, -1), "RIGHT"),
                 ]
             )
         )
         story.append(items_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 12))
 
+        # ----- Totales (alineados a la derecha, limpios) -----
         totals = [
-            [Paragraph("<b>Neto</b>", right), Paragraph(self._format_clp(q.subtotal or 0), right)],
-            [Paragraph("<b>IVA 19%</b>", right), Paragraph(self._format_clp(q.tax or 0), right)],
-            [Paragraph("<b>Total</b>", right), Paragraph(f"<b>{self._format_clp(q.total or 0)}</b>", right)],
+            [Paragraph("Neto", small_b), Paragraph(self._format_clp(q.subtotal or 0), right)],
+            [Paragraph("IVA 19%", small_b), Paragraph(self._format_clp(q.tax or 0), right)],
+            [
+                Paragraph("Total", ParagraphStyle("q_tot_l", parent=small_b, fontSize=10)),
+                Paragraph(
+                    f"<b>{self._format_clp(q.total or 0)}</b>",
+                    ParagraphStyle("q_tot_r", parent=right, fontSize=10, fontName="Helvetica-Bold"),
+                ),
+            ],
         ]
-        tot_table = Table(totals, colWidths=[3.5 * cm, 3.2 * cm], hAlign="RIGHT")
+        tot_table = Table(totals, colWidths=[3.2 * cm, 3.6 * cm], hAlign="RIGHT")
         tot_table.setStyle(
             TableStyle(
                 [
-                    ("BOX", (0, 0), (-1, -1), 0.7, colors.black),
-                    ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#e6eaf5")),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
+                    ("LINEABOVE", (0, 2), (-1, 2), 0.8, colors.black),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#f5f5f5")),
                 ]
             )
         )
         story.append(tot_table)
-        story.append(Spacer(1, 14))
+        story.append(Spacer(1, 16))
         story.append(
             Paragraph(
                 "Documento informativo. No constituye boleta ni factura electrónica ante el SII.",
-                ParagraphStyle("q_note", parent=tiny, textColor=colors.gray),
+                ParagraphStyle(
+                    "q_note",
+                    parent=tiny,
+                    textColor=colors.HexColor("#666666"),
+                    fontSize=7.5,
+                ),
             )
         )
+        story.append(Spacer(1, 4))
         story.append(
             Paragraph(
                 f"Contacto comercial: {html.escape(contact['name'])} · "
