@@ -1952,6 +1952,56 @@ class AccountingEntryDocumentModel(Base):
     period = Column(String(7))
 
 
+class QuotationModel(Base):
+    __tablename__ = 'quotations'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quotation_number = Column(String(32), nullable=False)
+    branch_office_id = Column(Integer, nullable=False)
+    rut = Column(String(32), nullable=False)
+    customer = Column(String(255))
+    email = Column(String(255))
+    phone = Column(String(64))
+    activity = Column(String(255))
+    address = Column(String(512))
+    region_id = Column(Integer)
+    commune_id = Column(Integer)
+    period = Column(String(7), nullable=False)
+    renew_mode = Column(Integer, default=1)  # 1 fija, 2 mes a mes
+    status_id = Column(Integer, default=1)  # 1 borrador, 2 enviada, 3 convertida, 4 anulada
+    payment_term_id = Column(Integer, default=1)
+    chip_id = Column(Integer, default=0)
+    subtotal = Column(Integer, default=0)
+    tax = Column(Integer, default=0)
+    total = Column(Integer, default=0)
+    last_sent_at = Column(DateTime())
+    last_sent_channel = Column(String(32))
+    converted_dte_id = Column(Integer)
+    source_quotation_id = Column(Integer)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class QuotationItemModel(Base):
+    __tablename__ = 'quotation_items'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quotation_id = Column(Integer, ForeignKey('quotations.id', ondelete='CASCADE'), nullable=False)
+    line_number = Column(Integer, nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    unit_amount = Column(Integer, nullable=False, default=0)
+    total_amount = Column(Integer, nullable=False, default=0)
+    description = Column(String(500), nullable=False)
+    dsc_item = Column(String(500))
+    item_code = Column(String(64))
+    item_name = Column(String(255))
+    unit_measure = Column(String(32))
+    discount_amount = Column(Integer, default=0)
+    status_id = Column(Integer, default=1)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
 class AlertUserModel(Base):
     __tablename__ = 'alert_users'
 

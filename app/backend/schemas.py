@@ -2580,3 +2580,61 @@ class ReceivedInboxAcknowledgment(BaseModel):
 class ReceivedInboxImportDay(BaseModel):
     date: str  # YYYY-MM-DD
     consolidate: bool = False
+
+
+class QuotationItemInput(BaseModel):
+    quantity: int
+    unit_amount: int
+    amount: Optional[int] = None
+    description: str
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    unit_measure: Optional[str] = None
+    discount_amount: Optional[int] = None
+    dsc_item: Optional[str] = None
+
+
+class StoreQuotation(BaseModel):
+    branch_office_id: int
+    rut: str
+    period: str
+    renew_mode: int = 1  # 1 fija, 2 mes a mes
+    chip_id: Optional[int] = 0
+    payment_term_id: Optional[int] = 1
+    region_id: Optional[int] = None
+    commune_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    activity: Optional[str] = None
+    address: Optional[str] = None
+    items: List[QuotationItemInput] = Field(default_factory=list)
+
+
+class QuotationList(BaseModel):
+    page: int = 1
+    items_per_page: Optional[int] = 10
+
+
+class QuotationSearch(BaseModel):
+    page: int = 1
+    items_per_page: Optional[int] = 10
+    rut: Optional[str] = None
+    customer: Optional[str] = None
+    period: Optional[str] = None
+    renew_mode: Optional[int] = None
+    status_id: Optional[int] = None
+    branch_office_id: Optional[int] = None
+
+
+class QuotationSend(BaseModel):
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class QuotationRenew(BaseModel):
+    period: str  # YYYY-MM destino
+
+
+class QuotationConvert(BaseModel):
+    dte_type_id: int  # 33 factura | 39 boleta
