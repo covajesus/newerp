@@ -220,7 +220,10 @@ class HonoraryClass:
             honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
             honorary.account_type_id = honorary_inputs.account_type_id
-            honorary.status_id = 2
+            should_emit_sii = int(honorary_inputs.foreigner_id or 0) == 1
+            # Solo marca Aceptado (2) si no requiere BTE. Con RUT queda Solicitado (14)
+            # hasta que el SII confirme la emisión.
+            honorary.status_id = 14 if should_emit_sii else 2
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
             honorary.replacement_employee_full_name = honorary_inputs.replacement_employee_full_name
@@ -241,9 +244,14 @@ class HonoraryClass:
 
             return {
                 "status": "success",
-                "message": "Honorario aceptado",
+                "message": (
+                    "Datos guardados; pendiente emisión BTE en SII"
+                    if should_emit_sii
+                    else "Honorario aceptado"
+                ),
                 "id": honorary.id,
-                "should_emit_sii": int(honorary_inputs.foreigner_id or 0) == 1,
+                "should_emit_sii": should_emit_sii,
+                "status_id": honorary.status_id,
             }
         except Exception as e:
             error_message = str(e)
@@ -515,15 +523,35 @@ class HonoraryClass:
             )
         return sii_region, comuna_code, commune_name
 
+    def _keep_pending_for_sii_retry(self, honorary_id) -> None:
+        """Si falla el SII, deja el honorario en Solicitado (14) para poder reaceptar."""
+        if not honorary_id:
+            return
+        row = (
+            self.db.query(HonoraryModel)
+            .filter(HonoraryModel.id == honorary_id)
+            .first()
+        )
+        if not row:
+            return
+        row.status_id = 14
+        row.bte_emitted = 0
+        row.updated_date = datetime.now()
+        self.db.commit()
+
     def send(self, data):
         """Emite BTE ante el SII (Clave Tributaria) — reemplaza SimpleFactura BHE terceros."""
+        honorary_id = getattr(data, "id", None)
         try:
             from app.backend.classes.sii.bte import emit_bte
         except ModuleNotFoundError as e:
             print(f"Missing dependency for SII BTE: {e}")
+            self._keep_pending_for_sii_retry(honorary_id)
             return {
                 "status": "error",
                 "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
+                "bte_emitted": 0,
+                "status_id": 14,
             }
 
         settings = SettingClass(self.db).get()
@@ -532,9 +560,12 @@ class HonoraryClass:
         password = creds.get("password") or ""
         if not login_rut or not password:
             print("Clave Tributaria SII no configurada; no se emite BTE")
+            self._keep_pending_for_sii_retry(honorary_id)
             return {
                 "status": "error",
                 "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+                "bte_emitted": 0,
+                "status_id": 14,
             }
 
         pct = settings.get("setting_data", {}).get("percentage_honorary_bill") or "1"
@@ -550,7 +581,8 @@ class HonoraryClass:
             )
         except Exception as e:
             print(f"Error mapeo región/comuna SII: {e}")
-            return {"status": "error", "message": str(e)}
+            self._keep_pending_for_sii_retry(honorary_id)
+            return {"status": "error", "message": str(e), "bte_emitted": 0, "status_id": 14}
 
         beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
         beneficiary_name = (
@@ -586,7 +618,6 @@ class HonoraryClass:
             # 1 = emitted (confirmed in SII list, or folio returned by emit)
             bte_emitted = 1 if (confirmed or result.folio) else 0
 
-            honorary_id = getattr(data, "id", None)
             if honorary_id:
                 row = (
                     self.db.query(HonoraryModel)
@@ -594,39 +625,46 @@ class HonoraryClass:
                     .first()
                 )
                 if row:
-                    row.bte_emitted = bte_emitted
-                    row.bte_folio = int(result.folio) if result.folio else None
-                    note = f"BTE SII folio {result.folio}"
-                    if confirmed:
-                        note += " (confirmada)"
-                    prev = (row.observation or "").strip()
-                    row.observation = f"{prev} | {note}".strip(" |") if prev else note
-                    row.updated_date = datetime.now()
-                    self.db.commit()
+                    if bte_emitted == 1:
+                        row.status_id = 2  # Aceptado solo si se emitió
+                        row.bte_emitted = 1
+                        row.bte_folio = int(result.folio) if result.folio else None
+                        note = f"BTE SII folio {result.folio}"
+                        if confirmed:
+                            note += " (confirmada)"
+                        prev = (row.observation or "").strip()
+                        row.observation = f"{prev} | {note}".strip(" |") if prev else note
+                        row.updated_date = datetime.now()
+                        self.db.commit()
+                    else:
+                        self._keep_pending_for_sii_retry(honorary_id)
+                        return {
+                            "status": "error",
+                            "message": "SII no confirmó la BTE; puede reintentar Aceptar",
+                            "folio": result.folio,
+                            "bte_emitted": 0,
+                            "status_id": 14,
+                        }
             return {
                 "status": "success",
                 "message": "Boleta de honorarios (BTE) emitida en SII",
                 "folio": result.folio,
                 "bte_emitted": bte_emitted,
                 "confirmed_in_sii": bool(confirmed),
+                "status_id": 2,
                 "monto_bruto": result.monto_bruto,
                 "retencion": result.retencion,
                 "liquido": result.liquido,
             }
         except Exception as e:
             print(f"Error al emitir BTE en SII: {e}")
-            honorary_id = getattr(data, "id", None)
-            if honorary_id:
-                row = (
-                    self.db.query(HonoraryModel)
-                    .filter(HonoraryModel.id == honorary_id)
-                    .first()
-                )
-                if row:
-                    row.bte_emitted = 0
-                    row.updated_date = datetime.now()
-                    self.db.commit()
-            return {"status": "error", "message": str(e), "bte_emitted": 0}
+            self._keep_pending_for_sii_retry(honorary_id)
+            return {
+                "status": "error",
+                "message": str(e),
+                "bte_emitted": 0,
+                "status_id": 14,
+            }
 
     def _confirm_bte_in_sii(self, login_rut, password, folio, issue_date) -> bool:
         """Consulta BTE emitidas del mes en SII y busca el folio."""
