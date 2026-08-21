@@ -131,6 +131,7 @@ class HonoraryClass:
                 "employee_to_replace": str(data.employee_to_replace),
                 "replacement_employee_rut": str(data.replacement_employee_rut),
                 "replacement_employee_full_name": data.replacement_employee_full_name,
+                "email": str(data.email) if data.email is not None else None,
                 "address": str(data.address),
                 "account_number": str(data.account_number),
                 "start_date": str(data.start_date),
