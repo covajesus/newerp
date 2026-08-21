@@ -1,6 +1,11 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects import mysql
-from app.backend.db.models import ReceivedInboxModel, BranchOfficeModel
+from app.backend.db.models import (
+    ReceivedInboxModel,
+    BranchOfficeModel,
+    DteModel,
+    SupplierModel,
+)
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.customer_ticket_class import (
     CustomerTicketClass,
@@ -143,6 +148,92 @@ class ReceivedInboxClass:
         ):
             return False
         return True
+
+    def _ensure_supplier(self, rut, supplier_name):
+        if not rut:
+            return
+        exists = (
+            self.db.query(SupplierModel.id)
+            .filter(SupplierModel.rut == rut)
+            .first()
+        )
+        if exists:
+            return
+        supplier = SupplierModel()
+        supplier.rut = rut
+        supplier.supplier = (supplier_name or "").upper() or None
+        self.db.add(supplier)
+
+    def _ensure_received_dte(self, row):
+        """
+        After SII/SimpleFactura accept, mirror LibreDTE import into dtes
+        (dte_version_id=2, status_id=1 = No revisada / Recibidas).
+        """
+        if not row or not row.rut or not row.folio:
+            return {"created": False, "reason": "incomplete"}
+
+        folio = int(row.folio)
+        dte_type_id = int(row.dte_type_id or 0)
+        rut = str(row.rut)
+
+        existing = (
+            self.db.query(DteModel.id)
+            .filter(
+                DteModel.dte_version_id == 2,
+                DteModel.folio == folio,
+                DteModel.rut == rut,
+                DteModel.dte_type_id == dte_type_id,
+            )
+            .first()
+        )
+        if existing:
+            return {"created": False, "reason": "exists", "dte_id": existing.id}
+
+        self._ensure_supplier(rut, getattr(row, "supplier", None))
+
+        total = int(row.total or 0)
+        net = int(row.subtotal or 0)
+        tax = int(row.tax if row.tax is not None else (total - net))
+        if dte_type_id == 61:
+            total = -abs(total)
+            net = -abs(net)
+            tax = int(total) - int(net)
+
+        added_date = row.added_date or datetime.now()
+        if row.document_date and not row.added_date:
+            try:
+                added_date = datetime.strptime(
+                    str(row.document_date)[:10] + " 00:00:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+            except ValueError:
+                added_date = datetime.now()
+
+        dte = DteModel()
+        dte.branch_office_id = int(row.branch_office_id or 0)
+        dte.cashier_id = 0
+        dte.dte_type_id = dte_type_id
+        dte.dte_version_id = 2
+        dte.status_id = 1
+        dte.chip_id = 0
+        dte.rut = rut
+        dte.folio = folio
+        dte.cash_amount = total
+        dte.card_amount = 0
+        dte.subtotal = net
+        dte.tax = tax
+        dte.discount = 0
+        dte.total = total
+        dte.added_date = added_date
+        dte.updated_date = datetime.now()
+        self.db.add(dte)
+        self.db.flush()
+        print(
+            f"[received_inbox] created received dte id={dte.id} "
+            f"folio={folio} rut={rut} type={dte_type_id}",
+            flush=True,
+        )
+        return {"created": True, "dte_id": dte.id}
 
     def _map_acknowledgment_status(self, item):
         """
@@ -687,6 +778,8 @@ class ReceivedInboxClass:
                     updated += 1
                 else:
                     skipped += 1
+                if status_id == RECEIVED_INBOX_STATUS_ACCEPTED:
+                    self._ensure_received_dte(existing)
                 continue
 
             supplier_name = (
@@ -757,8 +850,11 @@ class ReceivedInboxClass:
                 updated_date=now,
             )
             self.db.add(row)
+            self.db.flush()
             existing_by_key[key] = row
             inserted += 1
+            if status_id == RECEIVED_INBOX_STATUS_ACCEPTED:
+                self._ensure_received_dte(row)
 
         self.db.commit()
         return {"inserted": inserted, "skipped": skipped, "updated": updated}
@@ -819,16 +915,23 @@ class ReceivedInboxClass:
             now = datetime.now()
             if action == "accept":
                 row.status_id = RECEIVED_INBOX_STATUS_ACCEPTED
-                row.acknowledgment_status = "Accepted"
+                row.acknowledgment_status = "RECIBIDO CONFORME"
+                row.document_status = row.document_status or "RECIBIDO CONFORME"
             else:
                 row.status_id = RECEIVED_INBOX_STATUS_REJECTED
                 row.acknowledgment_status = "Rejected"
             row.updated_date = now
+
+            dte_result = None
+            if action == "accept":
+                dte_result = self._ensure_received_dte(row)
+
             self.db.commit()
             return {
                 "status": "success",
                 "action": action,
                 "id": row.id,
+                "received_dte": dte_result,
                 "simplefactura": body,
             }
         except Exception as exc:
