@@ -79,6 +79,11 @@ class AccountingEntryImportLibreDte(BaseModel):
     user_id: Optional[int] = None
 
 
+class AccountingEntryImportLibreDteDay(BaseModel):
+    date: str
+    user_id: Optional[int] = None
+
+
 @accounting_entries.post("/search")
 def search(payload: AccountingEntrySearch, db: Session = Depends(get_db)):
     data = AccountingEntryClass(db).search(
@@ -91,6 +96,24 @@ def search(payload: AccountingEntrySearch, db: Session = Depends(get_db)):
         user_id=payload.user_id,
         page=payload.page,
         items_per_page=payload.items_per_page,
+    )
+    return {"message": data}
+
+
+@accounting_entries.post("/import_libredte/plan")
+def import_libredte_plan(payload: AccountingEntryImportLibreDte, db: Session = Depends(get_db)):
+    data = AccountingEntryClass(db).import_libredte_plan(
+        since=payload.since,
+        until=payload.until,
+    )
+    return {"message": data}
+
+
+@accounting_entries.post("/import_libredte/day")
+def import_libredte_day(payload: AccountingEntryImportLibreDteDay, db: Session = Depends(get_db)):
+    data = AccountingEntryClass(db).import_from_libredte_day(
+        day=payload.date,
+        user_id=payload.user_id,
     )
     return {"message": data}
 

@@ -465,10 +465,43 @@ class AccountingEntryClass:
             self.db.commit()
         return {"status": "success", "annulled": len(rows)}
 
+    def import_libredte_plan(self, since: str, until: str) -> dict:
+        since = str(since or "").strip()[:10]
+        until = str(until or "").strip()[:10]
+        if not since or not until:
+            return {"status": "error", "message": "Desde y hasta son obligatorios", "days": []}
+        try:
+            start = datetime.strptime(since, "%Y-%m-%d").date()
+            end = datetime.strptime(until, "%Y-%m-%d").date()
+        except ValueError:
+            return {"status": "error", "message": "Fechas inválidas (YYYY-MM-DD)", "days": []}
+        if start > end:
+            return {"status": "error", "message": "Desde no puede ser mayor que hasta", "days": []}
+
+        days = []
+        cursor = start
+        while cursor <= end:
+            days.append(cursor.strftime("%Y-%m-%d"))
+            cursor = cursor.fromordinal(cursor.toordinal() + 1)
+        return {
+            "status": "success",
+            "since": since,
+            "until": until,
+            "days": days,
+            "total_days": len(days),
+        }
+
+    def import_from_libredte_day(self, day: str, user_id: Optional[int] = None) -> dict:
+        day = str(day or "").strip()[:10]
+        if not day:
+            return {"status": "error", "message": "El día es obligatorio"}
+        return self.import_from_libredte(since=day, until=day, user_id=user_id)
+
     def import_from_libredte(self, since: str, until: str, user_id: Optional[int] = None) -> dict:
         """
         Fetch LibreDTE asientos between since/until and upsert into local tables.
         Dedupes by external_ref (LibreDTE id / year-number).
+        Returns `items` so the UI can show live progress per asiento.
         """
         since = str(since or "").strip()[:10]
         until = str(until or "").strip()[:10]
@@ -520,16 +553,29 @@ class AccountingEntryClass:
         skipped = 0
         errors = 0
         now = datetime.now()
+        items = []
 
         for raw in entries:
             if not isinstance(raw, dict):
                 errors += 1
+                items.append({"action": "error", "message": "Asiento inválido"})
                 continue
             try:
                 external_ref = self._libredte_external_ref(raw)
                 if not external_ref:
                     errors += 1
+                    items.append(
+                        {
+                            "action": "error",
+                            "glosa": str(raw.get("glosa") or "")[:120],
+                            "message": "Sin referencia externa",
+                        }
+                    )
                     continue
+
+                glosa = str(raw.get("glosa") or "").strip() or f"Asiento {external_ref}"
+                entry_date = self._parse_entry_date(raw.get("fecha"))
+                number = self._libredte_number(raw, external_ref)
 
                 exists = (
                     self.db.query(AccountingEntryModel.id)
@@ -538,11 +584,17 @@ class AccountingEntryClass:
                 )
                 if exists:
                     skipped += 1
+                    items.append(
+                        {
+                            "action": "skipped",
+                            "external_ref": external_ref,
+                            "number": number,
+                            "fecha": entry_date.strftime("%Y-%m-%d"),
+                            "glosa": glosa[:180],
+                        }
+                    )
                     continue
 
-                entry_date = self._parse_entry_date(raw.get("fecha"))
-                number = self._libredte_number(raw, external_ref)
-                glosa = str(raw.get("glosa") or "").strip() or f"Asiento {external_ref}"
                 operation = raw.get("operacion")
                 if operation not in (None, "", "I", "E"):
                     operation = str(operation)[:8]
@@ -590,10 +642,26 @@ class AccountingEntryClass:
 
                 self.db.commit()
                 imported += 1
+                items.append(
+                    {
+                        "action": "imported",
+                        "external_ref": external_ref,
+                        "number": number,
+                        "fecha": entry_date.strftime("%Y-%m-%d"),
+                        "glosa": glosa[:180],
+                    }
+                )
             except Exception as exc:
                 self.db.rollback()
                 print(f"[accounting_entry.import] error: {exc}", flush=True)
                 errors += 1
+                items.append(
+                    {
+                        "action": "error",
+                        "glosa": str(raw.get("glosa") or "")[:120],
+                        "message": str(exc)[:180],
+                    }
+                )
                 continue
 
         return {
@@ -604,6 +672,7 @@ class AccountingEntryClass:
             "total_libredte": len(entries),
             "since": since,
             "until": until,
+            "items": items,
         }
 
     def _libredte_external_ref(self, raw: dict) -> Optional[str]:
