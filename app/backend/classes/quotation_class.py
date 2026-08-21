@@ -199,7 +199,6 @@ class QuotationClass:
             "period_label": HelperClass.period_detail_label(q.period or ""),
             "renew_mode": q.renew_mode,
             "status_id": q.status_id,
-            "payment_term_id": q.payment_term_id,
             "chip_id": q.chip_id,
             "subtotal": q.subtotal,
             "tax": q.tax,
@@ -336,7 +335,6 @@ class QuotationClass:
             period=period,
             renew_mode=int(getattr(form_data, "renew_mode", RENEW_FIXED) or RENEW_FIXED),
             status_id=STATUS_DRAFT,
-            payment_term_id=int(getattr(form_data, "payment_term_id", 1) or 1),
             chip_id=chip_id,
             subtotal=subtotal,
             tax=tax,
@@ -386,7 +384,6 @@ class QuotationClass:
         row.commune_id = getattr(form_data, "commune_id", None)
         row.period = period
         row.renew_mode = int(getattr(form_data, "renew_mode", row.renew_mode) or RENEW_FIXED)
-        row.payment_term_id = int(getattr(form_data, "payment_term_id", 1) or 1)
         row.chip_id = chip_id
         row.subtotal = subtotal
         row.tax = tax
@@ -770,7 +767,6 @@ class QuotationClass:
                     period=current_period,
                     renew_mode=RENEW_MONTHLY,
                     status_id=STATUS_DRAFT,
-                    payment_term_id=src.payment_term_id,
                     chip_id=0,
                     subtotal=src.subtotal,
                     tax=src.tax,
@@ -850,7 +846,7 @@ class QuotationClass:
             folio=0,
             chip_id=int(q.chip_id or 0),
             category_id=3,
-            payment_term_id=int(q.payment_term_id or 1),
+            payment_term_id=1,
             cash_amount=int(q.total or 0),
             card_amount=0,
             subtotal=int(q.subtotal or 0),

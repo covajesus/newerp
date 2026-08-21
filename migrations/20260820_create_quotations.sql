@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `period` VARCHAR(7) NOT NULL,
   `renew_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '1=fija 2=mes a mes',
   `status_id` TINYINT NOT NULL DEFAULT 1 COMMENT '1=borrador 2=enviada 3=convertida 4=anulada',
-  `payment_term_id` INT DEFAULT 1,
   `chip_id` INT DEFAULT 0,
   `subtotal` INT NOT NULL DEFAULT 0,
   `tax` INT NOT NULL DEFAULT 0,

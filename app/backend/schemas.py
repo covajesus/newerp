@@ -2600,7 +2600,6 @@ class StoreQuotation(BaseModel):
     period: str
     renew_mode: int = 1  # 1 fija, 2 mes a mes
     chip_id: Optional[int] = 0
-    payment_term_id: Optional[int] = 1
     region_id: Optional[int] = None
     commune_id: Optional[int] = None
     customer: Optional[str] = None

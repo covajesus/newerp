@@ -1969,7 +1969,6 @@ class QuotationModel(Base):
     period = Column(String(7), nullable=False)
     renew_mode = Column(Integer, default=1)  # 1 fija, 2 mes a mes
     status_id = Column(Integer, default=1)  # 1 borrador, 2 enviada, 3 convertida, 4 anulada
-    payment_term_id = Column(Integer, default=1)
     chip_id = Column(Integer, default=0)
     subtotal = Column(Integer, default=0)
     tax = Column(Integer, default=0)

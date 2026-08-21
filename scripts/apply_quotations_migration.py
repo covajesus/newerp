@@ -21,7 +21,6 @@ try:
               period VARCHAR(7) NOT NULL,
               renew_mode TINYINT NOT NULL DEFAULT 1,
               status_id TINYINT NOT NULL DEFAULT 1,
-              payment_term_id INT DEFAULT 1,
               chip_id INT DEFAULT 0,
               subtotal INT NOT NULL DEFAULT 0,
               tax INT NOT NULL DEFAULT 0,
