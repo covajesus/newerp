@@ -770,6 +770,13 @@ class QuotationClass:
         }
 
     def send_email(self, quotation_id: int, to_email: Optional[str] = None) -> dict:
+        from email.mime.image import MIMEImage
+        from app.backend.classes.dte_subscriber_email_class import (
+            LOGO_CID,
+            _build_quotation_html_body,
+            _load_brand_logo_bytes,
+        )
+
         q = self.db.query(QuotationModel).filter(QuotationModel.id == quotation_id).first()
         if not q or q.status_id == STATUS_ANNULLED:
             return {"status": "error", "message": "Cotización no encontrada"}
@@ -797,22 +804,41 @@ class QuotationClass:
         if not pdf_bytes:
             return {"status": "error", "message": pdf_err or "No se pudo generar el PDF"}
 
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == q.branch_office_id)
+            .first()
+        )
+        contact = self._branch_contact(branch)
+        logo_bytes = _load_brand_logo_bytes()
         subject = f"JIS Parking - Cotización {q.quotation_number}"
-        body = f"""
-        <div style="font-family:Arial,sans-serif;color:#1d2630;">
-          <h2 style="color:{JIS_PRIMARY};">Cotización {html.escape(q.quotation_number or '')}</h2>
-          <p>Estimado(a) {html.escape(q.customer or 'Cliente')},</p>
-          <p>Adjuntamos la cotización correspondiente al período
-             <b>{html.escape(HelperClass.period_detail_label(q.period or ''))}</b>.</p>
-          <p>Total: <b>{html.escape(self._format_clp(q.total or 0))}</b></p>
-          <p style="color:#5b6b79;font-size:12px;">Este documento no es un DTE del SII.</p>
-        </div>
-        """
+        html_body = _build_quotation_html_body(
+            customer_name=q.customer or "Cliente",
+            quotation_number=q.quotation_number or str(quotation_id),
+            issue_date=self._format_date_short(q.added_date),
+            period_label=HelperClass.period_detail_label(q.period or ""),
+            total_clp=self._format_clp(q.total or 0),
+            contact_name=contact["name"],
+            contact_phone=contact["phone"],
+            contact_email=contact["email"],
+            has_logo=bool(logo_bytes),
+        )
+
         msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
         msg["From"] = f"{smtp['from_name']} <{smtp['user']}>"
         msg["To"] = ", ".join(recipients)
-        msg.attach(MIMEText(body, "html", "utf-8"))
+
+        related = MIMEMultipart("related")
+        alt = MIMEMultipart("alternative")
+        alt.attach(MIMEText(html_body, "html", "utf-8"))
+        related.attach(alt)
+        if logo_bytes:
+            logo_part = MIMEImage(logo_bytes, _subtype="png")
+            logo_part.add_header("Content-ID", f"<{LOGO_CID}>")
+            logo_part.add_header("Content-Disposition", "inline", filename="jisparking-logo.png")
+            related.attach(logo_part)
+        msg.attach(related)
 
         part = MIMEBase("application", "pdf")
         part.set_payload(pdf_bytes)
@@ -820,7 +846,7 @@ class QuotationClass:
         part.add_header(
             "Content-Disposition",
             "attachment",
-            filename=f"{q.quotation_number or 'cotizacion'}.pdf",
+            filename=f"{q.quotation_number or 'quotation'}.pdf",
         )
         msg.attach(part)
 

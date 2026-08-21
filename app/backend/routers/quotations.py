@@ -121,7 +121,7 @@ def pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="cotizacion-{quotation_id}.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="quotation-{quotation_id}.pdf"'},
     )
 
 

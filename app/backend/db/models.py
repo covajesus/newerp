@@ -1896,9 +1896,9 @@ class SettingModel(Base):
     apigetaway_token = Column(Text)
     # 1 = LibreDTE only, 2 = LibreDTE + Intrajis local
     accounting_backend = Column(Integer, default=1)
-    # Clave Tributaria SII para emitir BTE (boletas de terceros / honorarios)
+    # SII tax password for BTE (third-party service receipts / honorarios)
     sii_login_rut = Column(String(32))
-    sii_clave_tributaria = Column(Text)
+    sii_tax_password = Column(Text)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

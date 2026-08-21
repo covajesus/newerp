@@ -1093,6 +1093,8 @@ class UpdateSetting(BaseModel):
     percentage_honorary_bill: str
     apigetaway_token: str
     accounting_backend: Optional[int] = 1
+    sii_login_rut: Optional[str] = None
+    sii_tax_password: Optional[str] = None
 
     @classmethod
     def as_form(cls,
@@ -1106,7 +1108,9 @@ class UpdateSetting(BaseModel):
                 caf_limit: str = Form(),
                 percentage_honorary_bill: str = Form(),
                 apigetaway_token: str = Form(),
-                accounting_backend: int = Form(1)
+                accounting_backend: int = Form(1),
+                sii_login_rut: Optional[str] = Form(None),
+                sii_tax_password: Optional[str] = Form(None),
                 ):
         return cls(
             capitulation_open_period=capitulation_open_period,
@@ -1120,6 +1124,8 @@ class UpdateSetting(BaseModel):
             percentage_honorary_bill=percentage_honorary_bill,
             apigetaway_token=apigetaway_token,
             accounting_backend=accounting_backend,
+            sii_login_rut=sii_login_rut,
+            sii_tax_password=sii_tax_password,
         )
     
 class ImputeCapitulation(BaseModel):

@@ -1,13 +1,13 @@
 from app.backend.db.models import HonoraryModel, EmployeeModel, EmployeeLaborDatumModel, UserModel, BranchOfficeModel, SupervisorModel, BankModel, RegionModel, CommuneModel, HonoraryReasonModel
 from sqlalchemy import desc
-from datetime import datetime
+from datetime import datetime, date
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
-from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.helper_class import HelperClass
-import requests
-import json
+from app.backend.classes.sii.bte import emit_bte
+from app.backend.classes.sii.bte_comunas import REGIONS
+import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
@@ -211,7 +211,7 @@ class HonoraryClass:
             self.db.commit()
 
             if honorary_inputs.foreigner_id == 1:
-                self.send(honorary_inputs)
+                self.send(honorary)
 
             return 1
         except Exception as e:
@@ -423,78 +423,131 @@ class HonoraryClass:
             "errors": errors
         }
         
+    @staticmethod
+    def _normalize_commune_name(name: str) -> str:
+        text = unicodedata.normalize("NFKD", (name or "").strip().upper())
+        text = "".join(c for c in text if not unicodedata.combining(c))
+        return " ".join(text.replace("-", " ").split())
+
+    def _resolve_sii_region_comuna(self, region_id, commune_id) -> tuple[int, int, str]:
+        """Map IntraJIS region/commune to SII BTE codes."""
+        region = RegionClass(self.db).get("id", region_id)
+        commune = CommuneClass(self.db).get("id", commune_id)
+        if not region or isinstance(region, str):
+            raise ValueError("Región no encontrada")
+        if not commune or isinstance(commune, str):
+            raise ValueError("Comuna no encontrada")
+
+        sii_region = int(
+            getattr(region, "simplefactura_region_code", None)
+            or getattr(region, "region_remuneration_code", None)
+            or 0
+        )
+        if sii_region not in REGIONS:
+            # Fallback: try IntraJIS id if it matches SII catalog
+            sii_region = int(getattr(region, "id", 0) or 0)
+        if sii_region not in REGIONS:
+            raise ValueError(
+                f"No se pudo mapear región IntraJIS id={region_id} a código SII BTE"
+            )
+
+        commune_name = getattr(commune, "commune", None) or ""
+        target = self._normalize_commune_name(commune_name)
+        comuna_code = None
+        for cid, cname in REGIONS[sii_region].items():
+            if self._normalize_commune_name(cname) == target:
+                comuna_code = int(cid)
+                break
+        if comuna_code is None:
+            # Partial match (e.g. SAN PEDRO DE MELIPILLA vs SAN PEDRO)
+            for cid, cname in REGIONS[sii_region].items():
+                n = self._normalize_commune_name(cname)
+                if target and (target in n or n in target):
+                    comuna_code = int(cid)
+                    break
+        if comuna_code is None:
+            raise ValueError(
+                f"No se pudo mapear comuna '{commune_name}' a código SII (región {sii_region})"
+            )
+        return sii_region, comuna_code, commune_name
+
     def send(self, data):
+        """Emite BTE ante el SII (Clave Tributaria) — reemplaza SimpleFactura BHE terceros."""
         settings = SettingClass(self.db).get()
-        commune = CommuneClass(self.db).get('id', data.commune_id)
-        region = RegionClass(self.db).get('id', data.region_id)
-        
-        # Obtener fecha actual en formato DD-MM-YYYY para Simple Factura
-        current_date_y_m_d = HelperClass().get_time_Y_m_d()  # Formato YYYY-MM-DD
-        # Convertir a DD-MM-YYYY
-        date_parts = current_date_y_m_d.split('-')
-        current_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
-        
-        amount = HelperClass().remove_from_string('.', str(data.amount))
-        amount = round(int(amount) / float(settings["setting_data"]["percentage_honorary_bill"]))
+        creds = SettingClass(self.db).get_sii_credentials()
+        login_rut = creds.get("login_rut") or ""
+        password = creds.get("password") or ""
+        if not login_rut or not password:
+            print("Clave Tributaria SII no configurada; no se emite BTE")
+            return {
+                "status": "error",
+                "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+            }
 
-        # Verificar y renovar token si es necesario
-        check_token_status = CustomerTicketClass(self.db).check_simplefactura_token()
-        if check_token_status == 0:
-            print('El token de Simple Factura está vencido, renovando...')
-            CustomerTicketClass(self.db).create_simplefactura_token()
-        
-        # Obtener token actualizado
-        updated_settings = SettingClass(self.db).get()
-        token = updated_settings["setting_data"]["simplefactura_token"]
-
-        url = "https://api.simplefactura.cl/bhe/terceros/emitir"
-
-        payload = {
-            "RutEmisor": "76063822-6",
-            "Retencion": 1,
-            "FechaEmision": current_date,
-            "Emisor": {
-                "Rut": data.replacement_employee_rut,
-                "Direccion": "0"
-            },
-            "Receptor": {
-                "Rut": data.replacement_employee_rut,
-                "Nombre": data.replacement_employee_full_name,
-                "Direccion": data.address,
-                "Region": region.simplefactura_region_code,
-                "Comuna": commune.commune if commune else "No especificada"
-            },
-            "Detalles": [
-                {
-                    "Nombre": f"Boleta de Honorarios para {data.replacement_employee_full_name}",
-                    "Valor": amount
-                }
-            ]
-        }
-
-        print(payload)
-        
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
+        pct = settings.get("setting_data", {}).get("percentage_honorary_bill") or "1"
+        amount_raw = HelperClass().remove_from_string(".", str(data.amount))
+        try:
+            amount = round(int(amount_raw) / float(pct))
+        except (TypeError, ValueError, ZeroDivisionError):
+            amount = int(amount_raw or 0)
 
         try:
-            response = requests.post(url, headers=headers, json=payload)
-            
-            print(f"Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
-
-            if response.status_code == 200:
-                print("Boleta de honorarios emitida exitosamente en Simple Factura")
-                return 1
-            else:
-                print(f"Error al emitir boleta de honorarios: {response.status_code} - {response.text}")
-                return 0
-                
+            sii_region, sii_comuna, _commune_name = self._resolve_sii_region_comuna(
+                data.region_id, data.commune_id
+            )
         except Exception as e:
-            print(f"Error de conexión con Simple Factura: {str(e)}")
-            return 0
+            print(f"Error mapeo región/comuna SII: {e}")
+            return {"status": "error", "message": str(e)}
+
+        beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
+        beneficiary_name = (
+            getattr(data, "replacement_employee_full_name", None) or "Beneficiario"
+        ).strip()
+        domicilio = (getattr(data, "address", None) or "Sin dirección").strip()
+        servicio = f"Boleta de Honorarios para {beneficiary_name}"
+
+        try:
+            result = emit_bte(
+                login_rut=login_rut,
+                password=password,
+                beneficiary_rut=beneficiary_rut,
+                beneficiary_name=beneficiary_name,
+                domicilio=domicilio,
+                region=sii_region,
+                comuna=sii_comuna,
+                servicio=servicio,
+                monto=int(amount),
+                issue_date=date.today(),
+            )
+            print(
+                f"BTE emitida SII folio={result.folio} bruto={result.monto_bruto} "
+                f"ret={result.retencion} liq={result.liquido}"
+            )
+            # Guardar folio en observation si hay registro con id
+            honorary_id = getattr(data, "id", None)
+            if honorary_id:
+                row = (
+                    self.db.query(HonoraryModel)
+                    .filter(HonoraryModel.id == honorary_id)
+                    .first()
+                )
+                if row:
+                    note = f"BTE SII folio {result.folio}"
+                    prev = (row.observation or "").strip()
+                    row.observation = f"{prev} | {note}".strip(" |") if prev else note
+                    row.updated_date = datetime.now()
+                    self.db.commit()
+            return {
+                "status": "success",
+                "message": "Boleta de honorarios (BTE) emitida en SII",
+                "folio": result.folio,
+                "monto_bruto": result.monto_bruto,
+                "retencion": result.retencion,
+                "liquido": result.liquido,
+            }
+        except Exception as e:
+            print(f"Error al emitir BTE en SII: {e}")
+            return {"status": "error", "message": str(e)}
 
     def get_data_by_rut(self, rut):
         """
