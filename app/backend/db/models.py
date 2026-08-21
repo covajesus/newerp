@@ -1393,6 +1393,8 @@ class HonoraryModel(Base):
     amount = Column(Integer)
     period = Column(String(255))
     observation = Column(String(255))
+    bte_emitted = Column(Integer, default=0)  # 1 = emitted in SII, 0 = not
+    bte_folio = Column(Integer, nullable=True)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
 

@@ -1081,6 +1081,11 @@ class ImputeHonorary(BaseModel):
                 ):
         return cls(id=id, period=period, expense_type_id=expense_type_id)
 
+class AnnulHonoraryBte(BaseModel):
+    """Payload to annul a BTE in SII from an honorary."""
+    cause: str = "error_digitacion"
+    folio: Optional[int] = None
+
 class UpdateSetting(BaseModel):
     capitulation_open_period: str
     capitulation_close_period: str

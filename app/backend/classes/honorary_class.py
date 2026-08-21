@@ -6,6 +6,7 @@ from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
 from app.backend.classes.helper_class import HelperClass
 import json
+import re
 import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
@@ -39,7 +40,18 @@ class HonoraryClass:
             print(rol_id)
 
             if rol_id == 1 or rol_id == 2 or rol_id == 5:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.period, HonoraryModel.added_date). \
+                data_query = self.db.query(
+                    HonoraryModel.status_id,
+                    HonoraryModel.id,
+                    UserModel.full_name,
+                    HonoraryReasonModel.honorary_reason,
+                    HonoraryModel.replacement_employee_rut,
+                    HonoraryModel.replacement_employee_full_name,
+                    HonoraryModel.period,
+                    HonoraryModel.added_date,
+                    HonoraryModel.bte_emitted,
+                    HonoraryModel.bte_folio,
+                ). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -65,11 +77,24 @@ class HonoraryClass:
                     "replacement_employee_rut": honorary.replacement_employee_rut,
                     "replacement_employee_full_name": honorary.replacement_employee_full_name,
                     "period": honorary.period,
-                    "added_date": honorary.added_date
+                    "added_date": honorary.added_date,
+                    "bte_emitted": int(getattr(honorary, "bte_emitted", 0) or 0),
+                    "bte_folio": getattr(honorary, "bte_folio", None),
                 } for honorary in data]
 
             else:
-                data_query = self.db.query(HonoraryModel.status_id, HonoraryModel.id, UserModel.full_name, HonoraryReasonModel.honorary_reason, HonoraryModel.replacement_employee_rut, HonoraryModel.replacement_employee_full_name, HonoraryModel.period, HonoraryModel.added_date). \
+                data_query = self.db.query(
+                    HonoraryModel.status_id,
+                    HonoraryModel.id,
+                    UserModel.full_name,
+                    HonoraryReasonModel.honorary_reason,
+                    HonoraryModel.replacement_employee_rut,
+                    HonoraryModel.replacement_employee_full_name,
+                    HonoraryModel.period,
+                    HonoraryModel.added_date,
+                    HonoraryModel.bte_emitted,
+                    HonoraryModel.bte_folio,
+                ). \
                     outerjoin(BranchOfficeModel, BranchOfficeModel.id == HonoraryModel.branch_office_id). \
                     outerjoin(HonoraryReasonModel, HonoraryReasonModel.id == HonoraryModel.honorary_reason_id). \
                     outerjoin(UserModel, UserModel.rut == HonoraryModel.requested_by). \
@@ -97,7 +122,9 @@ class HonoraryClass:
                     "replacement_employee_rut": honorary.replacement_employee_rut,
                     "replacement_employee_full_name": honorary.replacement_employee_full_name,
                     "period": honorary.period,
-                    "added_date": honorary.added_date
+                    "added_date": honorary.added_date,
+                    "bte_emitted": int(getattr(honorary, "bte_emitted", 0) or 0),
+                    "bte_folio": getattr(honorary, "bte_folio", None),
                 } for honorary in data]
 
             return {
@@ -138,6 +165,8 @@ class HonoraryClass:
                 "end_date": str(data.end_date),
                 "amount": str(data.amount),
                 "observation": str(data.observation),
+                "bte_emitted": int(getattr(data, "bte_emitted", 0) or 0),
+                "bte_folio": getattr(data, "bte_folio", None),
             }
 
             return json.dumps(serialized_data)
@@ -210,13 +239,26 @@ class HonoraryClass:
             self.db.add(honorary)
             self.db.commit()
 
-            if honorary_inputs.foreigner_id == 1:
-                self.send(honorary)
-
-            return 1
+            return {
+                "status": "success",
+                "message": "Honorario aceptado",
+                "id": honorary.id,
+                "should_emit_sii": int(honorary_inputs.foreigner_id or 0) == 1,
+            }
         except Exception as e:
             error_message = str(e)
-            return f"Error: {error_message}"
+            return {"status": "error", "message": error_message}
+
+    def send_by_id(self, id: int):
+        honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+        if not honorary:
+            return {"status": "error", "message": "Honorario no encontrado"}
+        if int(honorary.foreigner_id or 0) != 1:
+            return {
+                "status": "skipped",
+                "message": "Sin RUT del trabajador: no se emite BTE en SII",
+            }
+        return self.send(honorary)
         
     def delete(self, id):
         try:
@@ -534,7 +576,16 @@ class HonoraryClass:
                 f"BTE emitida SII folio={result.folio} bruto={result.monto_bruto} "
                 f"ret={result.retencion} liq={result.liquido}"
             )
-            # Guardar folio en observation si hay registro con id
+
+            confirmed = self._confirm_bte_in_sii(
+                login_rut=login_rut,
+                password=password,
+                folio=result.folio,
+                issue_date=date.today(),
+            )
+            # 1 = emitted (confirmed in SII list, or folio returned by emit)
+            bte_emitted = 1 if (confirmed or result.folio) else 0
+
             honorary_id = getattr(data, "id", None)
             if honorary_id:
                 row = (
@@ -543,7 +594,11 @@ class HonoraryClass:
                     .first()
                 )
                 if row:
+                    row.bte_emitted = bte_emitted
+                    row.bte_folio = int(result.folio) if result.folio else None
                     note = f"BTE SII folio {result.folio}"
+                    if confirmed:
+                        note += " (confirmada)"
                     prev = (row.observation or "").strip()
                     row.observation = f"{prev} | {note}".strip(" |") if prev else note
                     row.updated_date = datetime.now()
@@ -552,13 +607,179 @@ class HonoraryClass:
                 "status": "success",
                 "message": "Boleta de honorarios (BTE) emitida en SII",
                 "folio": result.folio,
+                "bte_emitted": bte_emitted,
+                "confirmed_in_sii": bool(confirmed),
                 "monto_bruto": result.monto_bruto,
                 "retencion": result.retencion,
                 "liquido": result.liquido,
             }
         except Exception as e:
             print(f"Error al emitir BTE en SII: {e}")
+            honorary_id = getattr(data, "id", None)
+            if honorary_id:
+                row = (
+                    self.db.query(HonoraryModel)
+                    .filter(HonoraryModel.id == honorary_id)
+                    .first()
+                )
+                if row:
+                    row.bte_emitted = 0
+                    row.updated_date = datetime.now()
+                    self.db.commit()
+            return {"status": "error", "message": str(e), "bte_emitted": 0}
+
+    def _confirm_bte_in_sii(self, login_rut, password, folio, issue_date) -> bool:
+        """Consulta BTE emitidas del mes en SII y busca el folio."""
+        if not folio:
+            return False
+        try:
+            from app.backend.classes.sii.bte import list_emitted
+
+            items = list_emitted(
+                login_rut=login_rut,
+                password=password,
+                year=issue_date.year,
+                month=issue_date.month,
+            )
+            folio_int = int(folio)
+            for item in items:
+                if item.folio is not None and int(item.folio) == folio_int:
+                    return True
+            return False
+        except Exception as e:
+            print(f"No se pudo confirmar BTE folio={folio} en SII: {e}")
+            return False
+
+    def verify_bte_status(self, id: int):
+        """Reconsulta SII y actualiza bte_emitted (1/0) para el honorario."""
+        honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+        if not honorary:
+            return {"status": "error", "message": "Honorario no encontrado"}
+
+        folio = honorary.bte_folio
+        if not folio:
+            # Try parse from observation: "BTE SII folio 123"
+            obs = honorary.observation or ""
+            m = re.search(r"folio\s+(\d+)", obs, re.I)
+            if m:
+                folio = int(m.group(1))
+                honorary.bte_folio = folio
+
+        if not folio:
+            honorary.bte_emitted = 0
+            honorary.updated_date = datetime.now()
+            self.db.commit()
+            return {
+                "status": "success",
+                "bte_emitted": 0,
+                "bte_folio": None,
+                "message": "Sin folio BTE; marcado como no emitida",
+            }
+
+        creds = SettingClass(self.db).get_sii_credentials()
+        login_rut = creds.get("login_rut") or ""
+        password = creds.get("password") or ""
+        if not login_rut or not password:
+            return {
+                "status": "error",
+                "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+            }
+
+        ref_date = honorary.updated_date.date() if honorary.updated_date else date.today()
+        confirmed = self._confirm_bte_in_sii(
+            login_rut=login_rut,
+            password=password,
+            folio=folio,
+            issue_date=ref_date,
+        )
+        honorary.bte_emitted = 1 if confirmed else 0
+        honorary.updated_date = datetime.now()
+        self.db.commit()
+        return {
+            "status": "success",
+            "bte_emitted": honorary.bte_emitted,
+            "bte_folio": folio,
+            "confirmed_in_sii": confirmed,
+            "message": (
+                f"BTE folio {folio} confirmada en SII"
+                if confirmed
+                else f"BTE folio {folio} no encontrada en SII del mes"
+            ),
+        }
+
+    def annul_bte(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
+        """Anula BTE en SII y marca el honorario como no emitida (bte_emitted=0)."""
+        honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
+        if not honorary:
+            return {"status": "error", "message": "Honorario no encontrado"}
+
+        try:
+            from app.backend.classes.sii.bte import annul_bte, ANNUL_CAUSES
+        except ModuleNotFoundError as e:
+            return {
+                "status": "error",
+                "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
+            }
+
+        cause_key = (cause or "error_digitacion").strip()
+        if cause_key not in ANNUL_CAUSES:
+            return {
+                "status": "error",
+                "message": f"Motivo inválido. Use: {', '.join(ANNUL_CAUSES.keys())}",
+            }
+
+        target_folio = folio or honorary.bte_folio
+        if not target_folio:
+            obs = honorary.observation or ""
+            m = re.search(r"folio\s+(\d+)", obs, re.I)
+            if m:
+                target_folio = int(m.group(1))
+        if not target_folio:
+            return {
+                "status": "error",
+                "message": "Indique el folio de la BTE a anular",
+            }
+
+        creds = SettingClass(self.db).get_sii_credentials()
+        login_rut = creds.get("login_rut") or ""
+        password = creds.get("password") or ""
+        if not login_rut or not password:
+            return {
+                "status": "error",
+                "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+            }
+
+        try:
+            annul_bte(
+                login_rut=login_rut,
+                password=password,
+                folio=int(target_folio),
+                cause=cause_key,
+            )
+        except Exception as e:
+            print(f"Error al anular BTE folio={target_folio}: {e}")
             return {"status": "error", "message": str(e)}
+
+        cause_label = {
+            "prestacion_no_efectuada": "Prestación no efectuada",
+            "error_digitacion": "Error de digitación",
+        }.get(cause_key, cause_key)
+
+        honorary.bte_emitted = 0
+        honorary.bte_folio = int(target_folio)
+        note = f"BTE SII folio {target_folio} anulada ({cause_label})"
+        prev = (honorary.observation or "").strip()
+        honorary.observation = f"{prev} | {note}".strip(" |") if prev else note
+        honorary.updated_date = datetime.now()
+        self.db.commit()
+
+        return {
+            "status": "success",
+            "message": f"BTE folio {target_folio} anulada en SII",
+            "bte_emitted": 0,
+            "bte_folio": int(target_folio),
+            "cause": cause_key,
+        }
 
     def get_data_by_rut(self, rut):
         """

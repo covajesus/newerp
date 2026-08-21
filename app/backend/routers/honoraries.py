@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
-from app.backend.schemas import Honorary, UpdateHonorary, GenerateHonorary, UserLogin, HonoraryList, ValidateHonoraryRut, ImputeHonorary
+from app.backend.schemas import Honorary, UpdateHonorary, GenerateHonorary, UserLogin, HonoraryList, ValidateHonoraryRut, ImputeHonorary, AnnulHonoraryBte
 from app.backend.classes.honorary_class import HonoraryClass
 from app.backend.auth.auth_user import get_current_active_user
 
@@ -27,6 +27,24 @@ def store(form_data: Honorary = Depends(Honorary.as_form), session_user: UserLog
 def generate(id: int, form_data: GenerateHonorary = Depends(GenerateHonorary.as_form), session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
     data = HonoraryClass(db).generate(id, form_data)
 
+    return {"message": data}
+
+@honoraries.post("/send/{id}")
+def send(id: int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Emite BTE en SII para el honorario (solo si tiene RUT)."""
+    data = HonoraryClass(db).send_by_id(id)
+    return {"message": data}
+
+@honoraries.post("/verify_bte/{id}")
+def verify_bte(id: int, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Reconsulta SII y actualiza bte_emitted (1 emitida / 0 no)."""
+    data = HonoraryClass(db).verify_bte_status(id)
+    return {"message": data}
+
+@honoraries.post("/annul_bte/{id}")
+def annul_bte_route(id: int, payload: AnnulHonoraryBte, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Anula BTE en SII (folio + motivo)."""
+    data = HonoraryClass(db).annul_bte(id, payload.cause, payload.folio)
     return {"message": data}
 
 @honoraries.post("/validate")
