@@ -15,6 +15,7 @@ import uuid
 import base64
 import requests
 import json
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 dtes = APIRouter(
     prefix="/dtes",
@@ -583,6 +584,11 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
                             },
                         )
                         print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                        AccountingEntryClass(db).sync_local_annul_after_libredte_delete(
+                            number=codigo_asiento,
+                            glosa=asiento.get("glosa"),
+                            year=year,
+                        )
                         
                         eliminated_entries.append({
                             "codigo": codigo_asiento,
@@ -710,16 +716,7 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
                     }
                 
                 # Enviar asiento a LibreDTE
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/76063822"
-                
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                )
+                result = AccountingEntryClass(db).create(data, token=TOKEN)
                 
                 # Procesar respuesta
                 dte_result = {
@@ -736,11 +733,11 @@ def send_ticket_bill_assets(period: str, db: Session = Depends(get_db)):
                     "added_date": dte.added_date.strftime('%Y-%m-%d %H:%M:%S') if dte.added_date else None,
                     "payment_date": dte.payment_date.strftime('%Y-%m-%d') if dte.payment_date else None,
                     "glosa": gloss,
-                    "libredte_response_status": response.status_code,
-                    "libredte_response": response.text
+                    "libredte_response_status": (result.get("libredte") or {}).get("http_status", 200 if result.get("status") in ("success", "partial") else 500),
+                    "libredte_response": str((result.get("libredte") or {}).get("body") or (result.get("libredte") or {}).get("message") or result.get("errors") or result)
                 }
                 
-                if response.status_code == 200:
+                if result.get("status") in ("success", "partial"):
                     dte_result["accounting_status"] = "success"
                     dte_result["message"] = "Accounting entry created successfully"
                     successful_entries += 1

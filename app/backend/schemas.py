@@ -1092,6 +1092,7 @@ class UpdateSetting(BaseModel):
     caf_limit: str
     percentage_honorary_bill: str
     apigetaway_token: str
+    accounting_backend: Optional[int] = 1
 
     @classmethod
     def as_form(cls,
@@ -1104,9 +1105,22 @@ class UpdateSetting(BaseModel):
                 simplefactura_token: str = Form(),
                 caf_limit: str = Form(),
                 percentage_honorary_bill: str = Form(),
-                apigetaway_token: str = Form()
+                apigetaway_token: str = Form(),
+                accounting_backend: int = Form(1)
                 ):
-        return cls(capitulation_open_period=capitulation_open_period, capitulation_close_period=capitulation_close_period, honorary_open_period=honorary_open_period, honorary_close_period=honorary_close_period, dropbox_token=dropbox_token, facebook_token=facebook_token, simplefactura_token=simplefactura_token, caf_limit=caf_limit, percentage_honorary_bill=percentage_honorary_bill, apigetaway_token=apigetaway_token)
+        return cls(
+            capitulation_open_period=capitulation_open_period,
+            capitulation_close_period=capitulation_close_period,
+            honorary_open_period=honorary_open_period,
+            honorary_close_period=honorary_close_period,
+            dropbox_token=dropbox_token,
+            facebook_token=facebook_token,
+            simplefactura_token=simplefactura_token,
+            caf_limit=caf_limit,
+            percentage_honorary_bill=percentage_honorary_bill,
+            apigetaway_token=apigetaway_token,
+            accounting_backend=accounting_backend,
+        )
     
 class ImputeCapitulation(BaseModel):
     id: int

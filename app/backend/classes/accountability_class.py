@@ -1,4 +1,4 @@
-﻿import requests
+import requests
 from app.backend.db.models import BranchOfficeModel, ExpenseTypeModel, CollectionModel
 import json
 from calendar import monthrange
@@ -8,6 +8,7 @@ from io import BytesIO
 import pandas as pd
 from sqlalchemy import text, func, extract
 from decimal import Decimal
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class AccountabilityClass:
     def __init__(self, db):
@@ -99,18 +100,9 @@ class AccountabilityClass:
                 },
             }
 
-        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+        result = AccountingEntryClass(self.db).create(data, token=token)
 
-        response = requests.post(
-            url,
-            json=data,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            },
-        )
-
-        print(response.text)
+        print(result)
 
     def delete(self, branch_office_id, period, expense_type_id):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
@@ -202,6 +194,11 @@ class AccountabilityClass:
                 delete_response = requests.get(delete_url, headers=delete_headers)
 
                 print(delete_response.text)
+                AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                    number=asset_number,
+                    glosa=description,
+                    year=period_year,
+                )
     
     def store_subscriber_assets(self, branch_office_id, period):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
@@ -258,18 +255,9 @@ class AccountabilityClass:
                     print(data)
 
 
-                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                    result = AccountingEntryClass(self.db).create(data, token=token)
 
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type": "application/json",
-                        },
-                    )
-
-                    print(response.text)
+                    print(result)
         else:
             branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
             collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.subscribers > 0).first()
@@ -317,18 +305,9 @@ class AccountabilityClass:
                 print(data)
 
 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                result = AccountingEntryClass(self.db).create(data, token=token)
 
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-
-                print(response.text)
+                print(result)
 
     def delete_subscriber_assets(self, branch_office_id, period):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
@@ -408,6 +387,11 @@ class AccountabilityClass:
                 delete_response = requests.get(delete_url, headers=delete_headers)
 
                 print(delete_response.text)
+                AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                    number=asset_number,
+                    glosa=description,
+                    year=period_year,
+                )
 
     def read_store_massive_accountability(self, file_url):
         try:
@@ -498,17 +482,9 @@ class AccountabilityClass:
                             "documentos": {"emitidos": [{"dte": '', "folio": 0}]},
                         }
 
-                    url = "https://libredte.cl/api/lce/lce_asientos/crear/76063822"
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type": "application/json",
-                        },
-                    )
+                    result = AccountingEntryClass(self.db).create(data, token=token)
 
-                    print(response.text)
+                    print(result)
 
                 except Exception as row_error:
                     print(f"[Fila {index + 2}] Error procesando fila: {row_error}")
@@ -568,18 +544,9 @@ class AccountabilityClass:
                             },
                         }
 
-                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                    result = AccountingEntryClass(self.db).create(data, token=token)
 
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type": "application/json",
-                        },
-                    )
-
-                    print(response.text)
+                    print(result)
         else:
             branch_office = self.db.query(BranchOfficeModel).filter(BranchOfficeModel.id == branch_office_id).first()
             collection = self.db.query(CollectionModel).filter(CollectionModel.branch_office_id == branch_office_id).filter(CollectionModel.added_date == period + "-01").filter(CollectionModel.income > 0).first()
@@ -624,18 +591,9 @@ class AccountabilityClass:
                         },
                     }
 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                result = AccountingEntryClass(self.db).create(data, token=token)
 
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-
-                print(response.text)
+                print(result)
 
     def delete_income_assets(self, branch_office_id, period):
         token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
@@ -703,6 +661,11 @@ class AccountabilityClass:
                 )
 
                 print(delete_response.text)
+                AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                    number=asset.get("codigo") or asset.get("asiento"),
+                    glosa=asset.get("glosa"),
+                    year=None,
+                )
 
     def get_monthly_collections_data(self, period=None):
         """
@@ -806,17 +769,8 @@ class AccountabilityClass:
             }
             
             # Enviar asiento a LibreDTE
-            url = f"https://libredte.cl/api/lce/lce_asientos/crear/76063822"
-            
             try:
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
+                result = AccountingEntryClass(self.db).create(data, token=token)
                 
                 result_data = {
                     "branch_office_id": branch_office_id,
@@ -827,12 +781,12 @@ class AccountabilityClass:
                     "iva_amount": iva_amount,
                     "subscribers_total": subscribers_total,
                     "gloss": gloss,
-                    "response_status": response.status_code,
-                    "response_text": response.text
+                    "response_status": (result.get("libredte") or {}).get("http_status", 200 if result.get("status") in ("success", "partial") else 500),
+                    "response_text": str((result.get("libredte") or {}).get("body") or (result.get("libredte") or {}).get("message") or result.get("errors") or result)
                 }
                 
                 results.append(result_data)
-                print(f"✅ Asiento creado para {branch_office.branch_office}: {response.text}")
+                print(f"✅ Asiento creado para {branch_office.branch_office}: {result}")
                 
             except Exception as e:
                 error_data = {
@@ -873,6 +827,11 @@ class AccountabilityClass:
                 )
 
                 print(delete_response.text)
+                AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                    number=asset.get("codigo") or asset.get("asiento"),
+                    glosa=asset.get("glosa"),
+                    year=None,
+                )
 
     def store_all_assets(self, period):
         """
@@ -1000,6 +959,11 @@ class AccountabilityClass:
                                 },
                             )
                             print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                                number=codigo_asset,
+                                glosa=asset.get("glosa") if isinstance(asset, dict) else None,
+                                year=year,
+                            )
                             
                             # Si el primer formato falla, probar formato alternativo
                             if delete_response.status_code != 200:
@@ -1145,6 +1109,11 @@ class AccountabilityClass:
                                 },
                             )
                             print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                                number=codigo_asiento,
+                                glosa=asiento.get("glosa") if isinstance(asiento, dict) else None,
+                                year=year,
+                            )
                             
                             # Si el primer formato falla, probar formato alternativo
                             if delete_response.status_code != 200:
@@ -1262,14 +1231,7 @@ class AccountabilityClass:
                 }
                 
                 try:
-                    response = requests.post(
-                        f"https://libredte.cl/api/lce/lce_asientos/crear/76063822",
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type": "application/json",
-                        },
-                    )
+                    result = AccountingEntryClass(self.db).create(data, token=token)
                     
                     results["created_income_assets"].append({
                         "branch_office_id": branch_office_id,
@@ -1278,8 +1240,8 @@ class AccountabilityClass:
                         "ingreso_neto": net_incomes,
                         "iva_amount": iva_amount,
                         "gloss": gloss,
-                        "response_status": response.status_code,
-                        "response_text": response.text
+                        "response_status": (result.get("libredte") or {}).get("http_status", 200 if result.get("status") in ("success", "partial") else 500),
+                        "response_text": str((result.get("libredte") or {}).get("body") or (result.get("libredte") or {}).get("message") or result.get("errors") or result)
                     })
                     print(f"✅ Asiento de ingresos creado para {branch_office.branch_office}")
                     
@@ -1360,14 +1322,7 @@ class AccountabilityClass:
                     }
                     
                     try:
-                        response = requests.post(
-                            f"https://libredte.cl/api/lce/lce_asientos/crear/76063822",
-                            json=data,
-                            headers={
-                                "Authorization": f"Bearer {token}",
-                                "Content-Type": "application/json",
-                            },
-                        )
+                        result = AccountingEntryClass(self.db).create(data, token=token)
                         
                         results["created_subscriber_assets"].append({
                             "branch_office_id": branch_office.id,
@@ -1376,8 +1331,8 @@ class AccountabilityClass:
                             "neto": round(amount/1.19),
                             "iva": round(amount - (amount/1.19)),
                             "gloss": gloss,
-                            "response_status": response.status_code,
-                            "response_text": response.text
+                            "response_status": (result.get("libredte") or {}).get("http_status", 200 if result.get("status") in ("success", "partial") else 500),
+                            "response_text": str((result.get("libredte") or {}).get("body") or (result.get("libredte") or {}).get("message") or result.get("errors") or result)
                         })
                         print(f"✅ Asiento de abonados creado para {branch_office.branch_office}")
                         
@@ -1744,6 +1699,11 @@ class AccountabilityClass:
                                     },
                                 )
                                 print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
+                                AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                                    number=codigo_asset,
+                                    glosa=asset.get("glosa"),
+                                    year=year,
+                                )
                                 
                                 results["eliminated_seats"].append({
                                     "term": term,

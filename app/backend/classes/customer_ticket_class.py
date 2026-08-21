@@ -23,6 +23,7 @@ from app.backend.classes.folio_class import FolioClass
 from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
 from sqlalchemy import text, bindparam
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 JISBACKEND_SETTINGS_TOKEN_URL = os.getenv(
     "JISBACKEND_SETTINGS_TOKEN_URL",
@@ -1636,18 +1637,9 @@ class CustomerTicketClass:
             }
 
         try:
-            url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+            result = AccountingEntryClass(self.db).create(data, token=TOKEN)
 
-            response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            if response.status_code == 200:
+            if result.get("status") in ("success", "partial"):
                 return "Accounting entry created successfully"
             else:
                 return f"Accounting entry creation failed."

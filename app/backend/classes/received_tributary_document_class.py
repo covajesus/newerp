@@ -13,6 +13,7 @@ import uuid
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
 from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class ReceivedTributaryDocumentClass:
     def __init__(self, db: Session):
@@ -564,18 +565,9 @@ class ReceivedTributaryDocumentClass:
             }
 
         try:
-            url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+            result = AccountingEntryClass(self.db).create(data, token=TOKEN)
 
-            response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-            if response.status_code == 200:
+            if result.get("status") in ("success", "partial"):
                 return "Accounting entry created successfully"
             else:
                 return f"Accounting entry creation failed."
@@ -1190,23 +1182,14 @@ class ReceivedTributaryDocumentClass:
                         },
                     }
                 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                )
+                result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                 
                 # Verificar si la respuesta fue exitosa
-                if response.status_code not in [200, 201]:
+                if result.get("status") not in ("success", "partial"):
                     errors.append({
                         "dte_id": dte.id,
                         "folio": dte.folio,
-                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                     })
                     continue
                 
@@ -1363,23 +1346,14 @@ class ReceivedTributaryDocumentClass:
                     },
                 }
                 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                )
+                result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                 
                 # Verificar si la respuesta fue exitosa
-                if response.status_code not in [200, 201]:
+                if result.get("status") not in ("success", "partial"):
                     errors.append({
                         "dte_id": dte.id,
                         "folio": dte.folio,
-                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                     })
                     continue
                 

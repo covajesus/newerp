@@ -9,6 +9,7 @@ from app.backend.classes.helper_class import HelperClass
 import requests
 import json
 from sqlalchemy import func
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class HonoraryClass:
     def __init__(self, db):
@@ -285,16 +286,7 @@ class HonoraryClass:
                 },
             }
 
-        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-
-        response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
+        result = AccountingEntryClass(self.db).create(data, token=TOKEN)
 
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == form_data.id).first()
         honorary.status_id = 15
@@ -386,22 +378,13 @@ class HonoraryClass:
                     },
                 }
                 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Content-Type": "application/json",
-                    },
-                )
+                result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                 
                 # Verificar si la respuesta fue exitosa
-                if response.status_code not in [200, 201]:
+                if result.get("status") not in ("success", "partial"):
                     errors.append({
                         "honorary_id": honorary.id,
-                        "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                        "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                     })
                     continue
                 

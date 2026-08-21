@@ -81,6 +81,7 @@ from app.backend.routers.group_details import group_details
 from app.backend.routers.dte_line_item_names import dte_line_item_names
 from app.backend.routers.dte_line_item_details import dte_line_item_details
 from app.backend.routers.accountability import accountability
+from app.backend.routers.accounting_entries import accounting_entries, accounting_accounts
 from app.backend.routers.remuneration import remuneration
 from app.backend.routers.suppliers import suppliers
 from app.backend.routers.kpis import kpis
@@ -210,6 +211,8 @@ app.include_router(group_details)
 app.include_router(dte_line_item_names)
 app.include_router(dte_line_item_details)
 app.include_router(accountability)
+app.include_router(accounting_entries)
+app.include_router(accounting_accounts)
 app.include_router(remuneration)
 app.include_router(suppliers)
 app.include_router(kpis)

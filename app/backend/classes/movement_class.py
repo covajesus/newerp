@@ -9,6 +9,7 @@ import json
 import pandas as pd
 import io
 import requests
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class MovementClass:
     def __init__(self, db: Session):
@@ -289,16 +290,11 @@ class MovementClass:
                             }
                             
                             if amount > 0:
-                                response = requests.post(
-                                    f"{url_base}/api/lce/lce_asientos/crear/{emisor}",
-                                    json=datos,
-                                    headers=headers,
-                                    timeout=30
-                                )
+                                result = AccountingEntryClass(self.db).create(datos, token=hash_value)
                                 
-                                if response.status_code != 200:
+                                if result.get("status") not in ("success", "partial"):
                                     # Log del error pero no fallar la operación
-                                    print(f"Error al crear asiento contable: {response.text}")
+                                    print(f"Error al crear asiento contable: {result}")
                             
                     except Exception as e:
                         # Log del error pero no fallar la operación principal
@@ -631,22 +627,13 @@ class MovementClass:
                                     }
                                     
                                     # Enviar a LibreDTE
-                                    url_create = f"{url_base}/api/lce/lce_asientos/crear/{emisor}"
-                                    
-                                    response = requests.post(
-                                        url_create,
-                                        json=datos,
-                                        headers={
-                                            "Authorization": f"Bearer {TOKEN}",
-                                            "Content-Type": "application/json"
-                                        }
-                                    )
+                                    result = AccountingEntryClass(self.db).create(datos, token=TOKEN)
                                     
                                     # Si la imputación es exitosa, actualizar status del movimiento
-                                    if response.status_code == 200:
+                                    if result.get("status") in ("success", "partial"):
                                         new_movement.status_id = 15  # Imputado
                                     else:
-                                        print(f"Warning: Failed to create accounting entry for movement {new_movement.id}: {response.text}")
+                                        print(f"Warning: Failed to create accounting entry for movement {new_movement.id}: {result}")
                                         
                                 except Exception as date_error:
                                     print(f"Error processing period {period} for movement {new_movement.id}: {str(date_error)}")
@@ -809,22 +796,13 @@ class MovementClass:
                     }
                     
                     # Enviar a LibreDTE
-                    url_create = f"{url_base}/api/lce/lce_asientos/crear/{emisor}"
+                    result = AccountingEntryClass(self.db).create(datos, token=TOKEN)
                     
-                    response = requests.post(
-                        url_create,
-                        json=datos,
-                        headers={
-                            "Authorization": f"Bearer {TOKEN}",
-                            "Content-Type": "application/json"
-                        }
-                    )
-                    
-                    print(f"LibreDTE Response for product {movement_product.id}: {response.text}")
+                    print(f"LibreDTE Response for product {movement_product.id}: {result}")
                     
                     # Verificar respuesta siguiendo el patrón de otras clases
-                    if response.status_code != 200:
-                        print(f"Warning: Failed to create accounting entry for product {movement_product.id}: {response.text}")
+                    if result.get("status") not in ("success", "partial"):
+                        print(f"Warning: Failed to create accounting entry for product {movement_product.id}: {result}")
                         # Continuar con el siguiente producto
                         continue
                         

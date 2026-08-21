@@ -8,6 +8,7 @@ from app.backend.classes.customer_ticket_class import (
     _is_simplefactura_v2_dte,
     is_document_simplefactura_v2,
 )
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import or_
@@ -615,18 +616,9 @@ class CustomerTicketBillClass:
                 },
             }
 
-        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+        result = AccountingEntryClass(self.db).create(data, token=TOKEN)
 
-        response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-        if response.status_code == 200:
+        if result.get("status") in ("success", "partial"):
             return "Accounting entry created successfully"
         else:
             return f"Accounting entry creation failed."

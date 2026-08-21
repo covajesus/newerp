@@ -9,6 +9,7 @@ from sqlalchemy.orm import aliased
 import requests
 import json
 from sqlalchemy import cast, String, case, or_, func, and_, extract
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class CapitulationClass:
     def __init__(self, db: Session):
@@ -571,18 +572,9 @@ class CapitulationClass:
                     },
                 }
 
-                url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+                result = AccountingEntryClass(self.db).create(data, token=token)
 
-                response = requests.post(
-                    url,
-                    json=data,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-
-                if response.status_code == 200:
+                if result.get("status") in ("success", "partial"):
                     return {"status": "success", "message": "Capitulation imputed successfully"}
             else:
                 return {"status": "success", "message": "Capitulation imputed successfully"}
@@ -710,22 +702,13 @@ class CapitulationClass:
                         },
                     }
                     
-                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                    
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {TOKEN}",
-                            "Content-Type": "application/json",
-                        },
-                    )
+                    result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                     
                     # Verificar si la respuesta fue exitosa
-                    if response.status_code not in [200, 201]:
+                    if result.get("status") not in ("success", "partial"):
                         errors.append({
                             "capitulation_id": capitulation.id,
-                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                            "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                         })
                         continue
                 
@@ -898,22 +881,13 @@ class CapitulationClass:
                         },
                     }
                     
-                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                    
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {TOKEN}",
-                            "Content-Type": "application/json",
-                        },
-                    )
+                    result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                     
                     # Verificar si la respuesta fue exitosa
-                    if response.status_code not in [200, 201]:
+                    if result.get("status") not in ("success", "partial"):
                         errors.append({
                             "capitulation_id": capitulation.id,
-                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                            "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                         })
                         continue
                 
@@ -1116,22 +1090,13 @@ class CapitulationClass:
                         },
                     }
                     
-                    url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
-                    
-                    response = requests.post(
-                        url,
-                        json=data,
-                        headers={
-                            "Authorization": f"Bearer {TOKEN}",
-                            "Content-Type": "application/json",
-                        },
-                    )
+                    result = AccountingEntryClass(self.db).create(data, token=TOKEN)
                     
                     # Verificar si la respuesta fue exitosa
-                    if response.status_code not in [200, 201]:
+                    if result.get("status") not in ("success", "partial"):
                         errors.append({
                             "capitulation_id": capitulation.id,
-                            "error": f"Error al crear asiento contable: {response.status_code} - {response.text}"
+                            "error": f"Error al crear asiento contable: {result.get('status')} - {result.get('errors') or result}"
                         })
                         # Continuar para actualizar el status aunque falle el envío a LibreDTE
                 

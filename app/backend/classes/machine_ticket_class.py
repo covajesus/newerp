@@ -11,6 +11,7 @@ import uuid
 import base64
 from sqlalchemy import or_
 import json
+from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
 class MachineTicketClass:
     def __init__(self, db: Session):
@@ -464,18 +465,9 @@ class MachineTicketClass:
                 },
             }
 
-        url = f"https://libredte.cl/api/lce/lce_asientos/crear/" + "76063822"
+        result = AccountingEntryClass(self.db).create(data, token=TOKEN)
 
-        response = requests.post(
-                url,
-                json=data,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-        if response.status_code == 200:
+        if result.get("status") in ("success", "partial"):
             return "Accounting entry created successfully"
         else:
             return f"Accounting entry creation failed."

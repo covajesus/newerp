@@ -19,7 +19,8 @@ class SettingClass:
                 SettingModel.simplefactura_token,
                 SettingModel.caf_limit,
                 SettingModel.percentage_honorary_bill,
-                SettingModel.apigetaway_token
+                SettingModel.apigetaway_token,
+                SettingModel.accounting_backend,
             ).filter(SettingModel.id == 1).first()
 
             if data_query:
@@ -34,7 +35,8 @@ class SettingClass:
                     "simplefactura_token": data_query.simplefactura_token,
                     "caf_limit": data_query.caf_limit,
                     "percentage_honorary_bill": data_query.percentage_honorary_bill,
-                    "apigetaway_token": data_query.apigetaway_token
+                    "apigetaway_token": data_query.apigetaway_token,
+                    "accounting_backend": int(data_query.accounting_backend or 1),
                 }
 
                 return {"setting_data": setting_data}
@@ -59,6 +61,12 @@ class SettingClass:
         settings.caf_limit = form_data.caf_limit
         settings.percentage_honorary_bill = form_data.percentage_honorary_bill
         settings.apigetaway_token = form_data.apigetaway_token
+        try:
+            settings.accounting_backend = int(getattr(form_data, "accounting_backend", 1) or 1)
+        except (TypeError, ValueError):
+            settings.accounting_backend = 1
+        if settings.accounting_backend not in (1, 2):
+            settings.accounting_backend = 1
 
         self.db.commit()
 

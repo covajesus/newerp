@@ -1894,8 +1894,63 @@ class SettingModel(Base):
     caf_limit = Column(Integer)
     percentage_honorary_bill = Column(Text)
     apigetaway_token = Column(Text)
+    # 1 = LibreDTE only, 2 = LibreDTE + Intrajis local
+    accounting_backend = Column(Integer, default=1)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+
+class AccountingAccountModel(Base):
+    __tablename__ = 'accounting_accounts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(32), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    status_id = Column(Integer, default=1)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class AccountingEntryModel(Base):
+    __tablename__ = 'accounting_entries'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    number = Column(Integer, nullable=False)
+    period = Column(String(7))
+    entry_date = Column(Date)
+    glosa = Column(String(512), nullable=False)
+    operation = Column(String(8))
+    annulled = Column(Integer, default=0)
+    user_id = Column(Integer)
+    source = Column(String(32), default='system')
+    external_ref = Column(String(128))
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class AccountingEntryLineModel(Base):
+    __tablename__ = 'accounting_entry_lines'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    accounting_entry_id = Column(Integer, ForeignKey('accounting_entries.id'))
+    account_code = Column(String(32), nullable=False)
+    debit = Column(Integer, default=0)
+    credit = Column(Integer, default=0)
+    concept = Column(String(255))
+    sort_order = Column(Integer, default=0)
+
+
+class AccountingEntryDocumentModel(Base):
+    __tablename__ = 'accounting_entry_documents'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    accounting_entry_id = Column(Integer, ForeignKey('accounting_entries.id'))
+    doc_type = Column(String(16), nullable=False)
+    issuer_rut = Column(String(16))
+    dte_type_id = Column(Integer)
+    folio = Column(Integer)
+    period = Column(String(7))
+
 
 class AlertUserModel(Base):
     __tablename__ = 'alert_users'
