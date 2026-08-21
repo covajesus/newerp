@@ -942,9 +942,10 @@ class ReceivedInboxClass:
         if not self._is_acknowledgment_pending(row.status_id, row.acknowledgment_status):
             return {"status": "error", "message": "DTE already accepted or rejected"}
 
+        # SimpleFactura exige Comentario siempre (también en acuse conforme).
         comment = (getattr(form_data, "comment", None) or "").strip()
-        if action == "reject" and not comment:
-            comment = "Rejected"
+        if not comment:
+            comment = "Recibido conforme" if action == "accept" else "Rechazado"
 
         try:
             environment = SIMPLEFACTURA_AMBIENTE
@@ -970,13 +971,12 @@ class ReceivedInboxClass:
                     if action == "accept"
                     else SIMPLEFACTURA_RESPONSE_REJECTED
                 ),
-                "tipo_rechazo": (
-                    None
-                    if action == "accept"
-                    else int(getattr(form_data, "rejection_type_id", None) or 1)
-                ),
-                "comentario": comment or None,
+                "comentario": comment,
             }
+            if action == "reject":
+                payload["tipo_rechazo"] = int(
+                    getattr(form_data, "rejection_type_id", None) or 1
+                )
             body = self._simplefactura_post(SIMPLEFACTURA_ACKNOWLEDGMENT_URL, payload)
 
             now = datetime.now()

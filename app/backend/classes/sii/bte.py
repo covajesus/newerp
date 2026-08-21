@@ -476,7 +476,7 @@ def _parse_int(value: str | None) -> int | None:
 
 def _comuna_name(region: int, comuna: int) -> str | None:
     try:
-        from app.backend.classes.sii.bte_communes import REGIONS
+        from invoicer.sii.bte_comunas import REGIONS
 
         return REGIONS.get(region, {}).get(comuna)
     except Exception:

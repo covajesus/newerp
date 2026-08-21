@@ -1,4 +1,4 @@
-"""SII regions/communes catalog (from cvc/comun/cat_comunas.js)."""
+"""Catálogo de regiones/comunas SII (desde cvc/comun/cat_comunas.js)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def regions_list() -> list[dict]:
         16: "Ñuble",
     }
     return [
-        {"id": rid, "name": labels.get(rid, f"Region {rid}"), "communes": [
+        {"id": rid, "name": labels.get(rid, f"Región {rid}"), "comunas": [
             {"id": cid, "name": cname} for cid, cname in sorted(REGIONS[rid].items())
         ]}
         for rid in sorted(REGIONS)
