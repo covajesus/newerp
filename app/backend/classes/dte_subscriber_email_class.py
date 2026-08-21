@@ -415,6 +415,7 @@ def _build_quotation_html_body(
     contact_phone: str,
     contact_email: str,
     has_logo: bool,
+    tracking_pixel_url: str | None = None,
 ) -> str:
     name = html.escape(customer_name or "Cliente")
     number_s = html.escape(quotation_number or "—")
@@ -431,6 +432,14 @@ def _build_quotation_html_body(
               <img src="cid:{LOGO_CID}" alt="JIS Parking" width="200"
                    style="display:block;margin:0 auto 14px;max-width:200px;height:auto;border:0;" />
         """
+
+    pixel_block = ""
+    if tracking_pixel_url:
+        safe_url = html.escape(tracking_pixel_url, quote=True)
+        pixel_block = (
+            f'<img src="{safe_url}" width="1" height="1" alt="" '
+            f'style="display:block;width:1px;height:1px;border:0;opacity:0;" />'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -511,6 +520,7 @@ def _build_quotation_html_body(
                   contacto@jisparking.com
                 </a>
               </p>
+              {pixel_block}
             </td>
           </tr>
         </table>

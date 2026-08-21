@@ -745,23 +745,22 @@ class HonoraryClass:
             ),
         }
 
-    def annul_bte(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
-        """Anula BTE en SII y marca el honorario como no emitida (bte_emitted=0)."""
+    def _resolve_annul_bte_inputs(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
         if not honorary:
-            return {"status": "error", "message": "Honorario no encontrado"}
+            return None, {"status": "error", "message": "Honorario no encontrado"}
 
         try:
-            from app.backend.classes.sii.bte import annul_bte, ANNUL_CAUSES
+            from app.backend.classes.sii.bte import ANNUL_CAUSES
         except ModuleNotFoundError as e:
-            return {
+            return None, {
                 "status": "error",
                 "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
             }
 
         cause_key = (cause or "error_digitacion").strip()
         if cause_key not in ANNUL_CAUSES:
-            return {
+            return None, {
                 "status": "error",
                 "message": f"Motivo inválido. Use: {', '.join(ANNUL_CAUSES.keys())}",
             }
@@ -773,9 +772,51 @@ class HonoraryClass:
             if m:
                 target_folio = int(m.group(1))
         if not target_folio:
-            return {
+            return None, {
                 "status": "error",
                 "message": "Indique el folio de la BTE a anular",
+            }
+
+        return {
+            "honorary": honorary,
+            "cause_key": cause_key,
+            "folio": int(target_folio),
+        }, None
+
+    def prepare_annul_bte(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
+        """Paso 1: valida folio, motivo y credenciales SII."""
+        resolved, err = self._resolve_annul_bte_inputs(id, cause, folio)
+        if err:
+            return err
+
+        creds = SettingClass(self.db).get_sii_credentials()
+        login_rut = creds.get("login_rut") or ""
+        password = creds.get("password") or ""
+        if not login_rut or not password:
+            return {
+                "status": "error",
+                "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+            }
+
+        return {
+            "status": "success",
+            "message": "Datos validados; listo para anular en SII",
+            "folio": resolved["folio"],
+            "cause": resolved["cause_key"],
+        }
+
+    def annul_bte_sii(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
+        """Paso 2: anula la BTE en el portal SII."""
+        resolved, err = self._resolve_annul_bte_inputs(id, cause, folio)
+        if err:
+            return err
+
+        try:
+            from app.backend.classes.sii.bte import annul_bte
+        except ModuleNotFoundError as e:
+            return {
+                "status": "error",
+                "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
             }
 
         creds = SettingClass(self.db).get_sii_credentials()
@@ -787,6 +828,8 @@ class HonoraryClass:
                 "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
             }
 
+        target_folio = resolved["folio"]
+        cause_key = resolved["cause_key"]
         try:
             annul_bte(
                 login_rut=login_rut,
@@ -798,6 +841,22 @@ class HonoraryClass:
             print(f"Error al anular BTE folio={target_folio}: {e}")
             return {"status": "error", "message": str(e)}
 
+        return {
+            "status": "success",
+            "message": f"BTE folio {target_folio} anulada en SII",
+            "folio": int(target_folio),
+            "cause": cause_key,
+        }
+
+    def annul_bte_local(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
+        """Paso 3: actualiza el honorario en Intrajis (bte_emitted=0)."""
+        resolved, err = self._resolve_annul_bte_inputs(id, cause, folio)
+        if err:
+            return err
+
+        honorary = resolved["honorary"]
+        target_folio = resolved["folio"]
+        cause_key = resolved["cause_key"]
         cause_label = {
             "prestacion_no_efectuada": "Prestación no efectuada",
             "error_digitacion": "Error de digitación",
@@ -813,10 +872,42 @@ class HonoraryClass:
 
         return {
             "status": "success",
-            "message": f"BTE folio {target_folio} anulada en SII",
+            "message": "Honorario actualizado en Intrajis",
             "bte_emitted": 0,
             "bte_folio": int(target_folio),
             "cause": cause_key,
+        }
+
+    def annul_bte(self, id: int, cause: str = "error_digitacion", folio: int | None = None):
+        """Anula BTE en SII y marca el honorario como no emitida (bte_emitted=0)."""
+        prepared = self.prepare_annul_bte(id, cause, folio)
+        if prepared.get("status") == "error":
+            return prepared
+
+        sii = self.annul_bte_sii(id, cause, folio)
+        if sii.get("status") == "error":
+            return sii
+
+        local = self.annul_bte_local(id, cause, folio)
+        if local.get("status") == "error":
+            return {
+                "status": "partial",
+                "message": (
+                    "BTE anulada en SII, pero no se pudo actualizar Intrajis: "
+                    f"{local.get('message')}"
+                ),
+                "sii": sii,
+                "local": local,
+            }
+
+        return {
+            "status": "success",
+            "message": f"BTE folio {sii.get('folio')} anulada en SII",
+            "bte_emitted": 0,
+            "bte_folio": sii.get("folio"),
+            "cause": sii.get("cause"),
+            "sii": sii,
+            "local": local,
         }
 
     def get_data_by_rut(self, rut):

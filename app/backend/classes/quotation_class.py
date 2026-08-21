@@ -6,6 +6,7 @@ import html
 import io
 import os
 import re
+import secrets
 import smtplib
 from datetime import datetime
 from email import encoders
@@ -300,6 +301,12 @@ class QuotationClass:
             "total": q.total,
             "last_sent_at": q.last_sent_at.strftime("%d-%m-%Y %H:%M") if q.last_sent_at else None,
             "last_sent_channel": q.last_sent_channel,
+            "email_read": int(getattr(q, "email_read", 0) or 0),
+            "email_read_at": (
+                q.email_read_at.strftime("%d-%m-%Y %H:%M")
+                if getattr(q, "email_read_at", None)
+                else None
+            ),
             "converted_dte_id": q.converted_dte_id,
             "source_quotation_id": q.source_quotation_id,
             "added_date": q.added_date.strftime("%d-%m-%Y") if q.added_date else None,
@@ -811,6 +818,17 @@ class QuotationClass:
         )
         contact = self._branch_contact(branch)
         logo_bytes = _load_brand_logo_bytes()
+        # Tracking pixel: new token on each send; reset read flag
+        token = secrets.token_urlsafe(24)
+        q.email_read_token = token
+        q.email_read = 0
+        q.email_read_at = None
+        public_base = os.getenv(
+            "PUBLIC_API_BASE_URL",
+            "https://intrajisbackend.com/api",
+        ).rstrip("/")
+        tracking_pixel_url = f"{public_base}/quotations/email_open/{token}.gif"
+
         subject = f"JIS Parking - Cotización {q.quotation_number}"
         html_body = _build_quotation_html_body(
             customer_name=q.customer or "Cliente",
@@ -822,6 +840,7 @@ class QuotationClass:
             contact_phone=contact["phone"],
             contact_email=contact["email"],
             has_logo=bool(logo_bytes),
+            tracking_pixel_url=tracking_pixel_url,
         )
 
         msg = MIMEMultipart("mixed")
@@ -864,6 +883,27 @@ class QuotationClass:
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": f"Error SMTP: {e}"}
+
+    def mark_email_read(self, token: str) -> bool:
+        """Marca email_read=1 cuando el cliente abre el correo (píxel)."""
+        token = (token or "").strip()
+        if token.endswith(".gif"):
+            token = token[:-4]
+        if not token:
+            return False
+        q = (
+            self.db.query(QuotationModel)
+            .filter(QuotationModel.email_read_token == token)
+            .first()
+        )
+        if not q:
+            return False
+        if int(getattr(q, "email_read", 0) or 0) != 1:
+            q.email_read = 1
+            q.email_read_at = datetime.now()
+            q.updated_date = datetime.now()
+            self.db.commit()
+        return True
 
     def send_whatsapp(self, quotation_id: int, phone: Optional[str] = None) -> dict:
         """

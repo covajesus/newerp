@@ -47,6 +47,24 @@ def annul_bte_route(id: int, payload: AnnulHonoraryBte, session_user: UserLogin 
     data = HonoraryClass(db).annul_bte(id, payload.cause, payload.folio)
     return {"message": data}
 
+@honoraries.post("/annul_bte_prepare/{id}")
+def annul_bte_prepare(id: int, payload: AnnulHonoraryBte, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Paso 1: valida datos y credenciales SII."""
+    data = HonoraryClass(db).prepare_annul_bte(id, payload.cause, payload.folio)
+    return {"message": data}
+
+@honoraries.post("/annul_bte_sii/{id}")
+def annul_bte_sii(id: int, payload: AnnulHonoraryBte, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Paso 2: anula BTE en el portal SII."""
+    data = HonoraryClass(db).annul_bte_sii(id, payload.cause, payload.folio)
+    return {"message": data}
+
+@honoraries.post("/annul_bte_local/{id}")
+def annul_bte_local(id: int, payload: AnnulHonoraryBte, session_user: UserLogin = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Paso 3: actualiza honorario en Intrajis."""
+    data = HonoraryClass(db).annul_bte_local(id, payload.cause, payload.folio)
+    return {"message": data}
+
 @honoraries.post("/validate")
 def validate(form_data: ValidateHonoraryRut = Depends(ValidateHonoraryRut.as_form), db: Session = Depends(get_db)):
     data = HonoraryClass(db).validate(form_data)

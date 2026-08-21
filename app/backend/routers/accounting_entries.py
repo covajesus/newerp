@@ -146,6 +146,20 @@ def annul_entry(entry_id: int, db: Session = Depends(get_db)):
     return {"message": data}
 
 
+@accounting_entries.post("/{entry_id}/annul_local")
+def annul_entry_local(entry_id: int, db: Session = Depends(get_db)):
+    """Paso 1: anular solo en Intrajis."""
+    data = AccountingEntryClass(db).annul_local(entry_id)
+    return {"message": data}
+
+
+@accounting_entries.post("/{entry_id}/annul_libredte")
+def annul_entry_libredte(entry_id: int, db: Session = Depends(get_db)):
+    """Paso 2: eliminar asiento en LibreDTE."""
+    data = AccountingEntryClass(db).annul_libredte(entry_id)
+    return {"message": data}
+
+
 @accounting_accounts.post("/search")
 def search_accounts(payload: AccountingAccountSearch, db: Session = Depends(get_db)):
     data = AccountingEntryClass(db).search_accounts(

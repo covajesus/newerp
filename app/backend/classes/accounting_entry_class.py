@@ -14,6 +14,8 @@ from app.backend.db.models import (
 )
 
 LIBREDTE_ASIENTO_URL = "https://libredte.cl/api/lce/lce_asientos/crear/76063822"
+LIBREDTE_ASIENTO_DELETE_URL = "https://libredte.cl/api/lce/lce_asientos/eliminar"
+LIBREDTE_COMPANY_RUT = "76063822"
 LIBREDTE_DEFAULT_TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
 ACCOUNTING_BACKEND_LIBREDTE = 1
 ACCOUNTING_BACKEND_BOTH = 2
@@ -410,14 +412,171 @@ class AccountingEntryClass:
             },
         }
 
-    def annul(self, entry_id: int):
+    def _entry_year_number(self, entry: AccountingEntryModel) -> tuple[int, int]:
+        year = None
+        if entry.entry_date:
+            year = int(entry.entry_date.year)
+        elif entry.period:
+            try:
+                year = int(str(entry.period).split("-")[0])
+            except (TypeError, ValueError, IndexError):
+                year = None
+        if year is None:
+            year = datetime.now().year
+        return year, int(entry.number or 0)
+
+    def annul_local(self, entry_id: int):
+        """Marca el asiento como anulado solo en Intrajis."""
         entry = self.db.query(AccountingEntryModel).filter(AccountingEntryModel.id == entry_id).first()
         if not entry:
             return {"status": "error", "message": "Asiento no encontrado"}
+        if int(entry.annulled or 0) == 1:
+            year, number = self._entry_year_number(entry)
+            return {
+                "status": "success",
+                "id": entry.id,
+                "number": number,
+                "year": year,
+                "message": "El asiento ya estaba anulado en Intrajis",
+            }
+
+        year, number = self._entry_year_number(entry)
         entry.annulled = 1
         entry.updated_date = datetime.now()
         self.db.commit()
-        return {"status": "success", "id": entry.id}
+        return {
+            "status": "success",
+            "id": entry.id,
+            "number": number,
+            "year": year,
+            "message": "Asiento anulado en Intrajis",
+        }
+
+    def annul_libredte(self, entry_id: int):
+        """Elimina el asiento equivalente en LibreDTE."""
+        entry = self.db.query(AccountingEntryModel).filter(AccountingEntryModel.id == entry_id).first()
+        if not entry:
+            return {"status": "error", "message": "Asiento no encontrado"}
+
+        year, number = self._entry_year_number(entry)
+        libredte_result = self._delete_libredte(
+            year=year,
+            number=number,
+            external_ref=entry.external_ref,
+        )
+        return {
+            "status": libredte_result.get("status") or "error",
+            "id": entry.id,
+            "number": number,
+            "year": year,
+            "libredte": libredte_result,
+            "message": (
+                "Asiento eliminado en LibreDTE"
+                if libredte_result.get("status") == "success"
+                else (libredte_result.get("message") or "No se pudo eliminar en LibreDTE")
+            ),
+        }
+
+    def annul(self, entry_id: int):
+        """Anula en Intrajis y elimina el asiento equivalente en LibreDTE."""
+        local = self.annul_local(entry_id)
+        if local.get("status") == "error":
+            return local
+
+        libredte = self.annul_libredte(entry_id)
+        status = "success"
+        if libredte.get("status") == "error":
+            status = "partial"
+
+        return {
+            "status": status,
+            "id": local.get("id"),
+            "number": local.get("number"),
+            "year": local.get("year"),
+            "local": {"status": "success", "annulled": 1},
+            "libredte": libredte.get("libredte") or libredte,
+            "message": (
+                "Asiento anulado en Intrajis y eliminado en LibreDTE"
+                if status == "success"
+                else (
+                    "Asiento anulado en Intrajis, pero no se pudo eliminar en LibreDTE: "
+                    f"{libredte.get('message') or 'error desconocido'}"
+                )
+            ),
+        }
+
+    def _delete_libredte(
+        self,
+        year: int,
+        number: int,
+        external_ref: Optional[str] = None,
+        token: Optional[str] = None,
+    ) -> dict:
+        auth = token or LIBREDTE_DEFAULT_TOKEN
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {auth}",
+        }
+        attempts = []
+        if year and number:
+            attempts.append(
+                f"{LIBREDTE_ASIENTO_DELETE_URL}/{int(year)}/{int(number)}/{LIBREDTE_COMPANY_RUT}"
+            )
+        if external_ref:
+            ref = str(external_ref).strip()
+            if ref.isdigit():
+                attempts.append(f"{LIBREDTE_ASIENTO_DELETE_URL}/{ref}/{LIBREDTE_COMPANY_RUT}")
+            # Some imports store "year-number"
+            if "-" in ref:
+                parts = ref.split("-")
+                if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+                    attempts.append(
+                        f"{LIBREDTE_ASIENTO_DELETE_URL}/{parts[0]}/{parts[1]}/{LIBREDTE_COMPANY_RUT}"
+                    )
+
+        if not attempts:
+            return {
+                "status": "error",
+                "message": "Falta año/número del asiento para eliminar en LibreDTE",
+            }
+
+        last_error = None
+        for url in attempts:
+            try:
+                print(f"[accounting_entry.annul] LibreDTE DELETE GET {url}", flush=True)
+                response = requests.get(url, headers=headers, timeout=60)
+                body = (response.text or "")[:400]
+                print(
+                    f"[accounting_entry.annul] LibreDTE HTTP {response.status_code}: {body}",
+                    flush=True,
+                )
+                if response.status_code == 200:
+                    return {
+                        "status": "success",
+                        "http_status": 200,
+                        "url": url,
+                        "body": _safe_json(response),
+                    }
+                # Already deleted / not found → treat as ok for sync
+                low = body.lower()
+                if response.status_code in (404, 400) and (
+                    "no existe" in low
+                    or "no se encuentra" in low
+                    or "not found" in low
+                    or "eliminad" in low
+                ):
+                    return {
+                        "status": "success",
+                        "http_status": response.status_code,
+                        "url": url,
+                        "message": "Asiento no encontrado en LibreDTE (ya eliminado)",
+                    }
+                last_error = f"LibreDTE HTTP {response.status_code}: {body}"
+            except Exception as exc:
+                last_error = str(exc)
+                print(f"[accounting_entry.annul] LibreDTE error: {exc}", flush=True)
+
+        return {"status": "error", "message": last_error or "No se pudo eliminar en LibreDTE"}
 
     def sync_local_annul_after_libredte_delete(
         self,

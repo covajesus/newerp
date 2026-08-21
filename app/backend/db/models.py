@@ -1982,6 +1982,9 @@ class QuotationModel(Base):
     total = Column(Integer, default=0)
     last_sent_at = Column(DateTime())
     last_sent_channel = Column(String(32))
+    email_read = Column(Integer, default=0)  # 1 = opened/read, 0 = not
+    email_read_token = Column(String(64), nullable=True)
+    email_read_at = Column(DateTime(), nullable=True)
     converted_dte_id = Column(Integer)
     source_quotation_id = Column(Integer)
     added_date = Column(DateTime())

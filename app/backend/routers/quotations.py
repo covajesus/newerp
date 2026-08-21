@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
+import base64
 
 from app.backend.auth.auth_user import get_current_active_user
 from app.backend.classes.quotation_class import QuotationClass
@@ -15,6 +16,27 @@ from app.backend.schemas import (
 )
 
 quotations = APIRouter(prefix="/quotations", tags=["Quotations"])
+
+# 1x1 transparent GIF for email open tracking
+_TRACKING_PIXEL_GIF = base64.b64decode(
+    "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+)
+
+
+@quotations.get("/email_open/{token}")
+def email_open(token: str, db: Session = Depends(get_db)):
+    """
+    Public tracking pixel (no auth). Marks quotation email_read=1 when the mail is opened.
+    """
+    QuotationClass(db).mark_email_read(token)
+    return Response(
+        content=_TRACKING_PIXEL_GIF,
+        media_type="image/gif",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @quotations.post("/")
