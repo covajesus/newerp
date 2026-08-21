@@ -11,9 +11,21 @@ import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
 
+# Nunca emitir BTE al SII para estos RUT (aunque marquen "Tiene RUT = Sí").
+_BTE_SII_BLOCKED_RUTS = frozenset({"271413998"})
+
+
+def _normalize_rut_digits(rut) -> str:
+    return re.sub(r"[^0-9Kk]", "", str(rut or "")).upper()
+
+
 class HonoraryClass:
     def __init__(self, db):
         self.db = db
+
+    @staticmethod
+    def is_bte_sii_blocked_rut(rut) -> bool:
+        return _normalize_rut_digits(rut) in _BTE_SII_BLOCKED_RUTS
 
     def get_all(self, search_branch_office_id=None, search_rut=None, rut=None, rol_id=None, page=1, items_per_page=10):
 
@@ -220,7 +232,12 @@ class HonoraryClass:
             honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
             honorary.account_type_id = honorary_inputs.account_type_id
-            should_emit_sii = int(honorary_inputs.foreigner_id or 0) == 1
+            blocked_rut = self.is_bte_sii_blocked_rut(
+                honorary_inputs.replacement_employee_rut
+            )
+            should_emit_sii = (
+                int(honorary_inputs.foreigner_id or 0) == 1 and not blocked_rut
+            )
             # Solo marca Aceptado (2) si no requiere BTE. Con RUT queda Solicitado (14)
             # hasta que el SII confirme la emisión.
             honorary.status_id = 14 if should_emit_sii else 2
@@ -242,13 +259,18 @@ class HonoraryClass:
             self.db.add(honorary)
             self.db.commit()
 
+            if blocked_rut and int(honorary_inputs.foreigner_id or 0) == 1:
+                accept_msg = (
+                    "Honorario aceptado (RUT excluido de emisión BTE en SII)"
+                )
+            elif should_emit_sii:
+                accept_msg = "Datos guardados; pendiente emisión BTE en SII"
+            else:
+                accept_msg = "Honorario aceptado"
+
             return {
                 "status": "success",
-                "message": (
-                    "Datos guardados; pendiente emisión BTE en SII"
-                    if should_emit_sii
-                    else "Honorario aceptado"
-                ),
+                "message": accept_msg,
                 "id": honorary.id,
                 "should_emit_sii": should_emit_sii,
                 "status_id": honorary.status_id,
@@ -265,6 +287,12 @@ class HonoraryClass:
             return {
                 "status": "skipped",
                 "message": "Sin RUT del trabajador: no se emite BTE en SII",
+            }
+        if self.is_bte_sii_blocked_rut(honorary.replacement_employee_rut):
+            return {
+                "status": "skipped",
+                "message": "RUT excluido: no se emite BTE en SII",
+                "bte_emitted": 0,
             }
         return self.send(honorary)
         
@@ -542,6 +570,13 @@ class HonoraryClass:
     def send(self, data):
         """Emite BTE ante el SII (Clave Tributaria) — reemplaza SimpleFactura BHE terceros."""
         honorary_id = getattr(data, "id", None)
+        beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
+        if self.is_bte_sii_blocked_rut(beneficiary_rut):
+            return {
+                "status": "skipped",
+                "message": "RUT excluido: no se emite BTE en SII",
+                "bte_emitted": 0,
+            }
         try:
             from app.backend.classes.sii.bte import emit_bte
         except ModuleNotFoundError as e:
