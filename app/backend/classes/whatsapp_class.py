@@ -14,6 +14,8 @@ WHATSAPP_TEMPLATE_LIBREDTE_ID = 1
 WHATSAPP_TEMPLATE_LIBREDTE_TITLE = "envio_dte"
 WHATSAPP_TEMPLATE_KLAP_ID = 8
 WHATSAPP_TEMPLATE_KLAP_TITLE = "envio_dte_v3"
+WHATSAPP_TEMPLATE_QUOTATION_ID = 9
+WHATSAPP_TEMPLATE_QUOTATION_TITLE = "quotation"
 
 
 def whatsapp_access_token() -> str:
@@ -52,6 +54,18 @@ def _whatsapp_template_klap(db):
         .first()
         or db.query(WhatsappTemplateModel)
         .filter(WhatsappTemplateModel.id == WHATSAPP_TEMPLATE_KLAP_ID)
+        .first()
+    )
+
+
+def _whatsapp_template_quotation(db):
+    """Cotización abonados: plantilla Meta `quotation` (header documento + body {{1}}..{{6}})."""
+    return (
+        db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.title == WHATSAPP_TEMPLATE_QUOTATION_TITLE)
+        .first()
+        or db.query(WhatsappTemplateModel)
+        .filter(WhatsappTemplateModel.id == WHATSAPP_TEMPLATE_QUOTATION_ID)
         .first()
     )
 

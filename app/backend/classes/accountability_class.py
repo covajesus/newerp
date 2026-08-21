@@ -664,7 +664,7 @@ class AccountabilityClass:
                 AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
                     number=asset.get("codigo") or asset.get("asiento"),
                     glosa=asset.get("glosa"),
-                    year=None,
+                    year=period_year,
                 )
 
     def get_monthly_collections_data(self, period=None):
@@ -959,11 +959,6 @@ class AccountabilityClass:
                                 },
                             )
                             print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
-                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
-                                number=codigo_asset,
-                                glosa=asset.get("glosa") if isinstance(asset, dict) else None,
-                                year=year,
-                            )
                             
                             # Si el primer formato falla, probar formato alternativo
                             if delete_response.status_code != 200:
@@ -999,6 +994,12 @@ class AccountabilityClass:
                                     delete_response = delete_response_id  # Usar esta respuesta para el logging
                                 else:
                                     delete_response = delete_response_alt
+
+                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                                number=codigo_asset,
+                                glosa=asset.get("glosa"),
+                                year=year,
+                            )
                             
                             results["eliminated_income_assets"].append({
                                 "codigo": codigo_asset,
@@ -1109,11 +1110,6 @@ class AccountabilityClass:
                                 },
                             )
                             print(f"📡 Respuesta eliminación: {delete_response.status_code} - {delete_response.text}")
-                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
-                                number=codigo_asiento,
-                                glosa=asiento.get("glosa") if isinstance(asiento, dict) else None,
-                                year=year,
-                            )
                             
                             # Si el primer formato falla, probar formato alternativo
                             if delete_response.status_code != 200:
@@ -1149,6 +1145,12 @@ class AccountabilityClass:
                                     delete_response = delete_response_id  # Usar esta respuesta para el logging
                                 else:
                                     delete_response = delete_response_alt
+
+                            AccountingEntryClass(self.db).sync_local_annul_after_libredte_delete(
+                                number=codigo_asiento,
+                                glosa=asiento.get("glosa"),
+                                year=year,
+                            )
                             
                             results["eliminated_subscriber_assets"].append({
                                 "codigo": codigo_asiento,

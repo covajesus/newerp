@@ -20,12 +20,15 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.backend.classes.helper_class import HelperClass
+from app.backend.classes.file_class import FileClass
 from app.backend.classes.whatsapp_class import (
+    WHATSAPP_TEMPLATE_QUOTATION_TITLE,
+    _whatsapp_template_quotation,
     whatsapp_access_token,
     whatsapp_graph_messages_url,
 )
@@ -36,6 +39,7 @@ from app.backend.db.models import (
     DteModel,
     QuotationItemModel,
     QuotationModel,
+    UserModel,
 )
 
 DTE_VERSION_V2 = 2
@@ -46,6 +50,35 @@ STATUS_ANNULLED = 4
 RENEW_FIXED = 1
 RENEW_MONTHLY = 2
 JIS_PRIMARY = "#152d8a"
+ISSUER_RUT = "76.063.822-6"
+ISSUER_NAME = "JIS PARKING SPA"
+ISSUER_GIRO = "ESTACIONAMIENTO DE VEHÍCULOS Y PARQUÍMETROS, VENTA DE PRODUCTOS FARMACEUTICOS"
+ISSUER_HQ = "Casa matriz: Matucana 40, Estación Central"
+ISSUER_PHONE = "+56 2 26825312"
+ISSUER_EMAIL = "contacto@jisparking.com"
+_MONTHS_ES = (
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
+_WEEKDAYS_ES = (
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+)
 
 
 class QuotationClass:
@@ -65,8 +98,68 @@ class QuotationClass:
         try:
             n = int(amount)
         except (TypeError, ValueError):
+            return "$ 0"
+        return f"$ {n:,.0f}".replace(",", ".")
+
+    @staticmethod
+    def _format_clp_plain(amount: int) -> str:
+        try:
+            n = int(amount)
+        except (TypeError, ValueError):
             return "0"
-        return f"${n:,.0f}".replace(",", ".")
+        return f"{n:,.0f}".replace(",", ".")
+
+    @staticmethod
+    def _format_date_short(dt: Optional[datetime]) -> str:
+        d = dt or datetime.now()
+        return d.strftime("%d-%m-%Y")
+
+    @staticmethod
+    def _format_date_long(dt: Optional[datetime]) -> str:
+        d = dt or datetime.now()
+        return f"{_WEEKDAYS_ES[d.weekday()]} {d.day} de {_MONTHS_ES[d.month - 1]} del {d.year}"
+
+    def _branch_contact(self, branch: Optional[BranchOfficeModel]) -> dict[str, str]:
+        """Contacto comercial para WhatsApp / pie de PDF (supervisor de sucursal)."""
+        name = "JIS Parking"
+        phone = ISSUER_PHONE.replace("+56 ", "").replace(" ", "")
+        email = ISSUER_EMAIL
+        if not branch:
+            return {"name": name, "phone": phone, "email": email}
+        supervisor_key = getattr(branch, "principal_supervisor", None)
+        user = None
+        if supervisor_key not in (None, "", 0):
+            user = (
+                self.db.query(UserModel)
+                .filter(UserModel.rut == supervisor_key)
+                .first()
+            )
+            if not user:
+                user = (
+                    self.db.query(UserModel)
+                    .filter(UserModel.id == supervisor_key)
+                    .first()
+                )
+        if user:
+            name = (user.full_name or name).strip() or name
+            if user.phone and str(user.phone).strip():
+                phone = re.sub(r"\D", "", str(user.phone)) or phone
+            if user.email and "@" in str(user.email):
+                email = str(user.email).strip()
+        return {"name": name, "phone": phone, "email": email}
+
+    def _logo_path(self) -> Optional[str]:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "logo.png"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "files", "logo.png"),
+            "/var/www/intrajisbackend.com/public_html/files/logo.png",
+            "/var/www/intrajisbackend.com/public_html/assets/logo.png",
+        ]
+        for path in candidates:
+            full = os.path.abspath(path)
+            if os.path.isfile(full):
+                return full
+        return None
 
     def _normalize_items(self, items) -> list[dict]:
         normalized = []
@@ -435,108 +528,167 @@ class QuotationClass:
             .filter(BranchOfficeModel.id == q.branch_office_id)
             .first()
         )
+        contact = self._branch_contact(branch)
+        branch_name = (getattr(branch, "branch_office", None) or "—") if branch else "—"
+        branch_address = (getattr(branch, "address", None) or "") if branch else ""
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer,
             pagesize=letter,
-            leftMargin=1.5 * cm,
-            rightMargin=1.5 * cm,
-            topMargin=1.2 * cm,
+            leftMargin=1.4 * cm,
+            rightMargin=1.4 * cm,
+            topMargin=1.0 * cm,
             bottomMargin=1.2 * cm,
         )
         styles = getSampleStyleSheet()
-        title = ParagraphStyle(
-            "q_title",
+        company = ParagraphStyle(
+            "q_company",
             parent=styles["Heading1"],
-            fontSize=16,
+            fontSize=13,
             textColor=colors.HexColor(JIS_PRIMARY),
             alignment=TA_LEFT,
-            spaceAfter=4,
+            spaceAfter=2,
+            leading=16,
         )
-        small = ParagraphStyle("q_small", parent=styles["Normal"], fontSize=9, leading=12)
-        right = ParagraphStyle("q_right", parent=styles["Normal"], fontSize=9, alignment=TA_RIGHT)
-        center = ParagraphStyle("q_center", parent=styles["Normal"], fontSize=10, alignment=TA_CENTER)
+        small = ParagraphStyle("q_small", parent=styles["Normal"], fontSize=8.5, leading=11)
+        tiny = ParagraphStyle("q_tiny", parent=styles["Normal"], fontSize=7.5, leading=9)
+        right = ParagraphStyle("q_right", parent=styles["Normal"], fontSize=8.5, alignment=TA_RIGHT, leading=11)
+        center = ParagraphStyle("q_center", parent=styles["Normal"], fontSize=9, alignment=TA_CENTER, leading=11)
+        center_b = ParagraphStyle(
+            "q_center_b",
+            parent=styles["Normal"],
+            fontSize=11,
+            alignment=TA_CENTER,
+            leading=13,
+            textColor=colors.HexColor(JIS_PRIMARY),
+        )
 
         story = []
-        issuer_name = "JIS Parking SpA"
-        issuer_rut = "76.XXX.XXX-X"
-        if branch:
-            issuer_name = getattr(branch, "branch_office", None) or issuer_name
 
-        header_left = [
-            Paragraph(f"<b>{html.escape(issuer_name)}</b>", title),
-            Paragraph("Cotización comercial (no es documento tributario SII)", small),
+        logo_cell: Any = ""
+        logo_path = self._logo_path()
+        if logo_path:
+            try:
+                logo_cell = Image(logo_path, width=2.2 * cm, height=2.2 * cm)
+            except Exception:
+                logo_cell = ""
+
+        issuer_lines = [
+            Paragraph(f"<b>{html.escape(ISSUER_NAME)}</b>", company),
+            Paragraph(html.escape(ISSUER_GIRO), tiny),
+            Paragraph(html.escape(branch_address or ISSUER_HQ), tiny),
+            Paragraph(f"Sucursal: {html.escape(str(branch_name))}", tiny),
+            Paragraph(html.escape(ISSUER_HQ), tiny),
+            Paragraph(f"{html.escape(ISSUER_PHONE)} / {html.escape(ISSUER_EMAIL)}", tiny),
         ]
+        header_left = Table([[logo_cell, issuer_lines]], colWidths=[2.4 * cm, 9.2 * cm])
+        header_left.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+
         box_data = [
-            [Paragraph("<b>RUT</b>", center)],
-            [Paragraph(html.escape(issuer_rut), center)],
-            [Paragraph("<b>COTIZACIÓN</b>", center)],
+            [Paragraph(f"<b>R.U.T.: {html.escape(ISSUER_RUT)}</b>", center)],
+            [Paragraph("<b>COTIZACIÓN</b>", center_b)],
             [Paragraph(f"<b>N° {html.escape(q.quotation_number or '')}</b>", center)],
         ]
-        box = Table(box_data, colWidths=[5.5 * cm])
+        box = Table(box_data, colWidths=[5.8 * cm])
         box.setStyle(
             TableStyle(
                 [
-                    ("BOX", (0, 0), (-1, -1), 1.5, colors.HexColor(JIS_PRIMARY)),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(JIS_PRIMARY)),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor(JIS_PRIMARY)),
-                    ("TEXTCOLOR", (0, 2), (-1, 2), colors.white),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("BOX", (0, 0), (-1, -1), 1.2, colors.black),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#f3f5f9")),
                 ]
             )
         )
-        top = Table([[header_left, box]], colWidths=[11 * cm, 6 * cm])
+        top = Table([[header_left, box]], colWidths=[11.6 * cm, 6 * cm])
         top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         story.append(top)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
 
-        fecha = q.added_date.strftime("%d-%m-%Y") if q.added_date else datetime.now().strftime("%d-%m-%Y")
+        fecha_larga = self._format_date_long(q.added_date)
+        meta = Table(
+            [
+                [Paragraph(html.escape(fecha_larga), right)],
+                [Paragraph("Venta: crédito", right)],
+                [Paragraph(f"Vendedor: {html.escape(contact['email'])}", right)],
+            ],
+            colWidths=[17.6 * cm],
+        )
+        meta.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "RIGHT")]))
+        story.append(meta)
+        story.append(Spacer(1, 6))
+
+        phone_show = q.phone or ""
+        email_show = q.email or ""
+        contacto_cliente = " / ".join([p for p in [phone_show, email_show] if p]) or "—"
         receptor = [
-            [Paragraph("<b>Señor(es)</b>", small), Paragraph(html.escape(q.customer or ""), small)],
-            [Paragraph("<b>RUT</b>", small), Paragraph(html.escape(q.rut or ""), small)],
-            [Paragraph("<b>Giro</b>", small), Paragraph(html.escape(q.activity or ""), small)],
-            [Paragraph("<b>Dirección</b>", small), Paragraph(html.escape(q.address or ""), small)],
-            [Paragraph("<b>Período</b>", small), Paragraph(html.escape(HelperClass.period_detail_label(q.period or "")), small)],
-            [Paragraph("<b>Fecha</b>", small), Paragraph(fecha, small)],
+            [Paragraph("<b>R.U.T.</b>", small), Paragraph(html.escape(q.rut or "—"), small)],
+            [Paragraph("<b>Razón social</b>", small), Paragraph(html.escape(q.customer or "—"), small)],
+            [Paragraph("<b>Giro</b>", small), Paragraph(html.escape(q.activity or "—"), small)],
+            [Paragraph("<b>Dirección</b>", small), Paragraph(html.escape(q.address or "—"), small)],
+            [Paragraph("<b>Contacto</b>", small), Paragraph(html.escape(contacto_cliente), small)],
+            [
+                Paragraph("<b>Período</b>", small),
+                Paragraph(html.escape(HelperClass.period_detail_label(q.period or "")), small),
+            ],
         ]
-        rec_table = Table(receptor, colWidths=[3 * cm, 14 * cm])
-        rec_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        rec_table = Table(receptor, colWidths=[3.2 * cm, 14.4 * cm])
+        rec_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
         story.append(rec_table)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 10))
 
         rows = [
             [
-                Paragraph("<b>#</b>", center),
-                Paragraph("<b>Nombre</b>", small),
-                Paragraph("<b>Detalle</b>", small),
+                Paragraph("<b>Item</b>", small),
                 Paragraph("<b>Cant.</b>", center),
-                Paragraph("<b>P. Unit.</b>", right),
-                Paragraph("<b>Total</b>", right),
+                Paragraph("<b>Unidad</b>", center),
+                Paragraph("<b>P. unitario</b>", right),
+                Paragraph("<b>Total item</b>", right),
             ]
         ]
         for it in items:
+            name = html.escape(it.item_name or "—")
+            detail = html.escape(it.description or "")
+            item_html = f"<b>{name}</b>"
+            if detail and detail != name:
+                item_html += f"<br/><font size='7'>{detail}</font>"
             rows.append(
                 [
-                    Paragraph(str(it.line_number), center),
-                    Paragraph(html.escape(it.item_name or "-"), small),
-                    Paragraph(html.escape(it.description or "-"), small),
-                    Paragraph(str(it.quantity), center),
-                    Paragraph(self._format_clp(it.unit_amount), right),
-                    Paragraph(self._format_clp(it.total_amount), right),
+                    Paragraph(item_html, small),
+                    Paragraph(str(it.quantity or 0), center),
+                    Paragraph(html.escape(it.unit_measure or "1"), center),
+                    Paragraph(self._format_clp_plain(it.unit_amount or 0), right),
+                    Paragraph(self._format_clp_plain(it.total_amount or 0), right),
                 ]
             )
-        items_table = Table(rows, colWidths=[1 * cm, 4.5 * cm, 5.5 * cm, 1.5 * cm, 2.5 * cm, 2.5 * cm])
+        items_table = Table(rows, colWidths=[8.2 * cm, 1.8 * cm, 2.0 * cm, 2.8 * cm, 2.8 * cm])
         items_table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6eaf5")),
-                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cfd6e4")),
+                    ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ]
             )
         )
@@ -548,23 +700,32 @@ class QuotationClass:
             [Paragraph("<b>IVA 19%</b>", right), Paragraph(self._format_clp(q.tax or 0), right)],
             [Paragraph("<b>Total</b>", right), Paragraph(f"<b>{self._format_clp(q.total or 0)}</b>", right)],
         ]
-        tot_table = Table(totals, colWidths=[4 * cm, 3 * cm], hAlign="RIGHT")
+        tot_table = Table(totals, colWidths=[3.5 * cm, 3.2 * cm], hAlign="RIGHT")
         tot_table.setStyle(
             TableStyle(
                 [
+                    ("BOX", (0, 0), (-1, -1), 0.7, colors.black),
                     ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#e6eaf5")),
-                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(JIS_PRIMARY)),
                     ("TOPPADDING", (0, 0), (-1, -1), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ]
             )
         )
         story.append(tot_table)
-        story.append(Spacer(1, 16))
+        story.append(Spacer(1, 14))
         story.append(
             Paragraph(
                 "Documento informativo. No constituye boleta ni factura electrónica ante el SII.",
-                ParagraphStyle("q_note", parent=small, textColor=colors.gray),
+                ParagraphStyle("q_note", parent=tiny, textColor=colors.gray),
+            )
+        )
+        story.append(
+            Paragraph(
+                f"Contacto comercial: {html.escape(contact['name'])} · "
+                f"{html.escape(contact['phone'])} · {html.escape(contact['email'])}",
+                tiny,
             )
         )
 
@@ -573,6 +734,29 @@ class QuotationClass:
             return buffer.getvalue(), None
         except Exception as e:
             return None, str(e)
+
+    def save_pdf_public(self, quotation_id: int) -> dict:
+        """Genera PDF y lo publica en /files para WhatsApp (link público)."""
+        q = self.db.query(QuotationModel).filter(QuotationModel.id == quotation_id).first()
+        if not q:
+            return {"status": "error", "message": "Cotización no encontrada"}
+        pdf_bytes, pdf_err = self.build_pdf_bytes(quotation_id)
+        if not pdf_bytes:
+            return {"status": "error", "message": pdf_err or "No se pudo generar el PDF"}
+
+        safe_number = re.sub(r"[^A-Za-z0-9_-]+", "-", q.quotation_number or str(quotation_id))
+        remote_path = f"quotations/{safe_number}.pdf"
+        try:
+            fc = FileClass(self.db)
+            fc.temporal_upload(pdf_bytes, remote_path)
+            return {
+                "status": "success",
+                "url": fc.get(remote_path),
+                "filename": f"{safe_number}.pdf",
+                "path": remote_path,
+            }
+        except Exception as e:
+            return {"status": "error", "message": f"No se pudo publicar el PDF: {e}"}
 
     # ------------------------------------------------------------------ send
     def _smtp_settings(self) -> dict[str, Any]:
@@ -656,6 +840,13 @@ class QuotationClass:
             return {"status": "error", "message": f"Error SMTP: {e}"}
 
     def send_whatsapp(self, quotation_id: int, phone: Optional[str] = None) -> dict:
+        """
+        Dispara plantilla Meta `quotation` (header documento PDF + body {{1}}..{{6}}).
+
+        Plantilla:
+          Cotización N° {{1}}, del día {{2}} por un monto total de {{3}}...
+          contactar a: {{4}} 📞 {{5}} o al email 📧 {{6}}.
+        """
         q = self.db.query(QuotationModel).filter(QuotationModel.id == quotation_id).first()
         if not q or q.status_id == STATUS_ANNULLED:
             return {"status": "error", "message": "Cotización no encontrada"}
@@ -681,32 +872,90 @@ class QuotationClass:
         if not token:
             return {"status": "error", "message": "WHATSAPP_ACCESS_TOKEN no configurado"}
 
-        text = (
-            f"JIS Parking — Cotización {q.quotation_number}\n"
-            f"Cliente: {q.customer or q.rut}\n"
-            f"Período: {HelperClass.period_detail_label(q.period or '')}\n"
-            f"Total: {self._format_clp(q.total or 0)}\n"
-            f"(Documento informativo, no es DTE SII). Se envió también por correo si corresponde."
+        whatsapp_template = _whatsapp_template_quotation(self.db)
+        if not whatsapp_template or not whatsapp_template.title:
+            return {
+                "status": "error",
+                "message": (
+                    f"Plantilla WhatsApp '{WHATSAPP_TEMPLATE_QUOTATION_TITLE}' no encontrada en "
+                    "whatsapp_templates. Ejecuta tools/sql/seed_whatsapp_template_quotation.sql"
+                ),
+            }
+        template_name = whatsapp_template.title
+
+        pdf_pub = self.save_pdf_public(quotation_id)
+        if pdf_pub.get("status") != "success" or not pdf_pub.get("url"):
+            return {
+                "status": "error",
+                "message": pdf_pub.get("message") or "PDF no disponible para WhatsApp",
+                "pdf": pdf_pub,
+            }
+
+        branch = (
+            self.db.query(BranchOfficeModel)
+            .filter(BranchOfficeModel.id == q.branch_office_id)
+            .first()
         )
+        contact = self._branch_contact(branch)
+
+        var1 = str(q.quotation_number or quotation_id)
+        var2 = self._format_date_short(q.added_date)
+        var3 = self._format_clp(q.total or 0)
+        var4 = contact["name"] or "JIS Parking"
+        var5 = contact["phone"] or "226825312"
+        var6 = contact["email"] or ISSUER_EMAIL
+
+        # Meta rechaza parámetros vacíos
+        body_params = [
+            {"type": "text", "text": v if str(v).strip() else "-"}
+            for v in (var1, var2, var3, var4, var5, var6)
+        ]
+
         payload = {
             "messaging_product": "whatsapp",
             "to": wa_to,
-            "type": "text",
-            "text": {"preview_url": False, "body": text},
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "document",
+                                "document": {
+                                    "link": pdf_pub["url"],
+                                    "filename": pdf_pub.get("filename") or f"{var1}.pdf",
+                                },
+                            }
+                        ],
+                    },
+                    {"type": "body", "parameters": body_params},
+                ],
+            },
         }
+
         try:
             resp = requests.post(
                 whatsapp_graph_messages_url(),
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                 json=payload,
-                timeout=30,
+                timeout=45,
             )
             data = resp.json() if resp.content else {}
             if resp.status_code >= 400:
+                err = (data.get("error") or {}) if isinstance(data, dict) else {}
                 return {
                     "status": "error",
-                    "message": (data.get("error") or {}).get("message") or "Error WhatsApp",
+                    "message": err.get("message") or "Error WhatsApp",
                     "response": data,
+                    "payload_preview": {
+                        "to": wa_to,
+                        "template": template_name,
+                        "vars": [var1, var2, var3, var4, var5, var6],
+                        "pdf": pdf_pub.get("url"),
+                    },
                 }
             q.last_sent_at = datetime.now()
             q.last_sent_channel = "whatsapp"
@@ -714,7 +963,14 @@ class QuotationClass:
                 q.status_id = STATUS_SENT
             q.updated_date = datetime.now()
             self.db.commit()
-            return {"status": "success", "message": "WhatsApp enviado", "to": wa_to, "response": data}
+            return {
+                "status": "success",
+                "message": "WhatsApp enviado",
+                "to": wa_to,
+                "template": template_name,
+                "pdf": pdf_pub.get("url"),
+                "response": data,
+            }
         except Exception as e:
             self.db.rollback()
             return {"status": "error", "message": str(e)}

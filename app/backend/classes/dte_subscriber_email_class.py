@@ -404,6 +404,123 @@ def _build_credit_note_html_body(
 </html>"""
 
 
+def _build_quotation_html_body(
+    *,
+    customer_name: str,
+    quotation_number: str,
+    issue_date: str,
+    period_label: str,
+    total_clp: str,
+    contact_name: str,
+    contact_phone: str,
+    contact_email: str,
+    has_logo: bool,
+) -> str:
+    name = html.escape(customer_name or "Cliente")
+    number_s = html.escape(quotation_number or "—")
+    date_s = html.escape(issue_date or "—")
+    period_s = html.escape(period_label or "—")
+    total_s = html.escape(total_clp)
+    contact_n = html.escape(contact_name or "JIS Parking")
+    contact_p = html.escape(contact_phone or "")
+    contact_e = html.escape(contact_email or "contacto@jisparking.com")
+
+    logo_block = ""
+    if has_logo:
+        logo_block = f"""
+              <img src="cid:{LOGO_CID}" alt="JIS Parking" width="200"
+                   style="display:block;margin:0 auto 14px;max-width:200px;height:auto;border:0;" />
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:{JIS_BG};font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{JIS_BG};padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0"
+               style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;
+                      box-shadow:0 4px 20px rgba(21,45,138,0.12);border:1px solid {JIS_BORDER};">
+          <tr>
+            <td style="background:linear-gradient(135deg,{JIS_PRIMARY_DARK} 0%,{JIS_PRIMARY} 100%);
+                       padding:28px 32px 22px;text-align:center;">
+              {logo_block}
+              <p style="margin:0;font-size:13px;color:#ffffff;letter-spacing:0.4px;
+                        text-transform:uppercase;font-weight:700;">
+                Cotizaci&oacute;n comercial
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 28px;">
+              <p style="margin:0 0 16px;font-size:16px;color:{JIS_TEXT};">
+                Estimado/a <strong style="color:{JIS_PRIMARY};">{name}</strong>,
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:{JIS_TEXT_MUTED};line-height:1.55;">
+                Adjuntamos su cotizaci&oacute;n por concepto de mensualidad de estacionamiento.
+                Este documento es informativo y <strong>no constituye un DTE del SII</strong>.
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+                     style="background:{JIS_PRIMARY_LIGHT};border-radius:10px;border:1px solid {JIS_BORDER};">
+                <tr>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT_MUTED};">Tipo</td>
+                  <td style="padding:16px 20px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>Cotizaci&oacute;n</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">N&deg;</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">
+                    <strong>{number_s}</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Fecha</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">{date_s}</td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT_MUTED};">Per&iacute;odo</td>
+                  <td style="padding:0 20px 16px;font-size:14px;color:{JIS_TEXT};text-align:right;">{period_s}</td>
+                </tr>
+                <tr>
+                  <td style="padding:0 20px 18px;font-size:14px;color:{JIS_TEXT_MUTED};">Monto total</td>
+                  <td style="padding:0 20px 18px;font-size:20px;color:{JIS_PRIMARY};text-align:right;font-weight:bold;">
+                    {total_s}
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 0;padding:14px 18px;background:{JIS_BG};border-radius:8px;
+                        color:{JIS_TEXT_MUTED};font-size:14px;line-height:1.55;border:1px solid {JIS_BORDER};">
+                Ante cualquier duda puede contactar a <strong style="color:{JIS_TEXT};">{contact_n}</strong>
+                al tel&eacute;fono <strong style="color:{JIS_TEXT};">{contact_p}</strong>
+                o al email
+                <a href="mailto:{contact_e}" style="color:{JIS_PRIMARY};text-decoration:none;">{contact_e}</a>.
+              </p>
+              <p style="margin:20px 0 0;font-size:14px;color:{JIS_TEXT_MUTED};">
+                El PDF de la cotizaci&oacute;n va adjunto a este correo.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;background:{JIS_BG};border-top:3px solid {JIS_WARNING};">
+              <p style="margin:0;font-size:12px;color:{JIS_TEXT_MUTED};line-height:1.55;text-align:center;">
+                <strong style="color:{JIS_PRIMARY};">JIS Parking SPA</strong> · RUT 76.063.822-6<br>
+                Nuestro servicio es un compromiso ·
+                <a href="mailto:contacto@jisparking.com" style="color:{JIS_PRIMARY};text-decoration:none;">
+                  contacto@jisparking.com
+                </a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
 class DteSubscriberEmailClass:
     def __init__(self, db: Session):
         self.db = db
