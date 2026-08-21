@@ -6,7 +6,7 @@ from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.sii.bte import emit_bte
-from app.backend.classes.sii.bte_comunas import REGIONS
+from app.backend.classes.sii.bte_communes import REGIONS
 import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
