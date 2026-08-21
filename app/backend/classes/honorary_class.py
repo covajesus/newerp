@@ -5,8 +5,6 @@ from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
 from app.backend.classes.helper_class import HelperClass
-from app.backend.classes.sii.bte import emit_bte
-from app.backend.classes.sii.bte_communes import REGIONS
 import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
@@ -431,6 +429,8 @@ class HonoraryClass:
 
     def _resolve_sii_region_comuna(self, region_id, commune_id) -> tuple[int, int, str]:
         """Map IntraJIS region/commune to SII BTE codes."""
+        from app.backend.classes.sii.bte_communes import REGIONS
+
         region = RegionClass(self.db).get("id", region_id)
         commune = CommuneClass(self.db).get("id", commune_id)
         if not region or isinstance(region, str):
@@ -473,6 +473,15 @@ class HonoraryClass:
 
     def send(self, data):
         """Emite BTE ante el SII (Clave Tributaria) — reemplaza SimpleFactura BHE terceros."""
+        try:
+            from app.backend.classes.sii.bte import emit_bte
+        except ModuleNotFoundError as e:
+            print(f"Missing dependency for SII BTE: {e}")
+            return {
+                "status": "error",
+                "message": f"Missing dependency for SII BTE: {e}. Install httpx in the service venv.",
+            }
+
         settings = SettingClass(self.db).get()
         creds = SettingClass(self.db).get_sii_credentials()
         login_rut = creds.get("login_rut") or ""

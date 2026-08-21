@@ -1,6 +1,5 @@
 from app.backend.db.models import SettingModel
 from sqlalchemy.orm import Session
-from app.backend.classes.sii.bte import validate_login
 
 
 class SettingClass:
@@ -98,6 +97,14 @@ class SettingClass:
         return settings
 
     def test_sii_tax_password(self, login_rut: str | None = None, password: str | None = None) -> dict:
+        try:
+            from app.backend.classes.sii.bte import validate_login
+        except ModuleNotFoundError as e:
+            return {
+                "status": "error",
+                "message": f"Missing dependency for SII BTE: {e}. Install httpx in the service venv.",
+            }
+
         creds = self.get_sii_credentials()
         rut = (login_rut or creds["login_rut"] or "").strip()
         tax_password = (password or creds["password"] or "").strip()
