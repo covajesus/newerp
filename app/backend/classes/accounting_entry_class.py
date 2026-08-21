@@ -465,6 +465,286 @@ class AccountingEntryClass:
             self.db.commit()
         return {"status": "success", "annulled": len(rows)}
 
+    def import_from_libredte(self, since: str, until: str, user_id: Optional[int] = None) -> dict:
+        """
+        Fetch LibreDTE asientos between since/until and upsert into local tables.
+        Dedupes by external_ref (LibreDTE id / year-number).
+        """
+        since = str(since or "").strip()[:10]
+        until = str(until or "").strip()[:10]
+        if not since or not until:
+            return {"status": "error", "message": "Desde y hasta son obligatorios"}
+
+        payload = {
+            "periodo": "",
+            "fecha_desde": since,
+            "fecha_hasta": until,
+            "glosa": "",
+            "operacion": "",
+            "cuenta": "",
+            "debe": "",
+            "debe_desde": "",
+            "debe_hasta": "",
+            "haber": "",
+            "haber_desde": "",
+            "haber_hasta": "",
+        }
+        try:
+            response = requests.post(
+                "https://libredte.cl/api/lce/lce_asientos/buscar/76063822",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {LIBREDTE_DEFAULT_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                timeout=90,
+            )
+        except Exception as exc:
+            return {"status": "error", "message": f"Error de conexión LibreDTE: {exc}"}
+
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "message": f"LibreDTE HTTP {response.status_code}: {(response.text or '')[:300]}",
+            }
+
+        try:
+            entries = response.json()
+        except Exception:
+            return {"status": "error", "message": "Respuesta LibreDTE inválida"}
+
+        if not isinstance(entries, list):
+            return {"status": "error", "message": "LibreDTE no devolvió una lista de asientos"}
+
+        imported = 0
+        skipped = 0
+        errors = 0
+        now = datetime.now()
+
+        for raw in entries:
+            if not isinstance(raw, dict):
+                errors += 1
+                continue
+            try:
+                external_ref = self._libredte_external_ref(raw)
+                if not external_ref:
+                    errors += 1
+                    continue
+
+                exists = (
+                    self.db.query(AccountingEntryModel.id)
+                    .filter(AccountingEntryModel.external_ref == external_ref)
+                    .first()
+                )
+                if exists:
+                    skipped += 1
+                    continue
+
+                entry_date = self._parse_entry_date(raw.get("fecha"))
+                number = self._libredte_number(raw, external_ref)
+                glosa = str(raw.get("glosa") or "").strip() or f"Asiento {external_ref}"
+                operation = raw.get("operacion")
+                if operation not in (None, "", "I", "E"):
+                    operation = str(operation)[:8]
+                period = entry_date.strftime("%Y-%m")
+
+                entry = AccountingEntryModel(
+                    number=number,
+                    period=period,
+                    entry_date=entry_date,
+                    glosa=glosa[:512],
+                    operation=operation or None,
+                    annulled=0,
+                    user_id=user_id,
+                    source="libredte_import",
+                    external_ref=external_ref[:128],
+                    added_date=now,
+                    updated_date=now,
+                )
+                self.db.add(entry)
+                self.db.flush()
+
+                for sort_order, line in enumerate(self._libredte_lines(raw)):
+                    self.db.add(
+                        AccountingEntryLineModel(
+                            accounting_entry_id=entry.id,
+                            account_code=line["account_code"][:32],
+                            debit=line["debit"],
+                            credit=line["credit"],
+                            concept=line.get("concept"),
+                            sort_order=sort_order,
+                        )
+                    )
+
+                for doc in self._libredte_documents(raw, period):
+                    self.db.add(
+                        AccountingEntryDocumentModel(
+                            accounting_entry_id=entry.id,
+                            doc_type=doc["doc_type"],
+                            issuer_rut=doc.get("issuer_rut"),
+                            dte_type_id=doc.get("dte_type_id"),
+                            folio=doc.get("folio"),
+                            period=doc.get("period") or period,
+                        )
+                    )
+
+                self.db.commit()
+                imported += 1
+            except Exception as exc:
+                self.db.rollback()
+                print(f"[accounting_entry.import] error: {exc}", flush=True)
+                errors += 1
+                continue
+
+        return {
+            "status": "success",
+            "imported": imported,
+            "skipped": skipped,
+            "errors": errors,
+            "total_libredte": len(entries),
+            "since": since,
+            "until": until,
+        }
+
+    def _libredte_external_ref(self, raw: dict) -> Optional[str]:
+        entry_id = raw.get("id")
+        if entry_id:
+            return str(entry_id).strip()
+        asiento = raw.get("asiento") or raw.get("codigo")
+        fecha = str(raw.get("fecha") or "")[:10]
+        year = fecha.split("-")[0] if fecha else ""
+        if asiento not in (None, "") and year:
+            return f"{year}-{asiento}"
+        if asiento not in (None, ""):
+            return str(asiento)
+        return None
+
+    def _libredte_number(self, raw: dict, external_ref: str) -> int:
+        for key in ("asiento", "codigo"):
+            if raw.get(key) not in (None, ""):
+                try:
+                    return int(raw.get(key))
+                except (TypeError, ValueError):
+                    pass
+        if "-" in external_ref:
+            try:
+                return int(external_ref.split("-")[-1])
+            except (TypeError, ValueError):
+                pass
+        return self._next_number(datetime.now().year)
+
+    def _libredte_lines(self, raw: dict) -> list:
+        lines = []
+        detalle = raw.get("detalle")
+        if isinstance(detalle, list):
+            for item in detalle:
+                if not isinstance(item, dict):
+                    continue
+                code = str(
+                    item.get("cuenta_codigo")
+                    or item.get("cuenta")
+                    or item.get("codigo")
+                    or ""
+                ).strip()
+                if not code:
+                    continue
+                try:
+                    debit = int(round(float(item.get("debe") or 0)))
+                except (TypeError, ValueError):
+                    debit = 0
+                try:
+                    credit = int(round(float(item.get("haber") or 0)))
+                except (TypeError, ValueError):
+                    credit = 0
+                if debit == 0 and credit == 0:
+                    continue
+                lines.append(
+                    {
+                        "account_code": code,
+                        "debit": abs(debit),
+                        "credit": abs(credit),
+                        "concept": item.get("cuenta_glosa") or item.get("glosa") or None,
+                    }
+                )
+            return lines
+
+        if isinstance(detalle, dict):
+            debe = detalle.get("debe") or {}
+            haber = detalle.get("haber") or {}
+            if isinstance(debe, dict):
+                for code, amount in debe.items():
+                    try:
+                        amt = int(round(float(amount or 0)))
+                    except (TypeError, ValueError):
+                        amt = 0
+                    if amt:
+                        lines.append(
+                            {
+                                "account_code": str(code).strip(),
+                                "debit": abs(amt),
+                                "credit": 0,
+                                "concept": None,
+                            }
+                        )
+            if isinstance(haber, dict):
+                for code, amount in haber.items():
+                    try:
+                        amt = int(round(float(amount or 0)))
+                    except (TypeError, ValueError):
+                        amt = 0
+                    if amt:
+                        lines.append(
+                            {
+                                "account_code": str(code).strip(),
+                                "debit": 0,
+                                "credit": abs(amt),
+                                "concept": None,
+                            }
+                        )
+        return lines
+
+    def _libredte_documents(self, raw: dict, period: str) -> list:
+        docs = []
+        documentos = raw.get("documentos") or {}
+        if isinstance(documentos, list):
+            for doc in documentos:
+                if not isinstance(doc, dict):
+                    continue
+                docs.append(
+                    {
+                        "doc_type": "emitido",
+                        "issuer_rut": str(doc.get("rut") or "") or None,
+                        "dte_type_id": int(doc.get("dte") or 0) or None,
+                        "folio": int(doc.get("folio") or 0) or None,
+                        "period": period,
+                    }
+                )
+            return docs
+
+        if isinstance(documentos, dict):
+            for key, doc_type in (("emitidos", "emitido"), ("recibidos", "recibido")):
+                for doc in documentos.get(key) or []:
+                    if not isinstance(doc, dict):
+                        continue
+                    try:
+                        folio = int(doc.get("folio") or 0) or None
+                    except (TypeError, ValueError):
+                        folio = None
+                    try:
+                        dte_type_id = int(doc.get("dte") or 0) or None
+                    except (TypeError, ValueError):
+                        dte_type_id = None
+                    docs.append(
+                        {
+                            "doc_type": doc_type,
+                            "issuer_rut": str(doc.get("rut") or "") or None,
+                            "dte_type_id": dte_type_id,
+                            "folio": folio,
+                            "period": period,
+                        }
+                    )
+        return docs
+
     def list_accounts(self, active_only=True):
         query = self.db.query(AccountingAccountModel)
         if active_only:
@@ -475,29 +755,138 @@ class AccountingEntryClass:
             for r in rows
         ]
 
-    def store_account(self, code: str, name: str):
+    def search_accounts(
+        self,
+        code=None,
+        name=None,
+        status_id=None,
+        page=1,
+        items_per_page=10,
+    ):
+        query = self.db.query(AccountingAccountModel)
+        if code:
+            query = query.filter(AccountingAccountModel.code.ilike(f"%{str(code).strip()}%"))
+        if name:
+            query = query.filter(AccountingAccountModel.name.ilike(f"%{str(name).strip()}%"))
+        if status_id not in (None, ""):
+            query = query.filter(AccountingAccountModel.status_id == int(status_id))
+
+        total_items = query.count()
+        page = max(1, int(page or 1))
+        items_per_page = max(1, int(items_per_page or 10))
+        total_pages = (total_items + items_per_page - 1) // items_per_page if total_items else 0
+        rows = (
+            query.order_by(AccountingAccountModel.code.asc())
+            .offset((page - 1) * items_per_page)
+            .limit(items_per_page)
+            .all()
+        )
+        return {
+            "data": [
+                {"id": r.id, "code": r.code, "name": r.name, "status_id": r.status_id}
+                for r in rows
+            ],
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "items_per_page": items_per_page,
+        }
+
+    def get_account(self, account_id: int):
+        row = (
+            self.db.query(AccountingAccountModel)
+            .filter(AccountingAccountModel.id == account_id)
+            .first()
+        )
+        if not row:
+            return {"status": "error", "message": "Cuenta no encontrada"}
+        return {
+            "status": "success",
+            "data": {
+                "id": row.id,
+                "code": row.code,
+                "name": row.name,
+                "status_id": row.status_id,
+            },
+        }
+
+    def store_account(self, code: str, name: str, status_id: int = 1):
         code = str(code or "").strip()
         name = str(name or "").strip()
         if not code or not name:
-            return {"status": "error", "message": "code and name required"}
+            return {"status": "error", "message": "Código y nombre son obligatorios"}
         exists = (
             self.db.query(AccountingAccountModel.id)
             .filter(AccountingAccountModel.code == code)
             .first()
         )
         if exists:
-            return {"status": "error", "message": "Account code already exists"}
+            return {"status": "error", "message": "El código de cuenta ya existe"}
         now = datetime.now()
+        try:
+            status_value = int(status_id or 1)
+        except (TypeError, ValueError):
+            status_value = 1
+        if status_value not in (0, 1):
+            status_value = 1
         row = AccountingAccountModel(
             code=code,
             name=name,
-            status_id=1,
+            status_id=status_value,
             added_date=now,
             updated_date=now,
         )
         self.db.add(row)
         self.db.commit()
         return {"status": "success", "id": row.id, "code": row.code}
+
+    def update_account(self, account_id: int, code: str, name: str, status_id: int = 1):
+        row = (
+            self.db.query(AccountingAccountModel)
+            .filter(AccountingAccountModel.id == account_id)
+            .first()
+        )
+        if not row:
+            return {"status": "error", "message": "Cuenta no encontrada"}
+        code = str(code or "").strip()
+        name = str(name or "").strip()
+        if not code or not name:
+            return {"status": "error", "message": "Código y nombre son obligatorios"}
+        exists = (
+            self.db.query(AccountingAccountModel.id)
+            .filter(
+                AccountingAccountModel.code == code,
+                AccountingAccountModel.id != account_id,
+            )
+            .first()
+        )
+        if exists:
+            return {"status": "error", "message": "El código de cuenta ya existe"}
+        try:
+            status_value = int(status_id)
+        except (TypeError, ValueError):
+            status_value = 1
+        if status_value not in (0, 1):
+            status_value = 1
+        row.code = code
+        row.name = name
+        row.status_id = status_value
+        row.updated_date = datetime.now()
+        self.db.commit()
+        return {"status": "success", "id": row.id}
+
+    def delete_account(self, account_id: int):
+        row = (
+            self.db.query(AccountingAccountModel)
+            .filter(AccountingAccountModel.id == account_id)
+            .first()
+        )
+        if not row:
+            return {"status": "error", "message": "Cuenta no encontrada"}
+        row.status_id = 0
+        row.updated_date = datetime.now()
+        self.db.commit()
+        return {"status": "success", "id": row.id}
 
 
 def _safe_json(response):
