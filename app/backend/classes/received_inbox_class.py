@@ -131,9 +131,46 @@ class ReceivedInboxClass:
         acuse = str(acknowledgment_status or "").strip().lower()
         if acuse in ("3", "4", "5"):
             return False
-        if any(token in acuse for token in ("acept", "rechaz", "approved", "rejected")):
+        if any(
+            token in acuse
+            for token in (
+                "acept",
+                "conforme",
+                "approved",
+                "rechaz",
+                "rejected",
+            )
+        ):
             return False
         return True
+
+    def _map_acknowledgment_status(self, item):
+        """
+        SimpleFactura documentsReceived uses `estado` (e.g. RECIBIDO CONFORME),
+        not always `estadoAcuse`.
+        """
+        raw = self._sf_item_value(
+            item,
+            "estadoAcuse",
+            "EstadoAcuse",
+            "estado",
+            "Estado",
+            "respuesta",
+            "Respuesta",
+        )
+        text = str(raw or "").strip()
+        if not text:
+            return None, RECEIVED_INBOX_STATUS_PENDING
+
+        lower = text.lower()
+        if any(token in lower for token in ("rechaz", "rejected", "no conforme")):
+            return text, RECEIVED_INBOX_STATUS_REJECTED
+        if any(
+            token in lower
+            for token in ("conforme", "acept", "approved", "acuse acept")
+        ):
+            return text, RECEIVED_INBOX_STATUS_ACCEPTED
+        return text, RECEIVED_INBOX_STATUS_PENDING
 
     def _serialize_rows(self, data):
         return [
@@ -488,10 +525,12 @@ class ReceivedInboxClass:
             persist = self._persist_received_items(data)
             summary["inserted"] = persist["inserted"]
             summary["skipped"] = persist["skipped"]
+            summary["updated"] = persist.get("updated", 0)
             print(
                 f"[received_inbox.refresh] source=sii_consolidate "
                 f"fetched={summary['fetched']} inserted={summary['inserted']} "
-                f"skipped={summary['skipped']} consolidated={summary.get('consolidated')}",
+                f"updated={summary['updated']} skipped={summary['skipped']} "
+                f"consolidated={summary.get('consolidated')}",
                 flush=True,
             )
             return summary
@@ -561,10 +600,11 @@ class ReceivedInboxClass:
             persist = self._persist_received_items(data)
             summary["inserted"] = persist["inserted"]
             summary["skipped"] = persist["skipped"]
+            summary["updated"] = persist.get("updated", 0)
             print(
                 f"[received_inbox.import_day] date={day_iso} "
                 f"fetched={summary['fetched']} inserted={summary['inserted']} "
-                f"skipped={summary['skipped']}",
+                f"updated={summary['updated']} skipped={summary['skipped']}",
                 flush=True,
             )
             return summary
@@ -576,19 +616,16 @@ class ReceivedInboxClass:
             return summary
 
     def _persist_received_items(self, data):
-        """Insert new received inbox rows; skip duplicates."""
-        existing_rows = self.db.query(
-            ReceivedInboxModel.folio,
-            ReceivedInboxModel.rut,
-            ReceivedInboxModel.dte_type_id,
-        ).all()
-        existing_keys = {
-            (int(row.folio or 0), str(row.rut), int(row.dte_type_id or 0))
+        """Insert new received inbox rows; update status on existing ones."""
+        existing_rows = self.db.query(ReceivedInboxModel).all()
+        existing_by_key = {
+            (int(row.folio or 0), str(row.rut), int(row.dte_type_id or 0)): row
             for row in existing_rows
         }
 
         inserted = 0
         skipped = 0
+        updated = 0
         now = datetime.now()
         for item in data:
             if not isinstance(item, dict):
@@ -619,8 +656,37 @@ class ReceivedInboxClass:
                 continue
 
             key = (folio, rut, dte_type_id)
-            if key in existing_keys:
-                skipped += 1
+            acknowledgment_status, status_id = self._map_acknowledgment_status(item)
+            document_status = (
+                str(self._sf_item_value(item, "estado", "Estado") or "") or None
+            )
+            sii_status = (
+                str(self._sf_item_value(item, "estadoSII", "EstadoSII") or "") or None
+            )
+            environment = (
+                str(self._sf_item_value(item, "ambiente", "Ambiente") or "") or None
+            )
+
+            existing = existing_by_key.get(key)
+            if existing:
+                changed = False
+                if acknowledgment_status and existing.acknowledgment_status != acknowledgment_status:
+                    existing.acknowledgment_status = acknowledgment_status
+                    changed = True
+                if existing.status_id != status_id:
+                    existing.status_id = status_id
+                    changed = True
+                if document_status and existing.document_status != document_status:
+                    existing.document_status = document_status
+                    changed = True
+                if sii_status and existing.sii_status != sii_status:
+                    existing.sii_status = sii_status
+                    changed = True
+                if changed:
+                    existing.updated_date = now
+                    updated += 1
+                else:
+                    skipped += 1
                 continue
 
             supplier_name = (
@@ -671,16 +737,6 @@ class ReceivedInboxClass:
             except (TypeError, ValueError):
                 track_id = None
 
-            acknowledgment_status = (
-                str(self._sf_item_value(item, "estadoAcuse", "EstadoAcuse") or "") or None
-            )
-            status_id = RECEIVED_INBOX_STATUS_PENDING
-            acuse_lower = str(acknowledgment_status or "").lower()
-            if any(token in acuse_lower for token in ("rechaz", "rejected")):
-                status_id = RECEIVED_INBOX_STATUS_REJECTED
-            elif any(token in acuse_lower for token in ("acept", "approved")):
-                status_id = RECEIVED_INBOX_STATUS_ACCEPTED
-
             row = ReceivedInboxModel(
                 rut=rut,
                 supplier=str(supplier_name).upper() if supplier_name else None,
@@ -691,9 +747,9 @@ class ReceivedInboxClass:
                 subtotal=net,
                 tax=int(total) - int(net),
                 total=total,
-                environment=str(self._sf_item_value(item, "ambiente", "Ambiente") or "") or None,
-                document_status=str(self._sf_item_value(item, "estado", "Estado") or "") or None,
-                sii_status=str(self._sf_item_value(item, "estadoSII", "EstadoSII") or "") or None,
+                environment=environment,
+                document_status=document_status,
+                sii_status=sii_status,
                 acknowledgment_status=acknowledgment_status,
                 track_id=track_id,
                 document_date=document_date,
@@ -701,11 +757,11 @@ class ReceivedInboxClass:
                 updated_date=now,
             )
             self.db.add(row)
-            existing_keys.add(key)
+            existing_by_key[key] = row
             inserted += 1
 
         self.db.commit()
-        return {"inserted": inserted, "skipped": skipped}
+        return {"inserted": inserted, "skipped": skipped, "updated": updated}
 
     def acknowledge(self, form_data):
         """Accept or reject via SimpleFactura POST /acknowledgmentReceipt."""
