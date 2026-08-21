@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<DTE version="1.0">
+<Documento ID="T33F73781767">
+<Encabezado>
+<IdDoc>
+<TipoDTE>33</TipoDTE>
+<Folio>73781767</Folio>
+<FchEmis>2026-08-19</FchEmis>
+<MntBruto>1</MntBruto>
+<MntPagos>
+<FchPago>2026-09-13</FchPago>
+<MntPago>39076</MntPago>
+</MntPagos>
+<PeriodoDesde>2026-07-19</PeriodoDesde>
+<PeriodoHasta>2026-08-18</PeriodoHasta>
+<FchVenc>2026-09-13</FchVenc>
+</IdDoc>
+<Emisor>
+<RUTEmisor>76124890-1</RUTEmisor>
+<RznSoc>Telefónica Móviles Chile S.A.</RznSoc>
+<GiroEmis>Comunicaciones</GiroEmis>
+<Telefono>6006003000</Telefono>
+<CorreoEmisor>movistar@movistar.cl</CorreoEmisor>
+<Acteco>642090</Acteco>
+<DirOrigen>Av. Providencia 111</DirOrigen>
+<CmnaOrigen>Providencia</CmnaOrigen>
+<CiudadOrigen>Santiago</CiudadOrigen>
+</Emisor>
+<Receptor>
+<RUTRecep>76063822-6</RUTRecep>
+<CdgIntRecep>23154290</CdgIntRecep>
+<RznSocRecep>J I S PARKING SPA</RznSocRecep>
+<GiroRecep>SERVICIO DE LAVADO DE VEHÍCULOS AUTOMOTO</GiroRecep>
+<Contacto>56996344204</Contacto>
+<CorreoRecep>13335</CorreoRecep>
+<DirRecep>AVENIDA MATUCANA 40</DirRecep>
+<CmnaRecep>ESTACION CENTRAL</CmnaRecep>
+<CiudadRecep>Metropolitana de San</CiudadRecep>
+<DirPostal>AVENIDA MATUCANA 40</DirPostal>
+<CmnaPostal>ESTACION CENTRAL</CmnaPostal>
+<CiudadPostal>Metropolitana de San</CiudadPostal>
+</Receptor>
+<Totales>
+<MntNeto>32837</MntNeto>
+<TasaIVA>19</TasaIVA>
+<IVA>6239</IVA>
+<MntTotal>39076</MntTotal>
+<MontoPeriodo>39076</MontoPeriodo>
+<VlrPagar>39076</VlrPagar>
+</Totales>
+</Encabezado>
+<Detalle>
+<NroLinDet>1</NroLinDet>
+<NmbItem>Cargo Fijo_Voz Asociado a PLAN</NmbItem>
+<DescuentoMonto>4227</DescuentoMonto>
+<MontoItem>3522</MontoItem>
+</Detalle>
+<Detalle>
+<NroLinDet>2</NroLinDet>
+<NmbItem>Cargo Fijo Dato Asociado a PLAN</NmbItem>
+<DescuentoMonto>2114</DescuentoMonto>
+<MontoItem>6540</MontoItem>
+</Detalle>
+<Detalle>
+<NroLinDet>3</NroLinDet>
+<NmbItem>Cargo Fijo_Voz Asociado a PLAN</NmbItem>
+<DescuentoMonto>12155</DescuentoMonto>
+<MontoItem>10125</MontoItem>
+</Detalle>
+<Detalle>
+<NroLinDet>4</NroLinDet>
+<NmbItem>Cargo Fijo Dato Asociado a PLAN</NmbItem>
+<DescuentoMonto>6078</DescuentoMonto>
+<MontoItem>18802</MontoItem>
+</Detalle>
+<Detalle>
+<NroLinDet>5</NroLinDet>
+<NmbItem>Minuto Adicional GTD Telesat S.A.</NmbItem>
+<MontoItem>87</MontoItem>
+</Detalle>
+<SubTotInfo>
+<NroSTI>1</NroSTI>
+<GlosaSTI>Servicio Telefonico Movil</GlosaSTI>
+<OrdenSTI>10</OrdenSTI>
+<SubTotNetoSTI>32837</SubTotNetoSTI>
+<SubTotIVASTI>6239</SubTotIVASTI>
+<ValSubtotSTI>39076</ValSubtotSTI>
+<LineasDeta>1</LineasDeta>
+<LineasDeta>2</LineasDeta>
+<LineasDeta>3</LineasDeta>
+<LineasDeta>4</LineasDeta>
+<LineasDeta>5</LineasDeta>
+</SubTotInfo>
+<TED version="1.0">
+<DD>
+<RE>76124890-1</RE>
+<TD>33</TD>
+<F>73781767</F>
+<FE>2026-08-19</FE>
+<RR>76063822-6</RR>
+<RSR>J I S PARKING SPA</RSR>
+<MNT>39076</MNT>
+<IT1>Cargo Fijo_Voz Asociado a PLAN</IT1>
+<CAF version="1.0">
+<DA>
+<RE>76124890-1</RE>
+<RS>TELEFONICA MOVILES CHILE S.A.</RS>
+<TD>33</TD>
+<RNG>
+<D>73646964</D>
+<H>73796963</H>
+</RNG>
+<FA>2026-06-23</FA>
+<RSAPK>
+<M>tq28tj+xocV3N6UsGG21PEwwEq57RW4hJfI7O9arvhiJjYcVunJH6Y70qXBBwePc9UMkAyjZkT9mstmKCKzcsw==</M>
+<E>Aw==</E>
+</RSAPK>
+<IDK>300</IDK>
+</DA>
+<FRMA algoritmo="SHA1withRSA">OBNGGT2ZCGSBcxRzLF55aM4B+mZUl+uy1KEV/ThRjfeGMUzugz/D5/nJ/1ZZOqs+cTfdDYjiQZCqSNWKOnUfeA==</FRMA>
+</CAF>
+<TSTED>2026-08-19T18:09:50</TSTED>
+</DD>
+<FRMT algoritmo="SHA1withRSA">EUBSiu0bSwip0EauGGFzvjwyBiSyebWDrptHBBI9jEiMwyF/NqdmN7+vRA6r2Z7QMmS4xIDJShJm
+yKsQzMqDPA==</FRMT>
+</TED>
+<TmstFirma>2026-08-19T18:09:50</TmstFirma>
+</Documento>
+</DTE>

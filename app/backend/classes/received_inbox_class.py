@@ -30,13 +30,13 @@ SIMPLEFACTURA_CONSOLIDATE_MONTHS = int(os.getenv("SIMPLEFACTURA_CONSOLIDATE_MONT
 RECEIVED_INBOX_LOOKBACK_DAYS = int(os.getenv("RECEIVED_INBOX_LOOKBACK_DAYS", "30"))
 RECEIVED_DTE_TYPES = (33, 34, 39, 61)
 DTE_TYPE_LABELS = {
-    33: "Factura electrónica",
-    34: "Factura exenta electrónica",
-    39: "Boleta electrónica",
-    41: "Boleta exenta electrónica",
-    52: "Guía de despacho electrónica",
-    56: "Nota de débito electrónica",
-    61: "Nota de crédito electrónica",
+    33: "FACTURA ELECTRÓNICA",
+    34: "FACTURA EXENTA ELECTRÓNICA",
+    39: "BOLETA ELECTRÓNICA",
+    41: "BOLETA EXENTA ELECTRÓNICA",
+    52: "GUÍA DE DESPACHO ELECTRÓNICA",
+    56: "NOTA DE DÉBITO ELECTRÓNICA",
+    61: "NOTA DE CRÉDITO ELECTRÓNICA",
 }
 RECEIVED_INBOX_STATUS_PENDING = 1
 RECEIVED_INBOX_STATUS_ACCEPTED = 2
@@ -1132,131 +1132,415 @@ class ReceivedInboxClass:
         name_l = name.lower()
         return [el for el in root.iter() if self._xml_local(el.tag).lower() == name_l]
 
+    @staticmethod
+    def _format_cl_rut(rut: str) -> str:
+        text = (rut or "").strip().upper().replace(".", "")
+        if "-" in text:
+            body, dv = text.rsplit("-", 1)
+        elif len(text) > 1:
+            body, dv = text[:-1], text[-1]
+        else:
+            return text
+        body = "".join(ch for ch in body if ch.isdigit())
+        if not body:
+            return text
+        parts = []
+        while body:
+            parts.insert(0, body[-3:])
+            body = body[:-3]
+        return f"{'.'.join(parts)}-{dv}"
+
+    @staticmethod
+    def _format_cl_money(value, decimals: int = 0) -> str:
+        if value in (None, ""):
+            return "—"
+        try:
+            num = float(str(value).replace(".", "").replace(",", ".")) if isinstance(value, str) and "," in str(value) else float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        if decimals <= 0:
+            return f"{int(round(num)):,}".replace(",", ".")
+        formatted = f"{num:,.{decimals}f}"
+        return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+    @staticmethod
+    def _format_cl_long_date(iso_date: str) -> str:
+        from datetime import datetime as dt
+
+        text = (iso_date or "").strip()[:10]
+        try:
+            d = dt.strptime(text, "%Y-%m-%d")
+        except ValueError:
+            return text or ""
+        weekdays = (
+            "Lunes",
+            "Martes",
+            "Miércoles",
+            "Jueves",
+            "Viernes",
+            "Sábado",
+            "Domingo",
+        )
+        months = (
+            "enero",
+            "febrero",
+            "marzo",
+            "abril",
+            "mayo",
+            "junio",
+            "julio",
+            "agosto",
+            "septiembre",
+            "octubre",
+            "noviembre",
+            "diciembre",
+        )
+        return f"{weekdays[d.weekday()]} {d.day} de {months[d.month - 1]} del {d.year}"
+
+    def _xml_block_fields(self, root, block_name: str) -> dict:
+        fields = {}
+        for el in root.iter():
+            if self._xml_local(el.tag).lower() != block_name.lower():
+                continue
+            for child in el:
+                ln = self._xml_local(child.tag)
+                val = (child.text or "").strip()
+                if ln and val:
+                    fields[ln] = val
+            break
+        return fields
+
     def _pdf_from_received_dte_xml(self, xml_bytes: bytes, row) -> bytes:
-        """Render a readable PDF from Chilean DTE XML (fallback when SF has no plantilla)."""
+        """Professional Chilean DTE PDF (LibreDTE-like layout, without LibreDTE branding)."""
         import io
+        import re
         import xml.etree.ElementTree as ET
-        from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-        from reportlab.lib.units import cm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.utils import ImageReader
 
         root = ET.fromstring(xml_bytes)
-        tipo = self._xml_find_text(root, "TipoDTE") or str(row.dte_type_id or "")
+        tipo_raw = self._xml_find_text(root, "TipoDTE") or str(row.dte_type_id or "")
+        try:
+            tipo = int(tipo_raw)
+        except (TypeError, ValueError):
+            tipo = 0
         folio = self._xml_find_text(root, "Folio") or str(row.folio or "")
-        fch = self._xml_find_text(root, "FchEmis") or str(row.added_date or "")
+        fch = self._xml_find_text(root, "FchEmis") or str(getattr(row, "added_date", "") or "")
+        fma_pago = self._xml_find_text(root, "FmaPago")
+        venta = "crédito" if str(fma_pago) == "2" else "contado"
 
-        emisor_name = ""
-        emisor_rut = str(row.rut or "")
-        receptor_name = ""
-        receptor_rut = ""
-        for el in root.iter():
-            local = self._xml_local(el.tag).lower()
-            if local not in ("emisor", "receptor"):
-                continue
-            rz = ""
-            ru = ""
-            for child in el.iter():
-                ln = self._xml_local(child.tag).lower()
-                val = (child.text or "").strip()
-                if not val:
-                    continue
-                if ln in ("rznsoc", "rznsocrecep"):
-                    rz = val
-                if ln in ("rutemisor", "rutrecep"):
-                    ru = val
-            if local == "emisor":
-                emisor_name = rz or emisor_name
-                emisor_rut = ru or emisor_rut
-            else:
-                receptor_name = rz or receptor_name
-                receptor_rut = ru or receptor_rut
+        emisor = self._xml_block_fields(root, "Emisor")
+        receptor = self._xml_block_fields(root, "Receptor")
+        emisor_name = emisor.get("RznSoc") or (row.supplier or "")
+        emisor_rut = emisor.get("RUTEmisor") or str(row.rut or "")
+        emisor_giro = emisor.get("GiroEmis") or ""
+        emisor_dir = ", ".join(
+            p for p in (
+                emisor.get("DirOrigen"),
+                emisor.get("CmnaOrigen"),
+                emisor.get("CiudadOrigen"),
+            ) if p
+        )
+        emisor_contact = " / ".join(
+            p for p in (emisor.get("Telefono"), emisor.get("CorreoEmisor")) if p
+        )
+        receptor_name = receptor.get("RznSocRecep") or "JIS PARKING SPA"
+        receptor_rut = receptor.get("RUTRecep") or SIMPLEFACTURA_RUT_EMISOR
+        receptor_giro = receptor.get("GiroRecep") or ""
+        receptor_dir = ", ".join(
+            p for p in (
+                receptor.get("DirRecep"),
+                receptor.get("CmnaRecep"),
+                receptor.get("CiudadRecep"),
+            ) if p
+        )
+        receptor_contact = " / ".join(
+            p for p in (receptor.get("Contacto"), receptor.get("CorreoRecep")) if p
+        )
 
         mnt_neto = self._xml_find_text(root, "MntNeto")
+        mnt_exento = self._xml_find_text(root, "MntExe")
+        tasa_iva = self._xml_find_text(root, "TasaIVA") or "19"
         mnt_iva = self._xml_find_text(root, "IVA")
         mnt_total = self._xml_find_text(root, "MntTotal") or str(row.total or "")
+        vlr_pagar = self._xml_find_text(root, "VlrPagar") or mnt_total
+        tipo_label = DTE_TYPE_LABELS.get(tipo, f"DTE {tipo_raw}")
+        sii_office = (emisor.get("CmnaOrigen") or emisor.get("CiudadOrigen") or "SANTIAGO").upper()
 
-        detail_rows = [["N°", "Detalle", "Cant.", "P. unit.", "Total"]]
-        for idx, det in enumerate(self._xml_find_all(root, "Detalle"), start=1):
-            name = ""
-            qty = ""
-            price = ""
-            total = ""
+        details = []
+        for det in self._xml_find_all(root, "Detalle"):
+            item = {}
             for child in list(det):
-                ln = self._xml_local(child.tag).lower()
+                ln = self._xml_local(child.tag)
                 val = (child.text or "").strip()
-                if ln == "nmbitem" and val:
-                    name = val
-                elif ln == "dscitem" and val and not name:
-                    name = val
-                elif ln == "qtyitem":
-                    qty = val
-                elif ln == "prcitem":
-                    price = val
-                elif ln == "montoitem":
-                    total = val
-            detail_rows.append([str(idx), name or "—", qty or "—", price or "—", total or "—"])
-
-        if len(detail_rows) == 1:
-            detail_rows.append(
-                ["1", emisor_name or row.supplier or "Documento recibido", "1", "", mnt_total or "—"]
+                if ln and val:
+                    item[ln] = val
+            name = item.get("NmbItem") or item.get("DscItem") or "—"
+            dsc = item.get("DscItem") or name
+            qty = item.get("QtyItem") or "1"
+            unit = item.get("UnmdItem") or "Unid"
+            price = item.get("PrcItem")
+            total = item.get("MontoItem") or "0"
+            if price in (None, "") and qty:
+                try:
+                    price = str(round(float(total) / float(qty), 1))
+                except (TypeError, ValueError, ZeroDivisionError):
+                    price = total
+            details.append(
+                {
+                    "name": name,
+                    "dsc": dsc,
+                    "qty": qty,
+                    "unit": unit,
+                    "price": price,
+                    "total": total,
+                }
+            )
+        if not details:
+            details.append(
+                {
+                    "name": emisor_name or "Documento recibido",
+                    "dsc": emisor_name or "Documento recibido",
+                    "qty": "1",
+                    "unit": "Unid",
+                    "price": mnt_total,
+                    "total": mnt_total,
+                }
             )
 
-        tipo_label = DTE_TYPE_LABELS.get(int(tipo) if str(tipo).isdigit() else 0, f"DTE {tipo}")
+        # TED → PDF417
+        ted_img = None
+        ted_match = re.search(rb"<TED[^>]*>.*?</TED>", xml_bytes, re.DOTALL | re.IGNORECASE)
+        if ted_match:
+            try:
+                from pdf417gen import encode, render_image
+
+                ted_xml = ted_match.group(0).decode("iso-8859-1", errors="replace")
+                ted_xml = re.sub(r">\s+<", "><", ted_xml)
+                codes = encode(ted_xml, columns=12, security_level=5)
+                pil_img = render_image(codes, scale=2, ratio=3)
+                ted_buf = io.BytesIO()
+                pil_img.save(ted_buf, format="PNG")
+                ted_buf.seek(0)
+                ted_img = ImageReader(ted_buf)
+            except Exception:
+                ted_img = None
 
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=letter,
-            leftMargin=1.5 * cm,
-            rightMargin=1.5 * cm,
-            topMargin=1.5 * cm,
-            bottomMargin=1.5 * cm,
-        )
-        styles = getSampleStyleSheet()
-        title = ParagraphStyle("t", parent=styles["Heading2"], textColor=colors.HexColor("#152d8a"))
-        body = ParagraphStyle("b", parent=styles["Normal"], fontSize=9, leading=12)
-        small = ParagraphStyle("s", parent=styles["Normal"], fontSize=8, leading=10, textColor=colors.grey)
+        c = canvas.Canvas(buf, pagesize=letter)
+        width, height = letter
+        left = 15 * mm
+        right = width - 15 * mm
+        usable = right - left
+        y = height - 16 * mm
 
-        story = [
-            Paragraph("Documento tributario recibido", title),
-            Paragraph("Generado desde XML SimpleFactura", small),
-            Spacer(1, 0.4 * cm),
-            Paragraph(f"<b>{tipo_label}</b> · Folio <b>{folio}</b> · Fecha {fch}", body),
-            Spacer(1, 0.3 * cm),
-            Paragraph(
-                f"<b>Emisor:</b> {emisor_name or row.supplier or '—'} ({emisor_rut})",
-                body,
-            ),
-            Paragraph(
-                f"<b>Receptor:</b> {receptor_name or 'JIS PARKING SPA'} "
-                f"({receptor_rut or SIMPLEFACTURA_RUT_EMISOR})",
-                body,
-            ),
-            Spacer(1, 0.5 * cm),
+        blue = (0.08, 0.25, 0.55)
+        red = (0.75, 0.05, 0.05)
+
+        # ---- Header: emisor (left) + caja RUT (right) ----
+        box_w, box_h = 68 * mm, 28 * mm
+        box_x = right - box_w
+        box_y = y - box_h
+        c.setStrokeColorRGB(*red)
+        c.setLineWidth(2.2)
+        c.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
+        c.setFillColorRGB(*red)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(box_x + box_w / 2, box_y + box_h - 9 * mm, f"R.U.T.: {self._format_cl_rut(emisor_rut)}")
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(box_x + box_w / 2, box_y + box_h / 2 - 1 * mm, tipo_label)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(box_x + box_w / 2, box_y + 5 * mm, f"N° {folio}")
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(box_x + box_w / 2, box_y - 5 * mm, f"S.I.I. - {sii_office}")
+
+        text_w = box_x - left - 6 * mm
+        c.setFillColorRGB(*blue)
+        c.setFont("Helvetica-Bold", 12)
+        name_y = y - 2 * mm
+        # wrap issuer name
+        words = (emisor_name or "").upper().split()
+        line = ""
+        for w in words:
+            test = f"{line} {w}".strip()
+            if c.stringWidth(test, "Helvetica-Bold", 12) <= text_w:
+                line = test
+            else:
+                c.drawString(left, name_y, line)
+                name_y -= 5 * mm
+                line = w
+        if line:
+            c.drawString(left, name_y, line)
+            name_y -= 5 * mm
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica", 8)
+        if emisor_giro:
+            giro = emisor_giro.upper()
+            while giro and c.stringWidth(giro, "Helvetica", 8) > text_w:
+                giro = giro[:-1]
+            c.drawString(left, name_y, giro)
+            name_y -= 4 * mm
+        if emisor_dir:
+            c.drawString(left, name_y, emisor_dir[:90])
+            name_y -= 4 * mm
+        if emisor_contact:
+            c.drawString(left, name_y, emisor_contact[:90])
+
+        y = min(box_y - 12 * mm, name_y - 8 * mm)
+
+        # ---- Receptor + fecha ----
+        c.setFont("Helvetica-Bold", 9)
+        labels = [
+            ("R.U.T.", self._format_cl_rut(receptor_rut)),
+            ("Razón social", receptor_name),
+            ("Giro", receptor_giro.upper() if receptor_giro else ""),
+            ("Dirección", receptor_dir),
+            ("Contacto", receptor_contact),
         ]
+        label_x = left
+        value_x = left + 28 * mm
+        row_y = y
+        for lab, val in labels:
+            if not val:
+                continue
+            c.setFont("Helvetica-Bold", 9)
+            c.drawString(label_x, row_y, f"{lab} :")
+            c.setFont("Helvetica", 9)
+            c.drawString(value_x, row_y, str(val)[:78])
+            row_y -= 4.5 * mm
 
-        table = Table(detail_rows, colWidths=[1.2 * cm, 9 * cm, 2 * cm, 2.5 * cm, 2.5 * cm])
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#152d8a")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                ]
+        c.setFont("Helvetica", 9)
+        c.drawRightString(right, y, self._format_cl_long_date(fch))
+        c.drawRightString(right, y - 4.5 * mm, f"Venta: {venta}")
+        y = row_y - 6 * mm
+
+        # ---- Items table ----
+        cols = [
+            ("Item", 0.52),
+            ("Cant.", 0.10),
+            ("Unidad", 0.10),
+            ("P. unitario", 0.14),
+            ("Total item", 0.14),
+        ]
+        col_ws = [usable * r for _, r in cols]
+        header_h = 7 * mm
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.8)
+        c.setFillColorRGB(0.95, 0.95, 0.95)
+        c.rect(left, y - header_h, usable, header_h, stroke=1, fill=1)
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 8)
+        x = left
+        for (title, _), w in zip(cols, col_ws):
+            c.drawCentredString(x + w / 2, y - 4.8 * mm, title)
+            x += w
+        # vertical lines header
+        x = left
+        for w in col_ws[:-1]:
+            x += w
+            c.line(x, y, x, y - header_h)
+        y -= header_h
+
+        c.setFont("Helvetica", 8)
+        for det in details:
+            # estimate row height (2 lines for item)
+            row_h = 9 * mm
+            if y - row_h < 55 * mm:
+                c.showPage()
+                y = height - 20 * mm
+            c.rect(left, y - row_h, usable, row_h, stroke=1, fill=0)
+            x = left
+            for w in col_ws[:-1]:
+                x += w
+                c.line(x, y, x, y - row_h)
+
+            name = (det["name"] or "—")[:70]
+            dsc = (det["dsc"] or name)[:70]
+            c.setFont("Helvetica", 8)
+            c.drawString(left + 1.5 * mm, y - 3.5 * mm, name)
+            c.setFont("Helvetica", 7)
+            c.drawString(left + 1.5 * mm, y - 7 * mm, dsc)
+            c.setFont("Helvetica", 8)
+            # qty
+            x0 = left + col_ws[0]
+            try:
+                qty_f = float(det["qty"])
+                qty_txt = f"{qty_f:.1f}".replace(".", ",")
+            except (TypeError, ValueError):
+                qty_txt = str(det["qty"])
+            c.drawRightString(x0 + col_ws[1] - 1.5 * mm, y - 5 * mm, qty_txt)
+            c.drawCentredString(x0 + col_ws[1] + col_ws[2] / 2, y - 5 * mm, str(det["unit"] or "Unid")[:8])
+            c.drawRightString(
+                x0 + col_ws[1] + col_ws[2] + col_ws[3] - 1.5 * mm,
+                y - 5 * mm,
+                self._format_cl_money(det["price"], 1),
             )
-        )
-        story.append(table)
-        story.append(Spacer(1, 0.5 * cm))
-        story.append(Paragraph(f"Neto: {mnt_neto or '—'}", body))
-        story.append(Paragraph(f"IVA: {mnt_iva or '—'}", body))
-        story.append(Paragraph(f"<b>Total: {mnt_total or '—'}</b>", body))
-        doc.build(story)
+            c.drawRightString(right - 1.5 * mm, y - 5 * mm, self._format_cl_money(det["total"], 0))
+            y -= row_h
+
+        # ---- Footer: timbre + totales ----
+        y -= 8 * mm
+        footer_top = y
+        timbre_w, timbre_h = 55 * mm, 32 * mm
+        if ted_img is not None:
+            c.drawImage(
+                ted_img,
+                left,
+                footer_top - timbre_h,
+                width=timbre_w,
+                height=timbre_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(left + timbre_w / 2, footer_top - timbre_h - 4 * mm, "Timbre Electrónico SII")
+            c.drawCentredString(left + timbre_w / 2, footer_top - timbre_h - 7.5 * mm, "Resolución 80 de 2014")
+            c.drawCentredString(
+                left + timbre_w / 2,
+                footer_top - timbre_h - 11 * mm,
+                "Verifique documento: www.sii.cl",
+            )
+        else:
+            c.setFont("Helvetica", 8)
+            c.drawString(left, footer_top - 10 * mm, "Timbre Electrónico SII")
+            c.drawString(left, footer_top - 14 * mm, "Verifique documento: www.sii.cl")
+
+        totals = []
+        if mnt_neto not in (None, ""):
+            totals.append(("Neto $", self._format_cl_money(mnt_neto)))
+        if mnt_exento not in (None, ""):
+            totals.append(("Exento $", self._format_cl_money(mnt_exento)))
+        if mnt_iva not in (None, ""):
+            try:
+                tasa_txt = f"{float(tasa_iva):.1f}"
+            except (TypeError, ValueError):
+                tasa_txt = str(tasa_iva)
+            totals.append((f"IVA ({tasa_txt}%) $", self._format_cl_money(mnt_iva)))
+        totals.append(("Total $", self._format_cl_money(mnt_total)))
+        totals.append(("Valor a pagar $", self._format_cl_money(vlr_pagar)))
+
+        # Totales a la derecha del timbre (como DTE profesional)
+        c.setFillColorRGB(0, 0, 0)
+        tot_y = footer_top - 4 * mm
+        for lab, val in totals:
+            c.setFont("Helvetica-Bold", 9)
+            c.drawRightString(right - 30 * mm, tot_y, f"{lab} :")
+            c.drawRightString(right, tot_y, val)
+            tot_y -= 5.2 * mm
+
+        # bottom line (no LibreDTE branding)
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.6)
+        line_y = 14 * mm
+        c.line(left, line_y, right, line_y)
+        c.setFont("Helvetica", 7)
+        c.setFillColorRGB(0.2, 0.2, 0.2)
+        c.drawString(left, line_y - 4 * mm, "Documento tributario electrónico")
+        c.drawRightString(right, line_y - 4 * mm, "www.sii.cl")
+
+        c.save()
         pdf = buf.getvalue()
         if not pdf.startswith(b"%PDF"):
             raise ValueError("PDF generado inválido")
