@@ -154,13 +154,16 @@ class QuotationClass:
         here = os.path.dirname(os.path.abspath(__file__))
         candidates = [
             env_logo,
-            # app/backend/static/logo.png (ruta real del proyecto)
+            # Prefer RGB version for ReportLab (RGBA often renders blank)
+            os.path.join(here, "..", "static", "logo_pdf.png"),
             os.path.join(here, "..", "static", "logo.png"),
             os.path.join(here, "..", "..", "..", "static", "logo.png"),
             os.path.join(here, "..", "..", "..", "files", "logo.png"),
+            "/var/www/intrajisbackend.com/public_html/app/backend/static/logo_pdf.png",
             "/var/www/intrajisbackend.com/public_html/app/backend/static/logo.png",
             "/var/www/intrajisbackend.com/public_html/files/logo.png",
             "/var/www/intrajisbackend.com/public_html/assets/logo.png",
+            "/var/www/intrajisbackend.com/public_html/static/logo.png",
         ]
         for path in candidates:
             if not path:
@@ -175,11 +178,31 @@ class QuotationClass:
         if not logo_path:
             return ""
         try:
-            img = Image(logo_path, width=width_cm * cm, height=height_cm * cm)
+            # ReportLab can drop RGBA logos; flatten onto white then embed.
+            from PIL import Image as PILImage
+
+            src = PILImage.open(logo_path)
+            if src.mode in ("RGBA", "LA", "P"):
+                rgba = src.convert("RGBA")
+                bg = PILImage.new("RGBA", rgba.size, (255, 255, 255, 255))
+                flat = PILImage.alpha_composite(bg, rgba).convert("RGB")
+            else:
+                flat = src.convert("RGB")
+            buf = io.BytesIO()
+            flat.save(buf, format="PNG")
+            buf.seek(0)
+            img = Image(buf, width=width_cm * cm, height=height_cm * cm)
             img.hAlign = "LEFT"
             return img
-        except Exception:
-            return ""
+        except Exception as e:
+            print(f"Quotation PDF logo error ({logo_path}): {e}")
+            try:
+                img = Image(logo_path, width=width_cm * cm, height=height_cm * cm)
+                img.hAlign = "LEFT"
+                return img
+            except Exception as e2:
+                print(f"Quotation PDF logo fallback error: {e2}")
+                return ""
 
     def _normalize_items(self, items) -> list[dict]:
         normalized = []
