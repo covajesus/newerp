@@ -2011,6 +2011,18 @@ class QuotationItemModel(Base):
     updated_date = Column(DateTime())
 
 
+class QuotationReferenceModel(Base):
+    __tablename__ = 'quotation_references'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quotation_id = Column(Integer, ForeignKey('quotations.id', ondelete='CASCADE'), nullable=False)
+    reference_type_id = Column(String(16))
+    reference_date_id = Column(String(255))
+    reference_code = Column(String(64))
+    reference_description = Column(String(512))
+    added_date = Column(DateTime())
+
+
 class AlertUserModel(Base):
     __tablename__ = 'alert_users'
 

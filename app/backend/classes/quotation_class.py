@@ -38,8 +38,10 @@ from app.backend.db.models import (
     CustomerDteItemModel,
     CustomerModel,
     DteModel,
+    DteReferenceModel,
     QuotationItemModel,
     QuotationModel,
+    QuotationReferenceModel,
     UserModel,
 )
 
@@ -262,6 +264,39 @@ class QuotationClass:
             )
         return normalized
 
+    def _normalize_references(self, references) -> list[dict]:
+        """Same fields as dte_references / factura category 2. Empty lines are dropped."""
+        out: list[dict] = []
+        if not references:
+            return out
+        for ref in references:
+            if hasattr(ref, "model_dump"):
+                plain = ref.model_dump()
+            elif isinstance(ref, dict):
+                plain = ref
+            else:
+                plain = {
+                    "reference_type_id": getattr(ref, "reference_type_id", None),
+                    "reference_date_id": getattr(ref, "reference_date_id", None),
+                    "reference_code": getattr(ref, "reference_code", None),
+                    "reference_description": getattr(ref, "reference_description", None),
+                }
+            type_id = self._clean_str(plain.get("reference_type_id"))
+            date_id = self._clean_str(plain.get("reference_date_id"))
+            code = self._clean_str(plain.get("reference_code"))
+            desc = self._clean_str(plain.get("reference_description"))
+            if not any([type_id, date_id, code, desc]):
+                continue
+            out.append(
+                {
+                    "reference_type_id": type_id,
+                    "reference_date_id": date_id,
+                    "reference_code": code,
+                    "reference_description": desc,
+                }
+            )
+        return out
+
     def _compute_totals(self, items: list[dict], chip_id: int = 0) -> tuple[int, int, int]:
         """Líneas en neto (como factura grupal V2 cat. 3). Chip se suma al bruto."""
         net = sum(int(i["total_amount"]) for i in items)
@@ -311,6 +346,41 @@ class QuotationClass:
                     updated_date=now,
                 )
             )
+
+    def _replace_references(self, quotation_id: int, references: list[dict]):
+        self.db.query(QuotationReferenceModel).filter(
+            QuotationReferenceModel.quotation_id == quotation_id
+        ).delete(synchronize_session=False)
+        now = datetime.now()
+        for ref in references:
+            self.db.add(
+                QuotationReferenceModel(
+                    quotation_id=quotation_id,
+                    reference_type_id=ref.get("reference_type_id"),
+                    reference_date_id=ref.get("reference_date_id"),
+                    reference_code=ref.get("reference_code"),
+                    reference_description=ref.get("reference_description"),
+                    added_date=now,
+                )
+            )
+
+    def _load_references(self, quotation_id: int) -> list[dict]:
+        rows = (
+            self.db.query(QuotationReferenceModel)
+            .filter(QuotationReferenceModel.quotation_id == quotation_id)
+            .order_by(QuotationReferenceModel.id.asc())
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "reference_type_id": r.reference_type_id,
+                "reference_date_id": r.reference_date_id,
+                "reference_code": r.reference_code,
+                "reference_description": r.reference_description,
+            }
+            for r in rows
+        ]
 
     def _serialize(self, q: QuotationModel, include_items: bool = False) -> dict:
         branch = (
@@ -383,6 +453,7 @@ class QuotationClass:
                 }
                 for r in rows
             ]
+            data["references"] = self._load_references(q.id)
         return data
 
     # ------------------------------------------------------------------ CRUD
@@ -514,6 +585,30 @@ class QuotationClass:
             )
 
         period = (dte.period or datetime.now().strftime("%Y-%m")).strip()
+
+        ref_rows = (
+            self.db.query(DteReferenceModel)
+            .filter(DteReferenceModel.dte_id == dte.id)
+            .order_by(DteReferenceModel.id.asc())
+            .all()
+        )
+        references = []
+        for r in ref_rows:
+            type_id = (r.reference_type_id or "").strip() or None
+            date_id = (r.reference_date_id or "").strip() or None
+            code = (r.reference_code or "").strip() or None
+            desc = (r.reference_description or "").strip() or None
+            if not any([type_id, date_id, code, desc]):
+                continue
+            references.append(
+                {
+                    "reference_type_id": type_id,
+                    "reference_date_id": date_id,
+                    "reference_code": code,
+                    "reference_description": desc,
+                }
+            )
+
         return {
             "status": "success",
             "data": {
@@ -535,6 +630,7 @@ class QuotationClass:
                 "send_whatsapp": 0,
                 "chip_id": int(dte.chip_id or 0),
                 "items": items,
+                "references": references,
             },
         }
 
@@ -582,6 +678,8 @@ class QuotationClass:
             self.db.add(row)
             self.db.flush()
             self._replace_items(row.id, items)
+            refs = self._normalize_references(getattr(form_data, "references", []) or [])
+            self._replace_references(row.id, refs)
             self.db.commit()
             self.db.refresh(row)
             return {
@@ -630,6 +728,8 @@ class QuotationClass:
 
         try:
             self._replace_items(row.id, items)
+            refs = self._normalize_references(getattr(form_data, "references", []) or [])
+            self._replace_references(row.id, refs)
             self.db.commit()
             return {"status": "success", "message": "Cotización actualizada", "id": row.id}
         except Exception as e:
@@ -1412,6 +1512,17 @@ class QuotationClass:
                             updated_date=now,
                         )
                     )
+                for ref in self._load_references(src.id):
+                    self.db.add(
+                        QuotationReferenceModel(
+                            quotation_id=clone.id,
+                            reference_type_id=ref.get("reference_type_id"),
+                            reference_date_id=ref.get("reference_date_id"),
+                            reference_code=ref.get("reference_code"),
+                            reference_description=ref.get("reference_description"),
+                            added_date=now,
+                        )
+                    )
                 existing_keys.add(key)
                 created += 1
             self.db.commit()
@@ -1452,6 +1563,9 @@ class QuotationClass:
 
         status_id = 2 if int(rol_id) in (1, 2) else 1
         now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        q_refs = self._load_references(q.id)
+        # 2 = con referencias (como factura), 3 = solo detalle grupal
+        category_id = 2 if q_refs else 3
         dte = DteModel(
             branch_office_id=q.branch_office_id,
             cashier_id=0,
@@ -1461,7 +1575,7 @@ class QuotationClass:
             rut=q.rut,
             folio=0,
             chip_id=int(q.chip_id or 0),
-            category_id=3,
+            category_id=category_id,
             payment_term_id=1,
             cash_amount=int(q.total or 0),
             card_amount=0,
@@ -1495,6 +1609,17 @@ class QuotationClass:
                         status_id=1,
                         added_date=datetime.now(),
                         updated_date=datetime.now(),
+                    )
+                )
+            for ref in q_refs:
+                self.db.add(
+                    DteReferenceModel(
+                        dte_id=dte.id,
+                        reference_type_id=ref.get("reference_type_id"),
+                        reference_date_id=ref.get("reference_date_id"),
+                        reference_code=ref.get("reference_code"),
+                        reference_description=ref.get("reference_description"),
+                        added_date=datetime.now(),
                     )
                 )
             q.converted_dte_id = dte.id

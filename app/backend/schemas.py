@@ -2605,6 +2605,13 @@ class QuotationItemInput(BaseModel):
     dsc_item: Optional[str] = None
 
 
+class QuotationReferenceInput(BaseModel):
+    reference_type_id: Optional[str] = None
+    reference_date_id: Optional[str] = None
+    reference_code: Optional[str] = None
+    reference_description: Optional[str] = None
+
+
 class StoreQuotation(BaseModel):
     branch_office_id: int
     rut: str
@@ -2621,6 +2628,7 @@ class StoreQuotation(BaseModel):
     activity: Optional[str] = None
     address: Optional[str] = None
     items: List[QuotationItemInput] = Field(default_factory=list)
+    references: List[QuotationReferenceInput] = Field(default_factory=list)
 
 
 class QuotationList(BaseModel):
