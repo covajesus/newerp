@@ -5,6 +5,7 @@ from app.backend.classes.setting_class import SettingClass
 from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
 from app.backend.classes.helper_class import HelperClass
+import json
 import unicodedata
 from sqlalchemy import func
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
