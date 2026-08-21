@@ -479,7 +479,7 @@ class HonoraryClass:
             print(f"Missing dependency for SII BTE: {e}")
             return {
                 "status": "error",
-                "message": f"Missing dependency for SII BTE: {e}. Install httpx in the service venv.",
+                "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
             }
 
         settings = SettingClass(self.db).get()

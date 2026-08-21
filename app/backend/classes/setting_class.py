@@ -102,7 +102,7 @@ class SettingClass:
         except ModuleNotFoundError as e:
             return {
                 "status": "error",
-                "message": f"Missing dependency for SII BTE: {e}. Install httpx in the service venv.",
+                "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
             }
 
         creds = self.get_sii_credentials()
@@ -111,15 +111,15 @@ class SettingClass:
         if not rut or not tax_password:
             return {
                 "status": "error",
-                "message": "Missing SII login RUT or tax password in settings",
+                "message": "Falta RUT de login SII o clave tributaria en configuración",
             }
         try:
             ok = validate_login(rut=rut, password=tax_password)
             if ok:
-                return {"status": "success", "message": "SII connection OK (tax password valid)"}
-            return {"status": "error", "message": "Could not authenticate with SII"}
+                return {"status": "success", "message": "Conexión SII correcta (clave tributaria válida)"}
+            return {"status": "error", "message": "No se pudo autenticar en el SII"}
         except Exception as e:
-            return {"status": "error", "message": f"Error testing SII tax password: {e}"}
+            return {"status": "error", "message": f"Error al probar clave tributaria SII: {e}"}
 
     def update_token(self, access_token):
         settings = self.db.query(SettingModel).filter(SettingModel.id == 1).first()
