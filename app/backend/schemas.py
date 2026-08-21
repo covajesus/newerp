@@ -2561,3 +2561,8 @@ class ReceivedInboxAcknowledgment(BaseModel):
     action: str  # accept | reject
     comment: Optional[str] = None
     rejection_type_id: Optional[int] = 1
+
+
+class ReceivedInboxImportDay(BaseModel):
+    date: str  # YYYY-MM-DD
+    consolidate: bool = False

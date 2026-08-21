@@ -16,7 +16,9 @@ import requests
 SIMPLEFACTURA_DOCUMENTS_RECEIVED_URL = "https://api.simplefactura.cl/documentsReceived"
 SIMPLEFACTURA_CONSOLIDATE_RECEIVED_URL = "https://api.simplefactura.cl/documentsReceived/consolidate"
 SIMPLEFACTURA_ACKNOWLEDGMENT_URL = "https://api.simplefactura.cl/acknowledgmentReceipt"
-SIMPLEFACTURA_RECEIVED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_RECEIVED_TIMEOUT", "180"))
+SIMPLEFACTURA_RECEIVED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_RECEIVED_TIMEOUT", "45"))
+SIMPLEFACTURA_CONSOLIDATE_MONTHS = int(os.getenv("SIMPLEFACTURA_CONSOLIDATE_MONTHS", "1"))
+RECEIVED_INBOX_LOOKBACK_DAYS = int(os.getenv("RECEIVED_INBOX_LOOKBACK_DAYS", "30"))
 RECEIVED_DTE_TYPES = (33, 34, 39, 61)
 RECEIVED_INBOX_STATUS_PENDING = 1
 RECEIVED_INBOX_STATUS_ACCEPTED = 2
@@ -109,8 +111,8 @@ class ReceivedInboxClass:
                 ReceivedInboxModel.status_id,
                 ReceivedInboxModel.dte_type_id,
                 ReceivedInboxModel.supplier,
-                ReceivedInboxModel.estado_acuse,
-                ReceivedInboxModel.ambiente,
+                ReceivedInboxModel.acknowledgment_status,
+                ReceivedInboxModel.environment,
                 BranchOfficeModel.branch_office,
             )
             .outerjoin(
@@ -120,13 +122,13 @@ class ReceivedInboxClass:
             .order_by(ReceivedInboxModel.id.desc())
         )
 
-    def _is_acknowledgment_pending(self, status_id, estado_acuse):
+    def _is_acknowledgment_pending(self, status_id, acknowledgment_status):
         if int(status_id or 0) in (
             RECEIVED_INBOX_STATUS_ACCEPTED,
             RECEIVED_INBOX_STATUS_REJECTED,
         ):
             return False
-        acuse = str(estado_acuse or "").strip().lower()
+        acuse = str(acknowledgment_status or "").strip().lower()
         if acuse in ("3", "4", "5"):
             return False
         if any(token in acuse for token in ("acept", "rechaz", "approved", "rejected")):
@@ -144,8 +146,8 @@ class ReceivedInboxClass:
                 "total": row.total,
                 "status_id": row.status_id,
                 "dte_type_id": row.dte_type_id,
-                "estado_acuse": row.estado_acuse,
-                "can_acknowledge": self._is_acknowledgment_pending(row.status_id, row.estado_acuse),
+                "acknowledgment_status": row.acknowledgment_status,
+                "can_acknowledge": self._is_acknowledgment_pending(row.status_id, row.acknowledgment_status),
                 "added_date": row.added_date.strftime("%Y-%m-%d") if row.added_date else None,
                 "branch_office": row.branch_office,
             }
@@ -260,21 +262,31 @@ class ReceivedInboxClass:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers,
-            timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
-        )
-        if response.status_code == 401:
-            token = ticket_class.fetch_simplefactura_token_from_jisbackend()
-            headers["Authorization"] = f"Bearer {token}"
+        try:
             response = requests.post(
                 url,
                 json=payload,
                 headers=headers,
                 timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
             )
+        except requests.Timeout as exc:
+            raise ValueError(f"SimpleFactura timeout ({SIMPLEFACTURA_RECEIVED_TIMEOUT}s): {url}") from exc
+        except requests.RequestException as exc:
+            raise ValueError(f"SimpleFactura connection error: {exc}") from exc
+        if response.status_code == 401:
+            token = ticket_class.fetch_simplefactura_token_from_jisbackend()
+            headers["Authorization"] = f"Bearer {token}"
+            try:
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
+                )
+            except requests.Timeout as exc:
+                raise ValueError(f"SimpleFactura timeout ({SIMPLEFACTURA_RECEIVED_TIMEOUT}s): {url}") from exc
+            except requests.RequestException as exc:
+                raise ValueError(f"SimpleFactura connection error: {exc}") from exc
         if response.status_code != 200:
             raise ValueError(
                 f"SimpleFactura {url} HTTP {response.status_code}: {(response.text or '')[:400]}"
@@ -303,6 +315,8 @@ class ReceivedInboxClass:
                     return parsed
                 if isinstance(parsed, dict):
                     return self._extract_dte_list(parsed)
+            # consolidate often returns a plain text message, not a DTE list
+            return []
         if isinstance(data, dict):
             for key in ("dtes", "documentos", "items", "list"):
                 nested = data.get(key)
@@ -346,7 +360,8 @@ class ReceivedInboxClass:
                 break
             except ValueError as exc:
                 last_error = exc
-                if "HTTP 400" not in str(exc):
+                msg = str(exc)
+                if "HTTP 400" not in msg and "timeout" not in msg.lower():
                     raise
         if body is None:
             raise last_error or ValueError("SimpleFactura consolidate: sin respuesta")
@@ -381,13 +396,22 @@ class ReceivedInboxClass:
 
     def refresh(self):
         """
-        Conciliar recibidos con el SII vía SimpleFactura
-        (POST /documentsReceived/consolidate/{mes}/{anio}) y guardar en received_inbox.
+        1) Conciliar solo el mes actual (SII → SimpleFactura).
+        2) Listar documentsReceived y guardar en received_inbox.
+        Evita colgarse reconciliando 3 meses seguidos.
         """
         until_dt = datetime.now()
-        since_dt = until_dt - timedelta(days=89)
+        since_dt = until_dt - timedelta(days=max(1, RECEIVED_INBOX_LOOKBACK_DAYS))
         since = since_dt.strftime("%Y-%m-%d")
         until = until_dt.strftime("%Y-%m-%d")
+        months_back = max(1, min(SIMPLEFACTURA_CONSOLIDATE_MONTHS, 3))
+        consolidate_since = datetime(until_dt.year, until_dt.month, 1)
+        for _ in range(months_back - 1):
+            if consolidate_since.month == 1:
+                consolidate_since = datetime(consolidate_since.year - 1, 12, 1)
+            else:
+                consolidate_since = datetime(consolidate_since.year, consolidate_since.month - 1, 1)
+
         summary = {
             "status": "success",
             "source": "simplefactura_sii_consolidate",
@@ -401,17 +425,44 @@ class ReceivedInboxClass:
         try:
             data = []
             seen_keys = set()
-            for mes, anio in self._months_covering(since_dt, until_dt):
-                result = self._consolidate_simplefactura_received(mes, anio)
-                summary["consolidated"].append(
-                    {
-                        "mes": result["mes"],
-                        "anio": result["anio"],
-                        "count": len(result["items"]),
-                        "message": result["message"],
-                    }
-                )
-                for item in result["items"]:
+
+            for mes, anio in self._months_covering(consolidate_since, until_dt):
+                try:
+                    result = self._consolidate_simplefactura_received(mes, anio)
+                    summary["consolidated"].append(
+                        {
+                            "mes": result["mes"],
+                            "anio": result["anio"],
+                            "count": len(result["items"]),
+                            "message": result["message"],
+                        }
+                    )
+                    for item in result["items"]:
+                        if not isinstance(item, dict):
+                            continue
+                        key = (
+                            self._sf_item_value(item, "folio", "Folio"),
+                            self._sf_item_value(
+                                item, "rutProveedor", "RutProveedor", "rutEmisor", "RutEmisor"
+                            ),
+                            self._sf_dte_type_id(item),
+                        )
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        data.append(item)
+                except Exception as exc:
+                    err = f"consolidate {mes}/{anio}: {exc}"
+                    summary["errors"].append(err)
+                    summary["consolidated"].append(
+                        {"mes": mes, "anio": anio, "count": 0, "message": str(exc)}
+                    )
+                    print(f"[received_inbox.refresh] {err}", flush=True)
+
+            # El listado real suele venir de documentsReceived, no del consolidate.
+            try:
+                listed = self._fetch_simplefactura_received_documents(since, until)
+                for item in listed:
                     if not isinstance(item, dict):
                         continue
                     key = (
@@ -425,133 +476,18 @@ class ReceivedInboxClass:
                         continue
                     seen_keys.add(key)
                     data.append(item)
+            except Exception as exc:
+                err = f"documentsReceived: {exc}"
+                summary["errors"].append(err)
+                print(f"[received_inbox.refresh] {err}", flush=True)
+                if not data:
+                    summary["status"] = "error"
+                    return summary
 
-            if not data:
-                data = self._fetch_simplefactura_received_documents(since, until)
             summary["fetched"] = len(data)
-
-            existing_rows = self.db.query(
-                ReceivedInboxModel.folio,
-                ReceivedInboxModel.rut,
-                ReceivedInboxModel.dte_type_id,
-            ).all()
-            existing_keys = {
-                (int(row.folio or 0), str(row.rut), int(row.dte_type_id or 0))
-                for row in existing_rows
-            }
-
-            now = datetime.now()
-            for item in data:
-                dte_type_id = self._sf_dte_type_id(item)
-                if dte_type_id not in RECEIVED_DTE_TYPES:
-                    continue
-
-                try:
-                    folio = int(self._sf_item_value(item, "folio", "Folio") or 0)
-                except (TypeError, ValueError):
-                    folio = 0
-                if folio <= 0:
-                    summary["skipped"] += 1
-                    continue
-
-                rut = self._sf_normalize_rut(
-                    self._sf_item_value(
-                        item,
-                        "rutProveedor",
-                        "RutProveedor",
-                        "rutEmisor",
-                        "RutEmisor",
-                    )
-                )
-                if not rut:
-                    summary["skipped"] += 1
-                    continue
-
-                key = (folio, rut, dte_type_id)
-                if key in existing_keys:
-                    summary["skipped"] += 1
-                    continue
-
-                supplier_name = (
-                    self._sf_item_value(
-                        item,
-                        "razonSocialProveedor",
-                        "RazonSocialProveedor",
-                        "razonSocialEmisor",
-                        "RazonSocialEmisor",
-                    )
-                    or ""
-                )
-                try:
-                    total = int(float(self._sf_item_value(item, "total", "Total") or 0))
-                except (TypeError, ValueError):
-                    total = 0
-                try:
-                    net = int(float(self._sf_item_value(item, "neto", "Neto") or 0))
-                except (TypeError, ValueError):
-                    net = 0
-                if dte_type_id == 61:
-                    total = -abs(total)
-                    net = -abs(net)
-
-                fecha = self._sf_parse_date(
-                    self._sf_item_value(
-                        item,
-                        "fechaDte",
-                        "FechaDte",
-                        "fechaEmision",
-                        "FechaEmision",
-                        "fechaCreacion",
-                        "FechaCreacion",
-                    )
-                )
-                document_date = None
-                added_date = now
-                if fecha:
-                    try:
-                        document_date = datetime.strptime(fecha, "%Y-%m-%d").date()
-                        added_date = datetime.strptime(fecha + " 00:00:00", "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        pass
-
-                track_raw = self._sf_item_value(item, "trackId", "TrackId")
-                try:
-                    track_id = int(track_raw) if track_raw is not None else None
-                except (TypeError, ValueError):
-                    track_id = None
-
-                estado_acuse = str(self._sf_item_value(item, "estadoAcuse", "EstadoAcuse") or "") or None
-                status_id = RECEIVED_INBOX_STATUS_PENDING
-                acuse_lower = str(estado_acuse or "").lower()
-                if any(token in acuse_lower for token in ("rechaz", "rejected")):
-                    status_id = RECEIVED_INBOX_STATUS_REJECTED
-                elif any(token in acuse_lower for token in ("acept", "approved")):
-                    status_id = RECEIVED_INBOX_STATUS_ACCEPTED
-
-                row = ReceivedInboxModel(
-                    rut=rut,
-                    supplier=str(supplier_name).upper() if supplier_name else None,
-                    branch_office_id=0,
-                    folio=folio,
-                    dte_type_id=dte_type_id,
-                    status_id=status_id,
-                    subtotal=net,
-                    tax=int(total) - int(net),
-                    total=total,
-                    ambiente=str(self._sf_item_value(item, "ambiente", "Ambiente") or "") or None,
-                    estado=str(self._sf_item_value(item, "estado", "Estado") or "") or None,
-                    estado_sii=str(self._sf_item_value(item, "estadoSII", "EstadoSII") or "") or None,
-                    estado_acuse=estado_acuse,
-                    track_id=track_id,
-                    document_date=document_date,
-                    added_date=added_date,
-                    updated_date=now,
-                )
-                self.db.add(row)
-                existing_keys.add(key)
-                summary["inserted"] += 1
-
-            self.db.commit()
+            persist = self._persist_received_items(data)
+            summary["inserted"] = persist["inserted"]
+            summary["skipped"] = persist["skipped"]
             print(
                 f"[received_inbox.refresh] source=sii_consolidate "
                 f"fetched={summary['fetched']} inserted={summary['inserted']} "
@@ -566,6 +502,211 @@ class ReceivedInboxClass:
             summary["errors"].append(str(e))
             return summary
 
+    def import_plan(self):
+        """Days to process (oldest → newest) for live SII import UI."""
+        until_dt = datetime.now().date()
+        lookback = max(1, RECEIVED_INBOX_LOOKBACK_DAYS)
+        since_dt = until_dt - timedelta(days=lookback - 1)
+        days = []
+        cursor = since_dt
+        while cursor <= until_dt:
+            days.append(cursor.strftime("%Y-%m-%d"))
+            cursor += timedelta(days=1)
+        return {
+            "status": "success",
+            "lookback_days": lookback,
+            "since": since_dt.strftime("%Y-%m-%d"),
+            "until": until_dt.strftime("%Y-%m-%d"),
+            "total_days": len(days),
+            "days": days,
+        }
+
+    def import_day(self, date_str: str, consolidate: bool = False):
+        """
+        Import received DTEs for a single calendar day.
+        Optionally consolidate that month with SII first.
+        """
+        try:
+            day = datetime.strptime(str(date_str).strip()[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return {"status": "error", "message": f"Invalid date: {date_str}"}
+
+        day_iso = day.strftime("%Y-%m-%d")
+        summary = {
+            "status": "success",
+            "date": day_iso,
+            "fetched": 0,
+            "inserted": 0,
+            "skipped": 0,
+            "consolidated": None,
+            "errors": [],
+        }
+
+        try:
+            if consolidate:
+                try:
+                    result = self._consolidate_simplefactura_received(day.month, day.year)
+                    summary["consolidated"] = {
+                        "mes": result["mes"],
+                        "anio": result["anio"],
+                        "message": result["message"],
+                    }
+                except Exception as exc:
+                    err = f"consolidate {day.month}/{day.year}: {exc}"
+                    summary["errors"].append(err)
+                    print(f"[received_inbox.import_day] {err}", flush=True)
+
+            data = self._fetch_simplefactura_received_documents(day_iso, day_iso)
+            summary["fetched"] = len(data)
+            persist = self._persist_received_items(data)
+            summary["inserted"] = persist["inserted"]
+            summary["skipped"] = persist["skipped"]
+            print(
+                f"[received_inbox.import_day] date={day_iso} "
+                f"fetched={summary['fetched']} inserted={summary['inserted']} "
+                f"skipped={summary['skipped']}",
+                flush=True,
+            )
+            return summary
+        except Exception as e:
+            self.db.rollback()
+            print(f"[received_inbox.import_day] error date={day_iso}: {e}", flush=True)
+            summary["status"] = "error"
+            summary["errors"].append(str(e))
+            return summary
+
+    def _persist_received_items(self, data):
+        """Insert new received inbox rows; skip duplicates."""
+        existing_rows = self.db.query(
+            ReceivedInboxModel.folio,
+            ReceivedInboxModel.rut,
+            ReceivedInboxModel.dte_type_id,
+        ).all()
+        existing_keys = {
+            (int(row.folio or 0), str(row.rut), int(row.dte_type_id or 0))
+            for row in existing_rows
+        }
+
+        inserted = 0
+        skipped = 0
+        now = datetime.now()
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            dte_type_id = self._sf_dte_type_id(item)
+            if dte_type_id not in RECEIVED_DTE_TYPES:
+                continue
+
+            try:
+                folio = int(self._sf_item_value(item, "folio", "Folio") or 0)
+            except (TypeError, ValueError):
+                folio = 0
+            if folio <= 0:
+                skipped += 1
+                continue
+
+            rut = self._sf_normalize_rut(
+                self._sf_item_value(
+                    item,
+                    "rutProveedor",
+                    "RutProveedor",
+                    "rutEmisor",
+                    "RutEmisor",
+                )
+            )
+            if not rut:
+                skipped += 1
+                continue
+
+            key = (folio, rut, dte_type_id)
+            if key in existing_keys:
+                skipped += 1
+                continue
+
+            supplier_name = (
+                self._sf_item_value(
+                    item,
+                    "razonSocialProveedor",
+                    "RazonSocialProveedor",
+                    "razonSocialEmisor",
+                    "RazonSocialEmisor",
+                )
+                or ""
+            )
+            try:
+                total = int(float(self._sf_item_value(item, "total", "Total") or 0))
+            except (TypeError, ValueError):
+                total = 0
+            try:
+                net = int(float(self._sf_item_value(item, "neto", "Neto") or 0))
+            except (TypeError, ValueError):
+                net = 0
+            if dte_type_id == 61:
+                total = -abs(total)
+                net = -abs(net)
+
+            fecha = self._sf_parse_date(
+                self._sf_item_value(
+                    item,
+                    "fechaDte",
+                    "FechaDte",
+                    "fechaEmision",
+                    "FechaEmision",
+                    "fechaCreacion",
+                    "FechaCreacion",
+                )
+            )
+            document_date = None
+            added_date = now
+            if fecha:
+                try:
+                    document_date = datetime.strptime(fecha, "%Y-%m-%d").date()
+                    added_date = datetime.strptime(fecha + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    pass
+
+            track_raw = self._sf_item_value(item, "trackId", "TrackId")
+            try:
+                track_id = int(track_raw) if track_raw is not None else None
+            except (TypeError, ValueError):
+                track_id = None
+
+            acknowledgment_status = (
+                str(self._sf_item_value(item, "estadoAcuse", "EstadoAcuse") or "") or None
+            )
+            status_id = RECEIVED_INBOX_STATUS_PENDING
+            acuse_lower = str(acknowledgment_status or "").lower()
+            if any(token in acuse_lower for token in ("rechaz", "rejected")):
+                status_id = RECEIVED_INBOX_STATUS_REJECTED
+            elif any(token in acuse_lower for token in ("acept", "approved")):
+                status_id = RECEIVED_INBOX_STATUS_ACCEPTED
+
+            row = ReceivedInboxModel(
+                rut=rut,
+                supplier=str(supplier_name).upper() if supplier_name else None,
+                branch_office_id=0,
+                folio=folio,
+                dte_type_id=dte_type_id,
+                status_id=status_id,
+                subtotal=net,
+                tax=int(total) - int(net),
+                total=total,
+                environment=str(self._sf_item_value(item, "ambiente", "Ambiente") or "") or None,
+                document_status=str(self._sf_item_value(item, "estado", "Estado") or "") or None,
+                sii_status=str(self._sf_item_value(item, "estadoSII", "EstadoSII") or "") or None,
+                acknowledgment_status=acknowledgment_status,
+                track_id=track_id,
+                document_date=document_date,
+                added_date=added_date,
+                updated_date=now,
+            )
+            self.db.add(row)
+            existing_keys.add(key)
+            inserted += 1
+
+        self.db.commit()
+        return {"inserted": inserted, "skipped": skipped}
+
     def acknowledge(self, form_data):
         """Accept or reject via SimpleFactura POST /acknowledgmentReceipt."""
         action = str(getattr(form_data, "action", "") or "").strip().lower()
@@ -579,7 +720,7 @@ class ReceivedInboxClass:
         )
         if not row:
             return {"status": "error", "message": "Received inbox DTE not found"}
-        if not self._is_acknowledgment_pending(row.status_id, row.estado_acuse):
+        if not self._is_acknowledgment_pending(row.status_id, row.acknowledgment_status):
             return {"status": "error", "message": "DTE already accepted or rejected"}
 
         comment = (getattr(form_data, "comment", None) or "").strip()
@@ -587,12 +728,12 @@ class ReceivedInboxClass:
             comment = "Rejected"
 
         try:
-            ambiente = SIMPLEFACTURA_AMBIENTE
+            environment = SIMPLEFACTURA_AMBIENTE
             try:
-                if row.ambiente not in (None, ""):
-                    ambiente = int(row.ambiente)
+                if row.environment not in (None, ""):
+                    environment = int(row.environment)
             except (TypeError, ValueError):
-                ambiente = SIMPLEFACTURA_AMBIENTE
+                environment = SIMPLEFACTURA_AMBIENTE
 
             payload = {
                 "credenciales": {
@@ -603,7 +744,7 @@ class ReceivedInboxClass:
                 "dteReferenciadoExterno": {
                     "folio": int(row.folio),
                     "codigoTipoDte": int(row.dte_type_id),
-                    "ambiente": ambiente,
+                    "ambiente": environment,
                 },
                 "respuesta": (
                     SIMPLEFACTURA_RESPONSE_ACCEPTED
@@ -622,10 +763,10 @@ class ReceivedInboxClass:
             now = datetime.now()
             if action == "accept":
                 row.status_id = RECEIVED_INBOX_STATUS_ACCEPTED
-                row.estado_acuse = "Accepted"
+                row.acknowledgment_status = "Accepted"
             else:
                 row.status_id = RECEIVED_INBOX_STATUS_REJECTED
-                row.estado_acuse = "Rejected"
+                row.acknowledgment_status = "Rejected"
             row.updated_date = now
             self.db.commit()
             return {

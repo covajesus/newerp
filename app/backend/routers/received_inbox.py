@@ -5,6 +5,7 @@ from app.backend.schemas import (
     ReceivedTributaryDocumentList,
     ReceivedDteList,
     ReceivedInboxAcknowledgment,
+    ReceivedInboxImportDay,
 )
 from app.backend.classes.received_inbox_class import ReceivedInboxClass
 
@@ -40,6 +41,21 @@ def search(received_inbox_inputs: ReceivedDteList, db: Session = Depends(get_db)
 @received_inbox.get("/refresh")
 def refresh(db: Session = Depends(get_db)):
     data = ReceivedInboxClass(db).refresh()
+    return {"message": data}
+
+
+@received_inbox.get("/import_plan")
+def import_plan(db: Session = Depends(get_db)):
+    data = ReceivedInboxClass(db).import_plan()
+    return {"message": data}
+
+
+@received_inbox.post("/import_day")
+def import_day(received_inbox_inputs: ReceivedInboxImportDay, db: Session = Depends(get_db)):
+    data = ReceivedInboxClass(db).import_day(
+        received_inbox_inputs.date,
+        received_inbox_inputs.consolidate,
+    )
     return {"message": data}
 
 
