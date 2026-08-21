@@ -78,6 +78,16 @@ def store(
     return {"message": data}
 
 
+@quotations.get("/prefill_from_dte/{dte_id}")
+def prefill_from_dte(
+    dte_id: int,
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    data = QuotationClass(db).prefill_from_dte(dte_id)
+    return {"message": data}
+
+
 @quotations.get("/edit/{quotation_id}")
 def get_one(
     quotation_id: int,

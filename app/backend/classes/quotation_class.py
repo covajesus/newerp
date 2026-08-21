@@ -453,6 +453,91 @@ class QuotationClass:
             return {"status": "error", "message": "Cotización no encontrada"}
         return {"status": "success", "data": self._serialize(q, include_items=True)}
 
+    def prefill_from_dte(self, dte_id: int) -> dict:
+        """Payload to create a quotation from an emitted subscriber ticket/bill."""
+        dte = self.db.query(DteModel).filter(DteModel.id == int(dte_id)).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+        if int(dte.dte_type_id or 0) not in (33, 39):
+            return {"status": "error", "message": "Solo boletas (39) o facturas (33)"}
+
+        customer = None
+        if dte.rut:
+            customer = (
+                self.db.query(CustomerModel)
+                .filter(CustomerModel.rut == str(dte.rut).strip())
+                .first()
+            )
+
+        item_rows = (
+            self.db.query(CustomerDteItemModel)
+            .filter(CustomerDteItemModel.dte_id == dte.id)
+            .order_by(CustomerDteItemModel.line_number.asc(), CustomerDteItemModel.id.asc())
+            .all()
+        )
+        items = []
+        for r in item_rows:
+            try:
+                q = int(r.quantity or 0)
+                u = int(r.unit_amount or 0)
+            except (TypeError, ValueError):
+                continue
+            if q < 1 or u < 0:
+                continue
+            items.append(
+                {
+                    "item_code": (r.item_code or "").strip() or "",
+                    "item_name": (r.item_name or "").strip() or "",
+                    "quantity": q,
+                    "unit_measure": (r.unit_measure or "").strip() or "Und",
+                    "unit_amount": u,
+                    "discount": int(getattr(r, "discount_amount", 0) or 0),
+                    "description": (r.description or "").strip() or (getattr(r, "dsc_item", None) or "").strip() or "",
+                }
+            )
+
+        if not items:
+            total = int(dte.total or 0)
+            net = int(round(total / 1.19)) if total > 0 else 0
+            if net <= 0:
+                return {"status": "error", "message": "El DTE no tiene líneas ni monto para cotizar"}
+            items.append(
+                {
+                    "item_code": "",
+                    "item_name": "Servicio de estacionamiento",
+                    "quantity": 1,
+                    "unit_measure": "Und",
+                    "unit_amount": net,
+                    "discount": 0,
+                    "description": HelperClass.period_detail_label(dte.period or datetime.now().strftime("%Y-%m")),
+                }
+            )
+
+        period = (dte.period or datetime.now().strftime("%Y-%m")).strip()
+        return {
+            "status": "success",
+            "data": {
+                "source_dte_id": dte.id,
+                "source_folio": dte.folio,
+                "source_dte_type_id": dte.dte_type_id,
+                "branch_office_id": dte.branch_office_id,
+                "rut": str(dte.rut).strip() if dte.rut else None,
+                "customer": (customer.customer if customer else None),
+                "email": (customer.email if customer else None),
+                "phone": (customer.phone if customer else None),
+                "activity": (customer.activity if customer else None),
+                "address": (customer.address if customer else None),
+                "region_id": (customer.region_id if customer else None),
+                "commune_id": (customer.commune_id if customer else None),
+                "period": period,
+                "renew_mode": RENEW_FIXED,
+                "send_email": 1,
+                "send_whatsapp": 0,
+                "chip_id": int(dte.chip_id or 0),
+                "items": items,
+            },
+        }
+
     def store(self, form_data) -> dict:
         items = self._normalize_items(getattr(form_data, "items", []) or [])
         if not items:

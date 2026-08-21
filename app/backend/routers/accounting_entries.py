@@ -128,6 +128,12 @@ def import_libredte(payload: AccountingEntryImportLibreDte, db: Session = Depend
     return {"message": data}
 
 
+@accounting_entries.get("/by_dte/{dte_id}")
+def get_entry_by_dte(dte_id: int, db: Session = Depends(get_db)):
+    data = AccountingEntryClass(db).find_by_dte(dte_id)
+    return {"message": data}
+
+
 @accounting_entries.get("/{entry_id}")
 def get_entry(entry_id: int, db: Session = Depends(get_db)):
     data = AccountingEntryClass(db).get(entry_id)

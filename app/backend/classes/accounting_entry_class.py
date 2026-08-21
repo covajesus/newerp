@@ -10,6 +10,7 @@ from app.backend.db.models import (
     AccountingEntryModel,
     AccountingEntryLineModel,
     AccountingEntryDocumentModel,
+    DteModel,
     UserModel,
 )
 
@@ -365,6 +366,66 @@ class AccountingEntryClass:
         entry = self.db.query(AccountingEntryModel).filter(AccountingEntryModel.id == entry_id).first()
         if not entry:
             return {"status": "error", "message": "Asiento no encontrado"}
+        return {"status": "success", "data": self._serialize_entry(entry)}
+
+    def find_by_dte(self, dte_id: int):
+        """Local accounting entry linked to an emitted DTE (folio + type, or glosa fallback)."""
+        dte = self.db.query(DteModel).filter(DteModel.id == int(dte_id)).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+
+        folio = int(dte.folio or 0)
+        dte_type_id = int(dte.dte_type_id or 0)
+        entry = None
+
+        if folio > 0 and dte_type_id > 0:
+            doc = (
+                self.db.query(AccountingEntryDocumentModel)
+                .filter(
+                    AccountingEntryDocumentModel.doc_type == "emitido",
+                    AccountingEntryDocumentModel.folio == folio,
+                    AccountingEntryDocumentModel.dte_type_id == dte_type_id,
+                )
+                .order_by(AccountingEntryDocumentModel.id.desc())
+                .first()
+            )
+            if doc:
+                entry = (
+                    self.db.query(AccountingEntryModel)
+                    .filter(AccountingEntryModel.id == doc.accounting_entry_id)
+                    .first()
+                )
+
+        if entry is None and folio > 0:
+            # Glosa from create_account_asset: ..._{dte.id}_{folio}
+            needle = f"_{dte.id}_{folio}"
+            entry = (
+                self.db.query(AccountingEntryModel)
+                .filter(AccountingEntryModel.glosa.ilike(f"%{needle}%"))
+                .order_by(AccountingEntryModel.id.desc())
+                .first()
+            )
+        if entry is None and folio > 0:
+            entry = (
+                self.db.query(AccountingEntryModel)
+                .filter(AccountingEntryModel.glosa.ilike(f"%_{folio}%"))
+                .order_by(AccountingEntryModel.id.desc())
+                .first()
+            )
+
+        if not entry:
+            return {
+                "status": "error",
+                "message": "No hay asiento contable local para este documento. "
+                "Se crea al marcar el pago (Imputada Pagada) con backend Intrajis activo.",
+                "dte_id": dte.id,
+                "folio": folio,
+                "dte_type_id": dte_type_id,
+            }
+
+        return {"status": "success", "data": self._serialize_entry(entry)}
+
+    def _serialize_entry(self, entry: AccountingEntryModel) -> dict:
         lines = (
             self.db.query(AccountingEntryLineModel)
             .filter(AccountingEntryLineModel.accounting_entry_id == entry.id)
@@ -377,39 +438,36 @@ class AccountingEntryClass:
             .all()
         )
         return {
-            "status": "success",
-            "data": {
-                "id": entry.id,
-                "number": entry.number,
-                "period": entry.period,
-                "entry_date": entry.entry_date.strftime("%Y-%m-%d") if entry.entry_date else None,
-                "glosa": entry.glosa,
-                "operation": entry.operation,
-                "annulled": int(entry.annulled or 0),
-                "user_id": entry.user_id,
-                "source": entry.source,
-                "lines": [
-                    {
-                        "id": l.id,
-                        "account_code": l.account_code,
-                        "debit": l.debit,
-                        "credit": l.credit,
-                        "concept": l.concept,
-                    }
-                    for l in lines
-                ],
-                "documents": [
-                    {
-                        "id": d.id,
-                        "doc_type": d.doc_type,
-                        "issuer_rut": d.issuer_rut,
-                        "dte_type_id": d.dte_type_id,
-                        "folio": d.folio,
-                        "period": d.period,
-                    }
-                    for d in docs
-                ],
-            },
+            "id": entry.id,
+            "number": entry.number,
+            "period": entry.period,
+            "entry_date": entry.entry_date.strftime("%Y-%m-%d") if entry.entry_date else None,
+            "glosa": entry.glosa,
+            "operation": entry.operation,
+            "annulled": int(entry.annulled or 0),
+            "user_id": entry.user_id,
+            "source": entry.source,
+            "lines": [
+                {
+                    "id": l.id,
+                    "account_code": l.account_code,
+                    "debit": l.debit,
+                    "credit": l.credit,
+                    "concept": l.concept,
+                }
+                for l in lines
+            ],
+            "documents": [
+                {
+                    "id": d.id,
+                    "doc_type": d.doc_type,
+                    "issuer_rut": d.issuer_rut,
+                    "dte_type_id": d.dte_type_id,
+                    "folio": d.folio,
+                    "period": d.period,
+                }
+                for d in docs
+            ],
         }
 
     def _entry_year_number(self, entry: AccountingEntryModel) -> tuple[int, int]:
