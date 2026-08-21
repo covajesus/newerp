@@ -16,15 +16,28 @@ from app.backend.classes.customer_ticket_class import (
 from datetime import datetime, timedelta
 import json
 import os
+import base64
+import uuid
 import requests
 
 SIMPLEFACTURA_DOCUMENTS_RECEIVED_URL = "https://api.simplefactura.cl/documentsReceived"
 SIMPLEFACTURA_CONSOLIDATE_RECEIVED_URL = "https://api.simplefactura.cl/documentsReceived/consolidate"
 SIMPLEFACTURA_ACKNOWLEDGMENT_URL = "https://api.simplefactura.cl/acknowledgmentReceipt"
+SIMPLEFACTURA_RECEIVED_PDF_URL = "https://api.simplefactura.cl/documentReceived/getPdf"
+SIMPLEFACTURA_RECEIVED_XML_URL = "https://api.simplefactura.cl/documentReceived/xml"
 SIMPLEFACTURA_RECEIVED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_RECEIVED_TIMEOUT", "45"))
 SIMPLEFACTURA_CONSOLIDATE_MONTHS = int(os.getenv("SIMPLEFACTURA_CONSOLIDATE_MONTHS", "1"))
 RECEIVED_INBOX_LOOKBACK_DAYS = int(os.getenv("RECEIVED_INBOX_LOOKBACK_DAYS", "30"))
 RECEIVED_DTE_TYPES = (33, 34, 39, 61)
+DTE_TYPE_LABELS = {
+    33: "Factura electrónica",
+    34: "Factura exenta electrónica",
+    39: "Boleta electrónica",
+    41: "Boleta exenta electrónica",
+    52: "Guía de despacho electrónica",
+    56: "Nota de débito electrónica",
+    61: "Nota de crédito electrónica",
+}
 RECEIVED_INBOX_STATUS_PENDING = 1
 RECEIVED_INBOX_STATUS_ACCEPTED = 2
 RECEIVED_INBOX_STATUS_REJECTED = 3
@@ -423,6 +436,60 @@ class ReceivedInboxClass:
             return response.json()
         except ValueError as exc:
             raise ValueError(f"SimpleFactura {url}: JSON inválido ({exc})") from exc
+
+    def _simplefactura_post_bytes(self, url, payload):
+        """POST that expects binary body (PDF)."""
+        token, ticket_class = self._simplefactura_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
+            )
+        except requests.Timeout as exc:
+            raise ValueError(f"SimpleFactura timeout ({SIMPLEFACTURA_RECEIVED_TIMEOUT}s): {url}") from exc
+        except requests.RequestException as exc:
+            raise ValueError(f"SimpleFactura connection error: {exc}") from exc
+        if response.status_code == 401:
+            token = ticket_class.fetch_simplefactura_token_from_jisbackend()
+            headers["Authorization"] = f"Bearer {token}"
+            try:
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
+                )
+            except requests.Timeout as exc:
+                raise ValueError(f"SimpleFactura timeout ({SIMPLEFACTURA_RECEIVED_TIMEOUT}s): {url}") from exc
+            except requests.RequestException as exc:
+                raise ValueError(f"SimpleFactura connection error: {exc}") from exc
+        if response.status_code != 200 or not response.content:
+            raise ValueError(
+                f"SimpleFactura {url} HTTP {response.status_code}: {(response.text or '')[:400]}"
+            )
+        if not response.content.startswith(b"%PDF"):
+            # Some gateways wrap PDF in JSON/base64 — try unwrap
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            if isinstance(body, dict):
+                data = body.get("data") or body.get("file") or body.get("pdf")
+                if isinstance(data, str) and data.strip():
+                    try:
+                        raw = base64.b64decode(data)
+                        if raw.startswith(b"%PDF"):
+                            return raw
+                    except Exception:
+                        pass
+            raise ValueError("SimpleFactura no devolvió un PDF válido")
+        return response.content
 
     def _extract_dte_list(self, body):
         if isinstance(body, list):
@@ -937,3 +1004,260 @@ class ReceivedInboxClass:
         except Exception as exc:
             self.db.rollback()
             return {"status": "error", "message": str(exc)}
+
+    def download_pdf(self, id: int):
+        """PDF of a received DTE via SimpleFactura (getPdf → XML render → LibreDTE)."""
+        row = (
+            self.db.query(ReceivedInboxModel)
+            .filter(ReceivedInboxModel.id == int(id))
+            .first()
+        )
+        if not row:
+            return {"status": "error", "message": "Documento no encontrado"}
+
+        environment = SIMPLEFACTURA_AMBIENTE
+        try:
+            if row.environment not in (None, ""):
+                environment = int(row.environment)
+        except (TypeError, ValueError):
+            environment = SIMPLEFACTURA_AMBIENTE
+
+        pdf_content = None
+        errors = []
+        sf_payload = {
+            "credenciales": {
+                "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                "rutContribuyente": str(row.rut or "").strip(),
+                "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
+            },
+            "ambiente": environment,
+            "folio": int(row.folio),
+            "codigoTipoDte": int(row.dte_type_id),
+        }
+
+        # 1) SimpleFactura documentReceived/getPdf
+        try:
+            pdf_content = self._simplefactura_post_bytes(SIMPLEFACTURA_RECEIVED_PDF_URL, sf_payload)
+        except Exception as exc:
+            errors.append(f"SimpleFactura getPdf: {exc}")
+
+        # 2) SimpleFactura XML → PDF local (cuando no hay plantilla activa en SF)
+        if not pdf_content:
+            try:
+                xml_bytes = self._fetch_received_xml_bytes(sf_payload)
+                pdf_content = self._pdf_from_received_dte_xml(xml_bytes, row)
+            except Exception as exc:
+                errors.append(f"SimpleFactura XML→PDF: {exc}")
+
+        # 3) LibreDTE dte_recibidos/pdf (fallback)
+        if not pdf_content:
+            try:
+                issuer_rut = HelperClass().numeric_rut(row.rut)
+                url = (
+                    f"https://libredte.cl/api/dte/dte_recibidos/pdf/"
+                    f"{issuer_rut}/{int(row.dte_type_id)}/{int(row.folio)}/76063822"
+                    f"?papelContinuo=0&copias_tributarias=1&copias_cedibles=0"
+                    f"&cedible=0&compress=0&base64=0"
+                )
+                token = (
+                    os.getenv("LIBREDTE_API_TOKEN")
+                    or os.getenv("LIBREDTE_DTE_TOKEN")
+                    or "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+                )
+                response = requests.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/pdf, application/octet-stream, */*",
+                    },
+                    timeout=SIMPLEFACTURA_RECEIVED_TIMEOUT,
+                )
+                if response.status_code == 200 and response.content.startswith(b"%PDF"):
+                    pdf_content = response.content
+                else:
+                    errors.append(
+                        f"LibreDTE HTTP {response.status_code}: {(response.text or '')[:200]}"
+                    )
+            except Exception as exc:
+                errors.append(f"LibreDTE: {exc}")
+
+        if not pdf_content:
+            return {
+                "status": "error",
+                "message": "No se pudo obtener el PDF del documento recibido. "
+                + (" | ".join(errors) if errors else ""),
+            }
+
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        unique_id = uuid.uuid4().hex[:8]
+        file_name = f"recibido_{row.dte_type_id}_{row.folio}_{timestamp}_{unique_id}.pdf"
+        return {
+            "status": "success",
+            "file_name": file_name,
+            "file_data": base64.b64encode(pdf_content).decode("utf-8"),
+        }
+
+    def _fetch_received_xml_bytes(self, payload: dict) -> bytes:
+        body = self._simplefactura_post(SIMPLEFACTURA_RECEIVED_XML_URL, payload)
+        if not isinstance(body, dict):
+            raise ValueError("Respuesta XML inválida")
+        data = body.get("data")
+        if isinstance(data, str) and data.strip():
+            raw = base64.b64decode(data)
+            if raw.lstrip().startswith(b"<?xml") or raw.lstrip().startswith(b"<"):
+                return raw
+            raise ValueError("data XML no es XML válido")
+        if isinstance(data, (bytes, bytearray)) and data:
+            return bytes(data)
+        raise ValueError(body.get("message") or "Sin XML del documento recibido")
+
+    @staticmethod
+    def _xml_local(tag: str) -> str:
+        if not tag:
+            return ""
+        if "}" in tag:
+            return tag.rsplit("}", 1)[-1]
+        return tag
+
+    def _xml_find_text(self, root, *names) -> str:
+        wanted = {n.lower() for n in names}
+        for el in root.iter():
+            if self._xml_local(el.tag).lower() in wanted:
+                text = (el.text or "").strip()
+                if text:
+                    return text
+        return ""
+
+    def _xml_find_all(self, root, name: str):
+        name_l = name.lower()
+        return [el for el in root.iter() if self._xml_local(el.tag).lower() == name_l]
+
+    def _pdf_from_received_dte_xml(self, xml_bytes: bytes, row) -> bytes:
+        """Render a readable PDF from Chilean DTE XML (fallback when SF has no plantilla)."""
+        import io
+        import xml.etree.ElementTree as ET
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        root = ET.fromstring(xml_bytes)
+        tipo = self._xml_find_text(root, "TipoDTE") or str(row.dte_type_id or "")
+        folio = self._xml_find_text(root, "Folio") or str(row.folio or "")
+        fch = self._xml_find_text(root, "FchEmis") or str(row.added_date or "")
+
+        emisor_name = ""
+        emisor_rut = str(row.rut or "")
+        receptor_name = ""
+        receptor_rut = ""
+        for el in root.iter():
+            local = self._xml_local(el.tag).lower()
+            if local not in ("emisor", "receptor"):
+                continue
+            rz = ""
+            ru = ""
+            for child in el.iter():
+                ln = self._xml_local(child.tag).lower()
+                val = (child.text or "").strip()
+                if not val:
+                    continue
+                if ln in ("rznsoc", "rznsocrecep"):
+                    rz = val
+                if ln in ("rutemisor", "rutrecep"):
+                    ru = val
+            if local == "emisor":
+                emisor_name = rz or emisor_name
+                emisor_rut = ru or emisor_rut
+            else:
+                receptor_name = rz or receptor_name
+                receptor_rut = ru or receptor_rut
+
+        mnt_neto = self._xml_find_text(root, "MntNeto")
+        mnt_iva = self._xml_find_text(root, "IVA")
+        mnt_total = self._xml_find_text(root, "MntTotal") or str(row.total or "")
+
+        detail_rows = [["N°", "Detalle", "Cant.", "P. unit.", "Total"]]
+        for idx, det in enumerate(self._xml_find_all(root, "Detalle"), start=1):
+            name = ""
+            qty = ""
+            price = ""
+            total = ""
+            for child in list(det):
+                ln = self._xml_local(child.tag).lower()
+                val = (child.text or "").strip()
+                if ln == "nmbitem" and val:
+                    name = val
+                elif ln == "dscitem" and val and not name:
+                    name = val
+                elif ln == "qtyitem":
+                    qty = val
+                elif ln == "prcitem":
+                    price = val
+                elif ln == "montoitem":
+                    total = val
+            detail_rows.append([str(idx), name or "—", qty or "—", price or "—", total or "—"])
+
+        if len(detail_rows) == 1:
+            detail_rows.append(
+                ["1", emisor_name or row.supplier or "Documento recibido", "1", "", mnt_total or "—"]
+            )
+
+        tipo_label = DTE_TYPE_LABELS.get(int(tipo) if str(tipo).isdigit() else 0, f"DTE {tipo}")
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=letter,
+            leftMargin=1.5 * cm,
+            rightMargin=1.5 * cm,
+            topMargin=1.5 * cm,
+            bottomMargin=1.5 * cm,
+        )
+        styles = getSampleStyleSheet()
+        title = ParagraphStyle("t", parent=styles["Heading2"], textColor=colors.HexColor("#152d8a"))
+        body = ParagraphStyle("b", parent=styles["Normal"], fontSize=9, leading=12)
+        small = ParagraphStyle("s", parent=styles["Normal"], fontSize=8, leading=10, textColor=colors.grey)
+
+        story = [
+            Paragraph("Documento tributario recibido", title),
+            Paragraph("Generado desde XML SimpleFactura", small),
+            Spacer(1, 0.4 * cm),
+            Paragraph(f"<b>{tipo_label}</b> · Folio <b>{folio}</b> · Fecha {fch}", body),
+            Spacer(1, 0.3 * cm),
+            Paragraph(
+                f"<b>Emisor:</b> {emisor_name or row.supplier or '—'} ({emisor_rut})",
+                body,
+            ),
+            Paragraph(
+                f"<b>Receptor:</b> {receptor_name or 'JIS PARKING SPA'} "
+                f"({receptor_rut or SIMPLEFACTURA_RUT_EMISOR})",
+                body,
+            ),
+            Spacer(1, 0.5 * cm),
+        ]
+
+        table = Table(detail_rows, colWidths=[1.2 * cm, 9 * cm, 2 * cm, 2.5 * cm, 2.5 * cm])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#152d8a")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(Paragraph(f"Neto: {mnt_neto or '—'}", body))
+        story.append(Paragraph(f"IVA: {mnt_iva or '—'}", body))
+        story.append(Paragraph(f"<b>Total: {mnt_total or '—'}</b>", body))
+        doc.build(story)
+        pdf = buf.getvalue()
+        if not pdf.startswith(b"%PDF"):
+            raise ValueError("PDF generado inválido")
+        return pdf

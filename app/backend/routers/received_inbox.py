@@ -63,3 +63,9 @@ def import_day(received_inbox_inputs: ReceivedInboxImportDay, db: Session = Depe
 def acknowledge(received_inbox_inputs: ReceivedInboxAcknowledgment, db: Session = Depends(get_db)):
     data = ReceivedInboxClass(db).acknowledge(received_inbox_inputs)
     return {"message": data}
+
+
+@received_inbox.get("/download/{id}")
+def download(id: int, db: Session = Depends(get_db)):
+    data = ReceivedInboxClass(db).download_pdf(id)
+    return {"message": data}
