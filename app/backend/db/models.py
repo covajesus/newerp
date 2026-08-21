@@ -1968,6 +1968,8 @@ class QuotationModel(Base):
     commune_id = Column(Integer)
     period = Column(String(7), nullable=False)
     renew_mode = Column(Integer, default=1)  # 1 fija, 2 mes a mes
+    send_email = Column(Integer, default=1)  # 1 sí, 0 no
+    send_whatsapp = Column(Integer, default=0)  # 1 sí, 0 no
     status_id = Column(Integer, default=1)  # 1 borrador, 2 enviada, 3 convertida, 4 anulada
     chip_id = Column(Integer, default=0)
     subtotal = Column(Integer, default=0)

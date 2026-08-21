@@ -2599,6 +2599,8 @@ class StoreQuotation(BaseModel):
     rut: str
     period: str
     renew_mode: int = 1  # 1 fija, 2 mes a mes
+    send_email: Optional[int] = 1
+    send_whatsapp: Optional[int] = 0
     chip_id: Optional[int] = 0
     region_id: Optional[int] = None
     commune_id: Optional[int] = None

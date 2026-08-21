@@ -198,6 +198,8 @@ class QuotationClass:
             "period": q.period,
             "period_label": HelperClass.period_detail_label(q.period or ""),
             "renew_mode": q.renew_mode,
+            "send_email": int(getattr(q, "send_email", 1) or 0),
+            "send_whatsapp": int(getattr(q, "send_whatsapp", 0) or 0),
             "status_id": q.status_id,
             "chip_id": q.chip_id,
             "subtotal": q.subtotal,
@@ -334,6 +336,8 @@ class QuotationClass:
             commune_id=getattr(form_data, "commune_id", None),
             period=period,
             renew_mode=int(getattr(form_data, "renew_mode", RENEW_FIXED) or RENEW_FIXED),
+            send_email=1 if int(getattr(form_data, "send_email", 1) or 0) else 0,
+            send_whatsapp=1 if int(getattr(form_data, "send_whatsapp", 0) or 0) else 0,
             status_id=STATUS_DRAFT,
             chip_id=chip_id,
             subtotal=subtotal,
@@ -384,6 +388,8 @@ class QuotationClass:
         row.commune_id = getattr(form_data, "commune_id", None)
         row.period = period
         row.renew_mode = int(getattr(form_data, "renew_mode", row.renew_mode) or RENEW_FIXED)
+        row.send_email = 1 if int(getattr(form_data, "send_email", row.send_email) or 0) else 0
+        row.send_whatsapp = 1 if int(getattr(form_data, "send_whatsapp", row.send_whatsapp) or 0) else 0
         row.chip_id = chip_id
         row.subtotal = subtotal
         row.tax = tax
@@ -766,6 +772,8 @@ class QuotationClass:
                     commune_id=src.commune_id,
                     period=current_period,
                     renew_mode=RENEW_MONTHLY,
+                    send_email=int(getattr(src, "send_email", 1) or 0),
+                    send_whatsapp=int(getattr(src, "send_whatsapp", 0) or 0),
                     status_id=STATUS_DRAFT,
                     chip_id=0,
                     subtotal=src.subtotal,

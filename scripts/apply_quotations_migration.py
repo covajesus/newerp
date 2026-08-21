@@ -20,6 +20,8 @@ try:
               commune_id INT DEFAULT NULL,
               period VARCHAR(7) NOT NULL,
               renew_mode TINYINT NOT NULL DEFAULT 1,
+              send_email TINYINT NOT NULL DEFAULT 1,
+              send_whatsapp TINYINT NOT NULL DEFAULT 0,
               status_id TINYINT NOT NULL DEFAULT 1,
               chip_id INT DEFAULT 0,
               subtotal INT NOT NULL DEFAULT 0,
