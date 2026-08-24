@@ -1791,7 +1791,6 @@ class DteClass:
             period_detail = HelperClass.period_detail_label(current_period)
             source_ids = [d.id for d in dte_data]
             pxq_items_by_dte = self._index_pxq_items_by_dte_id(source_ids)
-            refs_by_dte = self._index_dte_references_by_dte_id(source_ids)
 
             stats = {
                 "created": 0,
@@ -1799,7 +1798,6 @@ class DteClass:
                 "pxq_lines": 0,
                 "pxq_no_lines": 0,
                 "item_rows": 0,
-                "refs": 0,
             }
 
             for dte_datum in dte_data:
@@ -1861,15 +1859,7 @@ class DteClass:
                     self._persist_period_open_pxq_items(dte.id, source_items, period_detail)
                     stats["item_rows"] += len(source_items)
 
-                if target_category == 2:
-                    ref_rows = refs_by_dte.get(dte_datum.id, [])
-                    if ref_rows:
-                        stats["refs"] += 1
-                    self._copy_period_open_dte_references(
-                        dte_datum.id,
-                        dte.id,
-                        cached_refs=ref_rows,
-                    )
+                # category_id 2 se conserva pero sin filas en dte_references: referencias vacías para el nuevo mes.
 
             self.db.commit()
             return (
@@ -1878,7 +1868,6 @@ class DteClass:
                 f"|pxq_lines={stats['pxq_lines']}"
                 f"|pxq_no_lines={stats['pxq_no_lines']}"
                 f"|item_rows={stats['item_rows']}"
-                f"|refs={stats['refs']}"
                 f"|normal={stats['normal']}"
             )
         except Exception as e:

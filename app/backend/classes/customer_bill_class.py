@@ -61,14 +61,49 @@ def _bill_total_from_form(form_data, dte_row=None):
     return int(form_data.amount)
 
 
+def _bill_cat2_net_from_form_amount(form_data, dte=None) -> int:
+    """
+    Cat 2: el formulario envía neto. Si por error llega el bruto ya guardado
+    (o bruto de un subtotal existente), no volver a aplicar IVA.
+    """
+    raw = int(getattr(form_data, "amount", 0) or 0)
+    if raw <= 0:
+        return 0
+    existing_sub = int(getattr(dte, "subtotal", 0) or 0) if dte is not None else 0
+    existing_total = int(getattr(dte, "total", 0) or 0) if dte is not None else 0
+    if existing_sub > 0 and abs(raw - round(existing_sub * 1.19)) <= 1:
+        return existing_sub
+    if existing_total > 0 and abs(raw - existing_total) <= 1:
+        return existing_sub if existing_sub > 0 else round(raw / 1.19)
+    # Si raw ≈ bruto de sí mismo como neto (doble IVA típico: total = round(round(n*1.19)*1.19))
+    maybe_net = round(raw / 1.19)
+    if maybe_net > 0 and abs(raw - round(maybe_net * 1.19)) <= 1 and existing_sub > 0:
+        if abs(maybe_net - existing_sub) <= 1 or abs(raw - round(round(existing_sub * 1.19) * 1.19)) <= 1:
+            return existing_sub
+    return raw
+
+
+def _apply_pxq_header_from_net(dte, net: int) -> None:
+    """Fija subtotal/tax/total/cash_amount desde neto de líneas PXQ."""
+    net = int(net)
+    _, tax, gross, cash = dte_totals_from_net(net)
+    dte.subtotal = net
+    dte.tax = tax
+    dte.total = gross
+    dte.cash_amount = cash
+
+
 def _bill_parking_for_dte_match(form_data, dte_row=None):
-    """Estacionamiento (dtes.total) para buscar borrador o DTE emitido."""
+    """Valor a comparar con dtes.total (bruto). Cat 2: amount del form es neto → bruto."""
     cid = getattr(form_data, "category_id", None)
     if cid is None and dte_row is not None:
         cid = getattr(dte_row, "category_id", None)
     cid = int(cid or 1)
     if cid == 2:
-        return int(_bill_total_from_form(form_data, dte_row))
+        net = _bill_cat2_net_from_form_amount(form_data, dte_row)
+        if net <= 0:
+            return int(getattr(dte_row, "total", 0) or 0) if dte_row is not None else 0
+        return int(dte_totals_from_net(net)[2])
     if cid == 3:
         return int(_bill_total_from_form(form_data, dte_row))
     return int(form_data.amount)
@@ -111,12 +146,8 @@ def _apply_bill_draft_amounts(dte, form_data, pxq_items=None):
         return
 
     if cid == 2:
-        net = pxq_net if pxq_net is not None else raw
-        _, tax, gross, cash = dte_totals_from_net(net)
-        dte.subtotal = net
-        dte.total = gross
-        dte.tax = tax
-        dte.cash_amount = cash
+        net = pxq_net if pxq_net is not None else _bill_cat2_net_from_form_amount(form_data, dte)
+        _apply_pxq_header_from_net(dte, net)
         return
 
     gross = document_gross_from_form(form_data)
@@ -154,12 +185,12 @@ def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
         dte.tax = tax
         dte.category_id = cid
     elif cid == 2:
-        net = pxq_net if pxq_net is not None else int(_bill_total_from_form(form_data))
-        _, tax, gross, cash = dte_totals_from_net(net)
-        dte.cash_amount = cash
-        dte.subtotal = net
-        dte.total = gross
-        dte.tax = tax
+        net = (
+            pxq_net
+            if pxq_net is not None
+            else _bill_cat2_net_from_form_amount(form_data, dte)
+        )
+        _apply_pxq_header_from_net(dte, net)
         dte.category_id = cid
     else:
         gross = document_gross_from_form(form_data)
@@ -210,6 +241,17 @@ def _reference_line_nonempty(d):
         if v is not None and str(v).strip() not in ("", "null", "None"):
             return True
     return False
+
+
+def _reference_line_complete(d) -> bool:
+    if not d:
+        return False
+    c = _reference_line_canonical(dict(d))
+    for k in ("reference_type_id", "reference_date_id", "reference_code"):
+        v = c.get(k)
+        if v is None or str(v).strip() in ("", "null", "None"):
+            return False
+    return True
 
 
 def _reference_value_is_date_like(value) -> bool:
@@ -459,6 +501,74 @@ class CustomerBillClass:
                 return out
         return []
 
+    def _reconcile_pxq_bill_header(self, dte, items=None) -> bool:
+        """
+        Alinea encabezado dtes con suma neta de customer_dte_items (cat 2/3).
+        Evita total con IVA duplicado respecto al detalle.
+        Retorna True si corrige montos.
+        """
+        if dte is None:
+            return False
+        cid = int(getattr(dte, "category_id", 1) or 1)
+        if cid not in (2, 3):
+            return False
+        if items is None:
+            items = self._get_bill_items_for_generation(
+                type("F", (), {"items": None, "id": dte.id})(),
+                dte,
+            )
+        pxq_net = pxq_net_total_from_items(items)
+        if pxq_net is None:
+            return False
+        _, tax, gross, cash = dte_totals_from_net(pxq_net)
+        changed = (
+            int(dte.subtotal or 0) != pxq_net
+            or int(dte.total or 0) != gross
+            or int(dte.tax or 0) != tax
+            or int(dte.cash_amount or 0) != cash
+        )
+        if changed:
+            dte.subtotal = pxq_net
+            dte.tax = tax
+            dte.total = gross
+            dte.cash_amount = cash
+        return changed
+
+    def _pxq_gross_totals_by_dte_ids(self, dte_ids):
+        """
+        Bruto correcto (neto líneas × 1.19) para DTEs cat 2/3 con customer_dte_items.
+        Usado en listados para no mostrar IVA duplicado del encabezado.
+        """
+        if not dte_ids:
+            return {}
+        rows = (
+            self.db.query(
+                CustomerDteItemModel.dte_id,
+                CustomerDteItemModel.total_amount,
+            )
+            .filter(CustomerDteItemModel.dte_id.in_(list(dte_ids)))
+            .all()
+        )
+        net_by_id = {}
+        for dte_id, total_amount in rows:
+            try:
+                net_by_id[dte_id] = int(net_by_id.get(dte_id, 0)) + int(total_amount or 0)
+            except (TypeError, ValueError):
+                continue
+        out = {}
+        for dte_id, net in net_by_id.items():
+            if net > 0:
+                out[dte_id] = int(dte_totals_from_net(net)[2])
+        return out
+
+    def _bill_list_total(self, dte, pxq_gross_by_id=None):
+        cid = int(getattr(dte, "category_id", 1) or 1)
+        if pxq_gross_by_id and cid in (2, 3):
+            fixed = pxq_gross_by_id.get(dte.id)
+            if fixed is not None:
+                return fixed
+        return dte.total
+
     def _collect_bill_reference_lines(self, form_data, dte_row):
         """Líneas si category_id=2: body del request o filas en dte_references (no hay resumen en dtes)."""
         lines = []
@@ -489,6 +599,24 @@ class CustomerBillClass:
                     )
                 return lines
         return lines
+
+    def _validate_category2_references_for_emit(self, form_data, dte_row):
+        category_id = _bill_category_id(form_data, dte_row)
+        if int(category_id or 1) != 2:
+            return None
+        ref_lines = self._collect_bill_reference_lines(form_data, dte_row)
+        if not any(_reference_line_complete(rd) for rd in ref_lines):
+            return {
+                "status": "error",
+                "message": "Debe ingresar al menos una referencia (documento, fecha y folio).",
+            }
+        for rd in ref_lines:
+            if _reference_line_nonempty(rd) and not _reference_line_complete(rd):
+                return {
+                    "status": "error",
+                    "message": "Complete los campos obligatorios de cada referencia: documento, fecha y folio.",
+                }
+        return None
 
     def _persist_dte_reference_rows(self, dte_id, reference_dicts):
         self.db.query(DteReferenceModel).filter(DteReferenceModel.dte_id == dte_id).delete()
@@ -698,6 +826,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -708,7 +837,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -730,6 +859,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -740,7 +870,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id,
@@ -834,6 +964,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -844,7 +975,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -863,6 +994,8 @@ class CustomerBillClass:
                 else:
                     data = query.all()
 
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
+
                     # Serializar los datos
                     serialized_data = [{
                         "id": dte.id,
@@ -872,7 +1005,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id
@@ -978,6 +1111,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -988,7 +1122,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -1010,6 +1144,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -1020,7 +1155,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id,
@@ -1124,6 +1259,7 @@ class CustomerBillClass:
                     v2_folio_pool_ids = CustomerTicketClass(self.db)._v2_folio_pool_dte_ids(
                         [d.id for d in data]
                     )
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
 
                     # Serializar los datos
                     serialized_data = [{
@@ -1134,7 +1270,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -1153,6 +1289,8 @@ class CustomerBillClass:
                 else:
                     data = query.all()
 
+                    pxq_gross_by_id = self._pxq_gross_totals_by_dte_ids([d.id for d in data])
+
                     # Serializar los datos
                     serialized_data = [{
                         "id": dte.id,
@@ -1162,7 +1300,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
-                        "total": dte.total,
+                        "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id
@@ -1184,8 +1322,26 @@ class CustomerBillClass:
         # Actualizar campos
         dte.branch_office_id = form_data.branch_office_id
         dte.rut = form_data.rut
-        items = self._normalize_bill_items(getattr(form_data, "items", []))
+        form_items = getattr(form_data, "items", None)
+        cid = _bill_category_id(form_data, dte)
+        if form_items is not None:
+            items = self._normalize_bill_items(form_items)
+            if items:
+                self._replace_bill_items(dte.id, items)
+            elif int(cid or 1) in (2, 3):
+                # No vaciar PXQ si el payload llegó vacío; conservar líneas y reconciliar.
+                items = self._get_bill_items_for_generation(form_data, dte)
+            else:
+                self._replace_bill_items(dte.id, [])
+        else:
+            items = self._get_bill_items_for_generation(form_data, dte)
+
+        if int(cid or 1) in (2, 3) and not items:
+            items = self._get_bill_items_for_generation(form_data, dte)
+
         _apply_bill_draft_amounts(dte, form_data, pxq_items=items if items else None)
+        if int(cid or 1) in (2, 3):
+            self._reconcile_pxq_bill_header(dte, items if items else None)
         dte.payment_term_id = _bill_payment_term_id(form_data, dte)
         dte.status_id = 2
         qty = getattr(form_data, "quantity", None)
@@ -1203,9 +1359,6 @@ class CustomerBillClass:
             if int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2:
                 ref_dicts = [_reference_line_canonical(d) for d in ref_dicts]
             self._persist_dte_reference_rows(dte.id, ref_dicts)
-
-        if getattr(form_data, "items", None) is not None:
-            self._replace_bill_items(dte.id, items)
 
         self.db.commit()
         self.db.refresh(dte)
@@ -1418,7 +1571,18 @@ class CustomerBillClass:
                     .all()
                 )
                 dte_row = self.db.query(DteModel).filter(DteModel.id == id).first()
+                if dte_row is not None and self._reconcile_pxq_bill_header(dte_row):
+                    try:
+                        self.db.commit()
+                        self.db.refresh(dte_row)
+                    except Exception:
+                        self.db.rollback()
                 v2_emit = is_document_simplefactura_v2(self.db, dte_row)
+                display_total = (
+                    int(dte_row.total)
+                    if dte_row is not None and dte_row.total is not None
+                    else data_query.total
+                )
                 # Serializar los datos del empleado
                 customer_bill_data = {
                     "id": data_query.id,
@@ -1433,7 +1597,7 @@ class CustomerBillClass:
                     "region_id": data_query.region_id,
                     "commune_id": data_query.commune_id,
                     "address": data_query.address,
-                    "total": data_query.total,
+                    "total": display_total,
                     "status_id": data_query.status_id,
                     "added_date": data_query.added_date.strftime('%d-%m-%Y') if data_query.added_date else None,
                     "branch_office": data_query.branch_office,
@@ -1528,6 +1692,11 @@ class CustomerBillClass:
         ).count()
 
         if check_dte_existence == 0:
+            dte_row = self._find_open_bill_draft(form_data)
+            ref_err = self._validate_category2_references_for_emit(form_data, dte_row)
+            if ref_err:
+                return ref_err
+
             customer = CustomerClass(self.db).get_by_rut(form_data.rut)
             customer_data = json.loads(customer)
 
@@ -1662,6 +1831,7 @@ class CustomerBillClass:
                 print("[customer_bills/store] guardando customer_dte_items dte.id=", dte.id, "filas=", len(items))
                 dte.quantity = sum(i["quantity"] for i in items)
                 self._replace_bill_items(dte.id, items)
+                self._reconcile_pxq_bill_header(dte, items)
             else:
                 print("[customer_bills/store] NO se insertan líneas: items normalizado vacío (lista [])")
 
@@ -2130,6 +2300,7 @@ class CustomerBillClass:
             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
         # Actualizar campos
+        self._reconcile_pxq_bill_header(dte)
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
@@ -2140,6 +2311,7 @@ class CustomerBillClass:
             raise HTTPException(status_code=404, detail="Dte no encontrado")
 
         # Actualizar campos
+        self._reconcile_pxq_bill_header(dte)
         dte.status_id = 2
         self.db.commit()
         self.db.refresh(dte)
@@ -2273,8 +2445,8 @@ class CustomerBillClass:
                 entry["CdgItem"] = line["CdgItem"]
             formatted.append(entry)
         net_amount = sum(int(e["MontoItem"]) for e in formatted)
-        tax_amount = round(net_amount * 0.19)
-        total_amount = net_amount + tax_amount
+        # Misma regla que dte_totals_from_net (bruto = round(neto*1.19)), no neto+round(neto*0.19).
+        _, tax_amount, total_amount, _ = dte_totals_from_net(net_amount)
         return formatted, net_amount, tax_amount, total_amount
 
     def _bill_v2_detail_lines(self, form_data, dte_row, bill_items, category_id, qty):
@@ -2457,6 +2629,14 @@ class CustomerBillClass:
                 "message": "No hay borrador v2 en dtes para emitir (status 1 o 2, folio 0).",
             }
 
+        # Encabezado debe reflejar neto de líneas PXQ (evita IVA duplicado en listado).
+        self._reconcile_pxq_bill_header(dte_row)
+        self.db.flush()
+
+        ref_err = self._validate_category2_references_for_emit(form_data, dte_row)
+        if ref_err:
+            return ref_err
+
         bill_items = self._get_bill_items_for_generation(form_data, dte_row)
         category_id = _bill_category_id(form_data, dte_row)
         qty = getattr(form_data, "quantity", None)
@@ -2531,9 +2711,10 @@ class CustomerBillClass:
         dte_row.dte_version_id = DTE_VERSION_V2
         dte_row.updated_date = datetime.now()
         items = self._get_bill_items_for_generation(form_data, dte_row)
-        mnt_total = int(
-            (document.get("Encabezado") or {}).get("Totales", {}).get("MntTotal") or 0
-        )
+        totales = (document.get("Encabezado") or {}).get("Totales") or {}
+        mnt_total = int(totales.get("MntTotal") or 0)
+        mnt_neto = int(totales.get("MntNeto") or 0)
+        mnt_iva = int(totales.get("IVA") or 0)
         if mnt_total > 0:
             cid = int(category_id or 1)
             chip = int(getattr(form_data, "chip_id", 0) or 0)
@@ -2542,7 +2723,13 @@ class CustomerBillClass:
             dte_row.chip_id = chip
             dte_row.category_id = cid
             dte_row.payment_term_id = _bill_payment_term_id(form_data, dte_row)
-            _set_dte_gross_totals(dte_row, mnt_total)
+            if cid in (2, 3) and mnt_neto > 0:
+                dte_row.subtotal = mnt_neto
+                dte_row.tax = mnt_iva if mnt_iva > 0 else (mnt_total - mnt_neto)
+                dte_row.total = mnt_total
+                dte_row.cash_amount = mnt_total
+            else:
+                _set_dte_gross_totals(dte_row, mnt_total)
         else:
             _sync_bill_dte_amounts_from_form(dte_row, form_data, pxq_items=items if items else None)
             dte_row.payment_term_id = _bill_payment_term_id(form_data, dte_row)

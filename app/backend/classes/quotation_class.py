@@ -42,7 +42,6 @@ from app.backend.db.models import (
     QuotationItemModel,
     QuotationModel,
     QuotationReferenceModel,
-    UserModel,
 )
 
 DTE_VERSION_V2 = 2
@@ -122,34 +121,14 @@ class QuotationClass:
         d = dt or datetime.now()
         return f"{_WEEKDAYS_ES[d.weekday()]} {d.day} de {_MONTHS_ES[d.month - 1]} del {d.year}"
 
-    def _branch_contact(self, branch: Optional[BranchOfficeModel]) -> dict[str, str]:
-        """Contacto comercial para WhatsApp / pie de PDF (supervisor de sucursal)."""
-        name = "JIS Parking"
-        phone = ISSUER_PHONE.replace("+56 ", "").replace(" ", "")
-        email = ISSUER_EMAIL
-        if not branch:
-            return {"name": name, "phone": phone, "email": email}
-        supervisor_key = getattr(branch, "principal_supervisor", None)
-        user = None
-        if supervisor_key not in (None, "", 0):
-            user = (
-                self.db.query(UserModel)
-                .filter(UserModel.rut == supervisor_key)
-                .first()
-            )
-            if not user:
-                user = (
-                    self.db.query(UserModel)
-                    .filter(UserModel.id == supervisor_key)
-                    .first()
-                )
-        if user:
-            name = (user.full_name or name).strip() or name
-            if user.phone and str(user.phone).strip():
-                phone = re.sub(r"\D", "", str(user.phone)) or phone
-            if user.email and "@" in str(user.email):
-                email = str(user.email).strip()
-        return {"name": name, "phone": phone, "email": email}
+    @staticmethod
+    def _company_contact() -> dict[str, str]:
+        """Contacto comercial fijo para cotizaciones (siempre contacto@jisparking.com)."""
+        return {
+            "name": "JIS Parking",
+            "phone": ISSUER_PHONE.replace("+56 ", "").replace(" ", ""),
+            "email": ISSUER_EMAIL,
+        }
 
     def _logo_path(self) -> Optional[str]:
         env_logo = (os.getenv("DTE_EMAIL_LOGO_PATH") or "").strip()
@@ -767,9 +746,9 @@ class QuotationClass:
             .filter(BranchOfficeModel.id == q.branch_office_id)
             .first()
         )
-        contact = self._branch_contact(branch)
         branch_name = (getattr(branch, "branch_office", None) or "—") if branch else "—"
         branch_address = (getattr(branch, "address", None) or "").strip() if branch else ""
+        contact = self._company_contact()
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -1197,12 +1176,7 @@ class QuotationClass:
         if not pdf_bytes:
             return {"status": "error", "message": pdf_err or "No se pudo generar el PDF"}
 
-        branch = (
-            self.db.query(BranchOfficeModel)
-            .filter(BranchOfficeModel.id == q.branch_office_id)
-            .first()
-        )
-        contact = self._branch_contact(branch)
+        contact = self._company_contact()
         logo_bytes = _load_brand_logo_bytes()
         # Tracking pixel: new token on each send; reset read flag
         token = secrets.token_urlsafe(24)
@@ -1343,12 +1317,7 @@ class QuotationClass:
                 "pdf": pdf_pub,
             }
 
-        branch = (
-            self.db.query(BranchOfficeModel)
-            .filter(BranchOfficeModel.id == q.branch_office_id)
-            .first()
-        )
-        contact = self._branch_contact(branch)
+        contact = self._company_contact()
 
         var1 = str(q.quotation_number or quotation_id)
         var2 = self._format_date_short(q.added_date)
@@ -1512,17 +1481,7 @@ class QuotationClass:
                             updated_date=now,
                         )
                     )
-                for ref in self._load_references(src.id):
-                    self.db.add(
-                        QuotationReferenceModel(
-                            quotation_id=clone.id,
-                            reference_type_id=ref.get("reference_type_id"),
-                            reference_date_id=ref.get("reference_date_id"),
-                            reference_code=ref.get("reference_code"),
-                            reference_description=ref.get("reference_description"),
-                            added_date=now,
-                        )
-                    )
+                # Referencias no se copian al renovar: el usuario debe ingresarlas cada mes.
                 existing_keys.add(key)
                 created += 1
             self.db.commit()
