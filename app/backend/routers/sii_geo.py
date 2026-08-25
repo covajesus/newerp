@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 
+import httpx
 import requests
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -15,6 +17,10 @@ from app.backend.db.models import SiiCommuneModel, SiiRegionModel
 sii_geo = APIRouter(prefix="/sii", tags=["SII Geo"])
 
 SII_RSS_URL = "https://zeus.sii.cl/admin/rss/sii_ind_rss.xml"
+_SII_RSS_HEADERS = {"User-Agent": "IntraJIS/1.0 (+https://intrajis.com)"}
+_SII_INDICATORS_CACHE: dict | None = None
+_SII_INDICATORS_CACHE_AT: float = 0.0
+_SII_INDICATORS_CACHE_TTL = 3600  # 1 h — RSS SII cambia a lo sumo diario
 
 
 @sii_geo.get("/regions")
@@ -114,27 +120,68 @@ def _parse_sii_rss(xml_text: str) -> dict:
     return indicators
 
 
+def _fetch_sii_rss_xml() -> str:
+    """Descarga RSS SII con reintentos (requests → httpx → httpx sin verify)."""
+    errors: list[str] = []
+    attempts = [
+        ("requests", lambda: requests.get(SII_RSS_URL, timeout=15, headers=_SII_RSS_HEADERS)),
+        (
+            "httpx",
+            lambda: httpx.get(
+                SII_RSS_URL, timeout=15, headers=_SII_RSS_HEADERS, verify=True
+            ),
+        ),
+        (
+            "httpx_insecure",
+            lambda: httpx.get(
+                SII_RSS_URL, timeout=15, headers=_SII_RSS_HEADERS, verify=False
+            ),
+        ),
+    ]
+    for label, fetch in attempts:
+        try:
+            response = fetch()
+            status = getattr(response, "status_code", 0)
+            text = getattr(response, "text", "") or ""
+            if status == 200 and text.strip():
+                return text
+            errors.append(f"{label} HTTP {status}")
+        except Exception as exc:
+            errors.append(f"{label}: {exc}")
+    raise RuntimeError("; ".join(errors))
+
+
+def _cached_indicators_response(*, stale: bool = False, detail: str | None = None):
+    global _SII_INDICATORS_CACHE
+    payload: dict = {
+        "status": "success" if _SII_INDICATORS_CACHE else "error",
+        "indicators": _SII_INDICATORS_CACHE or {},
+    }
+    if stale:
+        payload["stale"] = True
+    if detail:
+        payload["detail"] = detail
+    return {"message": payload}
+
+
 @sii_geo.get("/indicators")
 def sii_indicators():
     """
     Indicadores SII (Dólar, UF, UTM) desde el RSS oficial.
     Se consulta en backend para evitar CORS / proxies externos inestables.
     """
+    global _SII_INDICATORS_CACHE, _SII_INDICATORS_CACHE_AT
+
+    now = time.time()
+    if _SII_INDICATORS_CACHE and (now - _SII_INDICATORS_CACHE_AT) < _SII_INDICATORS_CACHE_TTL:
+        return _cached_indicators_response()
+
     try:
-        response = requests.get(
-            SII_RSS_URL,
-            timeout=15,
-            headers={"User-Agent": "IntraJIS/1.0 (+https://intrajis.com)"},
-        )
-        if response.status_code != 200 or not response.text:
-            return {
-                "message": {
-                    "status": "error",
-                    "indicators": {},
-                    "detail": f"RSS SII HTTP {response.status_code}",
-                }
-            }
-        indicators = _parse_sii_rss(response.text)
+        xml_text = _fetch_sii_rss_xml()
+        indicators = _parse_sii_rss(xml_text)
+        if indicators:
+            _SII_INDICATORS_CACHE = indicators
+            _SII_INDICATORS_CACHE_AT = now
         return {
             "message": {
                 "status": "success",
@@ -142,6 +189,8 @@ def sii_indicators():
             }
         }
     except Exception as exc:
+        if _SII_INDICATORS_CACHE:
+            return _cached_indicators_response(stale=True, detail=str(exc))
         return {
             "message": {
                 "status": "error",
