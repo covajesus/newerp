@@ -1464,6 +1464,42 @@ class LogModel(Base):
     added_date = Column(DateTime())
 
 
+class UserAuditModel(Base):
+    """Auditoría de actividad por usuario (pantallas, clics, API, etc.)."""
+    __tablename__ = 'user_audits'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_rut = Column(String(32), nullable=False, index=True)
+    user_full_name = Column(String(255), nullable=True)
+    rol_id = Column(Integer, nullable=True)
+    session_id = Column(String(64), nullable=True, index=True)
+    process_id = Column(Integer, ForeignKey('processes.id'), nullable=True)
+    action_type = Column(String(32), nullable=False, index=True)
+    path = Column(String(512), nullable=True)
+    route_name = Column(String(128), nullable=True)
+    method = Column(String(16), nullable=True)
+    element_tag = Column(String(64), nullable=True)
+    element_id = Column(String(128), nullable=True)
+    element_text = Column(String(512), nullable=True)
+    message = Column(String(1024), nullable=True)
+    detail = Column(Text, nullable=True)
+    meta_json = Column(Text, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+    audit_datetime = Column(DateTime(), nullable=False, index=True)
+    audit_date = Column(Date(), nullable=False, index=True)
+    audit_time = Column(String(8), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    day = Column(Integer, nullable=False)
+    hour = Column(Integer, nullable=False)
+    minute = Column(Integer, nullable=False)
+    second = Column(Integer, nullable=False)
+    weekday = Column(Integer, nullable=True)
+    added_date = Column(DateTime())
+
+
 class UniformTypeModel(Base):
     __tablename__ = 'uniform_types'
 

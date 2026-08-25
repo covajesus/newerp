@@ -179,6 +179,7 @@ SPECIAL_PROCESSES: list[tuple[str, str, str]] = [
     ("email_send", "Email - Envío", "Envío de correos (SMTP / DTE / cotizaciones)"),
     ("email_dte_subscriber", "Email - DTE abonados", "Correos de DTE a abonados"),
     ("dte_massive_whatsapp", "DTE - Envío masivo WhatsApp", "Reenvío / envío masivo WhatsApp"),
+    ("user_audit", "Auditoría de usuarios", "Registro de actividad UI/API por usuario"),
 ]
 
 # Rutas frontend (path starts with) → proceso
@@ -300,6 +301,7 @@ FRONTEND_PATH_PROCESS_MAP: list[tuple[str, str, str]] = [
     ("/dte_line_item_details", "dte_line_item_details", "Detalle ítems DTE"),
     ("/dte_line_item_detail", "dte_line_item_details", "Detalle ítems DTE"),
     ("/tags", "delivery_address_tags", "Etiquetas"),
+    ("/user_audits", "user_audit", "Auditoría de usuarios"),
     ("/folios/segment", "folios", "Segmentos de folios"),
     ("/folios/report", "folios", "Reporte folios"),
     ("/folios/request", "folios", "Solicitud folios"),

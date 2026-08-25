@@ -103,13 +103,16 @@ from app.backend.routers.payments import payments
 from app.backend.routers.cashier_sync import cashier_sync_router
 from app.backend.routers.delivery_address_tags import delivery_address_tags
 from app.backend.routers.logs import logs
+from app.backend.routers.user_audits import user_audits
 
 app = FastAPI(root_path="/api")
 application = app
 
 from app.backend.middleware.global_error_logging import register_global_error_logging
+from app.backend.middleware.user_audit_middleware import UserAuditApiMiddleware
 
 register_global_error_logging(app)
+app.add_middleware(UserAuditApiMiddleware)
 
 # FILES_DIR = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
 
@@ -241,6 +244,7 @@ app.include_router(payments)
 app.include_router(cashier_sync_router)
 app.include_router(delivery_address_tags)
 app.include_router(logs)
+app.include_router(user_audits)
 
 if __name__ == "__main__":
     uvicorn.run(
