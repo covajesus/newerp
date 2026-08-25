@@ -1416,11 +1416,40 @@ class HonoraryModel(Base):
     end_date = Column(Date())
     amount = Column(Integer)
     period = Column(String(255))
-    observation = Column(String(255))
+    observation = Column(Text)
     bte_emitted = Column(Integer, default=0)  # 1 = emitted in SII, 0 = not
     bte_folio = Column(Integer, nullable=True)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+
+class ProcessModel(Base):
+    """Catálogo de procesos del sistema (honorarios, SII, facturación, etc.)."""
+    __tablename__ = 'processes'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(64), nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(512), nullable=True)
+    status_id = Column(Integer, default=1)
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class ProcessErrorLogModel(Base):
+    """Log de errores de cualquier proceso."""
+    __tablename__ = 'process_error_logs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    process_id = Column(Integer, nullable=False)
+    reference_type = Column(String(64), nullable=True)
+    reference_id = Column(Integer, nullable=True)
+    user_rut = Column(String(32), nullable=True)
+    error_code = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=False)
+    detail = Column(Text, nullable=True)
+    added_date = Column(DateTime())
+
 
 class UniformTypeModel(Base):
     __tablename__ = 'uniform_types'

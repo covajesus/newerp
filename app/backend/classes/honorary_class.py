@@ -214,7 +214,7 @@ class HonoraryClass:
                 honorary.start_date = honorary_inputs.start_date
             if honorary_inputs.end_date != 'None' and honorary_inputs.end_date != None:
                 honorary.end_date = honorary_inputs.end_date
-            honorary.observation = honorary_inputs.observation
+            honorary.observation = (honorary_inputs.observation or "")[:1000]
             honorary.added_date = datetime.now()
             honorary.updated_date = datetime.now()
 
@@ -259,7 +259,7 @@ class HonoraryClass:
                 honorary.start_date = honorary_inputs.start_date
             if honorary_inputs.end_date != 'None' and honorary_inputs.end_date != None:
                 honorary.end_date = honorary_inputs.end_date
-            honorary.observation = honorary_inputs.observation
+            honorary.observation = (honorary_inputs.observation or "")[:1000]
             honorary.amount = honorary_inputs.amount
             honorary.added_date = datetime.now()
             honorary.updated_date = datetime.now()
