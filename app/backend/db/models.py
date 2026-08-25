@@ -1436,18 +1436,31 @@ class ProcessModel(Base):
     updated_date = Column(DateTime())
 
 
-class ProcessErrorLogModel(Base):
-    """Log de errores de cualquier proceso."""
-    __tablename__ = 'process_error_logs'
+class LogModel(Base):
+    """Logs de errores/eventos de todos los procesos (detalle por día y hora)."""
+    __tablename__ = 'logs'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    process_id = Column(Integer, nullable=False)
-    reference_type = Column(String(64), nullable=True)
+    process_id = Column(Integer, ForeignKey('processes.id'), nullable=False)
+    level = Column(String(16), nullable=False, default='error')  # error | warning | info
+    reference_type = Column(String(64), nullable=True)  # honorary, bill, etc.
     reference_id = Column(Integer, nullable=True)
     user_rut = Column(String(32), nullable=True)
     error_code = Column(String(64), nullable=True)
-    error_message = Column(Text, nullable=False)
+    message = Column(Text, nullable=False)
     detail = Column(Text, nullable=True)
+    stack_trace = Column(Text, nullable=True)
+    # Marca temporal detallada
+    log_datetime = Column(DateTime(), nullable=False)
+    log_date = Column(Date(), nullable=False)  # día
+    log_time = Column(String(8), nullable=False)  # HH:MM:SS
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    day = Column(Integer, nullable=False)
+    hour = Column(Integer, nullable=False)
+    minute = Column(Integer, nullable=False)
+    second = Column(Integer, nullable=False)
+    weekday = Column(Integer, nullable=True)  # 0=lunes .. 6=domingo
     added_date = Column(DateTime())
 
 

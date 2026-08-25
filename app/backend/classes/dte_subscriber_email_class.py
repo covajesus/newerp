@@ -534,6 +534,23 @@ def _build_quotation_html_body(
 class DteSubscriberEmailClass:
     def __init__(self, db: Session):
         self.db = db
+
+    def _log_email_error(self, message: str, *, detail=None, exc=None, reference_id=None):
+        try:
+            from app.backend.classes.log_class import LogClass
+
+            LogClass(self.db).log_error(
+                "email_dte_subscriber",
+                message,
+                process_name="Email - DTE abonados",
+                reference_type="dte",
+                reference_id=reference_id,
+                detail=detail,
+                exc=exc,
+                error_code="smtp",
+            )
+        except Exception as log_exc:
+            print(f"DteSubscriberEmailClass log failed: {log_exc}")
         self.file_class = FileClass(db)
 
     def _resolve_customer(self, dte, customer):
@@ -694,12 +711,18 @@ class DteSubscriberEmailClass:
             with smtplib.SMTP_SSL(smtp["server"], smtp["port"]) as server:
                 server.login(smtp["user"], smtp["password"])
                 server.sendmail(smtp["user"], recipients, msg.as_string())
-        except smtplib.SMTPAuthenticationError:
-            return {"status": "error", "message": "Error de autenticación SMTP"}
+        except smtplib.SMTPAuthenticationError as exc:
+            msg_err = "Error de autenticación SMTP"
+            self._log_email_error(msg_err, detail=f"nc folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
         except smtplib.SMTPException as exc:
-            return {"status": "error", "message": f"Error SMTP: {exc}"}
+            msg_err = f"Error SMTP: {exc}"
+            self._log_email_error(msg_err, detail=f"nc folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
         except Exception as exc:
-            return {"status": "error", "message": f"Error al enviar correo: {exc}"}
+            msg_err = f"Error al enviar correo: {exc}"
+            self._log_email_error(msg_err, detail=f"nc folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
 
         print(
             f"[dte-email-nc] sent folio={folio} to={recipients} ref={ref_label} {ref_folio}",
@@ -817,12 +840,18 @@ class DteSubscriberEmailClass:
             with smtplib.SMTP_SSL(smtp["server"], smtp["port"]) as server:
                 server.login(smtp["user"], smtp["password"])
                 server.sendmail(smtp["user"], recipients, msg.as_string())
-        except smtplib.SMTPAuthenticationError:
-            return {"status": "error", "message": "Error de autenticación SMTP"}
+        except smtplib.SMTPAuthenticationError as exc:
+            msg_err = "Error de autenticación SMTP"
+            self._log_email_error(msg_err, detail=f"dte folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
         except smtplib.SMTPException as exc:
-            return {"status": "error", "message": f"Error SMTP: {exc}"}
+            msg_err = f"Error SMTP: {exc}"
+            self._log_email_error(msg_err, detail=f"dte folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
         except Exception as exc:
-            return {"status": "error", "message": f"Error al enviar correo: {exc}"}
+            msg_err = f"Error al enviar correo: {exc}"
+            self._log_email_error(msg_err, detail=f"dte folio={folio}; to={recipients}", exc=exc, reference_id=folio)
+            return {"status": "error", "message": msg_err}
 
         print(
             f"[dte-email] sent folio={folio} tipo={dte_type} to={recipients} "

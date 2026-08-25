@@ -102,9 +102,14 @@ from app.backend.routers.whatsapp_webhook import whatsapp_webhook
 from app.backend.routers.payments import payments
 from app.backend.routers.cashier_sync import cashier_sync_router
 from app.backend.routers.delivery_address_tags import delivery_address_tags
+from app.backend.routers.logs import logs
 
 app = FastAPI(root_path="/api")
 application = app
+
+from app.backend.middleware.global_error_logging import register_global_error_logging
+
+register_global_error_logging(app)
 
 # FILES_DIR = "C:/Users/jesus/OneDrive/Desktop/escritorio/newerp/files"
 
@@ -235,6 +240,7 @@ app.include_router(whatsapp_webhook)
 app.include_router(payments)
 app.include_router(cashier_sync_router)
 app.include_router(delivery_address_tags)
+app.include_router(logs)
 
 if __name__ == "__main__":
     uvicorn.run(

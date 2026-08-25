@@ -23,6 +23,35 @@ class HonoraryClass:
     def __init__(self, db):
         self.db = db
 
+    def _log_process_error(
+        self,
+        process_code: str,
+        message: str,
+        *,
+        reference_id=None,
+        user_rut=None,
+        error_code=None,
+        detail=None,
+        exc=None,
+        process_name=None,
+    ):
+        try:
+            from app.backend.classes.log_class import LogClass
+
+            LogClass(self.db).log_error(
+                process_code,
+                message,
+                reference_type="honorary",
+                reference_id=reference_id,
+                user_rut=user_rut,
+                error_code=error_code,
+                detail=detail,
+                exc=exc,
+                process_name=process_name,
+            )
+        except Exception as log_exc:
+            print(f"HonoraryClass log failed: {log_exc}")
+
     @staticmethod
     def is_bte_sii_blocked_rut(rut) -> bool:
         return _normalize_rut_digits(rut) in _BTE_SII_BLOCKED_RUTS
@@ -683,9 +712,17 @@ class HonoraryClass:
         except ModuleNotFoundError as e:
             print(f"Missing dependency for SII BTE: {e}")
             self._keep_pending_for_sii_retry(honorary_id)
+            msg = f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio."
+            self._log_process_error(
+                "honorary_send_sii",
+                msg,
+                reference_id=honorary_id,
+                error_code="missing_dependency",
+                exc=e,
+            )
             return {
                 "status": "error",
-                "message": f"Falta dependencia para BTE SII: {e}. Instale httpx en el venv del servicio.",
+                "message": msg,
                 "bte_emitted": 0,
                 "status_id": 14,
             }
@@ -697,9 +734,16 @@ class HonoraryClass:
         if not login_rut or not password:
             print("Clave Tributaria SII no configurada; no se emite BTE")
             self._keep_pending_for_sii_retry(honorary_id)
+            msg = "Configure RUT y Clave Tributaria SII en Configuraciones"
+            self._log_process_error(
+                "honorary_send_sii",
+                msg,
+                reference_id=honorary_id,
+                error_code="sii_credentials",
+            )
             return {
                 "status": "error",
-                "message": "Configure RUT y Clave Tributaria SII en Configuraciones",
+                "message": msg,
                 "bte_emitted": 0,
                 "status_id": 14,
             }
@@ -718,6 +762,14 @@ class HonoraryClass:
         except Exception as e:
             print(f"Error mapeo región/comuna SII: {e}")
             self._keep_pending_for_sii_retry(honorary_id)
+            self._log_process_error(
+                "honorary_send_sii",
+                str(e),
+                reference_id=honorary_id,
+                error_code="sii_region_commune_map",
+                exc=e,
+                process_name="Honorarios - Emitir BTE SII",
+            )
             return {"status": "error", "message": str(e), "bte_emitted": 0, "status_id": 14}
 
         beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
@@ -795,6 +847,15 @@ class HonoraryClass:
         except Exception as e:
             print(f"Error al emitir BTE en SII: {e}")
             self._keep_pending_for_sii_retry(honorary_id)
+            self._log_process_error(
+                "honorary_send_sii",
+                str(e),
+                reference_id=honorary_id,
+                error_code="sii_emit_bte",
+                detail=f"rut={beneficiary_rut}",
+                exc=e,
+                process_name="Honorarios - Emitir BTE SII",
+            )
             return {
                 "status": "error",
                 "message": str(e),
