@@ -163,7 +163,9 @@ class HonoraryClass:
                 "bank_id": data.bank_id,
                 "account_type_id": data.account_type_id,
                 "schedule_id": data.schedule_id,
-                "region_id": data.region_id,
+                "region_id": self._normalize_intrajis_region_id(
+                    data.region_id, data.commune_id
+                ),
                 "commune_id": data.commune_id,
                 "requested_by": data.requested_by,
                 "status_id": data.status_id,
@@ -195,8 +197,10 @@ class HonoraryClass:
             honorary.foreigner_id = honorary_inputs.foreigner_id
             honorary.bank_id = honorary_inputs.bank_id
             honorary.schedule_id = honorary_inputs.schedule_id
-            honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
+            honorary.region_id = self._normalize_intrajis_region_id(
+                honorary_inputs.region_id, honorary_inputs.commune_id
+            )
             honorary.account_type_id = honorary_inputs.account_type_id
             honorary.requested_by = requested_by
             honorary.status_id = 14
@@ -229,8 +233,10 @@ class HonoraryClass:
             honorary.foreigner_id = honorary_inputs.foreigner_id
             honorary.bank_id = honorary_inputs.bank_id
             honorary.schedule_id = honorary_inputs.schedule_id
-            honorary.region_id = honorary_inputs.region_id
             honorary.commune_id = honorary_inputs.commune_id
+            honorary.region_id = self._normalize_intrajis_region_id(
+                honorary_inputs.region_id, honorary_inputs.commune_id
+            )
             honorary.account_type_id = honorary_inputs.account_type_id
             blocked_rut = self.is_bte_sii_blocked_rut(
                 honorary_inputs.replacement_employee_rut
@@ -285,11 +291,19 @@ class HonoraryClass:
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
         if not honorary:
             return {"status": "error", "message": "Honorario no encontrado"}
-        if int(honorary.foreigner_id or 0) != 1:
+        if int(getattr(honorary, "bte_emitted", 0) or 0) == 1 and getattr(honorary, "bte_folio", None):
             return {
                 "status": "skipped",
-                "message": "Sin RUT del trabajador: no se emite BTE en SII",
+                "message": "La BTE ya está emitida en SII",
+                "bte_emitted": 1,
+                "folio": honorary.bte_folio,
+                "status_id": honorary.status_id,
             }
+        # Reenvío explícito desde listado: permitir aunque foreigner_id no sea 1
+        if int(honorary.foreigner_id or 0) != 1:
+            honorary.foreigner_id = 1
+            honorary.updated_date = datetime.now()
+            self.db.commit()
         if self.is_bte_sii_blocked_rut(honorary.replacement_employee_rut):
             # No emitir al SII, pero dejar el honorario Aceptado (2) para no trabarlo.
             honorary.status_id = 2
@@ -301,6 +315,13 @@ class HonoraryClass:
                 "message": "RUT excluido: no se emite BTE en SII (honorario aceptado)",
                 "bte_emitted": 0,
                 "status_id": 2,
+            }
+        if honorary.amount is None or str(honorary.amount).strip() in ("", "None"):
+            return {
+                "status": "error",
+                "message": "El honorario no tiene monto. Acéptelo primero con el monto antes de enviar al SII.",
+                "bte_emitted": 0,
+                "status_id": honorary.status_id,
             }
         return self.send(honorary)
         
@@ -515,49 +536,109 @@ class HonoraryClass:
         text = "".join(c for c in text if not unicodedata.combining(c))
         return " ".join(text.replace("-", " ").split())
 
-    def _resolve_sii_region_comuna(self, region_id, commune_id) -> tuple[int, int, str]:
-        """Map IntraJIS region/commune to SII BTE codes."""
-        from app.backend.classes.sii.bte_communes import REGIONS
+    def _resolve_region_row(self, region_id):
+        """Resuelve región IntraJIS; acepta código SII vía sii_regions.region_id."""
+        from app.backend.db.models import RegionModel, SiiRegionModel
 
         region = RegionClass(self.db).get("id", region_id)
+        if region and not isinstance(region, str):
+            return region
+        try:
+            rid = int(region_id)
+        except (TypeError, ValueError):
+            return None
+
+        # Código SII (ej. 13) → región IntraJIS vinculada en sii_regions
+        sii_region = (
+            self.db.query(SiiRegionModel)
+            .filter(SiiRegionModel.id == rid)
+            .first()
+        )
+        if sii_region and sii_region.region_id is not None:
+            linked = (
+                self.db.query(RegionModel)
+                .filter(RegionModel.id == sii_region.region_id)
+                .first()
+            )
+            if linked:
+                return linked
+
+        # Fallback legacy: simplefactura / remuneration code en regions
+        return (
+            self.db.query(RegionModel)
+            .filter(
+                (RegionModel.simplefactura_region_code == rid)
+                | (RegionModel.region_remuneration_code == rid)
+            )
+            .first()
+        )
+
+    def _normalize_intrajis_region_id(self, region_id, commune_id=None):
+        """Corrige region_id inválido (ej. 13) al id real de IntraJIS."""
+        region = self._resolve_region_row(region_id)
+        if region and not isinstance(region, str):
+            return int(region.id)
+        if commune_id is not None:
+            commune = CommuneClass(self.db).get("id", commune_id)
+            if commune and not isinstance(commune, str) and commune.region_id is not None:
+                return int(commune.region_id)
+        return region_id
+
+    def _resolve_sii_region_comuna(self, region_id, commune_id) -> tuple[int, int, str]:
+        """Map IntraJIS region/commune → códigos SII usando tablas sii_regions / sii_communes."""
+        from app.backend.db.models import SiiCommuneModel, SiiRegionModel
+
+        region = self._resolve_region_row(region_id)
         commune = CommuneClass(self.db).get("id", commune_id)
         if not region or isinstance(region, str):
             raise ValueError("Región no encontrada")
         if not commune or isinstance(commune, str):
             raise ValueError("Comuna no encontrada")
 
-        sii_region = int(
-            getattr(region, "simplefactura_region_code", None)
-            or getattr(region, "region_remuneration_code", None)
-            or 0
+        commune_name = getattr(commune, "commune", None) or ""
+
+        # 1) Link directo por commune_id en catálogo SII
+        sii_commune = (
+            self.db.query(SiiCommuneModel)
+            .filter(SiiCommuneModel.commune_id == int(commune.id))
+            .first()
         )
-        if sii_region not in REGIONS:
-            # Fallback: try IntraJIS id if it matches SII catalog
-            sii_region = int(getattr(region, "id", 0) or 0)
-        if sii_region not in REGIONS:
+
+        # 2) Por región SII vinculada + nombre normalizado
+        if not sii_commune:
+            sii_region = (
+                self.db.query(SiiRegionModel)
+                .filter(SiiRegionModel.region_id == int(region.id))
+                .first()
+            )
+            if not sii_region:
+                # Fallback: código SimpleFactura / id SII
+                sf_code = getattr(region, "simplefactura_region_code", None)
+                if sf_code is not None:
+                    sii_region = (
+                        self.db.query(SiiRegionModel)
+                        .filter(SiiRegionModel.id == int(sf_code))
+                        .first()
+                    )
+            if sii_region:
+                target = self._normalize_commune_name(commune_name)
+                sii_commune = (
+                    self.db.query(SiiCommuneModel)
+                    .filter(
+                        SiiCommuneModel.sii_region_id == int(sii_region.id),
+                        SiiCommuneModel.name_normalized == target,
+                    )
+                    .first()
+                )
+
+        if not sii_commune:
             raise ValueError(
-                f"No se pudo mapear región IntraJIS id={region_id} a código SII BTE"
+                f"No se pudo mapear comuna '{commune_name}' a catálogo SII "
+                f"(commune_id={commune.id}, region_id={region.id}). "
+                f"Revise sii_communes.commune_id"
             )
 
-        commune_name = getattr(commune, "commune", None) or ""
-        target = self._normalize_commune_name(commune_name)
-        comuna_code = None
-        for cid, cname in REGIONS[sii_region].items():
-            if self._normalize_commune_name(cname) == target:
-                comuna_code = int(cid)
-                break
-        if comuna_code is None:
-            # Partial match (e.g. SAN PEDRO DE MELIPILLA vs SAN PEDRO)
-            for cid, cname in REGIONS[sii_region].items():
-                n = self._normalize_commune_name(cname)
-                if target and (target in n or n in target):
-                    comuna_code = int(cid)
-                    break
-        if comuna_code is None:
-            raise ValueError(
-                f"No se pudo mapear comuna '{commune_name}' a código SII (región {sii_region})"
-            )
-        return sii_region, comuna_code, commune_name
+        return int(sii_commune.sii_region_id), int(sii_commune.id), commune_name
 
     def _keep_pending_for_sii_retry(self, honorary_id) -> None:
         """Si falla el SII, deja el honorario en Solicitado (14) para poder reaceptar."""
@@ -1017,7 +1098,9 @@ class HonoraryClass:
                         "foreigner_id": honorary.foreigner_id,
                         "bank_id": honorary.bank_id,
                         "schedule_id": honorary.schedule_id,
-                        "region_id": honorary.region_id,
+                        "region_id": self._normalize_intrajis_region_id(
+                            honorary.region_id, honorary.commune_id
+                        ),
                         "commune_id": honorary.commune_id,
                         "account_type_id": honorary.account_type_id,
                         "requested_by": honorary.requested_by,
@@ -1077,7 +1160,9 @@ class HonoraryClass:
                             "foreigner_id": last_honorary.foreigner_id,
                             "bank_id": last_honorary.bank_id,
                             "schedule_id": last_honorary.schedule_id,
-                            "region_id": last_honorary.region_id,
+                            "region_id": self._normalize_intrajis_region_id(
+                                last_honorary.region_id, last_honorary.commune_id
+                            ),
                             "commune_id": last_honorary.commune_id,
                             "account_type_id": last_honorary.account_type_id,
                             "requested_by": last_honorary.requested_by,

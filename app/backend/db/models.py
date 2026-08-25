@@ -1009,6 +1009,30 @@ class CommuneModel(Base):
     updated_date = Column(DateTime())
 
 
+class SiiRegionModel(Base):
+    """Catálogo de regiones SII BTE (códigos oficiales). No altera regions."""
+    __tablename__ = 'sii_regions'
+
+    id = Column(Integer, primary_key=True)  # código SII (1..16)
+    name = Column(String(255), nullable=False)
+    region_id = Column(Integer, nullable=True)  # link opcional a regions.id
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
+class SiiCommuneModel(Base):
+    """Catálogo de comunas SII BTE. No altera communes."""
+    __tablename__ = 'sii_communes'
+
+    id = Column(Integer, primary_key=True)  # código SII comuna
+    sii_region_id = Column(Integer, nullable=False)  # sii_regions.id
+    name = Column(String(255), nullable=False)
+    name_normalized = Column(String(255), nullable=True)
+    commune_id = Column(Integer, nullable=True)  # link opcional a communes.id
+    added_date = Column(DateTime())
+    updated_date = Column(DateTime())
+
+
 class DeliveryAddressTagModel(Base):
     __tablename__ = 'delivery_address_tags'
 
