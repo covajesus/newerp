@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.backend.db.database import get_db
 from sqlalchemy.orm import Session
 from app.backend.schemas import GeneratedCustomerTicketBillList, CustomerTicketBillList, GenerateCustomerCreditNoteTicketBill, CustomerTicketBillSearch, ToBeAcceptedCustomerTicketBill, ChangeStatusInCustomerTicketBill
@@ -80,7 +80,11 @@ def dtes_to_review(customer_ticket_bill_inputs:GeneratedCustomerTicketBillList, 
 @customer_tickets_bills.get("/download/{id}")
 def download(id:int, db: Session = Depends(get_db)):
     data = CustomerTicketBillClass(db).download(id)
-
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail="No se pudo obtener el PDF de la factura. Verifique que el DTE tenga folio y esté emitido.",
+        )
     return {"message": data}
 
 @customer_tickets_bills.get("/verify/{id}")

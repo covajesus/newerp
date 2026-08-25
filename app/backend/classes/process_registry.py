@@ -140,6 +140,7 @@ BACKEND_ROUTE_PROCESS_MAP: list[tuple[str, str, str]] = [
     ("/settings", "settings", "Configuraciones"),
     ("/sinister_types", "sinister_types", "Tipos de siniestro"),
     ("/sinisters", "sinisters", "Siniestros"),
+    ("/sii", "sii_geo", "SII - regiones/comunas/indicadores"),
     ("/slider", "slider", "Slider"),
     ("/social_laws", "social_laws", "Leyes sociales"),
     ("/summary-indicators", "summary_indicators", "Indicadores resumen"),
