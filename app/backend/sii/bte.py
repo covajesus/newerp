@@ -7,6 +7,7 @@ LibreDTE API Gateway / BaseAPI). Not a DTE/CAF flow.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from html import unescape
@@ -56,6 +57,16 @@ class BteListItem:
     retencion: int | None
     liquido: int | None
     status: str = "emitida"
+
+
+def sanitize_sii_text(value: str | None, *, max_len: int = 200) -> str:
+    """SII BTE solo acepta ASCII básico en prestación, nombre y domicilio."""
+    text = (value or "").strip()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"[^A-Za-z0-9 .,\-]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:max_len]
 
 
 def retention_amount(bruto: int, pct: float = RETENCION_PCT_2026) -> int:
@@ -143,6 +154,10 @@ def _emit_bte_once(
             raise RuntimeError("Sesión SII inválida al abrir emisión de BTE. Verifique la clave.")
 
         # Paso 1 → bte_indiv_ing2 (borrador / confirmación)
+        beneficiary_name = sanitize_sii_text(beneficiary_name, max_len=120)
+        domicilio = sanitize_sii_text(domicilio, max_len=120)
+        servicio = sanitize_sii_text(servicio, max_len=200)
+
         fields1 = {
             **_extract_inputs(html),
             "DIA": f"{when.day:02d}",
@@ -150,12 +165,12 @@ def _emit_bte_once(
             "ANO": str(when.year),
             "RUT_TERC": ben_body,
             "DV_TERC": ben_dv,
-            "NOMBRE_TERC": (beneficiary_name or "").strip(),
-            "DOMICILIO_TER": (domicilio or "").strip(),
+            "NOMBRE_TERC": beneficiary_name,
+            "DOMICILIO_TER": domicilio,
             "cod_region": str(region),
             "cod_comuna": str(comuna),
             "DESC_COMUNA": comuna_name,
-            "PRESTA1": (servicio or "").strip(),
+            "PRESTA1": servicio,
             "VALOR1": str(monto),
             "PRESTA2": "",
             "VALOR2": "",
@@ -493,14 +508,25 @@ def _extract_int_near(html: str, label_re: str) -> int | None:
     return int(digits) if digits else None
 
 
+def _html_to_plain(html: str) -> str:
+    text = re.sub(r"<style[^>]*>.*?</style>", " ", html or "", flags=re.I | re.S)
+    text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<[^>]+>", " ", unescape(text))
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _classify_error(html: str) -> str | None:
     if not html:
         return None
-    plain = re.sub(r"<[^>]+>", " ", unescape(html))
-    plain = re.sub(r"\s+", " ", plain).strip()
+    plain = _html_to_plain(html)
     low = plain.lower()
     if "no se encuentra autenticado" in low:
         return "Sesión SII expirada o no autenticada para BTE."
+    if "caracteres inv" in low and "prestaci" in low:
+        return (
+            "El SII rechazó la prestación por caracteres inválidos "
+            "(tildes, ñ u otros símbolos). Se normalizarán automáticamente al reintentar."
+        )
     if "no est" in low and "autorizad" in low:
         return plain[:400]
     if "clave incorrecta" in low or "clave inválida" in low:
@@ -512,8 +538,27 @@ def _classify_error(html: str) -> str | None:
 
 
 def _extract_plain_error(html: str) -> str | None:
-    plain = re.sub(r"<[^>]+>", " ", unescape(html or ""))
-    plain = re.sub(r"\s+", " ", plain).strip()
+    classified = _classify_error(html)
+    if classified:
+        return classified
+
+    plain = _html_to_plain(html)
+    if not plain:
+        return None
+
+    for pattern in (
+        r"Ud\. ha ingresado caracteres inv[^.]+\.",
+        r"No ha sido posible[^.]+\.",
+        r"El RUT[^.]+\.",
+        r"Debe ingresar[^.]+\.",
+    ):
+        m = re.search(pattern, plain, flags=re.I)
+        if m:
+            return m.group(0)[:400]
+
+    # Evitar devolver título/CSS cuando la página no trae mensaje útil.
+    if len(plain) > 120 and "INGRESO DE BOLETAS" in plain.upper():
+        return "El SII no devolvió el borrador de la BTE. Revise los datos del honorario."
     return plain[:400] if plain else None
 
 
