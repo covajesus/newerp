@@ -105,7 +105,7 @@ def emit_bte(
     servicio: str,
     monto: int,
     issue_date: date | None = None,
-    timeout: float = 90.0,
+    timeout: float = 45.0,
 ) -> BteEmitResult:
     if int(monto) < 1:
         raise ValueError("El monto debe ser al menos 1")
@@ -116,7 +116,7 @@ def emit_bte(
     comuna_name = _comuna_name(int(region), int(comuna)) or ""
 
     last_err: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             return _emit_bte_once(
                 login_rut=login_rut,
@@ -133,6 +133,8 @@ def emit_bte(
                 when=when,
                 timeout=timeout,
             )
+        except RuntimeError:
+            raise
         except httpx.HTTPError as exc:
             last_err = exc
             continue
@@ -246,7 +248,7 @@ def list_emitted(
     password: str,
     year: int,
     month: int,
-    timeout: float = 90.0,
+    timeout: float = 45.0,
 ) -> list[BteListItem]:
     if not (1 <= int(month) <= 12):
         raise ValueError("Mes inválido")
@@ -281,7 +283,7 @@ def annul_bte(
     password: str,
     folio: int,
     cause: str = "error_digitacion",
-    timeout: float = 90.0,
+    timeout: float = 45.0,
 ) -> None:
     motivo = ANNUL_CAUSES.get(cause) or ANNUL_CAUSES["error_digitacion"]
     with _managed_sii_client(timeout) as client:

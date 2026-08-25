@@ -6,6 +6,7 @@ from app.backend.classes.commune_class import CommuneClass
 from app.backend.classes.region_class import RegionClass
 from app.backend.classes.helper_class import HelperClass
 import json
+import os
 import re
 import unicodedata
 from sqlalchemy import func
@@ -917,13 +918,17 @@ class HonoraryClass:
                 f"ret={result.retencion} liq={result.liquido}"
             )
 
-            confirmed = self._confirm_bte_in_sii(
-                login_rut=login_rut,
-                password=password,
-                folio=result.folio,
-                issue_date=date.today(),
-            )
-            # 1 = emitted (confirmed in SII list, or folio returned by emit)
+            confirmed = False
+            if result.folio and (
+                os.getenv("DTE_BTE_CONFIRM_IN_SII", "").strip().lower() in ("1", "true", "yes")
+            ):
+                confirmed = self._confirm_bte_in_sii(
+                    login_rut=login_rut,
+                    password=password,
+                    folio=result.folio,
+                    issue_date=date.today(),
+                )
+            # Folio del paso de emisión es suficiente; confirmación extra duplica login SII (~90s).
             bte_emitted = 1 if (confirmed or result.folio) else 0
 
             if honorary_id:
