@@ -15,6 +15,7 @@ import base64
 import uuid
 from sqlalchemy.sql import func
 
+
 class CustomerCreditNoteClass:
     def __init__(self, db: Session):
         self.db = db
@@ -27,7 +28,7 @@ class CustomerCreditNoteClass:
                 # Inicialización de filtros dinámicos
                 filters = []
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id.in_([1, 2]))
                 filters.append(DteModel.dte_type_id == 61)
 
                 # Para notas de crédito, incluir status 14 (supervisor) y status 5 (procesado)
@@ -56,7 +57,7 @@ class CustomerCreditNoteClass:
                 # Inicialización de filtros dinámicos
                 filters = []
 
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id.in_([1, 2]))
                 filters.append(DteModel.dte_type_id == 61)  # Tipo 61 para notas de crédito
                 filters.append(DteModel.rut != None)
 
@@ -230,7 +231,7 @@ class CustomerCreditNoteClass:
         try:
             if rol_id == 1 or rol_id == 2:
                 filters = []
-                filters.append(DteModel.dte_version_id == 1)
+                filters.append(DteModel.dte_version_id.in_([1, 2]))
                 filters.append(DteModel.dte_type_id == 61)  # Notas de crédito
                 filters.append(DteModel.rut != None)
 
@@ -310,26 +311,119 @@ class CustomerCreditNoteClass:
             raise HTTPException(status_code=500, detail=f"Error retrieving credit note: {str(e)}")
 
     def download(self, dte_id):
+        """
+        PDF de NC emitida (tipo 61).
+        Primero SimpleFactura (NC recientes / pool); si falla, LibreDTE (NC viejas).
+        """
         try:
-            # Obtener la nota de crédito
             dte = self.db.query(DteModel).filter(
                 DteModel.id == dte_id,
                 DteModel.dte_type_id == 61
             ).first()
 
             if not dte:
-                return "Credit note not found"
+                return None
 
-            if not dte.folio or dte.folio == 0:
-                return "Credit note has no folio - cannot download"
+            if not dte.folio or int(dte.folio) == 0:
+                return None
 
-            # Usar la clase FileClass para generar el PDF
-            pdf_result = self.file_class.generate_credit_note_pdf(dte)
-            return pdf_result
+            folio = int(dte.folio)
+
+            # 1) SimpleFactura — muchas NC con dte_version_id=1 también están ahí
+            try:
+                from app.backend.classes.customer_ticket_class import CustomerTicketClass
+
+                pdf_result = CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
+                    folio,
+                    dte_type_id=61,
+                )
+                if pdf_result.get("status") == "success":
+                    remote_path = f"{folio}.pdf"
+                    file_contents = self.file_class.download(remote_path)
+                    return {
+                        "file_name": f"NC_{folio}.pdf",
+                        "file_data": base64.b64encode(file_contents).decode("utf-8"),
+                    }
+                print(
+                    f"[credit_note download] SimpleFactura folio={folio}: {pdf_result}",
+                    flush=True,
+                )
+            except Exception as sf_exc:
+                print(
+                    f"[credit_note download] SimpleFactura folio={folio} error: {sf_exc}",
+                    flush=True,
+                )
+
+            # 2) LibreDTE — NC históricas
+            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+            headers = {
+                "Accept": "application/json",
+                "Authorization": f"Bearer {TOKEN}",
+            }
+            libredte_urls = [
+                (
+                    f"https://libredte.cl/api/dte/dte_emitidos/pdf/61/{folio}/76063822"
+                    f"?formato=general&papelContinuo=0&copias_tributarias=1"
+                    f"&copias_cedibles=1&cedible=0&compress=0&base64=0"
+                ),
+                (
+                    f"https://libredte.cl/api/dte/dte_emitidos/pdf/61/{folio}/76063822-6"
+                    f"?formato=general&papelContinuo=0&copias_tributarias=1"
+                    f"&copias_cedibles=1&cedible=0&compress=0&base64=0"
+                ),
+            ]
+
+            response = None
+            for url in libredte_urls:
+                response = requests.get(url, headers=headers, timeout=60)
+                if (
+                    response.status_code == 200
+                    and response.content
+                    and response.content[:4] == b"%PDF"
+                ):
+                    break
+                response = requests.post(
+                    url,
+                    headers={**headers, "Content-Type": "application/json"},
+                    timeout=60,
+                )
+                if (
+                    response.status_code == 200
+                    and response.content
+                    and response.content[:4] == b"%PDF"
+                ):
+                    break
+
+            if (
+                not response
+                or response.status_code != 200
+                or not response.content
+                or response.content[:4] != b"%PDF"
+            ):
+                print(
+                    f"[credit_note download] LibreDTE PDF folio={folio} "
+                    f"HTTP {getattr(response, 'status_code', None)} "
+                    f"{(getattr(response, 'text', None) or '')[:120]}",
+                    flush=True,
+                )
+                return None
+
+            timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+            unique_id = uuid.uuid4().hex[:8]
+            unique_filename = f"NC_{folio}_{timestamp}_{unique_id}.pdf"
+            self.file_class.temporal_upload(response.content, unique_filename)
+            file_contents = self.file_class.download(unique_filename)
+            encoded_file = base64.b64encode(file_contents).decode("utf-8")
+            self.file_class.delete(unique_filename)
+
+            return {
+                "file_name": unique_filename,
+                "file_data": encoded_file,
+            }
 
         except Exception as e:
-            print(f"ERROR in download: {str(e)}")
-            return f"Error downloading credit note: {str(e)}"
+            print(f"ERROR in credit_note download: {str(e)}")
+            return None
 
     def verify(self, dte_id):
         try:

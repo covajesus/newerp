@@ -948,53 +948,94 @@ class ReceivedTributaryDocumentClass:
             return None
         
     def download(self, id):
+        """
+        PDF de DTE recibido (proveedor).
+        SimpleFactura getPdf → LibreDTE dte_recibidos/pdf.
+        """
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
+        if not dte or not dte.folio or not dte.rut:
+            return None
 
-        issuer_rut = HelperClass().numeric_rut(dte.rut)
+        folio = int(dte.folio)
+        dte_type_id = int(dte.dte_type_id or 33)
+        rut = str(dte.rut).strip()
+        pdf_content = None
+        errors = []
 
-        if dte:
-            TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-
-            url = f"https://libredte.cl/api/dte/dte_recibidos/pdf/"+ str(issuer_rut) +"/"+ str(dte.dte_type_id) +"/"+ str(dte.folio) +"/76063822?papelContinuo=0&copias_tributarias=1&copias_cedibles=0&cedible=0&compress=0&base64=0"
-
-            response = requests.get(
-                url,
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
+        # 1) SimpleFactura documentReceived/getPdf
+        try:
+            from app.backend.classes.received_inbox_class import (
+                ReceivedInboxClass,
+                SIMPLEFACTURA_RECEIVED_PDF_URL,
+                SIMPLEFACTURA_RUT_EMISOR,
+                SIMPLEFACTURA_SUCURSAL,
             )
+            from app.backend.classes.customer_ticket_class import SIMPLEFACTURA_AMBIENTE
 
-            print(response.content)
+            inbox = ReceivedInboxClass(self.db)
+            sf_payload = {
+                "credenciales": {
+                    "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                    "rutContribuyente": rut,
+                    "nombreSucursal": SIMPLEFACTURA_SUCURSAL,
+                },
+                "ambiente": int(SIMPLEFACTURA_AMBIENTE),
+                "folio": folio,
+                "codigoTipoDte": dte_type_id,
+            }
+            pdf_content = inbox._simplefactura_post_bytes(
+                SIMPLEFACTURA_RECEIVED_PDF_URL, sf_payload
+            )
+        except Exception as exc:
+            errors.append(f"SimpleFactura: {exc}")
+            pdf_content = None
 
-            # Manejar la respuesta
-            if response.status_code == 200:
-                pdf_content = response.content
-                timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-                unique_id = uuid.uuid4().hex[:8]  # 8 caracteres únicos
-                unique_filename = f"{timestamp}_{unique_id}.pdf"
+        # 2) LibreDTE
+        if not pdf_content or not pdf_content.startswith(b"%PDF"):
+            try:
+                issuer_rut = HelperClass().numeric_rut(rut)
+                token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+                url = (
+                    f"https://libredte.cl/api/dte/dte_recibidos/pdf/"
+                    f"{issuer_rut}/{dte_type_id}/{folio}/76063822"
+                    f"?papelContinuo=0&copias_tributarias=1&copias_cedibles=0"
+                    f"&cedible=0&compress=0&base64=0"
+                )
+                response = requests.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/pdf, application/octet-stream, */*",
+                    },
+                    timeout=60,
+                )
+                if response.status_code == 200 and response.content.startswith(b"%PDF"):
+                    pdf_content = response.content
+                else:
+                    errors.append(
+                        f"LibreDTE HTTP {response.status_code}: "
+                        f"{(response.text or '')[:160]}"
+                    )
+                    pdf_content = None
+            except Exception as exc:
+                errors.append(f"LibreDTE: {exc}")
+                pdf_content = None
 
-                # Ruta remota en Azure
-                remote_path = f"{unique_filename}"  # Organizar archivos en una carpeta específica
+        if not pdf_content or not pdf_content.startswith(b"%PDF"):
+            print(
+                f"[received_tributary download] folio={folio} rut={rut} failed: {errors}",
+                flush=True,
+            )
+            return None
 
-                self.file_class.temporal_upload(pdf_content, remote_path)  # Llamada correcta
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        unique_id = uuid.uuid4().hex[:8]
+        file_name = f"recibido_{dte_type_id}_{folio}_{timestamp}_{unique_id}.pdf"
+        return {
+            "file_name": file_name,
+            "file_data": base64.b64encode(pdf_content).decode("utf-8"),
+        }
 
-                # Descargar archivo desde Azure File Share
-                file_contents = self.file_class.download(remote_path)
-
-                # Convertir el contenido del archivo a base64
-                encoded_file = base64.b64encode(file_contents).decode('utf-8')
-
-                self.file_class.delete(remote_path)  # Llamada correcta
-
-                # Retornar el nombre del archivo y su contenido como base64
-                return {
-                    "file_name": unique_filename,
-                    "file_data": encoded_file
-                }
-            else:
-                return None
-            
     def verify(self, id):
         """
         Actualiza los datos de la patente en la base de datos.

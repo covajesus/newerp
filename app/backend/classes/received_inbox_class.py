@@ -29,14 +29,35 @@ SIMPLEFACTURA_RECEIVED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_RECEIVED_TIMEOUT",
 SIMPLEFACTURA_CONSOLIDATE_MONTHS = int(os.getenv("SIMPLEFACTURA_CONSOLIDATE_MONTHS", "1"))
 RECEIVED_INBOX_LOOKBACK_DAYS = int(os.getenv("RECEIVED_INBOX_LOOKBACK_DAYS", "30"))
 RECEIVED_DTE_TYPES = (33, 34, 39, 61)
+# Tipos de la bandeja que pueden intentar acuse (todos los recibidos).
+ACKNOWLEDGEABLE_DTE_TYPES = RECEIVED_DTE_TYPES
 DTE_TYPE_LABELS = {
     33: "FACTURA ELECTRÓNICA",
     34: "FACTURA EXENTA ELECTRÓNICA",
     39: "BOLETA ELECTRÓNICA",
     41: "BOLETA EXENTA ELECTRÓNICA",
+    43: "LIQUIDACIÓN FACTURA ELECTRÓNICA",
+    46: "FACTURA DE COMPRA ELECTRÓNICA",
     52: "GUÍA DE DESPACHO ELECTRÓNICA",
     56: "NOTA DE DÉBITO ELECTRÓNICA",
     61: "NOTA DE CRÉDITO ELECTRÓNICA",
+}
+_DTE_TYPE_FROM_LABEL = {
+    "factura electronica": 33,
+    "factura electrónica": 33,
+    "factura exenta electronica": 34,
+    "factura exenta electrónica": 34,
+    "factura electronica exenta": 34,
+    "boleta electronica": 39,
+    "boleta electrónica": 39,
+    "boleta exenta electronica": 41,
+    "boleta electrónica exenta": 41,
+    "nota debito electronica": 56,
+    "nota débito electrónica": 56,
+    "nota credito electronica": 61,
+    "nota crédito electrónica": 61,
+    "nota de credito electronica": 61,
+    "nota de crédito electrónica": 61,
 }
 RECEIVED_INBOX_STATUS_PENDING = 1
 RECEIVED_INBOX_STATUS_ACCEPTED = 2
@@ -51,7 +72,9 @@ class ReceivedInboxClass:
 
     def get_all(self, page=0, items_per_page=10):
         try:
-            query = self._base_query()
+            query = self._base_query().filter(
+                ReceivedInboxModel.dte_type_id.in_(list(RECEIVED_DTE_TYPES))
+            )
             if page > 0:
                 return self._paginate(query, page, items_per_page)
             data = query.all()
@@ -157,10 +180,105 @@ class ReceivedInboxClass:
                 "approved",
                 "rechaz",
                 "rejected",
+                "no reclamado",
             )
         ):
             return False
         return True
+
+    def _map_acknowledgment_status(self, item, dte_type_id=None):
+        """
+        Acuse mercantil según SimpleFactura.
+
+        Campo confiable: ``respuesta`` / ``estadoSII``
+        - PENDIENTE DE ACUSE → pendiente
+        - ACEPTADO → acusado
+        - NO RECLAMADO EN PLAZO → acusado (plazo vencido sin reclamo)
+        - RECHAZADO… → rechazado
+
+        ``estado`` = RECIBIDO CONFORME NO basta: SF a veces lo manda con
+        respuesta aún PENDIENTE DE ACUSE.
+        """
+        del dte_type_id
+
+        fecha_acuse = self._sf_item_value(item, "fechaAcuse", "FechaAcuse")
+        respuesta = str(
+            self._sf_item_value(item, "respuesta", "Respuesta")
+            or self._sf_item_value(item, "estadoSII", "EstadoSII")
+            or ""
+        ).strip()
+        estado_acuse = str(
+            self._sf_item_value(item, "estadoAcuse", "EstadoAcuse") or ""
+        ).strip()
+        estado = str(self._sf_item_value(item, "estado", "Estado") or "").strip()
+
+        # Texto a guardar: priorizar respuesta comercial de SF
+        display = respuesta or estado_acuse or estado or None
+        lower_resp = respuesta.lower()
+        lower_acuse = estado_acuse.lower()
+        lower_estado = estado.lower()
+        lower_all = " ".join(x for x in (lower_resp, lower_acuse, lower_estado) if x)
+
+        if any(token in lower_all for token in ("rechaz", "rejected", "no conforme")):
+            return display or "RECHAZADO", RECEIVED_INBOX_STATUS_REJECTED
+
+        if "pendiente" in lower_resp and "acuse" in lower_resp:
+            return display or "PENDIENTE DE ACUSE", RECEIVED_INBOX_STATUS_PENDING
+
+        if fecha_acuse and str(fecha_acuse).strip() not in ("", "null", "None"):
+            return display or "RECIBIDO CONFORME", RECEIVED_INBOX_STATUS_ACCEPTED
+
+        if any(
+            token in lower_resp
+            for token in (
+                "no reclamado",
+                "aceptado",
+                "aceptada",
+                "conforme",
+            )
+        ):
+            return display or respuesta, RECEIVED_INBOX_STATUS_ACCEPTED
+
+        if any(
+            token in lower_acuse
+            for token in ("conforme", "acept", "approved", "reclam")
+        ):
+            return display or estado_acuse, RECEIVED_INBOX_STATUS_ACCEPTED
+
+        # Solo si no hay respuesta comercial: RECIBIDO CONFORME histórico
+        if not respuesta and any(
+            token in lower_estado for token in ("conforme", "reclam")
+        ):
+            return display or estado, RECEIVED_INBOX_STATUS_ACCEPTED
+
+        return display, RECEIVED_INBOX_STATUS_PENDING
+
+    def _can_acknowledge_row(self, row) -> bool:
+        """Tipos recibidos que aún pueden intentar acuse mercantil."""
+        try:
+            dte_type_id = int(getattr(row, "dte_type_id", 0) or 0)
+        except (TypeError, ValueError):
+            dte_type_id = 0
+        if dte_type_id not in ACKNOWLEDGEABLE_DTE_TYPES:
+            return False
+        return self._is_acknowledgment_pending(
+            getattr(row, "status_id", None),
+            getattr(row, "acknowledgment_status", None),
+        )
+
+    def _sf_environment_code(self, value) -> int:
+        """Normaliza ambiente SF: 0=certificación, 1=producción."""
+        if value is None or str(value).strip() == "":
+            return int(SIMPLEFACTURA_AMBIENTE)
+        text = str(value).strip().lower()
+        if text in ("1", "produccion", "producción", "production", "prod"):
+            return 1
+        if text in ("0", "certificacion", "certificación", "certification", "cert"):
+            return 0
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return int(SIMPLEFACTURA_AMBIENTE)
 
     def _ensure_supplier(self, rut, supplier_name):
         if not rut:
@@ -248,34 +366,6 @@ class ReceivedInboxClass:
         )
         return {"created": True, "dte_id": dte.id}
 
-    def _map_acknowledgment_status(self, item):
-        """
-        SimpleFactura documentsReceived uses `estado` (e.g. RECIBIDO CONFORME),
-        not always `estadoAcuse`.
-        """
-        raw = self._sf_item_value(
-            item,
-            "estadoAcuse",
-            "EstadoAcuse",
-            "estado",
-            "Estado",
-            "respuesta",
-            "Respuesta",
-        )
-        text = str(raw or "").strip()
-        if not text:
-            return None, RECEIVED_INBOX_STATUS_PENDING
-
-        lower = text.lower()
-        if any(token in lower for token in ("rechaz", "rejected", "no conforme")):
-            return text, RECEIVED_INBOX_STATUS_REJECTED
-        if any(
-            token in lower
-            for token in ("conforme", "acept", "approved", "acuse acept")
-        ):
-            return text, RECEIVED_INBOX_STATUS_ACCEPTED
-        return text, RECEIVED_INBOX_STATUS_PENDING
-
     def _serialize_rows(self, data):
         return [
             {
@@ -287,8 +377,9 @@ class ReceivedInboxClass:
                 "total": row.total,
                 "status_id": row.status_id,
                 "dte_type_id": row.dte_type_id,
+                "dte_type_label": DTE_TYPE_LABELS.get(int(row.dte_type_id or 0), str(row.dte_type_id or "")),
                 "acknowledgment_status": row.acknowledgment_status,
-                "can_acknowledge": self._is_acknowledgment_pending(row.status_id, row.acknowledgment_status),
+                "can_acknowledge": self._can_acknowledge_row(row),
                 "added_date": row.added_date.strftime("%Y-%m-%d") if row.added_date else None,
                 "branch_office": row.branch_office,
             }
@@ -372,17 +463,25 @@ class ReceivedInboxClass:
         return text[:10]
 
     def _sf_dte_type_id(self, item):
-        codigo = self._sf_item_value(item, "codigoSii", "CodigoSii", "codigoTipoDte", "CodigoTipoDte")
-        try:
-            if codigo is not None and str(codigo).strip() != "":
-                return int(codigo)
-        except (TypeError, ValueError):
-            pass
+        # Preferir codigoTipoDte / codigoSii numérico (SF manda tipoDte como etiqueta).
+        for key in ("codigoTipoDte", "CodigoTipoDte", "codigoSii", "CodigoSii"):
+            codigo = self._sf_item_value(item, key)
+            try:
+                if codigo is not None and str(codigo).strip() != "":
+                    return int(codigo)
+            except (TypeError, ValueError):
+                pass
         tipo = self._sf_item_value(item, "tipoDte", "TipoDte", "tipoDTE")
         try:
             return int(tipo)
         except (TypeError, ValueError):
-            return 0
+            pass
+        if tipo is not None:
+            label = str(tipo).strip().lower()
+            mapped = _DTE_TYPE_FROM_LABEL.get(label)
+            if mapped:
+                return mapped
+        return 0
 
     def _simplefactura_token(self):
         ticket_class = CustomerTicketClass(self.db)
@@ -814,7 +913,9 @@ class ReceivedInboxClass:
                 continue
 
             key = (folio, rut, dte_type_id)
-            acknowledgment_status, status_id = self._map_acknowledgment_status(item)
+            acknowledgment_status, status_id = self._map_acknowledgment_status(
+                item, dte_type_id=dte_type_id
+            )
             document_status = (
                 str(self._sf_item_value(item, "estado", "Estado") or "") or None
             )
@@ -939,6 +1040,7 @@ class ReceivedInboxClass:
         )
         if not row:
             return {"status": "error", "message": "Received inbox DTE not found"}
+        dte_type_id = int(row.dte_type_id or 0)
         if not self._is_acknowledgment_pending(row.status_id, row.acknowledgment_status):
             return {"status": "error", "message": "DTE already accepted or rejected"}
 
@@ -948,12 +1050,7 @@ class ReceivedInboxClass:
             comment = "Recibido conforme" if action == "accept" else "Rechazado"
 
         try:
-            environment = SIMPLEFACTURA_AMBIENTE
-            try:
-                if row.environment not in (None, ""):
-                    environment = int(row.environment)
-            except (TypeError, ValueError):
-                environment = SIMPLEFACTURA_AMBIENTE
+            environment = self._sf_environment_code(row.environment)
 
             payload = {
                 "credenciales": {
@@ -963,7 +1060,7 @@ class ReceivedInboxClass:
                 },
                 "dteReferenciadoExterno": {
                     "folio": int(row.folio),
-                    "codigoTipoDte": int(row.dte_type_id),
+                    "codigoTipoDte": dte_type_id,
                     "ambiente": environment,
                 },
                 "respuesta": (
@@ -977,12 +1074,30 @@ class ReceivedInboxClass:
                 payload["tipo_rechazo"] = int(
                     getattr(form_data, "rejection_type_id", None) or 1
                 )
-            body = self._simplefactura_post(SIMPLEFACTURA_ACKNOWLEDGMENT_URL, payload)
+            try:
+                body = self._simplefactura_post(SIMPLEFACTURA_ACKNOWLEDGMENT_URL, payload)
+                local_only = False
+            except ValueError as sf_exc:
+                # SF no admite acuse mercantil en algunos tipos (p.ej. NC 61); marcar en Intrajis.
+                err = str(sf_exc)
+                if action == "accept" and "tipo de documento no corresponde" in err.lower():
+                    body = {
+                        "status": 400,
+                        "local_ack": True,
+                        "message": err,
+                    }
+                    local_only = True
+                else:
+                    raise
 
             now = datetime.now()
             if action == "accept":
                 row.status_id = RECEIVED_INBOX_STATUS_ACCEPTED
-                row.acknowledgment_status = "RECIBIDO CONFORME"
+                row.acknowledgment_status = (
+                    "RECIBIDO CONFORME (local; SF no admite acuse de este tipo)"
+                    if local_only
+                    else "RECIBIDO CONFORME"
+                )
                 row.document_status = row.document_status or "RECIBIDO CONFORME"
             else:
                 row.status_id = RECEIVED_INBOX_STATUS_REJECTED
@@ -994,10 +1109,19 @@ class ReceivedInboxClass:
                 dte_result = self._ensure_received_dte(row)
 
             self.db.commit()
+            msg = "Acusado correctamente"
+            if local_only:
+                label = DTE_TYPE_LABELS.get(dte_type_id, str(dte_type_id))
+                msg = (
+                    f"SimpleFactura no permite acuse mercantil para {label}; "
+                    "se marcó como acusado en Intrajis."
+                )
             return {
                 "status": "success",
                 "action": action,
                 "id": row.id,
+                "message": msg,
+                "local_ack": local_only,
                 "received_dte": dte_result,
                 "simplefactura": body,
             }
@@ -1015,12 +1139,7 @@ class ReceivedInboxClass:
         if not row:
             return {"status": "error", "message": "Documento no encontrado"}
 
-        environment = SIMPLEFACTURA_AMBIENTE
-        try:
-            if row.environment not in (None, ""):
-                environment = int(row.environment)
-        except (TypeError, ValueError):
-            environment = SIMPLEFACTURA_AMBIENTE
+        environment = self._sf_environment_code(row.environment)
 
         pdf_content = None
         errors = []
