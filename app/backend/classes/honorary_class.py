@@ -273,10 +273,9 @@ class HonoraryClass:
             should_emit_sii = (
                 int(honorary_inputs.foreigner_id or 0) == 1 and not blocked_rut
             )
-            # Solo marca Aceptado (2) si no requiere BTE. Con RUT queda Solicitado (14)
-            # hasta que el SII confirme la emisión.
-            honorary.status_id = 14 if should_emit_sii else 2
-            if blocked_rut:
+            # Aceptado (2) al guardar; la BTE se rastrea con bte_emitted (0/1).
+            honorary.status_id = 2
+            if should_emit_sii:
                 honorary.bte_emitted = 0
             honorary.employee_to_replace = honorary_inputs.employee_to_replace
             honorary.replacement_employee_rut = honorary_inputs.replacement_employee_rut
@@ -301,7 +300,7 @@ class HonoraryClass:
                     "Honorario aceptado (RUT excluido de emisión BTE en SII)"
                 )
             elif should_emit_sii:
-                accept_msg = "Datos guardados; pendiente emisión BTE en SII"
+                accept_msg = "Honorario aceptado; pendiente emisión BTE en SII"
             else:
                 accept_msg = "Honorario aceptado"
 
@@ -791,7 +790,7 @@ class HonoraryClass:
         return int(sii_commune.sii_region_id), int(sii_commune.id), commune_name
 
     def _keep_pending_for_sii_retry(self, honorary_id) -> None:
-        """Si falla el SII, deja el honorario en Solicitado (14) para poder reaceptar."""
+        """Si falla el SII, mantiene Aceptado (2) con bte_emitted=0 para reenvío."""
         if not honorary_id:
             return
         row = (
@@ -801,7 +800,7 @@ class HonoraryClass:
         )
         if not row:
             return
-        row.status_id = 14
+        row.status_id = 2
         row.bte_emitted = 0
         row.updated_date = datetime.now()
         self.db.commit()
@@ -845,7 +844,7 @@ class HonoraryClass:
                 "status": "error",
                 "message": msg,
                 "bte_emitted": 0,
-                "status_id": 14,
+                "status_id": 2,
             }
 
         settings = SettingClass(self.db).get()
@@ -866,7 +865,7 @@ class HonoraryClass:
                 "status": "error",
                 "message": msg,
                 "bte_emitted": 0,
-                "status_id": 14,
+                "status_id": 2,
             }
 
         pct = settings.get("setting_data", {}).get("percentage_honorary_bill") or "1"
@@ -891,7 +890,7 @@ class HonoraryClass:
                 exc=e,
                 process_name="Honorarios - Emitir BTE SII",
             )
-            return {"status": "error", "message": str(e), "bte_emitted": 0, "status_id": 14}
+            return {"status": "error", "message": str(e), "bte_emitted": 0, "status_id": 2}
 
         beneficiary_rut = str(getattr(data, "replacement_employee_rut", "") or "").strip()
         beneficiary_name = (
@@ -952,7 +951,7 @@ class HonoraryClass:
                             "message": "SII no confirmó la BTE; puede reintentar Aceptar",
                             "folio": result.folio,
                             "bte_emitted": 0,
-                            "status_id": 14,
+                            "status_id": 2,
                         }
             return {
                 "status": "success",
@@ -981,7 +980,7 @@ class HonoraryClass:
                 "status": "error",
                 "message": str(e),
                 "bte_emitted": 0,
-                "status_id": 14,
+                "status_id": 2,
             }
 
     def _confirm_bte_in_sii(self, login_rut, password, folio, issue_date) -> bool:
