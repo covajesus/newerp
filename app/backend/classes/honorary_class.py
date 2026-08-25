@@ -319,6 +319,13 @@ class HonoraryClass:
     def send_by_id(self, id: int):
         honorary = self.db.query(HonoraryModel).filter(HonoraryModel.id == id).first()
         if not honorary:
+            self._log_process_error(
+                "honorary_send_sii",
+                "Honorario no encontrado",
+                reference_id=id,
+                error_code="honorary_not_found",
+                process_name="Honorarios - Emitir BTE SII",
+            )
             return {"status": "error", "message": "Honorario no encontrado"}
         if int(getattr(honorary, "bte_emitted", 0) or 0) == 1 and getattr(honorary, "bte_folio", None):
             return {
@@ -346,9 +353,17 @@ class HonoraryClass:
                 "status_id": 2,
             }
         if honorary.amount is None or str(honorary.amount).strip() in ("", "None"):
+            msg = "El honorario no tiene monto. Acéptelo primero con el monto antes de enviar al SII."
+            self._log_process_error(
+                "honorary_send_sii",
+                msg,
+                reference_id=id,
+                error_code="honorary_missing_amount",
+                process_name="Honorarios - Emitir BTE SII",
+            )
             return {
                 "status": "error",
-                "message": "El honorario no tiene monto. Acéptelo primero con el monto antes de enviar al SII.",
+                "message": msg,
                 "bte_emitted": 0,
                 "status_id": honorary.status_id,
             }
@@ -951,9 +966,18 @@ class HonoraryClass:
                         self.db.commit()
                     else:
                         self._keep_pending_for_sii_retry(honorary_id)
+                        msg = "SII no confirmó la BTE; puede reintentar Aceptar"
+                        self._log_process_error(
+                            "honorary_send_sii",
+                            msg,
+                            reference_id=honorary_id,
+                            error_code="sii_bte_not_confirmed",
+                            detail=f"folio={result.folio}",
+                            process_name="Honorarios - Emitir BTE SII",
+                        )
                         return {
                             "status": "error",
-                            "message": "SII no confirmó la BTE; puede reintentar Aceptar",
+                            "message": msg,
                             "folio": result.folio,
                             "bte_emitted": 0,
                             "status_id": 2,
