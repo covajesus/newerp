@@ -59,12 +59,16 @@ class BteListItem:
     status: str = "emitida"
 
 
-def sanitize_sii_text(value: str | None, *, max_len: int = 200) -> str:
-    """SII BTE solo acepta ASCII básico en prestación, nombre y domicilio."""
+def sanitize_sii_text(value: str | None, *, max_len: int = 200, field: str = "text") -> str:
+    """
+    Normaliza texto para formularios SII BTE (ISO-8859-1, sin símbolos raros).
+    field: 'address' | 'service' | 'name' | 'text'
+    """
     text = (value or "").strip()
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
-    text = re.sub(r"[^A-Za-z0-9 .,\-]", " ", text)
+    # SII rechaza comas en domicilio; en prestación/nombre solo ASCII básico.
+    text = re.sub(r"[^A-Za-z0-9 .\-]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text[:max_len]
 
@@ -154,9 +158,9 @@ def _emit_bte_once(
             raise RuntimeError("Sesión SII inválida al abrir emisión de BTE. Verifique la clave.")
 
         # Paso 1 → bte_indiv_ing2 (borrador / confirmación)
-        beneficiary_name = sanitize_sii_text(beneficiary_name, max_len=120)
-        domicilio = sanitize_sii_text(domicilio, max_len=120)
-        servicio = sanitize_sii_text(servicio, max_len=200)
+        beneficiary_name = sanitize_sii_text(beneficiary_name, max_len=120, field="name")
+        domicilio = sanitize_sii_text(domicilio, max_len=120, field="address")
+        servicio = sanitize_sii_text(servicio, max_len=200, field="service")
 
         fields1 = {
             **_extract_inputs(html),
@@ -522,6 +526,12 @@ def _classify_error(html: str) -> str | None:
     low = plain.lower()
     if "no se encuentra autenticado" in low:
         return "Sesión SII expirada o no autenticada para BTE."
+    if "caracteres inv" in low and "direcci" in low and "receptor" in low:
+        return (
+            "El SII rechazó la dirección del beneficiario "
+            "(comas, # u otros símbolos no permitidos). "
+            "Se normalizará automáticamente al reintentar."
+        )
     if "caracteres inv" in low and "prestaci" in low:
         return (
             "El SII rechazó la prestación por caracteres inválidos "
