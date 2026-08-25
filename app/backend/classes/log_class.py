@@ -46,6 +46,7 @@ class LogClass:
         user_rut: Optional[str] = None,
         error_code: Optional[str] = None,
         detail: Optional[Any] = None,
+        stack_trace: Optional[str] = None,
         exc: Optional[BaseException] = None,
         process_name: Optional[str] = None,
     ) -> dict:
@@ -56,7 +57,7 @@ class LogClass:
             detail_text = None
             if detail is not None:
                 detail_text = detail if isinstance(detail, str) else str(detail)
-            stack = None
+            stack = stack_trace
             if exc is not None:
                 stack = "".join(
                     traceback.format_exception(type(exc), exc, exc.__traceback__)
@@ -73,7 +74,7 @@ class LogClass:
                 error_code=str(error_code)[:64] if error_code else None,
                 message=str(message or "Error")[:65000],
                 detail=detail_text,
-                stack_trace=stack,
+                stack_trace=(str(stack)[:65000] if stack else None),
                 log_datetime=now,
                 log_date=now.date(),
                 log_time=now.strftime("%H:%M:%S"),
@@ -132,6 +133,54 @@ class LogClass:
     def log_error(self, process_code: str, message: str, **kwargs) -> dict:
         kwargs.setdefault("level", "error")
         return self.log(process_code, message, **kwargs)
+
+    def log_massive_errors(
+        self,
+        process_code: str,
+        errors: list,
+        *,
+        process_name: Optional[str] = None,
+        reference_type: str = "massive",
+        id_keys: tuple[str, ...] = ("id", "honorary_id", "dte_id", "folio"),
+        user_rut: Optional[str] = None,
+    ) -> int:
+        """Registra cada error de un proceso masivo en logs (+ Slack si level=error)."""
+        if not errors:
+            return 0
+        logged = 0
+        for item in errors:
+            if not isinstance(item, dict):
+                self.log_error(
+                    process_code,
+                    str(item),
+                    process_name=process_name,
+                    reference_type=reference_type,
+                    user_rut=user_rut,
+                    error_code="massive",
+                )
+                logged += 1
+                continue
+            ref_id = None
+            for key in id_keys:
+                if item.get(key) is not None:
+                    try:
+                        ref_id = int(item.get(key))
+                    except (TypeError, ValueError):
+                        ref_id = None
+                    break
+            msg = str(item.get("error") or item.get("message") or item)
+            self.log_error(
+                process_code,
+                msg,
+                process_name=process_name,
+                reference_type=reference_type,
+                reference_id=ref_id,
+                user_rut=user_rut,
+                error_code="massive",
+                detail=str(item),
+            )
+            logged += 1
+        return logged
 
     def get_all(
         self,

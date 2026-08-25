@@ -544,13 +544,41 @@ class HonoraryClass:
             self.db.commit()
         except Exception as e:
             self.db.rollback()
+            errors.append({
+                "honorary_id": None,
+                "error": f"Error al guardar cambios en la base de datos: {str(e)}",
+            })
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "honorary_massive_accountability",
+                    errors,
+                    process_name="Honorarios - Imputación masiva",
+                    reference_type="honorary",
+                )
+            except Exception:
+                pass
             return {
                 "status": "error",
                 "message": f"Error al guardar cambios en la base de datos: {str(e)}",
                 "processed": processed,
                 "errors": errors
             }
-        
+
+        if errors:
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "honorary_massive_accountability",
+                    errors,
+                    process_name="Honorarios - Imputación masiva",
+                    reference_type="honorary",
+                )
+            except Exception as log_exc:
+                print(f"massive_accountability log failed: {log_exc}")
+
         return {
             "status": "success",
             "message": f"Procesamiento masivo completado. {processed} honorarios procesados exitosamente.",

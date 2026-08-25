@@ -1254,13 +1254,42 @@ class ReceivedTributaryDocumentClass:
             self.db.commit()
         except Exception as e:
             self.db.rollback()
+            errors.append({
+                "dte_id": None,
+                "folio": None,
+                "error": f"Error al guardar cambios en la base de datos: {str(e)}",
+            })
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "received_dte_massive_accountability",
+                    errors,
+                    process_name="Facturas recibidas - Imputación masiva",
+                    reference_type="dte",
+                )
+            except Exception:
+                pass
             return {
                 "status": "error",
                 "message": f"Error al guardar cambios en la base de datos: {str(e)}",
                 "processed": processed,
                 "errors": errors
             }
-        
+
+        if errors:
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "received_dte_massive_accountability",
+                    errors,
+                    process_name="Facturas recibidas - Imputación masiva",
+                    reference_type="dte",
+                )
+            except Exception as log_exc:
+                print(f"received_dte_massive_accountability log failed: {log_exc}")
+
         return {
             "status": "success",
             "message": f"Procesamiento masivo completado. {processed} DTEs recibidos procesados exitosamente.",
@@ -1417,13 +1446,42 @@ class ReceivedTributaryDocumentClass:
             self.db.commit()
         except Exception as e:
             self.db.rollback()
+            errors.append({
+                "dte_id": None,
+                "folio": None,
+                "error": f"Error al guardar cambios en la base de datos: {str(e)}",
+            })
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "received_credit_note_massive_accountability",
+                    errors,
+                    process_name="NC recibidas - Imputación masiva",
+                    reference_type="dte",
+                )
+            except Exception:
+                pass
             return {
                 "status": "error",
                 "message": f"Error al guardar cambios en la base de datos: {str(e)}",
                 "processed": processed,
                 "errors": errors
             }
-        
+
+        if errors:
+            try:
+                from app.backend.classes.log_class import LogClass
+
+                LogClass(self.db).log_massive_errors(
+                    "received_credit_note_massive_accountability",
+                    errors,
+                    process_name="NC recibidas - Imputación masiva",
+                    reference_type="dte",
+                )
+            except Exception as log_exc:
+                print(f"received_credit_note_massive_accountability log failed: {log_exc}")
+
         return {
             "status": "success",
             "message": f"Procesamiento masivo completado. {processed} Notas de Crédito recibidas procesadas exitosamente.",
