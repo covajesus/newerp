@@ -57,11 +57,65 @@ class BankStatementClass:
 
     @staticmethod
     def _normalize_rut(rut):
+        """Formato canónico BODY-DV (mayúscula, sin puntos ni ceros a la izquierda)."""
         if rut is None:
             return ""
         if rut == 0 or rut == "0":
             return "0"
-        return str(rut).strip()
+        s = str(rut).strip().upper().replace(".", "").replace(" ", "")
+        if not s:
+            return ""
+        if "-" in s:
+            left, right = s.split("-", 1)
+            body = "".join(c for c in left if c.isdigit()).lstrip("0") or "0"
+            dv = (right.strip()[:1] or "").upper()
+            if not dv:
+                return body
+            return f"{body}-{dv}"
+        # Sin guion: último char DV si es dígito o K
+        if len(s) >= 2 and (s[-1].isdigit() or s[-1] == "K"):
+            body = "".join(c for c in s[:-1] if c.isdigit()).lstrip("0") or "0"
+            return f"{body}-{s[-1]}"
+        return s
+
+    @classmethod
+    def _ruts_match(cls, a, b) -> bool:
+        na = cls._normalize_rut(a)
+        nb = cls._normalize_rut(b)
+        if not na or not nb or na == "0" or nb == "0":
+            return False
+        return na == nb
+
+    @staticmethod
+    def _parse_rut_from_movement_description(raw):
+        """
+        Extrae RUT desde DESCRIPCIÓN MOVIMIENTO (cartola abonados).
+
+        Bancos suelen escribir DV K con guion (`12345678-K`) y DV numérico
+        pegado (`123456789`). El patrón viejo solo aceptaba sin guion al inicio,
+        por eso los RUT con K no matcheaban.
+        """
+        text = str(raw or "").strip()
+        if not text:
+            return 0
+
+        patterns = (
+            # 12.345.678-K / 12345678-K (inicio)
+            r"^[\s]*(\d{1,2}\.?\d{3}\.?\d{3})\s*-\s*([\dkK])\b",
+            # 12345678K / 1234567K sin guion (inicio)
+            r"^[\s]*(\d{7,8})([\dkK])(?![0-9])",
+            # Mismos formatos en cualquier parte del texto
+            r"(\d{1,2}\.?\d{3}\.?\d{3})\s*-\s*([\dkK])\b",
+            r"(?<!\d)(\d{7,8})([\dkK])(?![0-9A-Za-z])",
+        )
+        for pat in patterns:
+            match = re.search(pat, text, re.IGNORECASE)
+            if not match:
+                continue
+            body = re.sub(r"\D", "", match.group(1)).lstrip("0") or "0"
+            dv = match.group(2).upper()
+            return f"{body}-{dv}"
+        return 0
 
     @staticmethod
     def _normalize_deposit_date_str(deposit_date):
@@ -492,24 +546,16 @@ class BankStatementClass:
                                 rut = "76063822-6"
                             else:
                                 bank_statement_type_id = 2
-                                
-                                raw = str(row[col])
-                                # Buscar RUT al inicio de la descripción (8-9 dígitos + dígito verificador)
-                                # Permite espacios y otros caracteres después del RUT
-                                match = re.search(r'^(\d{8,9}[\dkK])', raw, re.IGNORECASE)
-                                if match:
-                                    cleaned = match.group(1)
-                                    cuerpo = cleaned[:-1].lstrip("0")
-                                    dv = cleaned[-1].upper()
-                                    rut = f"{cuerpo}-{dv}"
-                                else:
-                                    rut = 0
+                                rut = self._parse_rut_from_movement_description(row[col])
                     
                     # Solo guardar si la fila es válida y tiene todos los datos necesarios
                     if valid_row and deposit_number is not None and amount is not None and deposit_date is not None:
                         bank_statement = BankStatementModel()
                         bank_statement.bank_statement_type_id = bank_statement_type_id
-                        bank_statement.rut = rut
+                        if rut in (None, 0, "0", ""):
+                            bank_statement.rut = 0
+                        else:
+                            bank_statement.rut = self._normalize_rut(rut) or 0
                         bank_statement.deposit_number = deposit_number
                         bank_statement.amount = amount
                         bank_statement.period = fixed_period
@@ -575,7 +621,7 @@ class BankStatementClass:
         if not dte:
             raise HTTPException(status_code=404, detail="DTE no encontrado")
 
-        if str(bs.rut or "").strip() != str(dte.rut or "").strip():
+        if not self._ruts_match(bs.rut, dte.rut):
             raise HTTPException(status_code=400, detail="El RUT de la cartola no coincide con el DTE")
 
         if int(bs.amount or 0) != int(dte.total or 0):
