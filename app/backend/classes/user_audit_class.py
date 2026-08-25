@@ -104,9 +104,14 @@ class UserAuditClass:
         return {"status": "success", "id": row.id}
 
     def record_many(self, events: list[dict], *, defaults: Optional[dict] = None) -> dict:
+        """Inserta el lote en una sola transacción (evita timeout en login/móvil)."""
         defaults = defaults or {}
         saved = 0
         errors = 0
+        now = datetime.now()
+        process_cache: dict[str, Optional[int]] = {}
+        rows: list[UserAuditModel] = []
+
         for ev in events:
             try:
                 payload = {**defaults, **(ev or {})}
@@ -114,31 +119,117 @@ class UserAuditClass:
                 if not user_rut:
                     errors += 1
                     continue
-                self.record(
-                    user_rut=str(user_rut),
-                    action_type=str(payload.get("action_type") or "unknown"),
-                    user_full_name=payload.get("user_full_name") or defaults.get("user_full_name"),
-                    rol_id=payload.get("rol_id") if payload.get("rol_id") is not None else defaults.get("rol_id"),
-                    session_id=payload.get("session_id") or defaults.get("session_id"),
-                    process_code=payload.get("process_code"),
-                    path=payload.get("path"),
-                    route_name=payload.get("route_name"),
-                    method=payload.get("method"),
-                    element_tag=payload.get("element_tag"),
-                    element_id=payload.get("element_id"),
-                    element_text=payload.get("element_text"),
-                    message=payload.get("message"),
-                    detail=payload.get("detail"),
-                    meta=payload.get("meta"),
-                    duration_ms=payload.get("duration_ms"),
-                    ip_address=payload.get("ip_address") or defaults.get("ip_address"),
-                    user_agent=payload.get("user_agent") or defaults.get("user_agent"),
-                    source=str(payload.get("source") or "frontend"),
+
+                path = payload.get("path")
+                process_code = payload.get("process_code")
+                source = str(payload.get("source") or "frontend")
+                cache_key = f"{source}|{process_code or ''}|{path or ''}"
+                if cache_key not in process_cache:
+                    process_cache[cache_key] = self._resolve_process_id(
+                        process_code=process_code,
+                        path=path,
+                        source=source,
+                    )
+                process_id = process_cache[cache_key]
+
+                meta = payload.get("meta")
+                meta_json = None
+                if meta is not None:
+                    meta_json = (
+                        meta
+                        if isinstance(meta, str)
+                        else json.dumps(meta, ensure_ascii=False, default=str)
+                    )
+
+                rows.append(
+                    UserAuditModel(
+                        user_rut=str(user_rut)[:32],
+                        user_full_name=(
+                            str(payload.get("user_full_name") or defaults.get("user_full_name") or "")[:255]
+                            or None
+                        ),
+                        rol_id=(
+                            int(payload["rol_id"])
+                            if payload.get("rol_id") is not None
+                            else (
+                                int(defaults["rol_id"])
+                                if defaults.get("rol_id") is not None
+                                else None
+                            )
+                        ),
+                        session_id=(
+                            str(payload.get("session_id") or defaults.get("session_id") or "")[:64]
+                            or None
+                        ),
+                        process_id=process_id,
+                        action_type=str(payload.get("action_type") or "unknown")[:32],
+                        path=(str(path)[:512] if path else None),
+                        route_name=(
+                            str(payload.get("route_name"))[:128]
+                            if payload.get("route_name")
+                            else None
+                        ),
+                        method=(
+                            str(payload.get("method"))[:16] if payload.get("method") else None
+                        ),
+                        element_tag=(
+                            str(payload.get("element_tag"))[:64]
+                            if payload.get("element_tag")
+                            else None
+                        ),
+                        element_id=(
+                            str(payload.get("element_id"))[:128]
+                            if payload.get("element_id")
+                            else None
+                        ),
+                        element_text=(
+                            str(payload.get("element_text"))[:512]
+                            if payload.get("element_text")
+                            else None
+                        ),
+                        message=(
+                            str(payload.get("message"))[:1024] if payload.get("message") else None
+                        ),
+                        detail=payload.get("detail"),
+                        meta_json=meta_json,
+                        duration_ms=(
+                            int(payload["duration_ms"])
+                            if payload.get("duration_ms") is not None
+                            else None
+                        ),
+                        ip_address=(
+                            str(payload.get("ip_address") or defaults.get("ip_address") or "")[:64]
+                            or None
+                        ),
+                        user_agent=(
+                            str(payload.get("user_agent") or defaults.get("user_agent") or "")[:512]
+                            or None
+                        ),
+                        audit_datetime=now,
+                        audit_date=now.date(),
+                        audit_time=now.strftime("%H:%M:%S"),
+                        year=now.year,
+                        month=now.month,
+                        day=now.day,
+                        hour=now.hour,
+                        minute=now.minute,
+                        second=now.second,
+                        weekday=now.weekday(),
+                        added_date=now,
+                    )
                 )
                 saved += 1
             except Exception:
-                self.db.rollback()
                 errors += 1
+
+        if rows:
+            try:
+                self.db.add_all(rows)
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                return {"status": "error", "saved": 0, "errors": saved + errors}
+
         return {"status": "success", "saved": saved, "errors": errors}
 
     def get_all(
