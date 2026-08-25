@@ -1464,6 +1464,7 @@ class ReceivedDteList(BaseModel):
     amount: Optional[str] = None  # Opcional con valor predeterminado None
     supervisor_id: Optional[str] = None  # Opcional con valor predeterminado None
     status_id: Optional[int] = None  # Opcional con valor predeterminado None
+    status_ids: Optional[List[int]] = None  # Varios estados (p.ej. historial de pagos: 4 y 5)
     dte_version_id: Optional[int] = None  # Opcional con valor predeterminado None
     dte_type_id: Optional[int] = None  # Opcional con valor predeterminado None
     page: int = 1  # Paginación coherente con get_received_tributary_documents (antes 0 invalidaba la búsqueda)

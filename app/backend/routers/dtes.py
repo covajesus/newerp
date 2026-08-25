@@ -80,7 +80,21 @@ def import_by_rut(dte: ImportDte, db: Session = Depends(get_db)):
 
 @dtes.post("/received_tributary_documents")
 def received_tributary_documents(dte: ReceivedDteList, db: Session = Depends(get_db)):
-    data = DteClass(db).get_received_tributary_documents(dte.folio, dte.branch_office_id, dte.rut, dte.supplier, dte.since, dte.until, dte.amount, dte.supervisor_id, dte.status_id, dte.dte_type_id, dte.dte_version_id, dte.page)
+    data = DteClass(db).get_received_tributary_documents(
+        dte.folio,
+        dte.branch_office_id,
+        dte.rut,
+        dte.supplier,
+        dte.since,
+        dte.until,
+        dte.amount,
+        dte.supervisor_id,
+        dte.status_id,
+        dte.dte_type_id,
+        dte.dte_version_id,
+        dte.page,
+        status_ids=dte.status_ids,
+    )
 
     return {"message": data}
 

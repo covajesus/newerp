@@ -840,7 +840,7 @@ class DteClass:
             self.db.rollback()
             return {"status": "error", "message": f"Error: {str(e)}"}
         
-    def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=1, items_per_page=10):
+    def get_received_tributary_documents(self, folio=None, branch_office_id=None, rut=None, supplier=None, since=None, until=None, amount=None, supervisor_id=None, status_id=None, dte_type_id=None, dte_version_id=None, page=1, items_per_page=10, status_ids=None):
         try:
             # page=0 desde el front invalidaba siempre la paginación (page < 1)
             if page is None or page < 1:
@@ -880,7 +880,14 @@ class DteClass:
                     filters.append(DteModel.supervisor_id == int(str(supervisor_id).strip()))
                 except (ValueError, TypeError):
                     filters.append(DteModel.supervisor_id == supervisor_id)
-            if status_id is not None:
+            if status_ids:
+                try:
+                    ids = [int(s) for s in status_ids if s is not None]
+                except (TypeError, ValueError):
+                    ids = []
+                if ids:
+                    filters.append(DteModel.status_id.in_(ids))
+            elif status_id is not None:
                 filters.append(DteModel.status_id == status_id)
             if dte_type_id is not None:
                 filters.append(DteModel.dte_type_id == dte_type_id)
