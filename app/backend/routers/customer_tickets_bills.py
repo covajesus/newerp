@@ -83,7 +83,7 @@ def download(id:int, db: Session = Depends(get_db)):
     if not data:
         raise HTTPException(
             status_code=404,
-            detail="No se pudo obtener el PDF de la factura. Verifique que el DTE tenga folio y esté emitido.",
+            detail="No se pudo obtener el PDF del documento. Verifique que el DTE tenga folio y esté emitido.",
         )
     return {"message": data}
 

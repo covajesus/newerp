@@ -8,6 +8,7 @@ from app.backend.classes.customer_ticket_class import (
     _is_simplefactura_v2_dte,
     is_document_simplefactura_v2,
 )
+from app.backend.classes.customer_credit_note_class import CustomerCreditNoteClass
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
@@ -1136,6 +1137,10 @@ class CustomerTicketBillClass:
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
         if not dte or not dte.folio:
             return None
+
+        # Notas de crédito (61): SimpleFactura getPdf + fallback LibreDTE
+        if int(dte.dte_type_id or 0) == 61:
+            return CustomerCreditNoteClass(self.db).download(id)
 
         # Boletas/facturas SimpleFactura v2 — getPdf (mismo flujo que boletas)
         if is_document_simplefactura_v2(self.db, dte):
