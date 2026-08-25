@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
 from html import unescape
@@ -23,6 +24,10 @@ _BASE = "https://zeus.sii.cl"
 _TARGET_EMIT = f"{_BASE}/cvc_cgi/bte/bte_indiv_ing"
 _TARGET_CONS = f"{_BASE}/cvc_cgi/bte/bte_indiv_cons?1"
 _TARGET_ANULA = f"{_BASE}/cvc_cgi/bte/bte_indiv_anula"
+_SII_LOGOUT_URLS = (
+    "https://zeusr.sii.cl/cgi_AUT2000/autTermino.cgi",
+    "https://zeusr.sii.cl/cgi_AUT2000/CAutTermino.cgi",
+)
 
 # Retención vigente 2026 (Ley 21.133). El SII puede devolver el monto exacto.
 RETENCION_PCT_2026 = 15.25
@@ -83,7 +88,7 @@ def liquido_amount(bruto: int, pct: float = RETENCION_PCT_2026) -> int:
 
 def validate_login(*, rut: str, password: str, timeout: float = 45.0) -> bool:
     """Authenticate against SII with Clave Tributaria; returns True if session cookies appear."""
-    with _session(timeout) as client:
+    with _managed_sii_client(timeout) as client:
         _login(client, rut, password, _TARGET_EMIT)
         return _has_livewire(client)
 
@@ -150,7 +155,7 @@ def _emit_bte_once(
     when: date,
     timeout: float,
 ) -> BteEmitResult:
-    with _session(timeout) as client:
+    with _managed_sii_client(timeout) as client:
         _login(client, login_rut, password, _TARGET_EMIT)
         r0 = client.get(_TARGET_EMIT)
         html = r0.text or ""
@@ -245,7 +250,7 @@ def list_emitted(
 ) -> list[BteListItem]:
     if not (1 <= int(month) <= 12):
         raise ValueError("Mes inválido")
-    with _session(timeout) as client:
+    with _managed_sii_client(timeout) as client:
         _login(client, login_rut, password, _TARGET_CONS)
         r0 = client.get(_TARGET_CONS)
         html = r0.text or ""
@@ -279,7 +284,7 @@ def annul_bte(
     timeout: float = 90.0,
 ) -> None:
     motivo = ANNUL_CAUSES.get(cause) or ANNUL_CAUSES["error_digitacion"]
-    with _session(timeout) as client:
+    with _managed_sii_client(timeout) as client:
         _login(client, login_rut, password, _TARGET_ANULA)
         r0 = client.get(_TARGET_ANULA)
         html = r0.text or ""
@@ -325,6 +330,30 @@ def _session(timeout: float) -> httpx.Client:
     )
 
 
+def _logout_sii(client: httpx.Client) -> None:
+    """Cierra sesión SII para no agotar el límite (~10 sesiones concurrentes)."""
+    if not _has_livewire(client):
+        return
+    for url in _SII_LOGOUT_URLS:
+        try:
+            client.get(url, timeout=10)
+        except httpx.HTTPError:
+            pass
+    try:
+        client.cookies.clear()
+    except Exception:
+        pass
+
+
+@contextmanager
+def _managed_sii_client(timeout: float):
+    with _session(timeout) as client:
+        try:
+            yield client
+        finally:
+            _logout_sii(client)
+
+
 def _login(client: httpx.Client, rut: str, password: str, target: str) -> None:
     body, dv = _split_rut(rut)
     rutcntr = f"{body}-{dv}"
@@ -361,7 +390,8 @@ def _login(client: httpx.Client, rut: str, password: str, target: str) -> None:
         raise RuntimeError("Clave Tributaria bloqueada en el SII.")
     if "máximo de sesiones" in text.lower() or "maximo de sesiones" in text.lower():
         raise RuntimeError(
-            "Límite de sesiones del SII alcanzado. Cierre sesión en sii.cl y reintente."
+            "Límite de sesiones del SII alcanzado (máx. 10). "
+            "Cierre sesiones en sii.cl (Cerrar sesión) o espere ~1 hora y reintente."
         )
     if not _has_livewire(client):
         client.post(
