@@ -7,6 +7,8 @@ LibreDTE API Gateway / BaseAPI). Not a DTE/CAF flow.
 from __future__ import annotations
 
 import re
+import ssl
+import time
 import unicodedata
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -115,8 +117,12 @@ def emit_bte(
     when = issue_date or date.today()
     comuna_name = _comuna_name(int(region), int(comuna)) or ""
 
+    # Zeus SII a veces falla el handshake TLS (BAD_SIGNATURE / connection reset).
+    # Reintentar con backoff y alternar TLS 1.2 no reemite si el fallo es pre-confirmación.
     last_err: Exception | None = None
-    for attempt in range(2):
+    max_attempts = 4
+    for attempt in range(max_attempts):
+        prefer_tls12 = attempt >= 2
         try:
             return _emit_bte_once(
                 login_rut=login_rut,
@@ -132,12 +138,17 @@ def emit_bte(
                 monto=int(monto),
                 when=when,
                 timeout=timeout,
+                prefer_tls12=prefer_tls12,
             )
         except RuntimeError:
             raise
-        except httpx.HTTPError as exc:
+        except Exception as exc:
+            if not _is_transient_tls_or_network_error(exc):
+                raise
             last_err = exc
-            continue
+            if attempt + 1 < max_attempts:
+                time.sleep(0.8 * (attempt + 1))
+                continue
     raise RuntimeError(f"Error de red al emitir BTE: {last_err}")
 
 
@@ -156,8 +167,9 @@ def _emit_bte_once(
     monto: int,
     when: date,
     timeout: float,
+    prefer_tls12: bool = False,
 ) -> BteEmitResult:
-    with _managed_sii_client(timeout) as client:
+    with _managed_sii_client(timeout, prefer_tls12=prefer_tls12) as client:
         _login(client, login_rut, password, _TARGET_EMIT)
         r0 = client.get(_TARGET_EMIT)
         html = r0.text or ""
@@ -319,10 +331,43 @@ def annul_bte(
                 raise RuntimeError(_extract_plain_error(html) or "No se pudo anular la BTE.")
 
 
-def _session(timeout: float) -> httpx.Client:
+def _is_transient_tls_or_network_error(exc: BaseException) -> bool:
+    """Handshake/red inestable hacia Zeus SII (p.ej. SSL BAD_SIGNATURE)."""
+    if isinstance(exc, (httpx.TransportError, httpx.TimeoutException, ssl.SSLError, OSError)):
+        return True
+    msg = str(exc).lower()
+    markers = (
+        "bad_signature",
+        "ssl",
+        "tls",
+        "connection reset",
+        "connection aborted",
+        "timed out",
+        "temporarily unavailable",
+        "eof occurred",
+        "wrong version number",
+    )
+    return any(m in msg for m in markers)
+
+
+def _build_ssl_context(*, prefer_tls12: bool = False) -> ssl.SSLContext:
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    # Algunos endpoints SII fallan con TLS 1.3 / OpenSSL 3 (BAD_SIGNATURE).
+    if prefer_tls12:
+        try:
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+        except Exception:
+            pass
+    return ctx
+
+
+def _session(timeout: float, *, prefer_tls12: bool = False) -> httpx.Client:
     return httpx.Client(
         timeout=timeout,
-        verify=False,
+        verify=_build_ssl_context(prefer_tls12=prefer_tls12),
         follow_redirects=True,
         headers={
             "User-Agent": _UA,
@@ -348,8 +393,8 @@ def _logout_sii(client: httpx.Client) -> None:
 
 
 @contextmanager
-def _managed_sii_client(timeout: float):
-    with _session(timeout) as client:
+def _managed_sii_client(timeout: float, *, prefer_tls12: bool = False):
+    with _session(timeout, prefer_tls12=prefer_tls12) as client:
         try:
             yield client
         finally:
