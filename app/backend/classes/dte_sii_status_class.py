@@ -47,15 +47,29 @@ DTE_SII_SYNC_MAX_SECONDS = int(os.getenv("DTE_SII_SYNC_MAX_SECONDS", "180"))
 DTE_SII_EMITTED_TYPES = (33, 39, 61)
 
 
+def reconcile_stored_sii_status(
+    status_id: int | None, rejection_reason: str | None
+) -> tuple[int | None, str | None]:
+    """Corrige registros mal guardados (p. ej. 'Aceptado con Reparos' como rechazado)."""
+    if status_id == SII_STATUS_REJECTED and rejection_reason:
+        corrected, _ = DteSiiStatusClass.map_sii_status(rejection_reason, None)
+        if corrected == SII_STATUS_ACCEPTED:
+            return SII_STATUS_ACCEPTED, None
+    return status_id, rejection_reason
+
+
 def serialize_dte_sii_fields(dte) -> dict:
     """Campos SII para respuestas de listado."""
     status_id = getattr(dte, "sii_status_id", None)
+    rejection_reason = getattr(dte, "sii_rejection_reason", None)
+    if status_id is not None:
+        status_id, rejection_reason = reconcile_stored_sii_status(status_id, rejection_reason)
     checked = getattr(dte, "sii_status_checked_at", None)
     return {
         "sii_status_id": status_id,
         "sii_status_label": SII_STATUS_LABELS.get(int(status_id)) if status_id else None,
         "sii_track_id": getattr(dte, "sii_track_id", None),
-        "sii_rejection_reason": getattr(dte, "sii_rejection_reason", None),
+        "sii_rejection_reason": rejection_reason,
         "sii_status_checked_at": checked.strftime("%Y-%m-%d %H:%M:%S") if checked else None,
     }
 
@@ -113,15 +127,24 @@ class DteSiiStatusClass:
         if not lower:
             return SII_STATUS_PENDING, None
 
+        # Códigos SII / SimpleFactura (siglas cortas).
+        if lower in ("rch", "rsc", "rfr", "rct"):
+            return SII_STATUS_REJECTED, text_all[:2000]
+        if lower in ("dok", "rpr"):
+            return SII_STATUS_ACCEPTED, None
+
+        # Aceptado con reparos = documento válido; no es rechazo.
+        if "aceptad" in lower and "reparo" in lower:
+            return SII_STATUS_ACCEPTED, None
+        if "reparo" in lower and "rechaz" not in lower:
+            return SII_STATUS_ACCEPTED, None
+
         if any(
             token in lower
             for token in (
                 "rechaz",
-                "rch",
                 "rejected",
                 "no conforme",
-                "reparo",
-                "rpr",
             )
         ):
             return SII_STATUS_REJECTED, text_all[:2000]
@@ -134,7 +157,6 @@ class DteSiiStatusClass:
                 "ok",
                 "conforme",
                 "aprobad",
-                "aceptado",
             )
         ):
             return SII_STATUS_ACCEPTED, None
@@ -382,6 +404,19 @@ class DteSiiStatusClass:
             .order_by(DteModel.id.asc())
         )
 
+    def _repair_misclassified_from_stored(self, dte: DteModel) -> bool:
+        """Corrige en BD registros guardados como rechazados pero con texto de aceptado/reparos."""
+        if dte.sii_status_id != SII_STATUS_REJECTED or not dte.sii_rejection_reason:
+            return False
+        corrected, _ = self.map_sii_status(dte.sii_rejection_reason, None)
+        if corrected != SII_STATUS_ACCEPTED:
+            return False
+        dte.sii_status_id = SII_STATUS_ACCEPTED
+        dte.sii_rejection_reason = None
+        dte.sii_status_checked_at = datetime.now()
+        self.db.add(dte)
+        return True
+
     def _sync_dte_entity(self, dte: DteModel, *, commit: bool = True) -> dict:
         """Consulta SimpleFactura por folio (documentsIssued) y actualiza el DTE."""
         if not dte.folio or int(dte.folio) <= 0:
@@ -393,6 +428,8 @@ class DteSiiStatusClass:
                 "id": dte.id,
             }
 
+        if self._repair_misclassified_from_stored(dte) and commit:
+            self.db.commit()
         added = dte.added_date or datetime.now()
         since = (added - timedelta(days=3)).strftime("%Y-%m-%d")
         until = (added + timedelta(days=3)).strftime("%Y-%m-%d")
