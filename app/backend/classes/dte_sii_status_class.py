@@ -41,7 +41,7 @@ SIMPLEFACTURA_DOCUMENTS_ISSUED_URL = "https://api.simplefactura.cl/documentsIssu
 SIMPLEFACTURA_ISSUED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_ISSUED_TIMEOUT", "120"))
 DTE_SII_SYNC_LOOKBACK_DAYS = int(os.getenv("DTE_SII_SYNC_LOOKBACK_DAYS", "90"))
 # Días por request a documentsIssued (mes entero ~timeout en SF).
-DTE_SII_SYNC_CHUNK_DAYS = int(os.getenv("DTE_SII_SYNC_CHUNK_DAYS", "7"))
+DTE_SII_SYNC_CHUNK_DAYS = int(os.getenv("DTE_SII_SYNC_CHUNK_DAYS", "3"))
 DTE_SII_EMITTED_TYPES = (33, 39, 61)
 
 
@@ -591,6 +591,8 @@ class DteSiiStatusClass:
                 if result.get("alerted"):
                     summary["rejected_alerts"] += 1
                 summary["items"].append(result)
+                if summary["updated"] % 25 == 0:
+                    self.db.commit()
             except Exception as exc:
                 summary["errors"].append(f"dte_id={dte.id}: {exc}")
 

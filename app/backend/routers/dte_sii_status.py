@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,14 @@ def sync_one(
 
 
 @dte_sii_status.get("/cron")
-def cron_sync(db: Session = Depends(get_db)):
-    """Cron externo: GET /api/dte_sii_status/cron"""
-    data = DteSiiStatusClass(db).sync()
+def cron_sync(
+    db: Session = Depends(get_db),
+    lookback_days: int = Query(14, ge=1, le=365),
+    limit: int = Query(100, ge=1, le=2000),
+):
+    """Cron externo: GET /api/dte_sii_status/cron?lookback_days=14&limit=100
+
+    Defaults cortos para no exceder timeout de Apache/proxy (~5–15 min).
+    """
+    data = DteSiiStatusClass(db).sync(lookback_days=lookback_days, limit=limit)
     return {"message": data}
