@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, TransbankTotalModel, CollectionModel, CashierModel
 from app.backend.classes.helper_class import HelperClass
@@ -9,6 +9,9 @@ import requests
 from io import StringIO
 import pandas as pd
 import re
+
+# Solo se cargan movimientos de los últimos N días del .dat (no todo el archivo).
+TRANSBANK_LOOKBACK_DAYS = 15
 
 class TransbankStatementClass:
     def __init__(self, db: Session):
@@ -439,9 +442,17 @@ class TransbankStatementClass:
                 )
             
             total_rows = len(df)
+            # Solo últimos N días (hacia atrás desde hoy); el resto del .dat se omite.
+            min_date = (datetime.now() - timedelta(days=TRANSBANK_LOOKBACK_DAYS)).date()
+            skipped_old = 0
+            inserted = 0
+
             if progress_callback:
-                progress_callback(35, f"📊 Iniciando procesamiento de {total_rows} transacciones...")
-            
+                progress_callback(
+                    35,
+                    f"Procesando {total_rows} filas (solo últimos {TRANSBANK_LOOKBACK_DAYS} días desde {min_date})...",
+                )
+
             processed_transactions = set()  # Para evitar duplicados en el mismo archivo
             batch_size = 50  # Lotes más pequeños para commits más frecuentes
             batch_count = 0
@@ -458,7 +469,10 @@ class TransbankStatementClass:
                 update_frequency = max(5, total_rows // 200)  # Cada 0.5% o mínimo cada 5 registros
                 
                 if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
-                    progress_callback(progress_percent, f"⚡ Procesando transacción {index + 1} de {total_rows} ({progress_percent}%)")
+                    progress_callback(
+                        progress_percent,
+                        f"Fila {index + 1}/{total_rows} | insertadas {inserted} | omitidas (>{TRANSBANK_LOOKBACK_DAYS}d) {skipped_old}",
+                    )
                 
                 local_id = self._row_get(row, colmap, "local_id")
                 if not local_id:
@@ -479,6 +493,11 @@ class TransbankStatementClass:
 
                     if not parsed_date:
                         raise ValueError(f"Invalid date format: '{raw_date}'")
+
+                    # Fuera de ventana de 15 días → no cargar
+                    if parsed_date.date() < min_date:
+                        skipped_old += 1
+                        continue
 
                     formatted_date = parsed_date.strftime("%Y-%m-%d")
                     
@@ -529,6 +548,7 @@ class TransbankStatementClass:
                     transbank_statement.value_4 = self._row_get(row, colmap, "cuotas")
                     transbank_statement.added_date = formatted_date
                     self.db.add(transbank_statement)
+                    inserted += 1
                     
                     batch_count += 1
                     
@@ -594,10 +614,10 @@ class TransbankStatementClass:
                     self.db.commit()
 
             if progress_callback:
-                progress_callback(100, "Procesamiento completado exitosamente")
-            
-            if progress_callback:
-                progress_callback(100, "Procesamiento completado exitosamente")
+                progress_callback(
+                    100,
+                    f"Completado: {inserted} insertadas, {skipped_old} omitidas (más de {TRANSBANK_LOOKBACK_DAYS} días)",
+                )
 
             return 1
 
