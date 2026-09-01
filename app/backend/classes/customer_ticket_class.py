@@ -741,6 +741,8 @@ class CustomerTicketClass:
 
                 v2_folio_pool_ids = self._v2_folio_pool_dte_ids([d.id for d in data])
 
+                from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
                 # Serializar los datos
                 serialized_data = [{
                     "id": dte.id,
@@ -755,6 +757,7 @@ class CustomerTicketClass:
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
                     "v2_emit": dte.id in v2_folio_pool_ids,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return {
@@ -771,6 +774,8 @@ class CustomerTicketClass:
 
                 v2_folio_pool_ids = self._v2_folio_pool_dte_ids([d.id for d in data])
 
+                from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
                 # Serializar los datos
                 serialized_data = [{
                     "id": dte.id,
@@ -785,6 +790,7 @@ class CustomerTicketClass:
                     "branch_office": dte.branch_office,
                     "status_id": dte.status_id,
                     "v2_emit": dte.id in v2_folio_pool_ids,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return serialized_data
@@ -2999,6 +3005,8 @@ class CustomerTicketClass:
         credit_note_dte.rut = customer_data["customer_data"]["rut"]
         credit_note_dte.folio = folio_number
         credit_note_dte.denied_folio = ref_folio_original
+        from app.backend.classes.dte_sii_status_class import mark_dte_sii_pending
+        mark_dte_sii_pending(credit_note_dte)
         credit_note_dte.reason_id = getattr(form_data, "reason_id", None) or dte.reason_id
         # NC siempre se persiste con montos negativos al quedar emitida (status 5).
         subtotal = round(abs(gross) / 1.19)
@@ -3758,6 +3766,8 @@ class CustomerTicketClass:
         dte.folio = folio_number
         dte.status_id = 4
         dte.dte_version_id = DTE_VERSION_V2
+        from app.backend.classes.dte_sii_status_class import mark_dte_sii_pending
+        mark_dte_sii_pending(dte)
         dte.updated_date = datetime.now()
         group_items = self._get_group_items_for_generation(form_data, dte)
         cid = int(getattr(form_data, "category_id", None) or dte.category_id or 1)

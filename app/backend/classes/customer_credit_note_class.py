@@ -44,6 +44,10 @@ class CustomerCreditNoteClass:
                     DteModel.rut,
                     DteModel.status_id,
                     DteModel.chip_id,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
                 ).join(
@@ -81,6 +85,10 @@ class CustomerCreditNoteClass:
                     DteModel.rut,
                     DteModel.status_id,
                     DteModel.chip_id,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
                 ).join(
@@ -121,6 +129,8 @@ class CustomerCreditNoteClass:
 
             # Formatear los resultados
             result = []
+            from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
             for dte in dtes:
                 result.append({
                     'id': dte.id,
@@ -132,7 +142,8 @@ class CustomerCreditNoteClass:
                     'status_id': dte.status_id,
                     'chip_id': dte.chip_id,
                     'customer': dte.customer,
-                    'branch_office': dte.branch_office
+                    'branch_office': dte.branch_office,
+                    **serialize_dte_sii_fields(dte),
                 })
 
             return {

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
 from app.backend.db.models import DteModel, BranchOfficeModel, FolioModel
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
@@ -65,6 +66,8 @@ class MachineTicketClass:
                     return {"status": "error", "message": "No data found"}
 
                 # Serializar los datos
+                from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
                 serialized_data = [{
                     "id": dte.id,
                     "rut": dte.rut,
@@ -76,7 +79,8 @@ class MachineTicketClass:
                     "total": dte.total,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "branch_office": dte.branch_office
+                    "branch_office": dte.branch_office,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return {
@@ -91,6 +95,8 @@ class MachineTicketClass:
             else:
                 data = query.all()
 
+                from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
                 # Serializar los datos
                 serialized_data = [{
                     "id": dte.id,
@@ -103,7 +109,8 @@ class MachineTicketClass:
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
-                    "status_id": dte.status_id
+                    "status_id": dte.status_id,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return serialized_data
@@ -199,7 +206,8 @@ class MachineTicketClass:
                     "requested_status_id": dte.requested_status_id,
                     "billed_status_id": dte.billed_status_id,
                     "used_status_id": dte.used_status_id,
-                    "have_credit_note": have_credit_note
+                    "have_credit_note": have_credit_note,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return {

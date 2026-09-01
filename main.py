@@ -105,6 +105,7 @@ from app.backend.routers.delivery_address_tags import delivery_address_tags
 from app.backend.routers.logs import logs
 from app.backend.routers.user_audits import user_audits
 from app.backend.routers.sii_geo import sii_geo
+from app.backend.routers.dte_sii_status import dte_sii_status
 
 app = FastAPI(root_path="/api")
 application = app
@@ -247,6 +248,7 @@ app.include_router(delivery_address_tags)
 app.include_router(logs)
 app.include_router(user_audits)
 app.include_router(sii_geo)
+app.include_router(dte_sii_status)
 
 if __name__ == "__main__":
     uvicorn.run(

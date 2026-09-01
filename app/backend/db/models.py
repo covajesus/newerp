@@ -485,6 +485,12 @@ class DteModel(Base):
     payment_date = Column(String)
     rut = Column(String)
     folio = Column(Integer)
+    # SII via SimpleFactura: 1=Pendiente, 2=Aceptado, 3=Rechazado
+    sii_status_id = Column(Integer)
+    sii_track_id = Column(BigInteger)
+    sii_rejection_reason = Column(Text)
+    sii_status_checked_at = Column(DateTime())
+    sii_status_alerted_at = Column(DateTime())
     denied_folio = Column(String(255))
     cash_amount = Column(Integer)
     card_amount = Column(Integer)

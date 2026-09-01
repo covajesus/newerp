@@ -23,6 +23,7 @@ from app.backend.classes.customer_ticket_class import (
     normalize_v2_rut,
 )
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
+from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
 from app.backend.classes.folio_class import FolioClass
 from datetime import timedelta
 from app.backend.classes.dte_pxq_amounts import dte_totals_from_net, pxq_net_total_from_items
@@ -842,6 +843,7 @@ class CustomerBillClass:
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return {
@@ -875,6 +877,7 @@ class CustomerBillClass:
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return serialized_data
@@ -980,6 +983,7 @@ class CustomerBillClass:
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return {
@@ -1127,6 +1131,7 @@ class CustomerBillClass:
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return {
@@ -1160,6 +1165,7 @@ class CustomerBillClass:
                         "branch_office": dte.branch_office,
                         "status_id": dte.status_id,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return serialized_data
@@ -1275,6 +1281,7 @@ class CustomerBillClass:
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
                         "v2_emit": dte.id in v2_folio_pool_ids,
+                        **serialize_dte_sii_fields(dte),
                     } for dte in data]
 
                     return {

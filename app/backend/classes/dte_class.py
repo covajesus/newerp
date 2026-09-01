@@ -518,9 +518,12 @@ class DteClass:
         status_id=None,
         dte_version_id=None,
         page=0,
-        items_per_page=10
+        items_per_page=10,
+        sii_status_id=None,
     ):
         try:
+            from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
+
             if rol_id == 1 or rol_id == 2:
                 # Filtros dinámicos
                 filters = []
@@ -540,6 +543,8 @@ class DteClass:
                     filters.append(DteModel.supervisor_id == supervisor_id)
                 if status_id:
                     filters.append(DteModel.status_id == status_id)
+                if sii_status_id is not None and sii_status_id != "":
+                    filters.append(DteModel.sii_status_id == int(sii_status_id))
 
                 filters.append(DteModel.rut != None)
 
@@ -560,6 +565,10 @@ class DteClass:
                     DteModel.exit_hour,
                     DteModel.status_id,
                     DteModel.payment_date,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.rut,
                     CustomerModel.customer,
                     DteModel.dte_type_id,
@@ -593,6 +602,8 @@ class DteClass:
                     filters.append(DteModel.supervisor_id == supervisor_id)
                 if status_id:
                     filters.append(DteModel.status_id == status_id)
+                if sii_status_id is not None and sii_status_id != "":
+                    filters.append(DteModel.sii_status_id == int(sii_status_id))
 
                 filters.append(DteModel.rut != None)
 
@@ -613,6 +624,10 @@ class DteClass:
                     DteModel.exit_hour,
                     DteModel.status_id,
                     DteModel.payment_date,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.rut,
                     CustomerModel.customer,
                     DteModel.dte_type_id,
@@ -678,6 +693,7 @@ class DteClass:
                 "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                 "branch_office": dte.branch_office,
                 "v2_emit": dte.id in v2_folio_pool_ids,
+                **serialize_dte_sii_fields(dte),
             } for dte in data]
 
             return {

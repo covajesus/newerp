@@ -55,6 +55,7 @@ BACKEND_ROUTE_PROCESS_MAP: list[tuple[str, str, str]] = [
     ("/documents", "documents", "Documentos"),
     ("/dte_line_item_details", "dte_line_item_details", "Detalle ítems DTE"),
     ("/dte_line_item_names", "dte_line_item_names", "Nombres ítems DTE"),
+    ("/dte_sii_status", "dtes", "Estados SII DTE emitidos"),
     ("/dtes", "dtes", "DTEs / documentos tributarios"),
     ("/employee_contracts", "employee_contracts", "Contratos empleados"),
     ("/employee_extras", "employee_extras", "Extras empleados"),
@@ -180,6 +181,7 @@ SPECIAL_PROCESSES: list[tuple[str, str, str]] = [
     ("email_send", "Email - Envío", "Envío de correos (SMTP / DTE / cotizaciones)"),
     ("email_dte_subscriber", "Email - DTE abonados", "Correos de DTE a abonados"),
     ("dte_massive_whatsapp", "DTE - Envío masivo WhatsApp", "Reenvío / envío masivo WhatsApp"),
+    ("dte_sii_rejected", "DTE - Rechazado SII", "DTE emitido rechazado por el SII (SimpleFactura)"),
     ("user_audit", "Auditoría de usuarios", "Registro de actividad UI/API por usuario"),
 ]
 

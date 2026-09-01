@@ -1451,6 +1451,7 @@ class DteList(BaseModel):
     amount: Optional[str] = None  # Opcional con valor predeterminado None
     supervisor_id: Optional[str] = None  # Opcional con valor predeterminado None
     status_id: Optional[int] = None  # Opcional con valor predeterminado None
+    sii_status_id: Optional[int] = None  # 1 Pendiente, 2 Aceptado, 3 Rechazado
     dte_version_id: Optional[int] = None  # Opcional con valor predeterminado None
     page: int = 0  # Opcional con valor predeterminado 0
 
