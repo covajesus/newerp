@@ -40,8 +40,10 @@ SIMPLEFACTURA_DOCUMENTS_ISSUED_URL = "https://api.simplefactura.cl/documentsIssu
 # Mes completo suele timeout; por defecto 120s y ventanas cortas.
 SIMPLEFACTURA_ISSUED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_ISSUED_TIMEOUT", "120"))
 DTE_SII_SYNC_LOOKBACK_DAYS = int(os.getenv("DTE_SII_SYNC_LOOKBACK_DAYS", "90"))
-# Días por request a documentsIssued (mes entero ~timeout en SF).
-DTE_SII_SYNC_CHUNK_DAYS = int(os.getenv("DTE_SII_SYNC_CHUNK_DAYS", "3"))
+# Días por request a documentsIssued. 1 = estable (mes entero timeout en SF).
+DTE_SII_SYNC_CHUNK_DAYS = int(os.getenv("DTE_SII_SYNC_CHUNK_DAYS", "1"))
+# Tope por invocación de cron (Apache ~5–15 min). El siguiente tick continúa.
+DTE_SII_SYNC_MAX_SECONDS = int(os.getenv("DTE_SII_SYNC_MAX_SECONDS", "180"))
 DTE_SII_EMITTED_TYPES = (33, 39, 61)
 
 
@@ -499,8 +501,22 @@ class DteSiiStatusClass:
                 return parsed
         return None
 
-    def sync(self, *, lookback_days: Optional[int] = None, limit: int = 300) -> dict:
-        """Batch: sincroniza candidatos SimpleFactura recientes / pendientes."""
+    def sync(
+        self,
+        *,
+        lookback_days: Optional[int] = None,
+        limit: int = 2000,
+        max_seconds: Optional[int] = None,
+    ) -> dict:
+        """Cron batch: SimpleFactura dia a dia (mismo enfoque que sync_one).
+
+        max_seconds evita 502 de Apache: avanza y deja has_more para el siguiente tick.
+        """
+        import time
+        from collections import defaultdict
+
+        started = time.monotonic()
+        budget = max_seconds if max_seconds is not None else DTE_SII_SYNC_MAX_SECONDS
         summary = {
             "status": "success",
             "checked": 0,
@@ -509,7 +525,16 @@ class DteSiiStatusClass:
             "skipped": 0,
             "errors": [],
             "items": [],
+            "has_more": False,
+            "lookback_days": lookback_days if lookback_days is not None else DTE_SII_SYNC_LOOKBACK_DAYS,
+            "elapsed_seconds": 0,
+            "buckets_total": 0,
+            "buckets_done": 0,
         }
+
+        def over_budget() -> bool:
+            return (time.monotonic() - started) >= max(30, int(budget))
+
         candidates = self._candidates_query(lookback_days=lookback_days).limit(max(1, int(limit))).all()
         sf_rows: list[DteModel] = []
         for dte in candidates:
@@ -519,68 +544,68 @@ class DteSiiStatusClass:
             sf_rows.append(dte)
 
         if not sf_rows:
+            summary["elapsed_seconds"] = round(time.monotonic() - started, 1)
             return summary
 
-        # Ventanas cortas por tipo (no mes completo: SF timeout).
-        tipos = sorted({int(d.dte_type_id or 0) for d in sf_rows})
-        chunk_days = max(1, DTE_SII_SYNC_CHUNK_DAYS)
+        by_day_tipo: dict[tuple[int, str], list[DteModel]] = defaultdict(list)
+        for dte in sf_rows:
+            added = dte.added_date or datetime.now()
+            day = added.strftime("%Y-%m-%d")
+            by_day_tipo[(int(dte.dte_type_id or 0), day)].append(dte)
 
+        keys = sorted(by_day_tipo.keys(), key=lambda x: (x[1], x[0]), reverse=True)
+        summary["buckets_total"] = len(keys)
         issued_index: dict[tuple[int, int], dict] = {}
-        failed_keys: set[tuple[int, int]] = set()
+        done_buckets: set[tuple[int, str]] = set()
 
-        for tipo in tipos:
-            tipo_rows = [d for d in sf_rows if int(d.dte_type_id or 0) == tipo]
-            if not tipo_rows:
-                continue
-            t_min = min((d.added_date or datetime.now()) for d in tipo_rows)
-            t_max = max((d.added_date or datetime.now()) for d in tipo_rows)
-            # Margen ±1 día por desfases de emisión/consulta
-            range_start = t_min - timedelta(days=1)
-            range_end = t_max + timedelta(days=1)
-
-            before_errors = len(summary["errors"])
-            for since, until in self._date_chunks(range_start, range_end, chunk_days):
-                items = self._fetch_issued_resilient(
-                    dte_type_id=tipo,
-                    since=since,
-                    until=until,
-                    errors=summary["errors"],
-                )
+        for tipo, day in keys:
+            if over_budget():
+                summary["has_more"] = True
+                break
+            try:
+                items = self._fetch_issued(dte_type_id=tipo, since=day, until=day, folio=0)
                 for item in items:
                     parsed = self._parse_item(item)
                     folio = parsed.get("folio")
-                    tipo_item = parsed.get("dte_type_id") or tipo
                     if folio is None:
                         continue
+                    tipo_item = parsed.get("dte_type_id") or tipo
                     issued_index[(int(tipo_item), int(folio))] = parsed
+                done_buckets.add((tipo, day))
+                summary["buckets_done"] += 1
+            except Exception as exc:
+                summary["errors"].append(f"tipo={tipo} {day}: {exc}")
+                for dte in by_day_tipo[(tipo, day)]:
+                    if over_budget():
+                        summary["has_more"] = True
+                        break
+                    try:
+                        parsed = self._fetch_one_folio(dte)
+                        if parsed:
+                            issued_index[(tipo, int(dte.folio))] = parsed
+                    except Exception as folio_exc:
+                        summary["errors"].append(
+                            f"dte_id={dte.id} folio={dte.folio}: {folio_exc}"
+                        )
+                if not over_budget():
+                    done_buckets.add((tipo, day))
+                    summary["buckets_done"] += 1
 
-            # Si fallaron todos los chunks de este tipo, marcar filas para fallback folio
-            if len(summary["errors"]) > before_errors:
-                for d in tipo_rows:
-                    key = (tipo, int(d.folio))
-                    if key not in issued_index:
-                        failed_keys.add(key)
-
+        remaining = 0
         for dte in sf_rows:
-            summary["checked"] += 1
-            key = (int(dte.dte_type_id or 0), int(dte.folio))
+            tipo = int(dte.dte_type_id or 0)
+            day = (dte.added_date or datetime.now()).strftime("%Y-%m-%d")
+            bucket = (tipo, day)
+            key = (tipo, int(dte.folio))
             parsed = issued_index.get(key)
 
-            # Fallback: consulta por folio puntual si el rango falló o no hubo match
-            if not parsed and key in failed_keys:
-                try:
-                    parsed = self._fetch_one_folio(dte)
-                    if parsed:
-                        issued_index[key] = parsed
-                except Exception as exc:
-                    summary["errors"].append(f"dte_id={dte.id} folio={dte.folio}: {exc}")
-                    continue
+            if bucket not in done_buckets and parsed is None:
+                remaining += 1
+                continue
 
+            summary["checked"] += 1
             try:
                 if not parsed:
-                    # Sin match en SF: pendiente, pero solo si no hubo fallo de red del bucket
-                    if key in failed_keys:
-                        continue
                     if dte.sii_status_id is None:
                         dte.sii_status_id = SII_STATUS_PENDING
                     dte.sii_status_checked_at = datetime.now()
@@ -590,11 +615,16 @@ class DteSiiStatusClass:
                 summary["updated"] += 1
                 if result.get("alerted"):
                     summary["rejected_alerts"] += 1
-                summary["items"].append(result)
+                if len(summary["items"]) < 100:
+                    summary["items"].append(result)
                 if summary["updated"] % 25 == 0:
                     self.db.commit()
             except Exception as exc:
                 summary["errors"].append(f"dte_id={dte.id}: {exc}")
+
+        if remaining > 0:
+            summary["has_more"] = True
+            summary["remaining"] = remaining
 
         try:
             self.db.commit()
@@ -602,8 +632,9 @@ class DteSiiStatusClass:
             self.db.rollback()
             summary["status"] = "error"
             summary["errors"].append(str(exc))
-        if summary["errors"] and summary["updated"] == 0:
+        if summary["errors"] and summary["updated"] == 0 and not summary["has_more"]:
             summary["status"] = "error"
         elif summary["errors"]:
             summary["status"] = "partial"
+        summary["elapsed_seconds"] = round(time.monotonic() - started, 1)
         return summary

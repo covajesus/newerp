@@ -12,7 +12,8 @@ dte_sii_status = APIRouter(prefix="/dte_sii_status", tags=["DTE SII Status"])
 
 class SyncBatchPayload(BaseModel):
     lookback_days: int | None = Field(default=None, ge=1, le=365)
-    limit: int = Field(default=300, ge=1, le=2000)
+    limit: int = Field(default=2000, ge=1, le=5000)
+    max_seconds: int | None = Field(default=None, ge=30, le=900)
 
 
 @dte_sii_status.post("/sync")
@@ -24,7 +25,11 @@ def sync_batch(
     """Sincroniza estados SII (SimpleFactura documentsIssued) de DTE emitidos."""
     del session_user
     body = payload or SyncBatchPayload()
-    data = DteSiiStatusClass(db).sync(lookback_days=body.lookback_days, limit=body.limit)
+    data = DteSiiStatusClass(db).sync(
+        lookback_days=body.lookback_days,
+        limit=body.limit,
+        max_seconds=body.max_seconds,
+    )
     return {"message": data}
 
 
@@ -42,12 +47,24 @@ def sync_one(
 @dte_sii_status.get("/cron")
 def cron_sync(
     db: Session = Depends(get_db),
-    lookback_days: int = Query(14, ge=1, le=365),
-    limit: int = Query(100, ge=1, le=2000),
+    lookback_days: int = Query(30, ge=1, le=365),
+    limit: int = Query(2000, ge=1, le=5000),
+    max_seconds: int = Query(180, ge=30, le=900),
+    dte_id: int | None = Query(None, ge=1),
 ):
-    """Cron externo: GET /api/dte_sii_status/cron?lookback_days=14&limit=100
+    """Cron: GET /api/dte_sii_status/cron?lookback_days=30&limit=2000&max_seconds=180
 
-    Defaults cortos para no exceder timeout de Apache/proxy (~5–15 min).
+    Consulta SimpleFactura día a día (mismo método que un folio).
+    Si has_more=true, el siguiente tick del cron continúa.
+    Prueba 1 DTE: ?dte_id=123
     """
-    data = DteSiiStatusClass(db).sync(lookback_days=lookback_days, limit=limit)
+    svc = DteSiiStatusClass(db)
+    if dte_id:
+        data = svc.sync_one(int(dte_id))
+    else:
+        data = svc.sync(
+            lookback_days=lookback_days,
+            limit=limit,
+            max_seconds=max_seconds,
+        )
     return {"message": data}
