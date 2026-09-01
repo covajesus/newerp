@@ -4,7 +4,6 @@ from app.backend.db.models import TransbankStatementModel, BranchOfficesTransban
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
-from sqlalchemy import text
 import requests
 from io import StringIO
 import pandas as pd
@@ -354,13 +353,22 @@ class TransbankStatementClass:
             fixed_period = HelperClass.fix_current_dte_period(period)
             date = fixed_period + "-01"
 
-            if progress_callback:
-                progress_callback(10, "Limpiando tabla anterior...")
+            # Ventana a cargar desde el .dat (últimos N días).
+            min_date = (datetime.now() - timedelta(days=TRANSBANK_LOOKBACK_DAYS)).date()
+            min_date_str = min_date.strftime("%Y-%m-%d")
 
-            # DELETE completo de la tabla antes de cargar el Transbank
-            # Usar DELETE en lugar de TRUNCATE para respetar las claves foráneas
-            self.db.execute(text("DELETE FROM transbank_statements"))
+            if progress_callback:
+                progress_callback(10, "Limpiando tabla completa de Transbank...")
+
+            # Vaciar tabla: se recarga limpia solo con los últimos N días del archivo.
+            deleted = self.db.query(TransbankStatementModel).delete(synchronize_session=False)
             self.db.commit()
+
+            if progress_callback:
+                progress_callback(
+                    12,
+                    f"Tabla vaciada ({deleted or 0} filas). Se cargarán solo desde {min_date_str} ({TRANSBANK_LOOKBACK_DAYS} días).",
+                )
 
             if progress_callback:
                 progress_callback(15, "Leyendo archivo...")
@@ -442,8 +450,6 @@ class TransbankStatementClass:
                 )
             
             total_rows = len(df)
-            # Solo últimos N días (hacia atrás desde hoy); el resto del .dat se omite.
-            min_date = (datetime.now() - timedelta(days=TRANSBANK_LOOKBACK_DAYS)).date()
             skipped_old = 0
             inserted = 0
 
