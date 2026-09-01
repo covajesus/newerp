@@ -14,7 +14,8 @@ from datetime import datetime
 import requests
 
 DEFAULT_URL = "https://intrajisbackend.com/api/dte_sii_status/cron"
-TIMEOUT = 300
+# Sync con chunks + fallback diario puede superar 5 min.
+TIMEOUT = 900
 
 
 def main() -> int:

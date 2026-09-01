@@ -37,8 +37,11 @@ SII_STATUS_LABELS = {
 }
 
 SIMPLEFACTURA_DOCUMENTS_ISSUED_URL = "https://api.simplefactura.cl/documentsIssued"
-SIMPLEFACTURA_ISSUED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_ISSUED_TIMEOUT", "90"))
+# Mes completo suele timeout; por defecto 120s y ventanas cortas.
+SIMPLEFACTURA_ISSUED_TIMEOUT = int(os.getenv("SIMPLEFACTURA_ISSUED_TIMEOUT", "120"))
 DTE_SII_SYNC_LOOKBACK_DAYS = int(os.getenv("DTE_SII_SYNC_LOOKBACK_DAYS", "90"))
+# Días por request a documentsIssued (mes entero ~timeout en SF).
+DTE_SII_SYNC_CHUNK_DAYS = int(os.getenv("DTE_SII_SYNC_CHUNK_DAYS", "7"))
 DTE_SII_EMITTED_TYPES = (33, 39, 61)
 
 
@@ -418,6 +421,84 @@ class DteSiiStatusClass:
         self.db.commit()
         return {"status": "success", **result, **serialize_dte_sii_fields(dte)}
 
+    def _date_chunks(self, start: datetime, end: datetime, chunk_days: int) -> list[tuple[str, str]]:
+        """Particiones inclusive [start, end] en ventanas de chunk_days."""
+        days = max(1, int(chunk_days))
+        chunks: list[tuple[str, str]] = []
+        cursor = start.date()
+        end_date = end.date()
+        while cursor <= end_date:
+            chunk_end = min(cursor + timedelta(days=days - 1), end_date)
+            chunks.append((cursor.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d")))
+            cursor = chunk_end + timedelta(days=1)
+        return chunks
+
+    def _fetch_issued_resilient(
+        self,
+        *,
+        dte_type_id: int,
+        since: str,
+        until: str,
+        errors: list,
+    ) -> list[dict]:
+        """documentsIssued por rango; si timeout, parte en días y luego deja el error."""
+        try:
+            return self._fetch_issued(dte_type_id=dte_type_id, since=since, until=until, folio=0)
+        except Exception as exc:
+            msg = str(exc)
+            # Reintentar día a día solo si el rango es > 1 día
+            try:
+                start = datetime.strptime(since, "%Y-%m-%d")
+                end = datetime.strptime(until, "%Y-%m-%d")
+            except ValueError:
+                errors.append(f"tipo={dte_type_id} {since}..{until}: {msg}")
+                return []
+            if (end - start).days <= 0:
+                errors.append(f"tipo={dte_type_id} {since}..{until}: {msg}")
+                return []
+
+            collected: list[dict] = []
+            day_errors = 0
+            for day_since, day_until in self._date_chunks(start, end, 1):
+                try:
+                    collected.extend(
+                        self._fetch_issued(
+                            dte_type_id=dte_type_id,
+                            since=day_since,
+                            until=day_until,
+                            folio=0,
+                        )
+                    )
+                except Exception as day_exc:
+                    day_errors += 1
+                    errors.append(f"tipo={dte_type_id} {day_since}: {day_exc}")
+            if day_errors and not collected:
+                errors.append(
+                    f"tipo={dte_type_id} {since}..{until}: fallback diario falló ({msg})"
+                )
+            return collected
+
+    def _fetch_one_folio(self, dte: DteModel) -> dict | None:
+        added = dte.added_date or datetime.now()
+        since = (added - timedelta(days=3)).strftime("%Y-%m-%d")
+        until = (added + timedelta(days=3)).strftime("%Y-%m-%d")
+        items = self._fetch_issued(
+            dte_type_id=int(dte.dte_type_id or 0),
+            since=since,
+            until=until,
+            folio=int(dte.folio),
+        )
+        for item in items:
+            parsed = self._parse_item(item)
+            if parsed.get("folio") == int(dte.folio):
+                if parsed.get("dte_type_id") in (None, int(dte.dte_type_id or 0)):
+                    return parsed
+        for item in items:
+            parsed = self._parse_item(item)
+            if parsed.get("folio") == int(dte.folio):
+                return parsed
+        return None
+
     def sync(self, *, lookback_days: Optional[int] = None, limit: int = 300) -> dict:
         """Batch: sincroniza candidatos SimpleFactura recientes / pendientes."""
         summary = {
@@ -430,45 +511,76 @@ class DteSiiStatusClass:
             "items": [],
         }
         candidates = self._candidates_query(lookback_days=lookback_days).limit(max(1, int(limit))).all()
-        # Agrupar fetches por tipo + mes para no golpear SF por cada fila
-        by_bucket: dict[tuple[int, str, str], list] = {}
-        sf_rows = []
+        sf_rows: list[DteModel] = []
         for dte in candidates:
             if not self._is_simplefactura_candidate(dte):
                 summary["skipped"] += 1
                 continue
             sf_rows.append(dte)
-            added = dte.added_date or datetime.now()
-            since = datetime(added.year, added.month, 1).strftime("%Y-%m-%d")
-            if added.month == 12:
-                until_dt = datetime(added.year + 1, 1, 1) - timedelta(days=1)
-            else:
-                until_dt = datetime(added.year, added.month + 1, 1) - timedelta(days=1)
-            until = until_dt.strftime("%Y-%m-%d")
-            key = (int(dte.dte_type_id or 0), since, until)
-            by_bucket.setdefault(key, []).append(dte)
+
+        if not sf_rows:
+            return summary
+
+        # Ventanas cortas por tipo (no mes completo: SF timeout).
+        tipos = sorted({int(d.dte_type_id or 0) for d in sf_rows})
+        chunk_days = max(1, DTE_SII_SYNC_CHUNK_DAYS)
 
         issued_index: dict[tuple[int, int], dict] = {}
-        for (tipo, since, until), rows in by_bucket.items():
-            try:
-                items = self._fetch_issued(dte_type_id=tipo, since=since, until=until, folio=0)
-            except Exception as exc:
-                summary["errors"].append(f"tipo={tipo} {since}..{until}: {exc}")
+        failed_keys: set[tuple[int, int]] = set()
+
+        for tipo in tipos:
+            tipo_rows = [d for d in sf_rows if int(d.dte_type_id or 0) == tipo]
+            if not tipo_rows:
                 continue
-            for item in items:
-                parsed = self._parse_item(item)
-                folio = parsed.get("folio")
-                tipo_item = parsed.get("dte_type_id") or tipo
-                if folio is None:
-                    continue
-                issued_index[(int(tipo_item), int(folio))] = parsed
+            t_min = min((d.added_date or datetime.now()) for d in tipo_rows)
+            t_max = max((d.added_date or datetime.now()) for d in tipo_rows)
+            # Margen ±1 día por desfases de emisión/consulta
+            range_start = t_min - timedelta(days=1)
+            range_end = t_max + timedelta(days=1)
+
+            before_errors = len(summary["errors"])
+            for since, until in self._date_chunks(range_start, range_end, chunk_days):
+                items = self._fetch_issued_resilient(
+                    dte_type_id=tipo,
+                    since=since,
+                    until=until,
+                    errors=summary["errors"],
+                )
+                for item in items:
+                    parsed = self._parse_item(item)
+                    folio = parsed.get("folio")
+                    tipo_item = parsed.get("dte_type_id") or tipo
+                    if folio is None:
+                        continue
+                    issued_index[(int(tipo_item), int(folio))] = parsed
+
+            # Si fallaron todos los chunks de este tipo, marcar filas para fallback folio
+            if len(summary["errors"]) > before_errors:
+                for d in tipo_rows:
+                    key = (tipo, int(d.folio))
+                    if key not in issued_index:
+                        failed_keys.add(key)
 
         for dte in sf_rows:
             summary["checked"] += 1
             key = (int(dte.dte_type_id or 0), int(dte.folio))
             parsed = issued_index.get(key)
+
+            # Fallback: consulta por folio puntual si el rango falló o no hubo match
+            if not parsed and key in failed_keys:
+                try:
+                    parsed = self._fetch_one_folio(dte)
+                    if parsed:
+                        issued_index[key] = parsed
+                except Exception as exc:
+                    summary["errors"].append(f"dte_id={dte.id} folio={dte.folio}: {exc}")
+                    continue
+
             try:
                 if not parsed:
+                    # Sin match en SF: pendiente, pero solo si no hubo fallo de red del bucket
+                    if key in failed_keys:
+                        continue
                     if dte.sii_status_id is None:
                         dte.sii_status_id = SII_STATUS_PENDING
                     dte.sii_status_checked_at = datetime.now()
@@ -490,4 +602,6 @@ class DteSiiStatusClass:
             summary["errors"].append(str(exc))
         if summary["errors"] and summary["updated"] == 0:
             summary["status"] = "error"
+        elif summary["errors"]:
+            summary["status"] = "partial"
         return summary
