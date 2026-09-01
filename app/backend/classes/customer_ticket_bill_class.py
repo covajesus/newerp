@@ -54,6 +54,10 @@ class CustomerTicketBillClass:
                         DteModel.status_id,
                         DteModel.chip_id,
                         DteModel.payment_date,
+                        DteModel.sii_status_id,
+                        DteModel.sii_track_id,
+                        DteModel.sii_rejection_reason,
+                        DteModel.sii_status_checked_at,
                         BranchOfficeModel.branch_office,
                         CustomerModel.customer.label('customer')
                 ).outerjoin(
@@ -88,6 +92,10 @@ class CustomerTicketBillClass:
                         DteModel.status_id,
                         DteModel.payment_date,
                         DteModel.chip_id,
+                        DteModel.sii_status_id,
+                        DteModel.sii_track_id,
+                        DteModel.sii_rejection_reason,
+                        DteModel.sii_status_checked_at,
                         BranchOfficeModel.branch_office,
                         CustomerModel.customer.label('customer')
                 ).outerjoin(
@@ -199,6 +207,10 @@ class CustomerTicketBillClass:
                     DteModel.status_id,
                     DteModel.chip_id,
                     DteModel.payment_date,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
                 ).outerjoin(
@@ -224,6 +236,10 @@ class CustomerTicketBillClass:
                     DteModel.status_id,
                     DteModel.payment_date,
                     DteModel.chip_id,
+                    DteModel.sii_status_id,
+                    DteModel.sii_track_id,
+                    DteModel.sii_rejection_reason,
+                    DteModel.sii_status_checked_at,
                     CustomerModel.customer,
                     BranchOfficeModel.branch_office
                 ).outerjoin(
