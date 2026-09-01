@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, TransbankTotalModel, CollectionModel, CashierModel
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
@@ -345,6 +346,100 @@ class TransbankStatementClass:
             error_message = str(e)
             return f"Error: {error_message}"
 
+    @staticmethod
+    def _parse_statement_date(date_str: str):
+        return datetime.strptime(str(date_str), "%Y-%m-%d").date()
+
+    def _aggregate_totals_since(self, min_date_str: str):
+        """Totales por sucursal/fecha desde transbank_statements (ventana recargada)."""
+        rows = (
+            self.db.query(
+                TransbankStatementModel.branch_office_id,
+                TransbankStatementModel.original_date,
+                func.sum(TransbankStatementModel.amount).label("total"),
+                func.count(TransbankStatementModel.id).label("total_tickets"),
+            )
+            .filter(TransbankStatementModel.original_date >= min_date_str)
+            .filter(TransbankStatementModel.branch_office_id.isnot(None))
+            .group_by(
+                TransbankStatementModel.branch_office_id,
+                TransbankStatementModel.original_date,
+            )
+            .all()
+        )
+        return rows
+
+    def _refresh_transbank_totals_window(self, min_date_str: str, totals) -> None:
+        """Actualiza transbank_total solo en la ventana recargada."""
+        min_date = self._parse_statement_date(min_date_str)
+        self.db.query(TransbankTotalModel).filter(
+            TransbankTotalModel.added_date >= min_date
+        ).delete(synchronize_session=False)
+        self.db.commit()
+
+        for row in totals:
+            if not row.branch_office_id or not row.original_date:
+                continue
+            self.db.add(
+                TransbankTotalModel(
+                    branch_office_id=int(row.branch_office_id),
+                    total=int(row.total or 0),
+                    total_tickets=int(row.total_tickets or 0),
+                    added_date=self._parse_statement_date(row.original_date),
+                )
+            )
+        self.db.commit()
+
+    def _sync_collections_for_totals(self, totals, progress_callback=None) -> int:
+        """Reemplaza colecciones tarjeta solo para sucursal/fecha en la ventana recargada."""
+        updated = 0
+        for item in totals:
+            if not item.branch_office_id or not item.original_date:
+                continue
+
+            cashier = (
+                self.db.query(CashierModel)
+                .filter(CashierModel.branch_office_id == item.branch_office_id)
+                .filter(CashierModel.transbank_status_id == 1)
+                .first()
+            )
+            if not cashier:
+                continue
+
+            collection_date = self._parse_statement_date(item.original_date)
+            card_gross = int(item.total or 0)
+            card_net = round(card_gross / 1.19)
+
+            existing_collections = (
+                self.db.query(CollectionModel)
+                .filter(CollectionModel.branch_office_id == item.branch_office_id)
+                .filter(CollectionModel.cashier_id == cashier.id)
+                .filter(CollectionModel.added_date == collection_date)
+                .all()
+            )
+            for existing_collection in existing_collections:
+                self.db.delete(existing_collection)
+
+            self.db.add(
+                CollectionModel(
+                    branch_office_id=item.branch_office_id,
+                    cashier_id=cashier.id,
+                    cash_gross_amount=0,
+                    cash_net_amount=0,
+                    card_gross_amount=card_gross,
+                    card_net_amount=card_net,
+                    total_tickets=int(item.total_tickets or 0),
+                    added_date=collection_date,
+                    updated_date=collection_date,
+                )
+            )
+            updated += 1
+
+        self.db.commit()
+        if progress_callback:
+            progress_callback(95, f"Colecciones actualizadas en ventana recargada: {updated}")
+        return updated
+
     def read_store_bank_statement(self, file_url, period, progress_callback=None):
         try:
             if progress_callback:
@@ -358,16 +453,24 @@ class TransbankStatementClass:
             min_date_str = min_date.strftime("%Y-%m-%d")
 
             if progress_callback:
-                progress_callback(10, "Limpiando tabla completa de Transbank...")
+                progress_callback(
+                    10,
+                    f"Reemplazando movimientos desde {min_date_str} (últimos {TRANSBANK_LOOKBACK_DAYS} días)...",
+                )
 
-            # Vaciar tabla: se recarga limpia solo con los últimos N días del archivo.
-            deleted = self.db.query(TransbankStatementModel).delete(synchronize_session=False)
+            # Solo borrar la ventana que se va a recargar; conservar días anteriores del mes.
+            deleted = (
+                self.db.query(TransbankStatementModel)
+                .filter(TransbankStatementModel.original_date >= min_date_str)
+                .delete(synchronize_session=False)
+            )
             self.db.commit()
 
             if progress_callback:
                 progress_callback(
                     12,
-                    f"Tabla vaciada ({deleted or 0} filas). Se cargarán solo desde {min_date_str} ({TRANSBANK_LOOKBACK_DAYS} días).",
+                    f"Eliminados {deleted or 0} movimientos desde {min_date_str}. "
+                    f"Se conservan los anteriores a esa fecha.",
                 )
 
             if progress_callback:
@@ -572,57 +675,18 @@ class TransbankStatementClass:
                 self.db.commit()
 
             if progress_callback:
-                progress_callback(85, "Procesando totales y colecciones...")
+                progress_callback(85, "Recalculando totales y colecciones (solo ventana recargada)...")
 
-            # Procesar totales y colecciones con mejor control de duplicados
-            transbank_total = self.db.query(TransbankTotalModel).all()
-
-            for item in transbank_total:
-                cashier = self.db.query(CashierModel). \
-                        filter(CashierModel.branch_office_id == item.branch_office_id). \
-                        filter(CashierModel.transbank_status_id == 1). \
-                        first()
-                
-                check_cashier = self.db.query(CashierModel). \
-                        filter(CashierModel.branch_office_id == item.branch_office_id). \
-                        filter(CashierModel.transbank_status_id == 1). \
-                        count()
-                
-                card_net_amount = round(item.total/1.19)
-
-                if check_cashier > 0:
-                    # Eliminar colecciones existentes del período específico para evitar duplicados
-                    existing_collections = self.db.query(CollectionModel). \
-                        filter(CollectionModel.branch_office_id == item.branch_office_id). \
-                        filter(CollectionModel.cashier_id == cashier.id). \
-                        filter(CollectionModel.added_date == item.added_date). \
-                        all()
-
-                    for existing_collection in existing_collections:
-                        self.db.delete(existing_collection)
-                    
-                    self.db.commit()
-
-                    # Crear nueva colección
-                    collection = CollectionModel(
-                            branch_office_id=item.branch_office_id,
-                            cashier_id=cashier.id,
-                            cash_gross_amount=0,
-                            cash_net_amount=0,
-                            card_gross_amount=item.total,
-                            card_net_amount=card_net_amount,
-                            total_tickets=item.total_tickets,
-                            added_date=item.added_date,
-                            updated_date=item.added_date,
-                        )
-
-                    self.db.add(collection)
-                    self.db.commit()
+            totals = self._aggregate_totals_since(min_date_str)
+            self._refresh_transbank_totals_window(min_date_str, totals)
+            collections_updated = self._sync_collections_for_totals(totals, progress_callback)
 
             if progress_callback:
                 progress_callback(
                     100,
-                    f"Completado: {inserted} insertadas, {skipped_old} omitidas (más de {TRANSBANK_LOOKBACK_DAYS} días)",
+                    f"Completado: {inserted} insertadas, {skipped_old} omitidas del archivo "
+                    f"(>{TRANSBANK_LOOKBACK_DAYS}d), {collections_updated} colecciones actualizadas "
+                    f"desde {min_date_str}. Días anteriores conservados.",
                 )
 
             return 1

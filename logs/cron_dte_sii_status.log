@@ -26,4 +26,25 @@ C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\request
   warnings.warn(
 ^CC:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
   warnings.warn(
-^C
+^CC:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 09:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
