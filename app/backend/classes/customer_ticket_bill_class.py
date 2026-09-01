@@ -10,6 +10,7 @@ from app.backend.classes.customer_ticket_class import (
 )
 from app.backend.classes.customer_credit_note_class import CustomerCreditNoteClass
 from app.backend.classes.accounting_entry_class import AccountingEntryClass
+from app.backend.classes.dte_sii_status_class import serialize_dte_sii_fields
 from sqlalchemy import desc
 from sqlalchemy.dialects import mysql
 from sqlalchemy import or_
@@ -128,7 +129,8 @@ class CustomerTicketBillClass:
                     "payment_date": dte.payment_date,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "branch_office": dte.branch_office
+                    "branch_office": dte.branch_office,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return {
@@ -155,7 +157,9 @@ class CustomerTicketBillClass:
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "payment_date": dte.payment_date,
                     "branch_office": dte.branch_office,
-                    "status_id": dte.status_id
+                    "status_id": dte.status_id,
+                    "dte_type_id": getattr(dte, "dte_type_id", None),
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return serialized_data
@@ -261,7 +265,8 @@ class CustomerTicketBillClass:
                     "total": dte.total,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
-                    "branch_office": dte.branch_office
+                    "branch_office": dte.branch_office,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return {
@@ -288,7 +293,8 @@ class CustomerTicketBillClass:
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
-                    "status_id": dte.status_id
+                    "status_id": dte.status_id,
+                    **serialize_dte_sii_fields(dte),
                 } for dte in data]
 
                 return serialized_data
