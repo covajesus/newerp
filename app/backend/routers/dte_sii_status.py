@@ -11,9 +11,9 @@ dte_sii_status = APIRouter(prefix="/dte_sii_status", tags=["DTE SII Status"])
 
 
 class SyncBatchPayload(BaseModel):
-    lookback_days: int | None = Field(default=None, ge=1, le=365)
-    limit: int = Field(default=2000, ge=1, le=5000)
-    max_seconds: int | None = Field(default=None, ge=30, le=900)
+    lookback_days: int | None = Field(default=30, ge=1, le=365)
+    limit: int = Field(default=5, ge=1, le=100)
+    max_seconds: int | None = Field(default=90, ge=30, le=900)
 
 
 @dte_sii_status.post("/sync")
@@ -48,14 +48,15 @@ def sync_one(
 def cron_sync(
     db: Session = Depends(get_db),
     lookback_days: int = Query(30, ge=1, le=365),
-    limit: int = Query(150, ge=1, le=5000),
+    limit: int = Query(5, ge=1, le=100),
     max_seconds: int = Query(90, ge=30, le=900),
     dte_id: int | None = Query(None, ge=1),
 ):
-    """Cron: GET /api/dte_sii_status/cron?lookback_days=30&limit=150&max_seconds=90
+    """Cron: uno a uno, sii_status_id=1 (Pendiente), últimos 30 días.
 
-    Consulta SimpleFactura día a día. Si has_more=true, repetir (o dejar crontab).
-    Prueba 1 DTE: ?dte_id=123
+    GET /api/dte_sii_status/cron?lookback_days=30&limit=5&max_seconds=90
+    Repetir mientras has_more=true (o dejar crontab cada 10 min).
+    Un DTE: ?dte_id=123
     """
     svc = DteSiiStatusClass(db)
     if dte_id:

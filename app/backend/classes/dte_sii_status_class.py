@@ -365,12 +365,27 @@ class DteSiiStatusClass:
         except Exception as exc:
             print(f"[dte_sii_status] Slack/log failed: {exc}", flush=True)
 
-    def sync_one(self, dte_id: int) -> dict:
-        dte = self.db.query(DteModel).filter(DteModel.id == int(dte_id)).first()
-        if not dte:
-            return {"status": "error", "message": "DTE no encontrado"}
+    def _pending_sii_query(self, lookback_days: Optional[int] = None):
+        """DTE SimpleFactura emitidos con sii_status_id=1 (Pendiente) en ventana lookback."""
+        days = lookback_days if lookback_days is not None else 30
+        since = datetime.now() - timedelta(days=max(1, days))
+        return (
+            self.db.query(DteModel)
+            .filter(
+                DteModel.folio.isnot(None),
+                DteModel.folio > 0,
+                DteModel.dte_type_id.in_(DTE_SII_EMITTED_TYPES),
+                DteModel.status_id.in_([4, 5, 14, 16]),
+                DteModel.sii_status_id == SII_STATUS_PENDING,
+                DteModel.added_date >= since,
+            )
+            .order_by(DteModel.id.asc())
+        )
+
+    def _sync_dte_entity(self, dte: DteModel, *, commit: bool = True) -> dict:
+        """Consulta SimpleFactura por folio (documentsIssued) y actualiza el DTE."""
         if not dte.folio or int(dte.folio) <= 0:
-            return {"status": "error", "message": "DTE sin folio emitido"}
+            return {"status": "error", "message": "DTE sin folio emitido", "id": dte.id}
         if not self._is_simplefactura_candidate(dte):
             return {
                 "status": "skipped",
@@ -399,7 +414,6 @@ class DteSiiStatusClass:
                     parsed = p
                     break
         if not parsed and items:
-            # folio exacto sin tipo: tomar el primero
             for item in items:
                 p = self._parse_item(item)
                 if p.get("folio") == int(dte.folio):
@@ -407,21 +421,31 @@ class DteSiiStatusClass:
                     break
 
         if not parsed:
-            # Sin match: marcar pendiente consultado
             dte.sii_status_id = dte.sii_status_id or SII_STATUS_PENDING
             dte.sii_status_checked_at = datetime.now()
             self.db.add(dte)
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return {
                 "status": "success",
                 "message": "Sin registro en SimpleFactura documentsIssued; queda Pendiente",
                 "id": dte.id,
+                "folio": dte.folio,
+                "dte_type_id": dte.dte_type_id,
+                "prev_sii_status_id": SII_STATUS_PENDING,
                 "sii_status_id": dte.sii_status_id,
             }
 
         result = self._apply_parsed(dte, parsed)
-        self.db.commit()
+        if commit:
+            self.db.commit()
         return {"status": "success", **result, **serialize_dte_sii_fields(dte)}
+
+    def sync_one(self, dte_id: int) -> dict:
+        dte = self.db.query(DteModel).filter(DteModel.id == int(dte_id)).first()
+        if not dte:
+            return {"status": "error", "message": "DTE no encontrado"}
+        return self._sync_dte_entity(dte, commit=True)
 
     def _date_chunks(self, start: datetime, end: datetime, chunk_days: int) -> list[tuple[str, str]]:
         """Particiones inclusive [start, end] en ventanas de chunk_days."""
@@ -505,152 +529,98 @@ class DteSiiStatusClass:
         self,
         *,
         lookback_days: Optional[int] = None,
-        limit: int = 2000,
+        limit: int = 5,
         max_seconds: Optional[int] = None,
     ) -> dict:
-        """Cron batch: SimpleFactura dia a dia (mismo enfoque que sync_one).
+        """Cron: recorre uno a uno DTE con sii_status_id=1 (Pendiente), últimos N días.
 
-        max_seconds evita 502 de Apache: avanza y deja has_more para el siguiente tick.
+        Cada fila usa el mismo fetch por folio que sync_one (~10s c/u).
+        limit = cuántos procesar por tick; max_seconds = tope de tiempo del request.
         """
         import time
-        from collections import defaultdict
 
         started = time.monotonic()
         budget = max_seconds if max_seconds is not None else DTE_SII_SYNC_MAX_SECONDS
+        lookback = lookback_days if lookback_days is not None else 30
+        batch_limit = max(1, int(limit))
+        # Reserva ~12s por folio antes de iniciar otro
+        per_dte_reserve = 12
+
         summary = {
             "status": "success",
+            "mode": "one_by_one",
+            "processed": 0,
             "checked": 0,
             "updated": 0,
+            "still_pending": 0,
             "rejected_alerts": 0,
             "skipped": 0,
             "errors": [],
             "items": [],
             "has_more": False,
-            "lookback_days": lookback_days if lookback_days is not None else DTE_SII_SYNC_LOOKBACK_DAYS,
+            "lookback_days": lookback,
             "elapsed_seconds": 0,
-            "buckets_total": 0,
-            "buckets_done": 0,
+            "pending_remaining": 0,
         }
 
         def over_budget() -> bool:
-            return (time.monotonic() - started) >= max(30, int(budget))
+            return (time.monotonic() - started) >= max(15, int(budget) - per_dte_reserve)
 
-        def remaining_seconds() -> float:
-            return max(0.0, float(budget) - (time.monotonic() - started))
+        # Traer más filas por si algunas no son SimpleFactura
+        candidates = self._pending_sii_query(lookback).limit(batch_limit + 200).all()
 
-        # No iniciar otra llamada SF si no alcanza el timeout (evita pasar max_seconds en silencio)
-        min_fetch_seconds = min(45, max(15, SIMPLEFACTURA_ISSUED_TIMEOUT // 2))
-
-        candidates = self._candidates_query(lookback_days=lookback_days).limit(max(1, int(limit))).all()
-        # Si llenamos el limit, quedan más filas para el próximo tick
-        if len(candidates) >= max(1, int(limit)):
-            summary["has_more"] = True
-
-        sf_rows: list[DteModel] = []
         for dte in candidates:
-            if not self._is_simplefactura_candidate(dte):
-                summary["skipped"] += 1
-                continue
-            sf_rows.append(dte)
-
-        if not sf_rows:
-            summary["elapsed_seconds"] = round(time.monotonic() - started, 1)
-            return summary
-
-        by_day_tipo: dict[tuple[int, str], list[DteModel]] = defaultdict(list)
-        for dte in sf_rows:
-            added = dte.added_date or datetime.now()
-            day = added.strftime("%Y-%m-%d")
-            by_day_tipo[(int(dte.dte_type_id or 0), day)].append(dte)
-
-        keys = sorted(by_day_tipo.keys(), key=lambda x: (x[1], x[0]), reverse=True)
-        summary["buckets_total"] = len(keys)
-        issued_index: dict[tuple[int, int], dict] = {}
-        done_buckets: set[tuple[int, str]] = set()
-
-        for tipo, day in keys:
-            if over_budget() or remaining_seconds() < min_fetch_seconds:
+            if summary["processed"] >= batch_limit:
                 summary["has_more"] = True
                 break
-            try:
-                items = self._fetch_issued(dte_type_id=tipo, since=day, until=day, folio=0)
-                for item in items:
-                    parsed = self._parse_item(item)
-                    folio = parsed.get("folio")
-                    if folio is None:
-                        continue
-                    tipo_item = parsed.get("dte_type_id") or tipo
-                    issued_index[(int(tipo_item), int(folio))] = parsed
-                done_buckets.add((tipo, day))
-                summary["buckets_done"] += 1
-            except Exception as exc:
-                summary["errors"].append(f"tipo={tipo} {day}: {exc}")
-                folio_fallbacks = 0
-                for dte in by_day_tipo[(tipo, day)]:
-                    if over_budget() or remaining_seconds() < 15:
-                        summary["has_more"] = True
-                        break
-                    if folio_fallbacks >= 5:
-                        summary["has_more"] = True
-                        break
-                    try:
-                        parsed = self._fetch_one_folio(dte)
-                        folio_fallbacks += 1
-                        if parsed:
-                            issued_index[(tipo, int(dte.folio))] = parsed
-                    except Exception as folio_exc:
-                        folio_fallbacks += 1
-                        summary["errors"].append(
-                            f"dte_id={dte.id} folio={dte.folio}: {folio_exc}"
-                        )
-                if not over_budget() and folio_fallbacks < len(by_day_tipo[(tipo, day)]):
-                    summary["has_more"] = True
-                elif not over_budget():
-                    done_buckets.add((tipo, day))
-                    summary["buckets_done"] += 1
+            if over_budget():
+                summary["has_more"] = True
+                break
 
-        remaining = 0
-        for dte in sf_rows:
-            tipo = int(dte.dte_type_id or 0)
-            day = (dte.added_date or datetime.now()).strftime("%Y-%m-%d")
-            bucket = (tipo, day)
-            key = (tipo, int(dte.folio))
-            parsed = issued_index.get(key)
-
-            if bucket not in done_buckets and parsed is None:
-                remaining += 1
+            if not self._is_simplefactura_candidate(dte):
+                summary["skipped"] += 1
                 continue
 
             summary["checked"] += 1
             try:
-                if not parsed:
-                    if dte.sii_status_id is None:
-                        dte.sii_status_id = SII_STATUS_PENDING
-                    dte.sii_status_checked_at = datetime.now()
-                    self.db.add(dte)
-                    continue
-                result = self._apply_parsed(dte, parsed)
-                summary["updated"] += 1
-                if result.get("alerted"):
-                    summary["rejected_alerts"] += 1
-                if len(summary["items"]) < 100:
-                    summary["items"].append(result)
-                if summary["updated"] % 25 == 0:
-                    self.db.commit()
+                result = self._sync_dte_entity(dte, commit=True)
+                summary["processed"] += 1
+
+                st = result.get("status")
+                if st == "skipped":
+                    summary["skipped"] += 1
+                elif st == "error":
+                    summary["errors"].append(
+                        f"dte_id={dte.id} folio={dte.folio}: {result.get('message')}"
+                    )
+                elif st == "success":
+                    prev = result.get("prev_sii_status_id", SII_STATUS_PENDING)
+                    new = result.get("sii_status_id")
+                    if new == SII_STATUS_PENDING:
+                        summary["still_pending"] += 1
+                    elif new != prev:
+                        summary["updated"] += 1
+                    if result.get("alerted"):
+                        summary["rejected_alerts"] += 1
+                    if len(summary["items"]) < 50:
+                        summary["items"].append(
+                            {
+                                "id": result.get("id"),
+                                "folio": result.get("folio"),
+                                "dte_type_id": result.get("dte_type_id"),
+                                "prev_sii_status_id": prev,
+                                "sii_status_id": new,
+                            }
+                        )
             except Exception as exc:
-                summary["errors"].append(f"dte_id={dte.id}: {exc}")
+                summary["errors"].append(f"dte_id={dte.id} folio={dte.folio}: {exc}")
 
-        if remaining > 0:
+        pending_remaining = self._pending_sii_query(lookback).count()
+        summary["pending_remaining"] = pending_remaining
+        if pending_remaining > 0:
             summary["has_more"] = True
-            summary["remaining"] = remaining
 
-        try:
-            self.db.commit()
-        except Exception as exc:
-            self.db.rollback()
-            summary["status"] = "error"
-            summary["errors"].append(str(exc))
-        if summary["errors"] and summary["updated"] == 0 and not summary["has_more"]:
+        if summary["errors"] and summary["processed"] == 0 and not summary["has_more"]:
             summary["status"] = "error"
         elif summary["errors"]:
             summary["status"] = "partial"
