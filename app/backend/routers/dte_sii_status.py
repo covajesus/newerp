@@ -48,14 +48,13 @@ def sync_one(
 def cron_sync(
     db: Session = Depends(get_db),
     lookback_days: int = Query(30, ge=1, le=365),
-    limit: int = Query(2000, ge=1, le=5000),
-    max_seconds: int = Query(180, ge=30, le=900),
+    limit: int = Query(150, ge=1, le=5000),
+    max_seconds: int = Query(90, ge=30, le=900),
     dte_id: int | None = Query(None, ge=1),
 ):
-    """Cron: GET /api/dte_sii_status/cron?lookback_days=30&limit=2000&max_seconds=180
+    """Cron: GET /api/dte_sii_status/cron?lookback_days=30&limit=150&max_seconds=90
 
-    Consulta SimpleFactura día a día (mismo método que un folio).
-    Si has_more=true, el siguiente tick del cron continúa.
+    Consulta SimpleFactura día a día. Si has_more=true, repetir (o dejar crontab).
     Prueba 1 DTE: ?dte_id=123
     """
     svc = DteSiiStatusClass(db)

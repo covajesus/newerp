@@ -535,6 +535,12 @@ class DteSiiStatusClass:
         def over_budget() -> bool:
             return (time.monotonic() - started) >= max(30, int(budget))
 
+        def remaining_seconds() -> float:
+            return max(0.0, float(budget) - (time.monotonic() - started))
+
+        # No iniciar otra llamada SF si no alcanza el timeout (evita pasar max_seconds en silencio)
+        min_fetch_seconds = min(45, max(15, SIMPLEFACTURA_ISSUED_TIMEOUT // 2))
+
         candidates = self._candidates_query(lookback_days=lookback_days).limit(max(1, int(limit))).all()
         # Si llenamos el limit, quedan más filas para el próximo tick
         if len(candidates) >= max(1, int(limit)):
@@ -563,7 +569,7 @@ class DteSiiStatusClass:
         done_buckets: set[tuple[int, str]] = set()
 
         for tipo, day in keys:
-            if over_budget():
+            if over_budget() or remaining_seconds() < min_fetch_seconds:
                 summary["has_more"] = True
                 break
             try:
@@ -579,19 +585,27 @@ class DteSiiStatusClass:
                 summary["buckets_done"] += 1
             except Exception as exc:
                 summary["errors"].append(f"tipo={tipo} {day}: {exc}")
+                folio_fallbacks = 0
                 for dte in by_day_tipo[(tipo, day)]:
-                    if over_budget():
+                    if over_budget() or remaining_seconds() < 15:
+                        summary["has_more"] = True
+                        break
+                    if folio_fallbacks >= 5:
                         summary["has_more"] = True
                         break
                     try:
                         parsed = self._fetch_one_folio(dte)
+                        folio_fallbacks += 1
                         if parsed:
                             issued_index[(tipo, int(dte.folio))] = parsed
                     except Exception as folio_exc:
+                        folio_fallbacks += 1
                         summary["errors"].append(
                             f"dte_id={dte.id} folio={dte.folio}: {folio_exc}"
                         )
-                if not over_budget():
+                if not over_budget() and folio_fallbacks < len(by_day_tipo[(tipo, day)]):
+                    summary["has_more"] = True
+                elif not over_budget():
                     done_buckets.add((tipo, day))
                     summary["buckets_done"] += 1
 
