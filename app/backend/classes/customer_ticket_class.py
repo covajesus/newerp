@@ -610,10 +610,6 @@ class CustomerTicketClass:
                         DteModel.status_id,
                         DteModel.chip_id,
                         DteModel.category_id,
-                        DteModel.sii_status_id,
-                        DteModel.sii_track_id,
-                        DteModel.sii_rejection_reason,
-                        DteModel.sii_status_checked_at,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -639,10 +635,6 @@ class CustomerTicketClass:
                         DteModel.status_id,
                         DteModel.chip_id,
                         DteModel.category_id,
-                        DteModel.sii_status_id,
-                        DteModel.sii_track_id,
-                        DteModel.sii_rejection_reason,
-                        DteModel.sii_status_checked_at,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -689,10 +681,6 @@ class CustomerTicketClass:
                         DteModel.status_id,
                         DteModel.chip_id,
                         DteModel.category_id,
-                        DteModel.sii_status_id,
-                        DteModel.sii_track_id,
-                        DteModel.sii_rejection_reason,
-                        DteModel.sii_status_checked_at,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
@@ -720,10 +708,6 @@ class CustomerTicketClass:
                         DteModel.status_id,
                         DteModel.chip_id,
                         DteModel.category_id,
-                        DteModel.sii_status_id,
-                        DteModel.sii_track_id,
-                        DteModel.sii_rejection_reason,
-                        DteModel.sii_status_checked_at,
                         CustomerModel.customer,
                         BranchOfficeModel.branch_office
                     ).outerjoin(
