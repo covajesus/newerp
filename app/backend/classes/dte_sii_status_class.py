@@ -536,6 +536,10 @@ class DteSiiStatusClass:
             return (time.monotonic() - started) >= max(30, int(budget))
 
         candidates = self._candidates_query(lookback_days=lookback_days).limit(max(1, int(limit))).all()
+        # Si llenamos el limit, quedan más filas para el próximo tick
+        if len(candidates) >= max(1, int(limit)):
+            summary["has_more"] = True
+
         sf_rows: list[DteModel] = []
         for dte in candidates:
             if not self._is_simplefactura_candidate(dte):
