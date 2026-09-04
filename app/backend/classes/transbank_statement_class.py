@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, date
+from calendar import monthrange
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, TransbankTotalModel, CollectionModel, CashierModel
+from app.backend.db.models import TransbankStatementModel, BranchOfficesTransbankStatementsModel, BranchOfficeModel, CollectionModel, CashierModel
 from app.backend.classes.helper_class import HelperClass
 from app.backend.classes.file_class import FileClass
 from fastapi import HTTPException
@@ -10,12 +11,18 @@ from io import StringIO
 import pandas as pd
 import re
 
-# Solo se cargan movimientos de los últimos N días del .dat (no todo el archivo).
-TRANSBANK_LOOKBACK_DAYS = 15
-
 class TransbankStatementClass:
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def _period_date_window(period: str) -> tuple[date, date]:
+        """Ventana del mes seleccionado (YYYY-MM): desde el día 1 hasta el último día del mes."""
+        fixed = HelperClass.fix_current_dte_period(period)
+        year_s, month_s = fixed.split("-")[:2]
+        year, month = int(year_s), int(month_s)
+        last_day = monthrange(year, month)[1]
+        return date(year, month, 1), date(year, month, last_day)
 
     @staticmethod
     def _decode_transbank_bytes(raw: bytes) -> str:
@@ -350,8 +357,8 @@ class TransbankStatementClass:
     def _parse_statement_date(date_str: str):
         return datetime.strptime(str(date_str), "%Y-%m-%d").date()
 
-    def _aggregate_totals_since(self, min_date_str: str):
-        """Totales por sucursal/fecha desde transbank_statements (ventana recargada)."""
+    def _aggregate_totals_in_range(self, min_date_str: str, max_date_str: str):
+        """Totales por sucursal/fecha desde transbank_statements (ventana del periodo)."""
         rows = (
             self.db.query(
                 TransbankStatementModel.branch_office_id,
@@ -360,6 +367,7 @@ class TransbankStatementClass:
                 func.count(TransbankStatementModel.id).label("total_tickets"),
             )
             .filter(TransbankStatementModel.original_date >= min_date_str)
+            .filter(TransbankStatementModel.original_date <= max_date_str)
             .filter(TransbankStatementModel.branch_office_id.isnot(None))
             .group_by(
                 TransbankStatementModel.branch_office_id,
@@ -368,27 +376,6 @@ class TransbankStatementClass:
             .all()
         )
         return rows
-
-    def _refresh_transbank_totals_window(self, min_date_str: str, totals) -> None:
-        """Actualiza transbank_total solo en la ventana recargada."""
-        min_date = self._parse_statement_date(min_date_str)
-        self.db.query(TransbankTotalModel).filter(
-            TransbankTotalModel.added_date >= min_date
-        ).delete(synchronize_session=False)
-        self.db.commit()
-
-        for row in totals:
-            if not row.branch_office_id or not row.original_date:
-                continue
-            self.db.add(
-                TransbankTotalModel(
-                    branch_office_id=int(row.branch_office_id),
-                    total=int(row.total or 0),
-                    total_tickets=int(row.total_tickets or 0),
-                    added_date=self._parse_statement_date(row.original_date),
-                )
-            )
-        self.db.commit()
 
     def _sync_collections_for_totals(self, totals, progress_callback=None) -> int:
         """Reemplaza colecciones tarjeta solo para sucursal/fecha en la ventana recargada."""
@@ -444,24 +431,23 @@ class TransbankStatementClass:
         try:
             if progress_callback:
                 progress_callback(5, "Preparando procesamiento...")
-                
-            fixed_period = HelperClass.fix_current_dte_period(period)
-            date = fixed_period + "-01"
 
-            # Ventana a cargar desde el .dat (últimos N días).
-            min_date = (datetime.now() - timedelta(days=TRANSBANK_LOOKBACK_DAYS)).date()
+            min_date, max_date = self._period_date_window(period)
             min_date_str = min_date.strftime("%Y-%m-%d")
+            max_date_str = max_date.strftime("%Y-%m-%d")
 
             if progress_callback:
                 progress_callback(
                     10,
-                    f"Reemplazando movimientos desde {min_date_str} (últimos {TRANSBANK_LOOKBACK_DAYS} días)...",
+                    f"Reemplazando movimientos del periodo {min_date_str} → {max_date_str}...",
                 )
 
-            # Solo borrar la ventana que se va a recargar; conservar días anteriores del mes.
+            # Solo borrar el mes seleccionado; otros meses se conservan.
+            # NO tocar transbank_total (es vista MySQL, no editable).
             deleted = (
                 self.db.query(TransbankStatementModel)
                 .filter(TransbankStatementModel.original_date >= min_date_str)
+                .filter(TransbankStatementModel.original_date <= max_date_str)
                 .delete(synchronize_session=False)
             )
             self.db.commit()
@@ -469,8 +455,8 @@ class TransbankStatementClass:
             if progress_callback:
                 progress_callback(
                     12,
-                    f"Eliminados {deleted or 0} movimientos desde {min_date_str}. "
-                    f"Se conservan los anteriores a esa fecha.",
+                    f"Eliminados {deleted or 0} movimientos del periodo. "
+                    f"Se conservan los de otros meses.",
                 )
 
             if progress_callback:
@@ -553,13 +539,13 @@ class TransbankStatementClass:
                 )
             
             total_rows = len(df)
-            skipped_old = 0
+            skipped_out_of_period = 0
             inserted = 0
 
             if progress_callback:
                 progress_callback(
                     35,
-                    f"Procesando {total_rows} filas (solo últimos {TRANSBANK_LOOKBACK_DAYS} días desde {min_date})...",
+                    f"Procesando {total_rows} filas (solo periodo {min_date_str} → {max_date_str})...",
                 )
 
             processed_transactions = set()  # Para evitar duplicados en el mismo archivo
@@ -580,7 +566,7 @@ class TransbankStatementClass:
                 if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
                     progress_callback(
                         progress_percent,
-                        f"Fila {index + 1}/{total_rows} | insertadas {inserted} | omitidas (>{TRANSBANK_LOOKBACK_DAYS}d) {skipped_old}",
+                        f"Fila {index + 1}/{total_rows} | insertadas {inserted} | fuera de periodo {skipped_out_of_period}",
                     )
                 
                 local_id = self._row_get(row, colmap, "local_id")
@@ -603,9 +589,10 @@ class TransbankStatementClass:
                     if not parsed_date:
                         raise ValueError(f"Invalid date format: '{raw_date}'")
 
-                    # Fuera de ventana de 15 días → no cargar
-                    if parsed_date.date() < min_date:
-                        skipped_old += 1
+                    # Fuera del mes seleccionado → no cargar
+                    row_date = parsed_date.date()
+                    if row_date < min_date or row_date > max_date:
+                        skipped_out_of_period += 1
                         continue
 
                     formatted_date = parsed_date.strftime("%Y-%m-%d")
@@ -675,18 +662,17 @@ class TransbankStatementClass:
                 self.db.commit()
 
             if progress_callback:
-                progress_callback(85, "Recalculando totales y colecciones (solo ventana recargada)...")
+                progress_callback(85, "Recalculando colecciones del periodo (sin tocar vista transbank_total)...")
 
-            totals = self._aggregate_totals_since(min_date_str)
-            self._refresh_transbank_totals_window(min_date_str, totals)
+            totals = self._aggregate_totals_in_range(min_date_str, max_date_str)
             collections_updated = self._sync_collections_for_totals(totals, progress_callback)
 
             if progress_callback:
                 progress_callback(
                     100,
-                    f"Completado: {inserted} insertadas, {skipped_old} omitidas del archivo "
-                    f"(>{TRANSBANK_LOOKBACK_DAYS}d), {collections_updated} colecciones actualizadas "
-                    f"desde {min_date_str}. Días anteriores conservados.",
+                    f"Completado: {inserted} insertadas, {skipped_out_of_period} fuera de periodo, "
+                    f"{collections_updated} colecciones actualizadas ({min_date_str} → {max_date_str}). "
+                    f"Otros meses conservados.",
                 )
 
             return 1

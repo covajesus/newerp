@@ -1312,9 +1312,9 @@ class CustomerTicketClass:
         """
         Detalle invoiceV2 (gateway v2).
         Cat. 1: PrcItem en líneas pre-generadas es bruto (como LibreDTE).
-        Cat. 3 (group): PrcItem es neto (BD); Totales v2 con IndMntNeto=2.
+        Cat. 2/3: PrcItem es neto (BD/OC/grupal); no aplicar /1.19 sobre el neto.
         """
-        prices_are_net = int(category_id or 1) == 3
+        prices_are_net = int(category_id or 1) in (2, 3)
         formatted_lines: list[dict] = []
         total_gross = 0
         for index, line in enumerate(detail_lines, start=1):

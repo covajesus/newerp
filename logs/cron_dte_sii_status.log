@@ -48,3 +48,2262 @@ HTTP 200
     "pending_remaining": 0
   }
 }
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+^CC:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 11:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [],
+    "has_more": false,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 0
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+^CC:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 12:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11806777,
+        "folio": 33474933,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806778,
+        "folio": 33474934,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806779,
+        "folio": 33474935,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806780,
+        "folio": 33474936,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806781,
+        "folio": 33474937,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.3,
+    "pending_remaining": 56
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11806800,
+        "folio": 33474948,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806802,
+        "folio": 33474949,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806803,
+        "folio": 33474950,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806804,
+        "folio": 33474951,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11806809,
+        "folio": 33474952,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 5.7,
+    "pending_remaining": 156
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 19:44:48] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807143,
+        "folio": 33475119,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807145,
+        "folio": 33475120,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807146,
+        "folio": 33475121,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807150,
+        "folio": 33475122,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807151,
+        "folio": 33475123,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 227
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807164,
+        "folio": 33475128,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807165,
+        "folio": 33475129,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807172,
+        "folio": 33475130,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807173,
+        "folio": 33475131,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807174,
+        "folio": 33475132,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 217
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807194,
+        "folio": 33475290,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807197,
+        "folio": 33475291,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807201,
+        "folio": 33475292,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807202,
+        "folio": 33475293,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807203,
+        "folio": 33475294,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 202
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 20:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807223,
+        "folio": 33475305,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807227,
+        "folio": 33475306,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807228,
+        "folio": 33475307,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807229,
+        "folio": 33475142,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807231,
+        "folio": 33475143,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 5.5,
+    "pending_remaining": 187
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807255,
+        "folio": 33475310,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807257,
+        "folio": 33475151,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807259,
+        "folio": 33475377,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807260,
+        "folio": 33475378,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807264,
+        "folio": 33475362,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 172
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 21:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807291,
+        "folio": 33475160,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807295,
+        "folio": 33475161,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807299,
+        "folio": 33475162,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807301,
+        "folio": 33475163,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807302,
+        "folio": 33475312,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 157
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807321,
+        "folio": 33475170,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807322,
+        "folio": 33475315,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807323,
+        "folio": 33475171,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807324,
+        "folio": 33475172,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807325,
+        "folio": 33475173,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.6,
+    "pending_remaining": 142
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-01 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807338,
+        "folio": 33475184,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807344,
+        "folio": 33475185,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807347,
+        "folio": 33475186,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807350,
+        "folio": 33475316,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807351,
+        "folio": 33475317,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 127
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-02 07:15:54] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+C:\Users\jesus\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.5.0) or chardet (7.4.3)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+[2026-09-02 07:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 07:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 08:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 08:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 08:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 09:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 09:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 09:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807009,
+        "folio": 33475388,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807166,
+        "folio": 33475389,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807181,
+        "folio": 33475390,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807182,
+        "folio": 33475391,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807188,
+        "folio": 33475392,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 15
+  }
+}
+[2026-09-02 11:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 3,
+    "checked": 3,
+    "updated": 3,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 2,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807489,
+        "folio": 33475398,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807491,
+        "folio": 33475399,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11809040,
+        "folio": 33475400,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 5.1,
+    "pending_remaining": 2
+  }
+}
+[2026-09-02 11:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807277,
+        "folio": 33475406,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807278,
+        "folio": 33475407,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807279,
+        "folio": 33475408,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807280,
+        "folio": 33475409,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807281,
+        "folio": 33475410,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 31
+  }
+}
+[2026-09-02 12:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807514,
+        "folio": 33475421,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807515,
+        "folio": 33475422,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807524,
+        "folio": 33475423,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807525,
+        "folio": 33475424,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807566,
+        "folio": 33475425,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 16
+  }
+}
+[2026-09-02 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11806815,
+        "folio": 33475439,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806825,
+        "folio": 33475440,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806919,
+        "folio": 33475441,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806928,
+        "folio": 33475442,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806965,
+        "folio": 33475443,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 6.9,
+    "pending_remaining": 24
+  }
+}
+[2026-09-02 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 1,
+    "still_pending": 4,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807061,
+        "folio": 33475459,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807063,
+        "folio": 33475452,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807093,
+        "folio": 33475460,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807099,
+        "folio": 33475461,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807100,
+        "folio": 33475462,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 4.0,
+    "pending_remaining": 27
+  }
+}
+[2026-09-02 13:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807141,
+        "folio": 33475464,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807149,
+        "folio": 33475453,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807179,
+        "folio": 33475448,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807265,
+        "folio": 33475465,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807274,
+        "folio": 33475466,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 28
+  }
+}
+[2026-09-02 13:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807632,
+        "folio": 33475433,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807633,
+        "folio": 33475434,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807636,
+        "folio": 33475435,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807639,
+        "folio": 33475436,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807648,
+        "folio": 33475437,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 7.1,
+    "pending_remaining": 13
+  }
+}
+[2026-09-02 13:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 14:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 2,
+    "checked": 2,
+    "updated": 0,
+    "still_pending": 2,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [
+      {
+        "id": 11809048,
+        "folio": 33475476,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11809049,
+        "folio": 33475477,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 2.4,
+    "pending_remaining": 5
+  }
+}
+[2026-09-02 14:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807420,
+        "folio": 33475482,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807421,
+        "folio": 33475483,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807422,
+        "folio": 33475484,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807423,
+        "folio": 33475485,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807463,
+        "folio": 33475486,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 28
+  }
+}
+[2026-09-02 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807486,
+        "folio": 33475488,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807645,
+        "folio": 33475489,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807646,
+        "folio": 33475490,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807707,
+        "folio": 33475491,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807708,
+        "folio": 33475492,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 17
+  }
+}
+[2026-09-02 15:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807793,
+        "folio": 33475501,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807794,
+        "folio": 33475502,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807795,
+        "folio": 33475503,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807796,
+        "folio": 33475504,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807797,
+        "folio": 33475505,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.7,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 15:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 16:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 3,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 3
+  }
+}
+[2026-09-02 17:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11806881,
+        "folio": 33475508,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806882,
+        "folio": 33475509,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806883,
+        "folio": 33475510,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11806886,
+        "folio": 33475511,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807304,
+        "folio": 33475512,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 21
+  }
+}
+[2026-09-02 17:31:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807130,
+        "folio": 33475535,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807271,
+        "folio": 33475536,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807304,
+        "folio": 33475512,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807362,
+        "folio": 33475513,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807365,
+        "folio": 33475537,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 5.4,
+    "pending_remaining": 40
+  }
+}
+[2026-09-02 17:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807433,
+        "folio": 33475544,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807434,
+        "folio": 33475545,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807435,
+        "folio": 33475546,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807436,
+        "folio": 33475518,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807437,
+        "folio": 33475519,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.3,
+    "pending_remaining": 27
+  }
+}
+[2026-09-02 18:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 5,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807665,
+        "folio": 33475553,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807666,
+        "folio": 33475554,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807667,
+        "folio": 33475555,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807668,
+        "folio": 33475556,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      },
+      {
+        "id": 11807676,
+        "folio": 33475559,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 2
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 12
+  }
+}
+[2026-09-02 18:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 18:51:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 19:11:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 19:31:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 19:51:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 20:11:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 20:31:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 20:51:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 21:11:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+^C[2026-09-02 22:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 22:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-02 23:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 4,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 4
+  }
+}
+[2026-09-03 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 5,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 5
+  }
+}
+[2026-09-03 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 5,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 5
+  }
+}
+[2026-09-04 08:02:27] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 5,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 5
+  }
+}

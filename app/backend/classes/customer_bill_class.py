@@ -653,16 +653,35 @@ class CustomerBillClass:
             },
         }
 
+    def _bill_items_include_chip_line(self, bill_items) -> bool:
+        for item in bill_items or []:
+            name = str(
+                (item.get("item_name") if isinstance(item, dict) else getattr(item, "item_name", None))
+                or (item.get("NmbItem") if isinstance(item, dict) else None)
+                or ""
+            ).strip().lower()
+            if "chip" in name:
+                return True
+        return False
+
     def _bill_pre_detail_lines_parking_or_items(self, form_data, bill_items, qty):
         """
         Líneas Detalle para categorías 1 y 2: ítems persistidos/multilínea, chip+parking o una sola línea.
+        Cat. 2 (OC): el chip va como línea neto en items; no se agrega el flag $5.000.
         """
+        category_id = int(getattr(form_data, "category_id", 1) or 1)
+        append_chip_flag = (
+            int(getattr(form_data, "chip_id", 0) or 0) == 1
+            and category_id != 2
+            and category_id != 3
+            and not self._bill_items_include_chip_line(bill_items)
+        )
         if bill_items:
             detail_lines = []
             for item in bill_items:
                 line = libredte_detail_line_from_group_item(item)
                 detail_lines.append(line)
-            if form_data.chip_id == 1:
+            if append_chip_flag:
                 detail_lines.append(
                     {
                         "NmbItem": "Chip",
@@ -671,7 +690,7 @@ class CustomerBillClass:
                     }
                 )
             return detail_lines
-        if form_data.chip_id == 1:
+        if append_chip_flag:
             parking = int(form_data.amount)
             parking_qty = qty if qty is not None and qty >= 1 else 1
             parking_unit = round(parking / parking_qty) if parking_qty > 0 else parking
@@ -838,6 +857,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
@@ -872,6 +892,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -978,6 +999,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
@@ -1009,6 +1031,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -1126,6 +1149,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
@@ -1160,6 +1184,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -1276,6 +1301,7 @@ class CustomerBillClass:
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
                         "folio": dte.folio,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "status_id": dte.status_id,
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
@@ -1307,6 +1333,7 @@ class CustomerBillClass:
                         "folio": dte.folio,
                         "chip_id": dte.chip_id,
                         "category_id": dte.category_id if dte.category_id is not None else 1,
+                        "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                         "total": self._bill_list_total(dte, pxq_gross_by_id),
                         "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                         "branch_office": dte.branch_office,
@@ -1968,7 +1995,10 @@ class CustomerBillClass:
             for item in bill_items:
                 line = libredte_detail_line_from_group_item(item)
                 detail_lines.append(line)
-            if form_data.chip_id == 1:
+            if (
+                int(getattr(form_data, "chip_id", 0) or 0) == 1
+                and not self._bill_items_include_chip_line(bill_items)
+            ):
                 detail_lines.append(
                     {
                         "NmbItem": "Chip",
@@ -2467,7 +2497,11 @@ class CustomerBillClass:
                     ),
                 }
             detail_lines = [libredte_detail_line_from_group_item(item) for item in bill_items]
-            if form_data.chip_id == 1:
+            # Cat. 3: chip flag no aplica; si hay línea Chip en items, no duplicar.
+            if (
+                int(getattr(form_data, "chip_id", 0) or 0) == 1
+                and not self._bill_items_include_chip_line(bill_items)
+            ):
                 detail_lines.append({"NmbItem": "Chip", "QtyItem": 1, "PrcItem": DTE_CHIP_AMOUNT_CLP})
             return detail_lines
         return self._bill_pre_detail_lines_parking_or_items(form_data, bill_items, qty)
