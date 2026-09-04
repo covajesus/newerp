@@ -206,11 +206,33 @@ def _sync_bill_dte_amounts_from_form(dte, form_data, pxq_items=None):
 
 
 def _bill_category_id(form_data, dte_row):
-    """category_id en dtes: 1 normal, 2 con referencias SII, 3 factura grupal (múltiples ítems)."""
-    cid = getattr(form_data, "category_id", None)
-    if cid is None and dte_row is not None:
-        cid = getattr(dte_row, "category_id", None)
-    return cid
+    """category_id en dtes: 1 normal (bruto), 2 con referencias/OC (neto), 3 grupal (neto).
+
+    Si el form manda 1 (o nada) pero el borrador ya es 2/3 (p.ej. desde cotización),
+    se respeta el DTE: si no, las líneas netas se tratan como brutas y se aplica /1.19
+    (850→714, 142→120).
+    """
+    def _as_cid(raw):
+        if raw is None or raw == "":
+            return None
+        try:
+            cid = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return cid if cid in (1, 2, 3) else None
+
+    form_cid = _as_cid(getattr(form_data, "category_id", None))
+    dte_cid = _as_cid(getattr(dte_row, "category_id", None)) if dte_row is not None else None
+
+    if form_cid in (2, 3):
+        return form_cid
+    if dte_cid in (2, 3):
+        return dte_cid
+    if form_cid == 1:
+        return 1
+    if dte_cid == 1:
+        return 1
+    return 1
 
 
 def _folio_ref_for_oc(oc_reference_str):
@@ -2680,6 +2702,15 @@ class CustomerBillClass:
 
         bill_items = self._get_bill_items_for_generation(form_data, dte_row)
         category_id = _bill_category_id(form_data, dte_row)
+        # Borrador desde cotización/OC con líneas PXQ: nunca emitir como cat. 1 (bruto).
+        if category_id == 1 and bill_items and len(bill_items) > 0:
+            has_refs = bool(self._collect_bill_reference_lines(form_data, dte_row))
+            category_id = 2 if has_refs else 3
+            print(
+                f"[v2 factura] category_id forzado a {category_id} "
+                f"(había líneas PXQ; evitar /1.19 sobre montos netos)",
+                flush=True,
+            )
         qty = getattr(form_data, "quantity", None)
         if qty is None and dte_row is not None and getattr(dte_row, "quantity", None) is not None:
             qty = dte_row.quantity

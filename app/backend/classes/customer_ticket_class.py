@@ -277,8 +277,37 @@ def normalize_v2_rut(rut) -> str:
     return raw
 
 
+def _resolve_ticket_category_id(form_data, source_dte=None) -> int:
+    """1 = bruto simple; 2 = OC/referencias (neto); 3 = grupal (neto).
+
+    Cotización→boleta con OC deja category_id=2. No forzar 2→1: eso aplica /1.19
+    sobre montos ya netos (850→714, 142→120).
+    """
+    def _as_cid(raw):
+        if raw is None or raw == "":
+            return None
+        try:
+            cid = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return cid if cid in (1, 2, 3) else None
+
+    form_cid = _as_cid(getattr(form_data, "category_id", None))
+    dte_cid = _as_cid(getattr(source_dte, "category_id", None)) if source_dte is not None else None
+
+    if form_cid in (2, 3):
+        return form_cid
+    if dte_cid in (2, 3):
+        return dte_cid
+    if form_cid == 1:
+        return 1
+    if dte_cid == 1:
+        return 1
+    return 1
+
+
 def _chip_applies(chip_id, category_id) -> bool:
-    return int(chip_id or 0) == 1 and int(category_id or 1) != 3
+    return int(chip_id or 0) == 1 and int(category_id or 1) not in (2, 3)
 
 
 def document_gross_from_parking(parking_gross: int, chip_id, category_id) -> int:
@@ -752,6 +781,7 @@ class CustomerTicketClass:
                     "chip_id": dte.chip_id,
                     "category_id": dte.category_id if dte.category_id is not None else 1,
                     "folio": dte.folio,
+                    "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                     "total": dte.total,
                     "status_id": dte.status_id,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
@@ -785,6 +815,7 @@ class CustomerTicketClass:
                     "chip_id": dte.chip_id,
                     "category_id": dte.category_id if dte.category_id is not None else 1,
                     "folio": dte.folio,
+                    "subtotal": int(dte.subtotal or 0) if getattr(dte, "subtotal", None) is not None else None,
                     "total": dte.total,
                     "added_date": dte.added_date.strftime('%d-%m-%Y') if dte.added_date else None,
                     "branch_office": dte.branch_office,
@@ -1219,18 +1250,24 @@ class CustomerTicketClass:
             return self.db.query(DteModel).filter(DteModel.id == did_int).first()
         return None
 
+    def _ticket_items_include_chip_line(self, group_items) -> bool:
+        for item in group_items or []:
+            name = str(
+                (item.get("item_name") if isinstance(item, dict) else getattr(item, "item_name", None))
+                or ""
+            ).strip().lower()
+            if "chip" in name:
+                return True
+        return False
+
     def _ticket_pre_detalle_lines_from_form(self, form_data, source_dte=None, *, libredte_v1: bool = False):
         """
         Líneas Detalle para boleta 39.
+        Cat. 2/3: precios netos desde customer_dte_items (cotización/OC/grupal).
+        Cat. 1: monto bruto simple (± chip flag).
         libredte_v1=True: boleta grupal PXQ envía PrcItem bruto (LibreDTE v1 emitir).
         """
-        category_id = getattr(form_data, "category_id", None)
-        if category_id is None and source_dte is not None:
-            category_id = source_dte.category_id
-        if category_id is None:
-            category_id = 1
-        if category_id not in (1, 3):
-            category_id = 1
+        category_id = _resolve_ticket_category_id(form_data, source_dte)
 
         qty = getattr(form_data, "quantity", None)
         if qty is None and source_dte is not None and source_dte.quantity is not None:
@@ -1242,13 +1279,22 @@ class CustomerTicketClass:
 
         group_items = self._get_group_items_for_generation(form_data, source_dte)
 
-        if category_id == 3:
+        # Cotización/OC con líneas: nunca emitir como cat. 1 (evita /1.19 sobre neto).
+        if category_id == 1 and group_items:
+            category_id = 2 if int(getattr(source_dte, "category_id", 0) or 0) == 2 else 3
+            print(
+                f"[v2 boleta] category_id forzado a {category_id} "
+                f"(había líneas PXQ; evitar /1.19 sobre montos netos)",
+                flush=True,
+            )
+
+        if category_id in (2, 3):
             if not group_items:
                 return {
                     "status": "error",
                     "message": (
-                        "Boleta grupal (categoría 3) sin líneas de ítem: cargue ítems en la petición o guarde líneas "
-                        "en customer_dte_items para el borrador."
+                        f"Boleta categoría {category_id} sin líneas de ítem: cargue ítems en la petición "
+                        "o guarde líneas en customer_dte_items para el borrador."
                     ),
                 }
             detail_lines = []
@@ -1260,7 +1306,12 @@ class CustomerTicketClass:
                         unit_prices_gross=libredte_v1,
                     )
                 )
-            if form_data.chip_id == 1:
+            append_chip = (
+                int(getattr(form_data, "chip_id", 0) or 0) == 1
+                and category_id != 2
+                and not self._ticket_items_include_chip_line(group_items)
+            )
+            if append_chip:
                 detail_lines.append(
                     {
                         "NmbItem": "Chip",
@@ -3512,10 +3563,11 @@ class CustomerTicketClass:
             FolioClass(self.db).release_folio_pool(folio_res["id"])
             return detail_lines
 
-        category_id = getattr(form_data, "category_id", None)
-        if category_id is None and source_dte is not None:
-            category_id = source_dte.category_id
-        category_id = int(category_id or 1)
+        category_id = _resolve_ticket_category_id(form_data, source_dte)
+        # Si hay líneas PXQ y quedó 1, forzar neto (misma regla que _ticket_pre_detalle_lines).
+        group_items = self._get_group_items_for_generation(form_data, source_dte)
+        if category_id == 1 and group_items:
+            category_id = 2 if int(getattr(source_dte, "category_id", 0) or 0) == 2 else 3
 
         formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
@@ -3529,8 +3581,20 @@ class CustomerTicketClass:
 
         issue_date = v2_dte_api_date()
         due_date = v2_dte_api_date(datetime.now() + timedelta(days=30))
-        net_amount = round(total_gross / 1.19)
-        tax_amount = total_gross - net_amount
+        if category_id in (2, 3):
+            net_amount = sum(int(line.get("MontoItem") or 0) for line in formatted_lines)
+            if net_amount <= 0:
+                # Boleta v2 a veces no lleva MontoItem; reconstruir desde Prc×Qty
+                net_amount = 0
+                for line in formatted_lines:
+                    try:
+                        net_amount += int(line.get("PrcItem") or 0) * int(line.get("QtyItem") or 1)
+                    except (TypeError, ValueError):
+                        continue
+            _, tax_amount, total_gross, _ = dte_totals_from_net(net_amount)
+        else:
+            net_amount = round(total_gross / 1.19)
+            tax_amount = total_gross - net_amount
         document = {
             "Encabezado": {
                 "IdDoc": {
@@ -3664,10 +3728,10 @@ class CustomerTicketClass:
         if isinstance(detail_lines, dict) and detail_lines.get("status") == "error":
             return detail_lines
 
-        category_id = getattr(form_data, "category_id", None)
-        if category_id is None and source_dte is not None:
-            category_id = source_dte.category_id
-        category_id = int(category_id or 1)
+        category_id = _resolve_ticket_category_id(form_data, source_dte)
+        group_items = self._get_group_items_for_generation(form_data, source_dte)
+        if category_id == 1 and group_items:
+            category_id = 2 if int(getattr(source_dte, "category_id", 0) or 0) == 2 else 3
 
         formatted_lines, total_gross = self._v2_format_detalle_lines(detail_lines, category_id)
 
@@ -3682,8 +3746,19 @@ class CustomerTicketClass:
         base_date = dte.added_date if dte.added_date else datetime.now()
         issue_date = v2_dte_api_date(base_date)
         due_date = v2_dte_api_date(base_date + timedelta(days=30))
-        net_amount = round(total_gross / 1.19)
-        tax_amount = total_gross - net_amount
+        if category_id in (2, 3):
+            net_amount = sum(int(line.get("MontoItem") or 0) for line in formatted_lines)
+            if net_amount <= 0:
+                net_amount = 0
+                for line in formatted_lines:
+                    try:
+                        net_amount += int(line.get("PrcItem") or 0) * int(line.get("QtyItem") or 1)
+                    except (TypeError, ValueError):
+                        continue
+            _, tax_amount, total_gross, _ = dte_totals_from_net(net_amount)
+        else:
+            net_amount = round(total_gross / 1.19)
+            tax_amount = total_gross - net_amount
 
         # Igual que en NC v2: si SimpleFactura ya consumió el folio (ej. boletas de
         # máquinas emitidas fuera de la pool local), se marca usado y se reintenta
@@ -3770,14 +3845,20 @@ class CustomerTicketClass:
         mark_dte_sii_pending(dte)
         dte.updated_date = datetime.now()
         group_items = self._get_group_items_for_generation(form_data, dte)
-        cid = int(getattr(form_data, "category_id", None) or dte.category_id or 1)
+        cid = int(category_id or _resolve_ticket_category_id(form_data, dte) or 1)
         chip = int(getattr(form_data, "chip_id", 0) or 0)
-        if cid == 3:
+        if cid in (2, 3):
             chip = 0
         dte.chip_id = chip
         dte.category_id = cid
-        _set_dte_gross_totals(dte, total_gross)
-        if cid == 3:
+        if cid in (2, 3):
+            dte.subtotal = int(net_amount)
+            dte.tax = int(tax_amount)
+            dte.total = int(total_gross)
+            dte.cash_amount = int(total_gross)
+        else:
+            _set_dte_gross_totals(dte, total_gross)
+        if cid in (2, 3):
             if group_items:
                 dte.quantity = sum(item["quantity"] for item in group_items)
                 if self._normalize_group_items(getattr(form_data, "items", [])):

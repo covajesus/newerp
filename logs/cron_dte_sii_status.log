@@ -2307,3 +2307,79 @@ HTTP 200
     "pending_remaining": 5
   }
 }
+[2026-09-04 08:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 5,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 5
+  }
+}
+[2026-09-04 08:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807346,
+        "folio": 33475760,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807439,
+        "folio": 33475761,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807530,
+        "folio": 33475762,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807586,
+        "folio": 33475763,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807669,
+        "folio": 33475764,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.4,
+    "pending_remaining": 12
+  }
+}
