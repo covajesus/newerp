@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+import sys
 from collections import Counter
 from io import StringIO
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 from app.backend.classes.transbank_statement_class import TransbankStatementClass
 

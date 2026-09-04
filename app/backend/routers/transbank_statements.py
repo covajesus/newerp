@@ -19,7 +19,7 @@ transbank_statements = APIRouter(
 
 @transbank_statements.post("/")
 def index(transbank: TransbankStatementList, db: Session = Depends(get_db)):
-    data = TransbankStatementClass(db).get_all(transbank.page)
+    data = TransbankStatementClass(db).get_all(transbank.page, period=transbank.period)
 
     return {"message": data}
 

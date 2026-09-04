@@ -1428,6 +1428,7 @@ class CashReserveList(BaseModel):
 
 class TransbankStatementList(BaseModel):
     page: int = 0
+    period: Optional[str] = None
 
 class DemarcationList(BaseModel):
     page: int = 0
