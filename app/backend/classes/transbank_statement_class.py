@@ -250,23 +250,14 @@ class TransbankStatementClass:
 
     def get_all(self, page=1, items_per_page=10, period=None):
         try:
-            # Sin periodo: pantalla vacía (no mezclar todos los meses).
-            period_value = (period or "").strip()
-            if not period_value:
-                empty = {
-                    "total_items": 0,
-                    "total_pages": 0,
-                    "current_page": page if page and page >= 1 else 1,
-                    "items_per_page": items_per_page,
-                    "data": [],
-                    "total_available_receipts": 0,
-                    "period": None,
-                }
-                return [] if page == 0 else empty
-
-            min_date, max_date = self._period_date_window(period_value)
-            min_date_str = min_date.strftime("%Y-%m-%d")
-            max_date_str = max_date.strftime("%Y-%m-%d")
+            # Con periodo: solo ese mes. Sin periodo: compat con FE viejo (todos).
+            # La lista vacía al entrar la controla el frontend (no pide hasta Buscar).
+            period_value = (period or "").strip() or None
+            min_date_str = max_date_str = None
+            if period_value:
+                min_date, max_date = self._period_date_window(period_value)
+                min_date_str = min_date.strftime("%Y-%m-%d")
+                max_date_str = max_date.strftime("%Y-%m-%d")
 
             if page != 0:
                 data_query = (
@@ -291,10 +282,12 @@ class TransbankStatementClass:
                         BranchOfficeModel,
                         BranchOfficeModel.id == TransbankStatementModel.branch_office_id,
                     )
-                    .filter(TransbankStatementModel.original_date >= min_date_str)
-                    .filter(TransbankStatementModel.original_date <= max_date_str)
-                    .order_by(TransbankStatementModel.id.desc())
                 )
+                if min_date_str and max_date_str:
+                    data_query = data_query.filter(
+                        TransbankStatementModel.original_date >= min_date_str
+                    ).filter(TransbankStatementModel.original_date <= max_date_str)
+                data_query = data_query.order_by(TransbankStatementModel.id.desc())
 
                 total_items = data_query.count()
                 total_pages = (
@@ -334,12 +327,12 @@ class TransbankStatementClass:
                     for transbank_statement in data
                 ]
 
-                total_available_receipts = (
-                    self.db.query(TransbankStatementModel)
-                    .filter(TransbankStatementModel.original_date >= min_date_str)
-                    .filter(TransbankStatementModel.original_date <= max_date_str)
-                    .count()
-                )
+                count_query = self.db.query(TransbankStatementModel)
+                if min_date_str and max_date_str:
+                    count_query = count_query.filter(
+                        TransbankStatementModel.original_date >= min_date_str
+                    ).filter(TransbankStatementModel.original_date <= max_date_str)
+                total_available_receipts = count_query.count()
 
                 return {
                     "total_items": total_items,
@@ -351,28 +344,27 @@ class TransbankStatementClass:
                     "period": period_value,
                 }
             else:
-                data = (
-                    self.db.query(
-                        TransbankStatementModel.id,
-                        TransbankStatementModel.branch_office_id,
-                        TransbankStatementModel.original_date,
-                        TransbankStatementModel.code,
-                        TransbankStatementModel.branch_office_name,
-                        TransbankStatementModel.sale_type,
-                        TransbankStatementModel.payment_type,
-                        TransbankStatementModel.card_number,
-                        TransbankStatementModel.sale_description,
-                        TransbankStatementModel.amount,
-                        TransbankStatementModel.value_1,
-                        TransbankStatementModel.value_2,
-                        TransbankStatementModel.value_3,
-                        TransbankStatementModel.value_4,
-                    )
-                    .filter(TransbankStatementModel.original_date >= min_date_str)
-                    .filter(TransbankStatementModel.original_date <= max_date_str)
-                    .order_by(TransbankStatementModel.id)
-                    .all()
+                data_query = self.db.query(
+                    TransbankStatementModel.id,
+                    TransbankStatementModel.branch_office_id,
+                    TransbankStatementModel.original_date,
+                    TransbankStatementModel.code,
+                    TransbankStatementModel.branch_office_name,
+                    TransbankStatementModel.sale_type,
+                    TransbankStatementModel.payment_type,
+                    TransbankStatementModel.card_number,
+                    TransbankStatementModel.sale_description,
+                    TransbankStatementModel.amount,
+                    TransbankStatementModel.value_1,
+                    TransbankStatementModel.value_2,
+                    TransbankStatementModel.value_3,
+                    TransbankStatementModel.value_4,
                 )
+                if min_date_str and max_date_str:
+                    data_query = data_query.filter(
+                        TransbankStatementModel.original_date >= min_date_str
+                    ).filter(TransbankStatementModel.original_date <= max_date_str)
+                data = data_query.order_by(TransbankStatementModel.id).all()
 
                 serialized_data = [
                     {
