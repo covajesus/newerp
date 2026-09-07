@@ -1707,6 +1707,17 @@ class CustomerBillClass:
     
     def save_pdf_bill(self, folio):
         folio = int(folio)
+        dte_row = (
+            self.db.query(DteModel)
+            .filter(DteModel.folio == folio, DteModel.dte_type_id == 33)
+            .order_by(DteModel.id.desc())
+            .first()
+        )
+        if dte_row and is_document_simplefactura_v2(self.db, dte_row):
+            return CustomerTicketClass(self.db).save_simplefactura_pdf_ticket(
+                folio, dte_type_id=33
+            )
+
         tipo_dte = 33
         rut_emisor = '76063822'
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"

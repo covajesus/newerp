@@ -122,7 +122,10 @@ def _whatsapp_document_pdf_url(db, dte_data) -> tuple[str | None, dict | None]:
     from fastapi import HTTPException
     from app.backend.classes.file_class import FileClass
     from app.backend.classes.customer_bill_class import CustomerBillClass
-    from app.backend.classes.customer_ticket_class import CustomerTicketClass
+    from app.backend.classes.customer_ticket_class import (
+        CustomerTicketClass,
+        is_document_simplefactura_v2,
+    )
 
     folio = int(getattr(dte_data, "folio", 0) or 0)
     if folio <= 0:
@@ -137,8 +140,14 @@ def _whatsapp_document_pdf_url(db, dte_data) -> tuple[str | None, dict | None]:
         pass
 
     dte_type_id = int(getattr(dte_data, "dte_type_id", 0) or 0)
-    if dte_type_id == 39:
-        pdf_result = CustomerTicketClass(db).save_simplefactura_pdf_ticket(folio, dte_type_id=dte_type_id)
+    if dte_type_id in (33, 39) and is_document_simplefactura_v2(db, dte_data):
+        pdf_result = CustomerTicketClass(db).save_simplefactura_pdf_ticket(
+            folio, dte_type_id=dte_type_id
+        )
+    elif dte_type_id == 39:
+        pdf_result = CustomerTicketClass(db).save_simplefactura_pdf_ticket(
+            folio, dte_type_id=dte_type_id
+        )
     elif dte_type_id == 33:
         pdf_result = CustomerBillClass(db).save_pdf_bill(folio)
     else:
@@ -985,12 +994,20 @@ class WhatsappClass:
         if not dte_data:
             return {"status": "error", "message": "DTE no encontrado"}
 
-        # Boletas (SimpleFactura v2 + Klap): plantilla envio_dte_v3
-        if int(dte_data.dte_type_id or 0) == 39:
-            print("[resend] Boleta -> send_v2_invoice (envio_dte_v3 / Klap)", flush=True)
+        from app.backend.classes.customer_ticket_class import is_document_simplefactura_v2
+
+        dte_type = int(dte_data.dte_type_id or 0)
+
+        # Boletas y facturas SimpleFactura v2: plantilla envio_dte_v3 + Klap (no LibreDTE)
+        if dte_type == 39 or (dte_type == 33 and is_document_simplefactura_v2(self.db, dte_data)):
+            print(
+                f"[resend] DTE tipo={dte_type} folio={dte_data.folio} "
+                "-> send_v2_invoice (envio_dte_v3 / SimpleFactura)",
+                flush=True,
+            )
             return self.send_v2_invoice(dte_data, dte_data.rut, phone_override=phone)
 
-        # Facturas: plantilla envio_dte + pago LibreDTE
+        # Facturas históricas LibreDTE: plantilla envio_dte + pago LibreDTE
         TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
         issued_dte_info_url = (
             "https://libredte.cl/api/dte/dte_emitidos/info/"

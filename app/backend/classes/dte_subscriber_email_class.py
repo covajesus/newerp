@@ -25,7 +25,7 @@ from app.backend.classes.customer_ticket_class import (
     DTE_VERSION_V2,
     CustomerTicketClass,
     _chip_applies,
-    _is_simplefactura_v2_dte,
+    is_document_simplefactura_v2,
     parking_gross_from_dte,
     ticket_payment_total,
 )
@@ -55,10 +55,9 @@ def is_subscriber_v2_dte(db: Session, dte) -> bool:
     dte_type = int(getattr(dte, "dte_type_id", 0) or 0)
     if dte_type == 61:
         return int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2
-    if dte_type == 39:
-        return _is_simplefactura_v2_dte(db, dte)
-    if dte_type == 33:
-        return int(getattr(dte, "dte_version_id", 0) or 0) == DTE_VERSION_V2
+    if dte_type in (33, 39):
+        # Pool de folios / Klap — no usar solo dte_version_id (LibreDTE también usa 1).
+        return is_document_simplefactura_v2(db, dte)
     return False
 
 
