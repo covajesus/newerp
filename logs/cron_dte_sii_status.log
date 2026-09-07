@@ -2551,4 +2551,1091 @@ HTTP 200
     "pending_remaining": 12
   }
 }
-^C
+^C[2026-09-04 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 5,
+    "checked": 5,
+    "updated": 0,
+    "still_pending": 5,
+    "rejected_alerts": 0,
+    "skipped": 0,
+    "errors": [],
+    "items": [
+      {
+        "id": 11807346,
+        "folio": 33475760,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807439,
+        "folio": 33475761,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807530,
+        "folio": 33475762,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807586,
+        "folio": 33475763,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      },
+      {
+        "id": 11807669,
+        "folio": 33475764,
+        "dte_type_id": 39,
+        "prev_sii_status_id": 1,
+        "sii_status_id": 1
+      }
+    ],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 3.5,
+    "pending_remaining": 12
+  }
+}
+[2026-09-04 19:29:24] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 20:11:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 20:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 20:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 21:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 21:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 22:11:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x00000230214EA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-04 22:31:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-04 22:51:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-04 23:11:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 14:31:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+^CERROR de red: ('Connection aborted.', ConnectionResetError(10054, 'Se ha forzado la interrupción de una conexión existente por el host remoto', None, 10054, None))
+[2026-09-05 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: ('Connection aborted.', ConnectionResetError(10054, 'Se ha forzado la interrupción de una conexión existente por el host remoto', None, 10054, None))
+[2026-09-05 15:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 16:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 17:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 17:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 17:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x0000029EDA2AA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 18:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 18:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: ('Connection aborted.', ConnectionResetError(10054, 'Se ha forzado la interrupción de una conexión existente por el host remoto', None, 10054, None))
+[2026-09-05 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x0000023DEABBA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-05 20:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x00000268D483A510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 21:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x00000248BB2BA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x00000222514DA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 22:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x0000021357DBA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 22:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x000001912B2AA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 22:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-05 23:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x000001CCFBCBA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 23:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x0000023BFE46A510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-05 23:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-06 01:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x000001B5142EA510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-06 01:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-06 01:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 02:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: ('Connection aborted.', ConnectionResetError(10054, 'Se ha forzado la interrupción de una conexión existente por el host remoto', None, 10054, None))
+[2026-09-06 02:31:01] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-06 17:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 17:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 18:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 18:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+^C[2026-09-06 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 20:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 21:11:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 21:31:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+ERROR de red: HTTPSConnectionPool(host='intrajisbackend.com', port=443): Max retries exceeded with url: /api/dte_sii_status/cron (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x0000016A8710A510>, 'Connection to intrajisbackend.com timed out. (connect timeout=900)'))
+[2026-09-06 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+[2026-09-06 22:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 22:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 22:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 23:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 23:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-06 23:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-07 00:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-07 00:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
+[2026-09-07 07:36:56] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 6,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 6
+  }
+}
