@@ -392,8 +392,10 @@ class TransbankStatementClass:
     def _parse_statement_date(date_str: str):
         return datetime.strptime(str(date_str), "%Y-%m-%d").date()
 
-    def _aggregate_totals_in_range(self, min_date_str: str, max_date_str: str):
-        """Totales por sucursal/fecha desde transbank_statements (ventana del periodo)."""
+    def _aggregate_totals_for_dates(self, date_strs: list[str]):
+        """Totales por sucursal/fecha solo para las fechas indicadas."""
+        if not date_strs:
+            return []
         rows = (
             self.db.query(
                 TransbankStatementModel.branch_office_id,
@@ -401,8 +403,7 @@ class TransbankStatementClass:
                 func.sum(TransbankStatementModel.amount).label("total"),
                 func.count(TransbankStatementModel.id).label("total_tickets"),
             )
-            .filter(TransbankStatementModel.original_date >= min_date_str)
-            .filter(TransbankStatementModel.original_date <= max_date_str)
+            .filter(TransbankStatementModel.original_date.in_(date_strs))
             .filter(TransbankStatementModel.branch_office_id.isnot(None))
             .group_by(
                 TransbankStatementModel.branch_office_id,
@@ -412,8 +413,30 @@ class TransbankStatementClass:
         )
         return rows
 
+    def _clear_transbank_collections_for_dates(self, date_strs: list[str]) -> int:
+        """Borra colecciones de cajas Transbank solo en las fechas recargadas."""
+        if not date_strs:
+            return 0
+        cashier_ids = [
+            c.id
+            for c in self.db.query(CashierModel.id)
+            .filter(CashierModel.transbank_status_id == 1)
+            .all()
+        ]
+        if not cashier_ids:
+            return 0
+        date_objs = [self._parse_statement_date(d) for d in date_strs]
+        deleted = (
+            self.db.query(CollectionModel)
+            .filter(CollectionModel.cashier_id.in_(cashier_ids))
+            .filter(CollectionModel.added_date.in_(date_objs))
+            .delete(synchronize_session=False)
+        )
+        self.db.commit()
+        return deleted or 0
+
     def _sync_collections_for_totals(self, totals, progress_callback=None) -> int:
-        """Reemplaza colecciones tarjeta solo para sucursal/fecha en la ventana recargada."""
+        """Inserta colecciones tarjeta para sucursal/fecha (tras limpiar esas fechas)."""
         updated = 0
         for item in totals:
             if not item.branch_office_id or not item.original_date:
@@ -432,16 +455,6 @@ class TransbankStatementClass:
             card_gross = int(item.total or 0)
             card_net = round(card_gross / 1.19)
 
-            existing_collections = (
-                self.db.query(CollectionModel)
-                .filter(CollectionModel.branch_office_id == item.branch_office_id)
-                .filter(CollectionModel.cashier_id == cashier.id)
-                .filter(CollectionModel.added_date == collection_date)
-                .all()
-            )
-            for existing_collection in existing_collections:
-                self.db.delete(existing_collection)
-
             self.db.add(
                 CollectionModel(
                     branch_office_id=item.branch_office_id,
@@ -459,7 +472,7 @@ class TransbankStatementClass:
 
         self.db.commit()
         if progress_callback:
-            progress_callback(95, f"Colecciones actualizadas en ventana recargada: {updated}")
+            progress_callback(95, f"Colecciones actualizadas en fechas del archivo: {updated}")
         return updated
 
     def read_store_bank_statement(self, file_url, period, progress_callback=None):
@@ -472,33 +485,8 @@ class TransbankStatementClass:
             max_date_str = max_date.strftime("%Y-%m-%d")
 
             if progress_callback:
-                progress_callback(
-                    10,
-                    f"Reemplazando movimientos del periodo {min_date_str} → {max_date_str}...",
-                )
+                progress_callback(10, "Leyendo archivo...")
 
-            # Solo borrar el mes seleccionado; otros meses se conservan.
-            # NO tocar transbank_total (es vista MySQL, no editable).
-            deleted = (
-                self.db.query(TransbankStatementModel)
-                .filter(TransbankStatementModel.original_date >= min_date_str)
-                .filter(TransbankStatementModel.original_date <= max_date_str)
-                .delete(synchronize_session=False)
-            )
-            self.db.commit()
-
-            if progress_callback:
-                progress_callback(
-                    12,
-                    f"Eliminados {deleted or 0} movimientos del periodo. "
-                    f"Se conservan los de otros meses.",
-                )
-
-            if progress_callback:
-                progress_callback(15, "Leyendo archivo...")
-
-            # Verificar si la URL es del servidor local y leer directamente del filesystem
-            base_url = "https://intrajisbackend.com/files"
             local_urls = [
                 "https://intrajisbackend.com/files",
                 "http://127.0.0.1:8000/files",
@@ -506,33 +494,28 @@ class TransbankStatementClass:
                 "http://127.0.0.1:8085/files",
                 "http://localhost:8085/files",
             ]
-            
-            # Si es una URL local, leer directamente del filesystem
+
             is_local_url = any(file_url.startswith(url) for url in local_urls)
-            
+
             if is_local_url:
-                # Extraer el remote_path de la URL
-                # Formato esperado: https://intrajisbackend.com/files/transbank_statements_xxx.dat
+                remote_path = None
                 for url_prefix in local_urls:
                     if file_url.startswith(url_prefix):
-                        remote_path = file_url[len(url_prefix):].lstrip('/')
+                        remote_path = file_url[len(url_prefix):].lstrip("/")
                         break
-                
-                # Leer el archivo directamente del filesystem usando FileClass
                 file_class = FileClass(self.db)
                 file_content = file_class.download(remote_path)
                 content = self._decode_transbank_bytes(file_content)
             else:
-                # Si es una URL externa, usar requests
                 response = requests.get(file_url)
                 response.raise_for_status()
                 content = self._decode_transbank_bytes(response.content)
-            
+
             lines = content.splitlines()
-            
+
             if progress_callback:
-                progress_callback(25, "Analizando estructura del archivo...")
-                
+                progress_callback(20, "Analizando estructura del archivo...")
+
             start_index = self._find_transbank_header_index(lines)
 
             if start_index is None:
@@ -556,7 +539,6 @@ class TransbankStatementClass:
                 quotechar='"',
             )
             df = df.fillna("")
-            # Normalizar nombres de columnas (BOM, espacios, comillas).
             df.columns = [
                 str(col).replace("\ufeff", "").strip().strip('"').strip("'")
                 for col in df.columns
@@ -572,7 +554,52 @@ class TransbankStatementClass:
                         f"Mapeadas: {colmap}"
                     ),
                 )
-            
+
+            # Fechas del archivo dentro del mes elegido (solo esas se reemplazan).
+            dates_in_file: set[str] = set()
+            for _, row in df.iterrows():
+                raw_date = self._row_get(row, colmap, "fecha")
+                if not raw_date:
+                    continue
+                parsed_date = self._parse_transbank_date(raw_date)
+                if not parsed_date:
+                    continue
+                row_date = parsed_date.date()
+                if min_date <= row_date <= max_date:
+                    dates_in_file.add(parsed_date.strftime("%Y-%m-%d"))
+
+            dates_list = sorted(dates_in_file)
+            if not dates_list:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"El archivo no tiene movimientos en el periodo {min_date_str} → {max_date_str}."
+                    ),
+                )
+
+            if progress_callback:
+                progress_callback(
+                    28,
+                    f"Reemplazando solo fechas del archivo: {', '.join(dates_list)}. "
+                    f"El resto del mes se conserva.",
+                )
+
+            # NO borrar todo el mes: solo las fechas presentes en el .dat.
+            # NO tocar transbank_total (vista MySQL).
+            deleted = (
+                self.db.query(TransbankStatementModel)
+                .filter(TransbankStatementModel.original_date.in_(dates_list))
+                .delete(synchronize_session=False)
+            )
+            self.db.commit()
+
+            if progress_callback:
+                progress_callback(
+                    32,
+                    f"Eliminados {deleted or 0} movimientos de {len(dates_list)} día(s). "
+                    f"Otros días del mes se conservan.",
+                )
+
             total_rows = len(df)
             skipped_out_of_period = 0
             inserted = 0
@@ -580,138 +607,125 @@ class TransbankStatementClass:
             if progress_callback:
                 progress_callback(
                     35,
-                    f"Procesando {total_rows} filas (solo periodo {min_date_str} → {max_date_str})...",
+                    f"Procesando {total_rows} filas (fechas {dates_list[0]} → {dates_list[-1]})...",
                 )
 
-            processed_transactions = set()  # Para evitar duplicados en el mismo archivo
-            batch_size = 50  # Lotes más pequeños para commits más frecuentes
+            processed_transactions = set()
+            batch_size = 50
             batch_count = 0
-            
-            # Crear cache de branch offices para evitar consultas repetidas
             branch_office_cache = {}
-            
+
             for index, row in df.iterrows():
-                # Calcular progreso más granular (35% a 85% para el procesamiento de filas)
-                progress_percent = 35 + ((index / total_rows) * 50)  # Usar float para más precisión
-                progress_percent = round(progress_percent, 1)  # Redondear a 1 decimal
-                
-                # Actualizar progreso mucho más frecuentemente - cada 5 registros o cada 0.5% de progreso
-                update_frequency = max(5, total_rows // 200)  # Cada 0.5% o mínimo cada 5 registros
-                
+                progress_percent = 35 + ((index / max(total_rows, 1)) * 50)
+                progress_percent = round(progress_percent, 1)
+                update_frequency = max(5, total_rows // 200)
+
                 if progress_callback and (index % update_frequency == 0 or index == total_rows - 1):
                     progress_callback(
                         progress_percent,
                         f"Fila {index + 1}/{total_rows} | insertadas {inserted} | fuera de periodo {skipped_out_of_period}",
                     )
-                
+
                 local_id = self._row_get(row, colmap, "local_id")
                 if not local_id:
                     continue
-                
-                # Usar cache para branch offices
+
                 if local_id not in branch_office_cache:
-                    branch_office_transbank_statement = self.db.query(BranchOfficesTransbankStatementsModel). \
-                            filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id). \
-                            first()
+                    branch_office_transbank_statement = (
+                        self.db.query(BranchOfficesTransbankStatementsModel)
+                        .filter(BranchOfficesTransbankStatementsModel.transbank_code == local_id)
+                        .first()
+                    )
                     branch_office_cache[local_id] = branch_office_transbank_statement
                 else:
                     branch_office_transbank_statement = branch_office_cache[local_id]
 
-                if branch_office_transbank_statement:
-                    raw_date = self._row_get(row, colmap, "fecha")
-                    parsed_date = self._parse_transbank_date(raw_date)
+                if not branch_office_transbank_statement:
+                    continue
 
-                    if not parsed_date:
-                        raise ValueError(f"Invalid date format: '{raw_date}'")
+                raw_date = self._row_get(row, colmap, "fecha")
+                parsed_date = self._parse_transbank_date(raw_date)
+                if not parsed_date:
+                    raise ValueError(f"Invalid date format: '{raw_date}'")
 
-                    # Fuera del mes seleccionado → no cargar
-                    row_date = parsed_date.date()
-                    if row_date < min_date or row_date > max_date:
-                        skipped_out_of_period += 1
-                        continue
+                row_date = parsed_date.date()
+                if row_date < min_date or row_date > max_date:
+                    skipped_out_of_period += 1
+                    continue
 
-                    formatted_date = parsed_date.strftime("%Y-%m-%d")
-                    
-                    monto_afecto_raw = self._row_get(row, colmap, "monto_afecto", "0")
-                    amount = self._parse_amount(monto_afecto_raw)
-                    card_number = self._row_get(row, colmap, "card_number")
-                    auth_code = self._row_get(row, colmap, "auth_code")
-                    
-                    transaction_key = (
-                        local_id,
-                        formatted_date,
-                        card_number,
-                        auth_code,
-                        amount,
-                    )
-                    
-                    # Evitar duplicados en el mismo archivo
-                    if transaction_key in processed_transactions:
-                        continue
-                    
-                    processed_transactions.add(transaction_key)
-                    
-                    # Verificar si ya existe en la base de datos
-                    existing_transaction = self.db.query(TransbankStatementModel).filter(
-                        TransbankStatementModel.code == local_id,
-                        TransbankStatementModel.original_date == formatted_date,
-                        TransbankStatementModel.card_number == card_number,
-                        TransbankStatementModel.value_3 == auth_code,
-                        TransbankStatementModel.amount == amount,
-                    ).first()
-                    
-                    if existing_transaction:
-                        continue  # Skip si ya existe
-                    
-                    transbank_statement = TransbankStatementModel()
-                    transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id if branch_office_transbank_statement else None
-                    transbank_statement.original_date = formatted_date
-                    transbank_statement.code = local_id
-                    transbank_statement.branch_office_name = self._row_get(row, colmap, "local_name")
-                    transbank_statement.sale_type = self._row_get(row, colmap, "sale_type")
-                    transbank_statement.payment_type = self._row_get(row, colmap, "payment_type")
-                    transbank_statement.card_number = card_number
-                    transbank_statement.sale_description = self._row_get(row, colmap, "sale_description")
-                    transbank_statement.amount = amount
-                    transbank_statement.value_1 = monto_afecto_raw
-                    transbank_statement.value_2 = self._row_get(row, colmap, "monto_exento")
-                    transbank_statement.value_3 = auth_code
-                    transbank_statement.value_4 = self._row_get(row, colmap, "cuotas")
-                    transbank_statement.added_date = formatted_date
-                    self.db.add(transbank_statement)
-                    inserted += 1
-                    
-                    batch_count += 1
-                    
-                    # Commit en lotes para mejorar performance
-                    if batch_count >= batch_size:
-                        if progress_callback:
-                            progress_callback(progress_percent, f"💾 Guardando lote de {batch_count} transacciones... ({progress_percent}%)")
-                        self.db.commit()
-                        batch_count = 0
+                formatted_date = parsed_date.strftime("%Y-%m-%d")
 
-            # Commit final para cualquier transacción restante
+                monto_afecto_raw = self._row_get(row, colmap, "monto_afecto", "0")
+                amount = self._parse_amount(monto_afecto_raw)
+                card_number = self._row_get(row, colmap, "card_number")
+                auth_code = self._row_get(row, colmap, "auth_code")
+
+                transaction_key = (
+                    local_id,
+                    formatted_date,
+                    card_number,
+                    auth_code,
+                    amount,
+                )
+                if transaction_key in processed_transactions:
+                    continue
+                processed_transactions.add(transaction_key)
+
+                transbank_statement = TransbankStatementModel()
+                transbank_statement.branch_office_id = branch_office_transbank_statement.branch_office_id
+                transbank_statement.original_date = formatted_date
+                transbank_statement.code = local_id
+                transbank_statement.branch_office_name = self._row_get(row, colmap, "local_name")
+                transbank_statement.sale_type = self._row_get(row, colmap, "sale_type")
+                transbank_statement.payment_type = self._row_get(row, colmap, "payment_type")
+                transbank_statement.card_number = card_number
+                transbank_statement.sale_description = self._row_get(row, colmap, "sale_description")
+                transbank_statement.amount = amount
+                transbank_statement.value_1 = monto_afecto_raw
+                transbank_statement.value_2 = self._row_get(row, colmap, "monto_exento")
+                transbank_statement.value_3 = auth_code
+                transbank_statement.value_4 = self._row_get(row, colmap, "cuotas")
+                transbank_statement.added_date = formatted_date
+                self.db.add(transbank_statement)
+                inserted += 1
+                batch_count += 1
+
+                if batch_count >= batch_size:
+                    if progress_callback:
+                        progress_callback(
+                            progress_percent,
+                            f"Guardando lote de {batch_count} transacciones... ({progress_percent}%)",
+                        )
+                    self.db.commit()
+                    batch_count = 0
+
             if batch_count > 0:
                 if progress_callback:
-                    progress_callback(82, f"💾 Guardando lote final de {batch_count} transacciones...")
+                    progress_callback(82, f"Guardando lote final de {batch_count} transacciones...")
                 self.db.commit()
 
             if progress_callback:
-                progress_callback(85, "Recalculando colecciones del periodo (sin tocar vista transbank_total)...")
+                progress_callback(
+                    85,
+                    f"Recalculando colecciones solo para {len(dates_list)} día(s)...",
+                )
 
-            totals = self._aggregate_totals_in_range(min_date_str, max_date_str)
+            self._clear_transbank_collections_for_dates(dates_list)
+            totals = self._aggregate_totals_for_dates(dates_list)
             collections_updated = self._sync_collections_for_totals(totals, progress_callback)
 
             if progress_callback:
                 progress_callback(
                     100,
                     f"Completado: {inserted} insertadas, {skipped_out_of_period} fuera de periodo, "
-                    f"{collections_updated} colecciones actualizadas ({min_date_str} → {max_date_str}). "
-                    f"Otros meses conservados.",
+                    f"{collections_updated} colecciones. Fechas reemplazadas: {', '.join(dates_list)}. "
+                    f"Resto del mes e otros meses conservados.",
                 )
 
             return 1
 
+        except HTTPException:
+            raise
         except Exception as e:
             if progress_callback:
                 progress_callback(0, f"Error: {str(e)}")
