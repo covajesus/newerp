@@ -534,6 +534,7 @@ def _build_quotation_html_body(
 class DteSubscriberEmailClass:
     def __init__(self, db: Session):
         self.db = db
+        self.file_class = FileClass(db)
 
     def _log_email_error(self, message: str, *, detail=None, exc=None, reference_id=None):
         try:
@@ -551,7 +552,6 @@ class DteSubscriberEmailClass:
             )
         except Exception as log_exc:
             print(f"DteSubscriberEmailClass log failed: {log_exc}")
-        self.file_class = FileClass(db)
 
     def _resolve_customer(self, dte, customer):
         if customer is not None:
