@@ -78,13 +78,31 @@ def _format_clp(amount: int) -> str:
 
 
 def _normalize_recipients(to_emails) -> list[str]:
+    import unicodedata
+
     if isinstance(to_emails, str):
         parts = [p.strip() for p in to_emails.replace(";", ",").split(",")]
     elif to_emails:
         parts = [str(e).strip() for e in to_emails]
     else:
         parts = []
-    return [e for e in parts if e and "@" in e]
+
+    cleaned: list[str] = []
+    for e in parts:
+        if not e or "@" not in e:
+            continue
+        # SMTP exige ASCII: quitar tildes en mails mal cargados (ej. Florería@...).
+        local, _, domain = e.partition("@")
+        local_a = (
+            unicodedata.normalize("NFKD", local).encode("ascii", "ignore").decode("ascii")
+        )
+        domain_a = (
+            unicodedata.normalize("NFKD", domain).encode("ascii", "ignore").decode("ascii")
+        )
+        addr = f"{local_a}@{domain_a}".strip()
+        if addr and "@" in addr and addr not in cleaned:
+            cleaned.append(addr)
+    return cleaned
 
 
 def _smtp_settings() -> dict[str, Any]:

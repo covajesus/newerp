@@ -87,35 +87,81 @@ class BankStatementClass:
         return na == nb
 
     @staticmethod
+    def _rut_dv_ok(body: str, dv: str) -> bool:
+        """Valida dígito verificador chileno (módulo 11)."""
+        body = (body or "").lstrip("0") or "0"
+        if not body.isdigit() or not (1 <= len(body) <= 8):
+            return False
+        dv = (dv or "").strip().upper()
+        if not dv:
+            return False
+        try:
+            expected = HelperClass.verificator_digit(body)
+        except Exception:
+            return False
+        return expected == dv
+
+    @staticmethod
     def _parse_rut_from_movement_description(raw):
         """
         Extrae RUT desde DESCRIPCIÓN MOVIMIENTO (cartola abonados).
 
-        Bancos suelen escribir DV K con guion (`12345678-K`) y DV numérico
-        pegado (`123456789`). El patrón viejo solo aceptaba sin guion al inicio,
-        por eso los RUT con K no matcheaban.
+        Formatos banco (ej. BCI/Iswitch):
+        - `019337364K Transf...` → 19337364-K (cero a la izquierda + cuerpo + DV)
+        - `86.326.000-0 Transf...` → 86326000-0
+        - `12345678-K` / `12.345.678-K`
+
+        Solo acepta candidatos cuyo DV módulo-11 sea válido (evita códigos
+        Iswitch tipo `0995469006` y cortes cortos `1933736-4`).
         """
         text = str(raw or "").strip()
         if not text:
             return 0
 
-        patterns = (
-            # 12.345.678-K / 12345678-K (inicio)
-            r"^[\s]*(\d{1,2}\.?\d{3}\.?\d{3})\s*-\s*([\dkK])\b",
-            # 12345678K / 1234567K sin guion (inicio)
-            r"^[\s]*(\d{7,8})([\dkK])(?![0-9])",
-            # Mismos formatos en cualquier parte del texto
-            r"(\d{1,2}\.?\d{3}\.?\d{3})\s*-\s*([\dkK])\b",
-            r"(?<!\d)(\d{7,8})([\dkK])(?![0-9A-Za-z])",
-        )
-        for pat in patterns:
-            match = re.search(pat, text, re.IGNORECASE)
-            if not match:
+        # Pasarela Iswitch: código interno, no RUT del abonado.
+        if re.search(r"iswitch", text, re.IGNORECASE):
+            return 0
+
+        candidates: list[tuple[str, str, int, int]] = []
+
+        # 1) Con guion (con o sin puntos)
+        for m in re.finditer(
+            r"(\d{1,2}(?:\.\d{3}){2}|\d{7,8})\s*-\s*([\dkK])\b",
+            text,
+            re.IGNORECASE,
+        ):
+            body = re.sub(r"\D", "", m.group(1)).lstrip("0") or "0"
+            dv = m.group(2).upper()
+            candidates.append((body, dv, m.start(), len(body)))
+
+        # 2) Pegado, con ceros a la izquierda: 019337364K / 005474885K
+        #    `0*` consume padding; el cuerpo queda en 7-8 dígitos + DV.
+        for m in re.finditer(
+            r"(?<!\d)0*(\d{7,8})([0-9Kk])(?![0-9A-Za-z])",
+            text,
+            re.IGNORECASE,
+        ):
+            body = (m.group(1) or "").lstrip("0") or "0"
+            dv = m.group(2).upper()
+            candidates.append((body, dv, m.start(), len(body)))
+
+        seen: set[tuple[str, str]] = set()
+        valid: list[tuple[str, str, int, int]] = []
+        for body, dv, pos, blen in candidates:
+            key = (body, dv)
+            if key in seen:
                 continue
-            body = re.sub(r"\D", "", match.group(1)).lstrip("0") or "0"
-            dv = match.group(2).upper()
-            return f"{body}-{dv}"
-        return 0
+            seen.add(key)
+            if BankStatementClass._rut_dv_ok(body, dv):
+                valid.append((body, dv, pos, blen))
+
+        if not valid:
+            return 0
+
+        # Preferir aparición más a la izquierda; empate → cuerpo más largo
+        valid.sort(key=lambda x: (x[2], -x[3]))
+        body, dv, _, _ = valid[0]
+        return f"{body}-{dv}"
 
     @staticmethod
     def _normalize_deposit_date_str(deposit_date):
@@ -537,9 +583,20 @@ class BankStatementClass:
                                 break
                                 
                         elif col == "DESCRIPCIÓN MOVIMIENTO":
-                            # Palabras clave que identifican depósitos propios (tipo 1)
-                            words = ["DeposDoctoMBanco", "DeposDoctoOBancos", "Depósito", "Dep Efect", "Dep", "Pago Remuneraciones", "Remuneracion", "Rem.", "Trabajo"]
-                            pattern = "|".join(words)
+                            # Palabras clave que identifican depósitos propios (tipo 1).
+                            # Evitar "Dep" suelto: matcheaba substrings indebidos.
+                            words = [
+                                "DeposDoctoMBanco",
+                                "DeposDoctoOBancos",
+                                "Depósito",
+                                "Deposito",
+                                "Dep Efect",
+                                "Pago Remuneraciones",
+                                "Remuneracion",
+                                "Rem.",
+                                "Trabajo",
+                            ]
+                            pattern = "|".join(re.escape(w) for w in words)
 
                             if re.search(pattern, str(row[col])):
                                 bank_statement_type_id = 1
@@ -550,6 +607,11 @@ class BankStatementClass:
                     
                     # Solo guardar si la fila es válida y tiene todos los datos necesarios
                     if valid_row and deposit_number is not None and amount is not None and deposit_date is not None:
+                        try:
+                            amount_int = int(round(float(amount)))
+                        except (ValueError, TypeError):
+                            skipped_count += 1
+                            continue
                         bank_statement = BankStatementModel()
                         bank_statement.bank_statement_type_id = bank_statement_type_id
                         if rut in (None, 0, "0", ""):
@@ -557,7 +619,7 @@ class BankStatementClass:
                         else:
                             bank_statement.rut = self._normalize_rut(rut) or 0
                         bank_statement.deposit_number = deposit_number
-                        bank_statement.amount = amount
+                        bank_statement.amount = amount_int
                         bank_statement.period = fixed_period
                         bank_statement.deposit_date = deposit_date
 
