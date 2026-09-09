@@ -36,7 +36,7 @@ DTE_V2_BRANCH_SUFFIX = " - JIS PARKING SPA"
 DTE_V2_HTTP_TIMEOUT = 30
 # SimpleFactura NC v2 suele tardar más que invoiceV2 y a veces no responde a 30s
 # aunque sí emite el DTE. Timeout propio para no cortar ni reciclar el folio.
-DTE_V2_NC_HTTP_TIMEOUT = int(os.getenv("DTE_V2_NC_HTTP_TIMEOUT", "90"))
+DTE_V2_NC_HTTP_TIMEOUT = int(os.getenv("DTE_V2_NC_HTTP_TIMEOUT", "150"))
 DTE_CHIP_AMOUNT_CLP = 5000
 SIMPLEFACTURA_RUT_EMISOR = "76063822-6"
 SIMPLEFACTURA_SUCURSAL = "Casa Matriz"
@@ -2706,6 +2706,9 @@ class CustomerTicketClass:
         """
         Confirma en SimpleFactura una NC ya emitida tras timeout/folio existente.
         El PDF debe ser tipo 61 y referenciar exactamente al DTE original.
+
+        Incluye folios huérfanos (used_id=1, dte_id=0): quedan así cuando SF emite
+        pero Intrajis corta por timeout antes de persistir el DTE.
         """
         candidates = []
         if current_folio:
@@ -2725,6 +2728,20 @@ class CustomerTicketClass:
             candidates.extend(int(folio) for folio in linked_folios if folio)
         except Exception as exc:
             print(f"[v2-nc-recovery] no se pudieron leer folios vinculados: {exc}", flush=True)
+            self.db.rollback()
+
+        # Folios NC usados sin DTE local (timeout típico: SF emitió, Intrajis no guardó).
+        try:
+            orphan_folios = self.db.execute(
+                text(
+                    "SELECT folio FROM folios "
+                    "WHERE document_type_id = 61 AND used_id = 1 AND (dte_id IS NULL OR dte_id = 0) "
+                    "ORDER BY id DESC LIMIT 40"
+                )
+            ).scalars().all()
+            candidates.extend(int(folio) for folio in orphan_folios if folio)
+        except Exception as exc:
+            print(f"[v2-nc-recovery] no se pudieron leer folios huérfanos: {exc}", flush=True)
             self.db.rollback()
 
         candidates = list(dict.fromkeys(candidates))
@@ -2970,10 +2987,34 @@ class CustomerTicketClass:
                 }
                 break
 
-            # SF dice que el documento ya estaba anulado y no se encontró una NC
-            # propia que recuperar: liberar el folio y cerrar el ciclo localmente
-            # (original y NC pendiente a status 5).
+            # SF dice que el documento ya estaba anulado: primero buscar NC huérfana
+            # (emitida en un intento anterior con timeout) antes de cerrar sin DTE.
             if self._emit_says_reference_already_annulled(emit_result):
+                recovered_annulled = self._find_existing_credit_note_v2(
+                    dte,
+                    reserved_folio,
+                    pending_nc_dte_id=pending_nc_dte_id,
+                    retry_delays=(0, 2, 5, 10),
+                )
+                if recovered_annulled:
+                    folio_cls.release_folio_pool(folio_res["id"])
+                    recovered_folio = int(recovered_annulled["folio"])
+                    recovered_row_id = recovered_annulled.get("folio_row_id")
+                    if not recovered_row_id:
+                        return {
+                            "status": "error",
+                            "message": f"NC {recovered_folio} existe, pero no está en la pool local",
+                        }
+                    reserved_folio = recovered_folio
+                    folio_res = {"id": int(recovered_row_id), "folio": recovered_folio}
+                    emit_result = {
+                        "status": "success",
+                        "message": "NC ya emitida confirmada en SimpleFactura (post anulación)",
+                        "folio": recovered_folio,
+                        "recovered": True,
+                    }
+                    break
+
                 folio_cls.release_folio_pool(folio_res["id"])
                 return self._complete_already_annulled_locally(
                     dte,
@@ -2990,9 +3031,27 @@ class CustomerTicketClass:
                     branch_office_id=dte.branch_office_id,
                 )
                 print(
-                    f"[v2-nc] timeout folio {reserved_folio}; se marca usado y no se reintenta otro",
+                    f"[v2-nc] timeout folio {reserved_folio}; se marca usado y se reintenta recuperar PDF",
                     flush=True,
                 )
+                recovered_timeout = self._find_existing_credit_note_v2(
+                    dte,
+                    reserved_folio,
+                    pending_nc_dte_id=pending_nc_dte_id,
+                    retry_delays=(5, 10, 20, 30),
+                )
+                if recovered_timeout:
+                    recovered_folio = int(recovered_timeout["folio"])
+                    recovered_row_id = recovered_timeout.get("folio_row_id") or folio_res["id"]
+                    reserved_folio = recovered_folio
+                    folio_res = {"id": int(recovered_row_id), "folio": recovered_folio}
+                    emit_result = {
+                        "status": "success",
+                        "message": "NC ya emitida confirmada en SimpleFactura tras timeout",
+                        "folio": recovered_folio,
+                        "recovered": True,
+                    }
+                    break
                 return {
                     "status": "error",
                     "timeout": True,
