@@ -25,7 +25,17 @@ if not DB_USER or not DB_PASSWORD:
 DB_PASSWORD_ENCODED = quote_plus(DB_PASSWORD)
 
 SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD_ENCODED}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-engine = create_engine(SQLALCHEMY_DATABASE_URI, pool_size=20, max_overflow=0, echo=False)
+# pool_pre_ping: descarta conexiones muertas. max_overflow: picos sin saturar MySQL.
+# pool_recycle: evita MySQL "gone away" en conexiones viejas.
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URI,
+    pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "30")),
+    pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+    pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "28000")),
+    pool_pre_ping=True,
+    echo=False,
+)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 
@@ -50,7 +60,15 @@ if DB2_USER and DB2_PASSWORD and DB2_HOST:
     # Codificar la contraseña para que funcione correctamente en la URI
     DB2_PASSWORD_ENCODED = quote_plus(DB2_PASSWORD)
     SQLALCHEMY_DB2_URI = f"mysql+pymysql://{DB2_USER}:{DB2_PASSWORD_ENCODED}@{DB2_HOST}:{DB2_PORT}/{DB2_NAME}"
-    engine_db2 = create_engine(SQLALCHEMY_DB2_URI, pool_size=10, max_overflow=0, echo=False)
+    engine_db2 = create_engine(
+        SQLALCHEMY_DB2_URI,
+        pool_size=int(os.getenv("DB2_POOL_SIZE", "10")),
+        max_overflow=int(os.getenv("DB2_MAX_OVERFLOW", "20")),
+        pool_timeout=int(os.getenv("DB2_POOL_TIMEOUT", "30")),
+        pool_recycle=int(os.getenv("DB2_POOL_RECYCLE", "28000")),
+        pool_pre_ping=True,
+        echo=False,
+    )
     SessionLocalDB2 = sessionmaker(bind=engine_db2, autocommit=False, autoflush=False)
     BaseDB2 = declarative_base()
 else:

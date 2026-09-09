@@ -6,7 +6,7 @@ from fastapi import HTTPException, Depends
 from app.backend.db.models import UserModel, EmployeeModel, EmployeeLaborDatumModel, JobPositionModel
 import os
 from jose import jwt, JWTError
-from app.backend.db.database import get_db
+from app.backend.db.database import SessionLocal
 from sqlalchemy.orm import Session
 import bcrypt
 
@@ -56,15 +56,16 @@ def get_optional_current_user(
 
 
 def get_user(rut):
-    db: Session = next(get_db())
-
-    user = db.query(UserModel). \
-                    filter(UserModel.rut == rut). \
-                    first()
-    
-    if not user:
-        return None
-    return user
+    """Carga el usuario y cierra la sesión (antes next(get_db()) filtraba conexiones)."""
+    db: Session = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.rut == rut).first()
+        if not user:
+            return None
+        db.expunge(user)
+        return user
+    finally:
+        db.close()
 
 def generate_bcrypt_hash(input_string):
     encoded_string = input_string.encode('utf-8')
