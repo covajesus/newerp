@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import base64
 import secrets
 from datetime import datetime, timedelta
 from html import escape
+from pathlib import Path
 from urllib.parse import unquote
 
 import pytz
@@ -78,6 +80,17 @@ def consume_challenge(db: Session, pay_id: str, token: str) -> bool:
     return True
 
 
+def _logo_src() -> str:
+    path = Path(__file__).resolve().parents[1] / "static" / "logo.png"
+    if not path.is_file():
+        return ""
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+_LOGO_SRC = _logo_src()
+
+
 def _submit_url() -> str:
     base = payments_env(
         "PAYMENTS_PUBLIC_API_BASE",
@@ -93,6 +106,11 @@ def render_consent_page(pay_id: str, challenge: str, error: str = "") -> HTMLRes
     error_html = (
         f'<p class="error">{escape(error)}</p>' if error else ""
     )
+    logo_html = (
+        f'<img class="logo" src="{_LOGO_SRC}" alt="JIS Parking">'
+        if _LOGO_SRC
+        else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -102,6 +120,7 @@ def render_consent_page(pay_id: str, challenge: str, error: str = "") -> HTMLRes
   <style>
     body {{ margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f4f7fb; color: #1a2332; }}
     .wrap {{ max-width: 640px; margin: 0 auto; padding: 28px 16px 40px; }}
+    .logo {{ display: block; height: 48px; width: auto; margin: 0 0 14px; }}
     h1 {{ font-size: 22px; margin: 0 0 8px; }}
     .lead {{ margin: 0 0 16px; color: #5a6577; font-size: 14px; }}
     .notice {{ background: #e8f1fb; border: 1px solid #d3e3f6; border-radius: 10px; padding: 16px 18px; color: #1e3a5f; font-size: 15px; line-height: 1.55; }}
@@ -116,6 +135,7 @@ def render_consent_page(pay_id: str, challenge: str, error: str = "") -> HTMLRes
 </head>
 <body>
   <main class="wrap">
+    {logo_html}
     <h1>Antes de continuar al pago</h1>
     <p class="lead">Lee la información y acepta el tratamiento de tus datos para seguir.</p>
     {error_html}

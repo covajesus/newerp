@@ -8,6 +8,7 @@ from urllib.parse import unquote
 
 import pytz
 from fastapi import Request
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.backend.classes.payment_gateway_class import normalize_gateway_order_id
@@ -60,6 +61,28 @@ LEGAL_BASIS = "Consentimiento previo, libre, especifico e inequivoco"
 class PersonalDataConsentClass:
     def __init__(self, db: Session):
         self.db = db
+
+    def already_accepted(self, pay_id: str) -> bool:
+        """True si este cliente (o este mismo enlace) ya dejo el consentimiento."""
+        cleaned = _clean_pay_id(pay_id)
+        dte = self._resolve_dte(cleaned)
+        clauses = []
+        rut = str(dte.rut).strip() if dte and dte.rut else ""
+        if rut:
+            clauses.append(PersonalDataConsentModel.rut == rut)
+        if cleaned:
+            clauses.append(PersonalDataConsentModel.pay_id == cleaned)
+        if dte and dte.folio is not None:
+            clauses.append(PersonalDataConsentModel.folio == int(dte.folio))
+        if not clauses:
+            return False
+        row = (
+            self.db.query(PersonalDataConsentModel.id)
+            .filter(PersonalDataConsentModel.accepted == 1)
+            .filter(or_(*clauses))
+            .first()
+        )
+        return row is not None
 
     def record_acceptance(self, pay_id: str, request: Request | None = None) -> PersonalDataConsentModel:
         cleaned = _clean_pay_id(pay_id)

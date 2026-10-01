@@ -168,15 +168,30 @@ def get_paid_document(folio: int, db: Session = Depends(get_db)):
     return {"message": data}
 
 
+def _checkout_redirect(pay_id: str, db: Session, status_code: int = 302):
+    try:
+        redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(pay_id, db)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else "No se pudo abrir el pago."
+        return render_message("No se pudo abrir el pago", detail, exc.status_code)
+    return RedirectResponse(
+        url=redirect_url,
+        status_code=status_code,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @payments.get("/pay/{order_id:path}")
 def pay_redirect(order_id: str, db: Session = Depends(get_db)):
     """
-    El enlace de WhatsApp/correo abre esta pantalla al instante.
-    No redirige a la pasarela ni a la app (evita el login).
+    El enlace de WhatsApp/correo abre el aviso solo la primera vez.
+    Si ese cliente ya acepto, va directo a la pasarela.
     """
     pay_id = clean_pay_id(order_id)
     if not pay_id:
         return render_message("Enlace no válido", "El enlace de pago no es válido.", 400)
+    if PersonalDataConsentClass(db).already_accepted(pay_id):
+        return _checkout_redirect(pay_id, db)
     token = issue_challenge(db, pay_id)
     return render_consent_page(pay_id, token)
 
@@ -206,19 +221,15 @@ def submit_payment_consent(
             "Esta pantalla ya no es válida. Abre de nuevo el enlace de pago que te enviamos.",
             403,
         )
-    try:
-        redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(cleaned, db)
-    except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, str) else "No se pudo abrir el pago."
-        return render_message("No se pudo abrir el pago", detail, exc.status_code)
-    PersonalDataConsentClass(db).record_acceptance(cleaned, request)
+    if not PersonalDataConsentClass(db).already_accepted(cleaned):
+        PersonalDataConsentClass(db).record_acceptance(cleaned, request)
     if not consume_challenge(db, cleaned, challenge):
         return render_message(
             "No se puede continuar",
             "Esta pantalla ya se utilizó. Abre de nuevo el enlace de pago que te enviamos.",
             403,
         )
-    return RedirectResponse(url=redirect_url, status_code=303)
+    return _checkout_redirect(cleaned, db, status_code=303)
 
 
 @payments.post("/consent/accept")
