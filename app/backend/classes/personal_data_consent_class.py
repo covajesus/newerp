@@ -18,7 +18,11 @@ from app.backend.db.models import (
     DteModel,
     DtePaymentDataModel,
     PersonalDataConsentModel,
+    PersonalDataConsentTypeModel,
 )
+
+TYPE_DTE_PAYMENT = "dte_payment"
+TYPE_WEB = "web"
 
 _TZ = pytz.timezone("America/Santiago")
 _WEEKDAYS = (
@@ -76,9 +80,13 @@ class PersonalDataConsentClass:
             clauses.append(PersonalDataConsentModel.folio == int(dte.folio))
         if not clauses:
             return False
+        payment_type = self._type_or_none(TYPE_DTE_PAYMENT)
+        if payment_type is None:
+            return False
         row = (
             self.db.query(PersonalDataConsentModel.id)
             .filter(PersonalDataConsentModel.accepted == 1)
+            .filter(PersonalDataConsentModel.consent_type_id == payment_type.id)
             .filter(or_(*clauses))
             .first()
         )
@@ -118,8 +126,10 @@ class PersonalDataConsentClass:
             + (f" por ${amount}" if amount is not None else "")
             + "."
         )
+        consent_type = self._type(TYPE_DTE_PAYMENT)
         form = {
             "acepta": True,
+            "origen": consent_type.name,
             "nombre": getattr(customer, "customer", None) if customer else None,
             "rut": (dte.rut if dte and dte.rut else None) or (getattr(customer, "rut", None) if customer else None),
             "telefono": getattr(customer, "phone", None) if customer else None,
@@ -139,6 +149,7 @@ class PersonalDataConsentClass:
         }
 
         row = PersonalDataConsentModel(
+            consent_type_id=consent_type.id,
             accepted=1,
             rut=form["rut"],
             customer_name=form["nombre"],
@@ -181,6 +192,19 @@ class PersonalDataConsentClass:
         self.db.commit()
         self.db.refresh(row)
         return row
+
+    def _type(self, code: str) -> PersonalDataConsentTypeModel:
+        row = self._type_or_none(code)
+        if row is None:
+            raise RuntimeError(f"Falta el tipo de consentimiento {code}")
+        return row
+
+    def _type_or_none(self, code: str) -> PersonalDataConsentTypeModel | None:
+        return (
+            self.db.query(PersonalDataConsentTypeModel)
+            .filter(PersonalDataConsentTypeModel.code == code)
+            .first()
+        )
 
     def _resolve_dte(self, pay_id: str) -> DteModel | None:
         if not pay_id:

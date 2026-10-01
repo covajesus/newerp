@@ -2563,12 +2563,25 @@ class DtePaymentDataModel(Base):
     updated_date = Column(DateTime())
 
 
+class PersonalDataConsentTypeModel(Base):
+    """Origen del consentimiento. Pago de DTE, Web, y los que se agreguen despues."""
+
+    __tablename__ = "personal_data_consent_types"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(64), nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(512), nullable=True)
+    added_date = Column(DateTime())
+
+
 class PersonalDataConsentModel(Base):
-    """Aceptacion del aviso de datos personales antes de ir a la pasarela de pago."""
+    """Aceptacion de datos personales. El origen va en consent_type_id; el DTE solo si aplica."""
 
     __tablename__ = "personal_data_consents"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    consent_type_id = Column(Integer, ForeignKey("personal_data_consent_types.id"), nullable=True, index=True)
     accepted = Column(Integer, nullable=False, default=1)
     rut = Column(String(32), nullable=True, index=True)
     customer_name = Column(String(255), nullable=True)

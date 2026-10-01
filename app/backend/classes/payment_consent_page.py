@@ -127,10 +127,12 @@ def render_consent_page(pay_id: str, challenge: str, error: str = "") -> HTMLRes
     .notice p {{ margin: 0 0 12px; }}
     .notice p:last-child {{ margin-bottom: 0; }}
     label {{ display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; font-size: 15px; line-height: 1.45; }}
-    button {{ margin-top: 18px; width: 100%; border: 0; border-radius: 8px; padding: 14px 16px; font-size: 16px; font-weight: 700; color: #fff; background: #1565c0; cursor: pointer; }}
-    button:disabled {{ background: #9bb8d3; cursor: not-allowed; }}
+    button {{ display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 18px; width: 100%; border: 0; border-radius: 8px; padding: 14px 16px; font-size: 16px; font-weight: 700; color: #fff; background: #152d8a; cursor: pointer; }}
+    button:hover:not(:disabled) {{ background: #0f2469; }}
+    button:disabled {{ background: #8d98c0; cursor: not-allowed; }}
+    button svg {{ width: 22px; height: 22px; flex: 0 0 auto; }}
     .error {{ background: #fdecea; color: #8a1f11; border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; }}
-    a {{ color: #1565c0; }}
+    a {{ color: #152d8a; }}
   </style>
 </head>
 <body>
@@ -151,7 +153,13 @@ def render_consent_page(pay_id: str, challenge: str, error: str = "") -> HTMLRes
         <input id="accepted" type="checkbox" name="accepted" value="1">
         <span>He leído la información anterior y autorizo el tratamiento de mis datos personales para las finalidades indicadas.</span>
       </label>
-      <button id="continue" type="submit" disabled>Continuar al pago</button>
+      <button id="continue" type="submit" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <path d="M2 10h20"></path>
+        </svg>
+        <span>Continuar al pago</span>
+      </button>
     </form>
   </main>
   <script>
