@@ -4,15 +4,24 @@ Payment gateway proxy and webhooks (Boleta2 / Factura2).
 Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
 """
 from typing import Any, Optional
-from urllib.parse import quote, unquote, urlencode
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.backend.classes.dte_payment_data_class import DtePaymentDataClass
+from app.backend.classes.payment_consent_page import (
+    challenge_is_valid,
+    clean_pay_id,
+    consume_challenge,
+    issue_challenge,
+    render_consent_page,
+    render_message,
+)
 from app.backend.classes.payment_gateway_class import PaymentGatewayClass
+from app.backend.classes.personal_data_consent_class import PersonalDataConsentClass
 from app.backend.classes.payment_webhook_class import (
     certification_debug_response,
     extract_payment_ids,
@@ -159,39 +168,63 @@ def get_paid_document(folio: int, db: Session = Depends(get_db)):
     return {"message": data}
 
 
-class PaymentConsentAccept(BaseModel):
-    pay_id: str
-    accepted: bool = False
-
-
-def _consent_page_url(pay_id: str) -> str:
-    base = payments_env(
-        "PAYMENTS_CONSENT_FRONTEND_URL",
-        default="https://intrajis.com/payments/consent",
-    ).rstrip("/")
-    cleaned = unquote((pay_id or "").strip()).strip("/")
-    return f"{base}?pay={quote(cleaned, safe='')}"
-
-
 @payments.get("/pay/{order_id:path}")
-def pay_redirect(order_id: str):
+def pay_redirect(order_id: str, db: Session = Depends(get_db)):
     """
-    WhatsApp/email link lands here first.
-    Do not send the privacy notice in the message: show it on the consent page.
-    Gateway redirect happens only after POST /payments/consent/accept.
+    El enlace de WhatsApp/correo abre esta pantalla al instante.
+    No redirige a la pasarela ni a la app (evita el login).
     """
-    return RedirectResponse(url=_consent_page_url(order_id), status_code=302)
+    pay_id = clean_pay_id(order_id)
+    if not pay_id:
+        return render_message("Enlace no válido", "El enlace de pago no es válido.", 400)
+    token = issue_challenge(db, pay_id)
+    return render_consent_page(pay_id, token)
+
+
+@payments.post("/consent/submit")
+def submit_payment_consent(
+    request: Request,
+    pay_id: str = Form(default=""),
+    challenge: str = Form(default=""),
+    accepted: str = Form(default=""),
+    db: Session = Depends(get_db),
+):
+    """Solo un formulario con token de esta pantalla puede abrir la pasarela."""
+    cleaned = clean_pay_id(pay_id)
+    if not cleaned:
+        return render_message("Enlace no válido", "El enlace de pago no es válido.", 400)
+    if accepted != "1":
+        token = issue_challenge(db, cleaned)
+        return render_consent_page(
+            cleaned,
+            token,
+            "Debes aceptar el tratamiento de datos para continuar al pago.",
+        )
+    if not challenge_is_valid(db, cleaned, challenge):
+        return render_message(
+            "No se puede continuar",
+            "Esta pantalla ya no es válida. Abre de nuevo el enlace de pago que te enviamos.",
+            403,
+        )
+    try:
+        redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(cleaned, db)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else "No se pudo abrir el pago."
+        return render_message("No se pudo abrir el pago", detail, exc.status_code)
+    PersonalDataConsentClass(db).record_acceptance(cleaned, request)
+    if not consume_challenge(db, cleaned, challenge):
+        return render_message(
+            "No se puede continuar",
+            "Esta pantalla ya se utilizó. Abre de nuevo el enlace de pago que te enviamos.",
+            403,
+        )
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @payments.post("/consent/accept")
-def accept_payment_consent(body: PaymentConsentAccept, db: Session = Depends(get_db)):
-    if not body.accepted:
-        raise HTTPException(status_code=400, detail="Consent is required before payment")
-    pay_id = unquote((body.pay_id or "").strip()).strip("/")
-    if not pay_id:
-        raise HTTPException(status_code=400, detail="Invalid payment link")
-    redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(pay_id, db)
-    return {"message": {"redirect_url": redirect_url}}
+def accept_payment_consent():
+    """Cerrado: la URL de la pasarela no se entrega por API."""
+    raise HTTPException(status_code=403, detail="Consent view is required")
 
 
 @payments.get("/dtes/{dte_id}/payment-url")
@@ -208,6 +241,7 @@ def dte_payment_url(dte_id: int, db: Session = Depends(get_db)):
             status_code=502,
             detail=result.get("message") or "Failed to create payment order",
         )
+    result.pop("redirect_url", None)
     return {"message": result}
 
 

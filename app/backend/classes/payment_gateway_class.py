@@ -419,19 +419,7 @@ class PaymentGatewayClass:
             "PAYMENTS_WHATSAPP_PROXY_PUBLIC_BASE",
             default="https://intrajisbackend.com/api/payments/pay",
         ).rstrip("/")
-        mode = payments_env("PAYMENTS_WHATSAPP_URL_MODE", default="proxy").strip().lower()
-        if mode == "direct" and redirect_url:
-            base = payments_env(
-                "PAYMENTS_WHATSAPP_URL_BASE",
-                default="https://pagos-pasarela.multicaja.cl/",
-            ).rstrip("/") + "/"
-            whatsapp_url_data = (
-                redirect_url[len(base):]
-                if redirect_url.startswith(base)
-                else redirect_url
-            )
-        else:
-            whatsapp_url_data = str(folio)
+        whatsapp_url_data = str(folio)
         return {
             "status": "success",
             "order_id": order_id,

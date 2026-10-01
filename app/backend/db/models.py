@@ -2561,3 +2561,61 @@ class DtePaymentDataModel(Base):
     raw_payload = Column(Text, nullable=True)
     added_date = Column(DateTime())
     updated_date = Column(DateTime())
+
+
+class PersonalDataConsentModel(Base):
+    """Aceptacion del aviso de datos personales antes de ir a la pasarela de pago."""
+
+    __tablename__ = "personal_data_consents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    accepted = Column(Integer, nullable=False, default=1)
+    rut = Column(String(32), nullable=True, index=True)
+    customer_name = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(64), nullable=True)
+    customer_id = Column(Integer, nullable=True)
+    dte_id = Column(Integer, nullable=True)
+    folio = Column(Integer, nullable=True, index=True)
+    dte_type_id = Column(Integer, nullable=True)
+    document_type = Column(String(64), nullable=True)
+    branch_office_id = Column(Integer, nullable=True)
+    branch_office_name = Column(String(255), nullable=True)
+    amount = Column(Integer, nullable=True)
+    pay_id = Column(String(128), nullable=True, index=True)
+    case_description = Column(Text, nullable=True)
+    event_place = Column(String(255), nullable=True)
+    document_datetime = Column(DateTime(), nullable=True)
+    attachments_note = Column(String(255), nullable=True)
+    consent_title = Column(String(255), nullable=True)
+    consent_body = Column(Text, nullable=True)
+    consent_statement = Column(Text, nullable=True)
+    legal_basis = Column(String(255), nullable=True)
+    form_json = Column(Text, nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+    accepted_datetime = Column(DateTime(), nullable=False, index=True)
+    accepted_date = Column(Date(), nullable=False, index=True)
+    accepted_time = Column(String(8), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    day = Column(Integer, nullable=False)
+    hour = Column(Integer, nullable=False)
+    minute = Column(Integer, nullable=False)
+    second = Column(Integer, nullable=False)
+    weekday = Column(Integer, nullable=True)
+    weekday_name = Column(String(16), nullable=True)
+    added_date = Column(DateTime())
+
+
+class PaymentConsentChallengeModel(Base):
+    """Token de un solo uso emitido al mostrar el aviso. Sin el no hay pasarela."""
+
+    __tablename__ = "payment_consent_challenges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(80), nullable=False, unique=True, index=True)
+    pay_id = Column(String(128), nullable=False, index=True)
+    expires_at = Column(DateTime(), nullable=False)
+    used_at = Column(DateTime(), nullable=True)
+    added_date = Column(DateTime())
