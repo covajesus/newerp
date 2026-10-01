@@ -4,7 +4,7 @@ Payment gateway proxy and webhooks (Boleta2 / Factura2).
 Docs: https://api.pasarela.multicaja.cl/docs/ecommerce_api_payments
 """
 from typing import Any, Optional
-from urllib.parse import urlencode
+from urllib.parse import quote, unquote, urlencode
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -159,19 +159,39 @@ def get_paid_document(folio: int, db: Session = Depends(get_db)):
     return {"message": data}
 
 
+class PaymentConsentAccept(BaseModel):
+    pay_id: str
+    accepted: bool = False
+
+
+def _consent_page_url(pay_id: str) -> str:
+    base = payments_env(
+        "PAYMENTS_CONSENT_FRONTEND_URL",
+        default="https://intrajis.com/payments/consent",
+    ).rstrip("/")
+    cleaned = unquote((pay_id or "").strip()).strip("/")
+    return f"{base}?pay={quote(cleaned, safe='')}"
+
+
 @payments.get("/pay/{order_id:path}")
-def pay_redirect(order_id: str, db: Session = Depends(get_db)):
-    return _pay_redirect_to_gateway(order_id, db)
+def pay_redirect(order_id: str):
+    """
+    WhatsApp/email link lands here first.
+    Do not send the privacy notice in the message: show it on the consent page.
+    Gateway redirect happens only after POST /payments/consent/accept.
+    """
+    return RedirectResponse(url=_consent_page_url(order_id), status_code=302)
 
 
-def _pay_redirect_to_gateway(pay_id: str, db: Session):
-    """
-    Public redirect to payment gateway checkout.
-    WhatsApp template envio_dte_v3: https://intrajisbackend.com/api/payments/pay/{{1}}
-    {{1}} may be document folio (stable) or legacy gateway order_id.
-    """
+@payments.post("/consent/accept")
+def accept_payment_consent(body: PaymentConsentAccept, db: Session = Depends(get_db)):
+    if not body.accepted:
+        raise HTTPException(status_code=400, detail="Consent is required before payment")
+    pay_id = unquote((body.pay_id or "").strip()).strip("/")
+    if not pay_id:
+        raise HTTPException(status_code=400, detail="Invalid payment link")
     redirect_url = PaymentGatewayClass().checkout_url_for_pay_link(pay_id, db)
-    return RedirectResponse(url=redirect_url, status_code=302)
+    return {"message": {"redirect_url": redirect_url}}
 
 
 @payments.get("/dtes/{dte_id}/payment-url")
