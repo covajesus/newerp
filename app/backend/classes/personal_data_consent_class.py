@@ -8,12 +8,10 @@ from urllib.parse import unquote
 
 import pytz
 from fastapi import Request
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.backend.classes.payment_gateway_class import normalize_gateway_order_id
 from app.backend.db.models import (
-    BranchOfficeModel,
     CustomerModel,
     DteModel,
     DtePaymentDataModel,
@@ -34,15 +32,6 @@ _WEEKDAYS = (
     "sabado",
     "domingo",
 )
-_DTE_TYPES = {
-    33: "Factura",
-    34: "Factura exenta",
-    39: "Boleta",
-    41: "Boleta exenta",
-    52: "Guia de despacho",
-    56: "Nota de debito",
-    61: "Nota de credito",
-}
 CONSENT_TITLE = "Tratamiento de datos personales (Ley N° 21.719)"
 CONSENT_BODY = (
     "JIS Parking tratara sus datos personales esenciales —nombre, RUT, telefono, "
@@ -67,18 +56,11 @@ class PersonalDataConsentClass:
         self.db = db
 
     def already_accepted(self, pay_id: str) -> bool:
-        """True si este cliente (o este mismo enlace) ya dejo el consentimiento."""
+        """True si este RUT ya acepto el consentimiento de pago."""
         cleaned = _clean_pay_id(pay_id)
         dte = self._resolve_dte(cleaned)
-        clauses = []
         rut = str(dte.rut).strip() if dte and dte.rut else ""
-        if rut:
-            clauses.append(PersonalDataConsentModel.rut == rut)
-        if cleaned:
-            clauses.append(PersonalDataConsentModel.pay_id == cleaned)
-        if dte and dte.folio is not None:
-            clauses.append(PersonalDataConsentModel.folio == int(dte.folio))
-        if not clauses:
+        if not rut:
             return False
         payment_type = self._type_or_none(TYPE_DTE_PAYMENT)
         if payment_type is None:
@@ -87,7 +69,7 @@ class PersonalDataConsentClass:
             self.db.query(PersonalDataConsentModel.id)
             .filter(PersonalDataConsentModel.accepted == 1)
             .filter(PersonalDataConsentModel.consent_type_id == payment_type.id)
-            .filter(or_(*clauses))
+            .filter(PersonalDataConsentModel.rut == rut)
             .first()
         )
         return row is not None
@@ -102,30 +84,8 @@ class PersonalDataConsentClass:
                 .filter(CustomerModel.rut == dte.rut)
                 .first()
             )
-        branch = None
-        if dte and dte.branch_office_id:
-            branch = (
-                self.db.query(BranchOfficeModel)
-                .filter(BranchOfficeModel.id == dte.branch_office_id)
-                .first()
-            )
-
         now = datetime.now(_TZ).replace(tzinfo=None)
-        document_type = _DTE_TYPES.get(int(dte.dte_type_id or 0), None) if dte else None
-        branch_name = getattr(branch, "branch_office", None) if branch else None
-        amount = None
-        if dte is not None:
-            from app.backend.classes.customer_ticket_class import ticket_payment_total
-
-            amount = ticket_payment_total(dte)
-
-        folio = int(dte.folio) if dte and dte.folio is not None else None
-        case_description = (
-            f"Aceptacion para continuar al pago de {document_type or 'documento'}"
-            + (f" folio {folio}" if folio else "")
-            + (f" por ${amount}" if amount is not None else "")
-            + "."
-        )
+        case_description = "Aceptacion para continuar al pago."
         consent_type = self._type(TYPE_DTE_PAYMENT)
         form = {
             "acepta": True,
@@ -135,13 +95,6 @@ class PersonalDataConsentClass:
             "telefono": getattr(customer, "phone", None) if customer else None,
             "correo": getattr(customer, "email", None) if customer else None,
             "descripcion_del_caso": case_description,
-            "fecha_del_documento": dte.added_date.strftime("%Y-%m-%d %H:%M:%S") if dte and dte.added_date else None,
-            "lugar": branch_name,
-            "adjuntos": "Sin adjuntos",
-            "folio": folio,
-            "tipo_documento": document_type,
-            "monto": amount,
-            "pay_id": cleaned,
             "dia": _WEEKDAYS[now.weekday()],
             "fecha": now.strftime("%Y-%m-%d"),
             "hora": now.strftime("%H:%M:%S"),
@@ -156,18 +109,7 @@ class PersonalDataConsentClass:
             email=form["correo"],
             phone=form["telefono"],
             customer_id=getattr(customer, "id", None) if customer else None,
-            dte_id=getattr(dte, "id", None) if dte else None,
-            folio=folio,
-            dte_type_id=getattr(dte, "dte_type_id", None) if dte else None,
-            document_type=document_type,
-            branch_office_id=getattr(dte, "branch_office_id", None) if dte else None,
-            branch_office_name=branch_name,
-            amount=amount,
-            pay_id=cleaned or None,
             case_description=case_description,
-            event_place=branch_name,
-            document_datetime=getattr(dte, "added_date", None) if dte else None,
-            attachments_note="Sin adjuntos",
             consent_title=CONSENT_TITLE,
             consent_body=CONSENT_BODY,
             consent_statement=CONSENT_STATEMENT,

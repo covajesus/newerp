@@ -42,14 +42,6 @@ CREATE TABLE IF NOT EXISTS personal_data_consents (
   email VARCHAR(255) DEFAULT NULL,
   phone VARCHAR(64) DEFAULT NULL,
   customer_id INT DEFAULT NULL,
-  dte_id INT DEFAULT NULL,
-  folio INT DEFAULT NULL,
-  dte_type_id INT DEFAULT NULL,
-  document_type VARCHAR(64) DEFAULT NULL,
-  branch_office_id INT DEFAULT NULL,
-  branch_office_name VARCHAR(255) DEFAULT NULL,
-  amount INT DEFAULT NULL,
-  pay_id VARCHAR(128) DEFAULT NULL,
   case_description TEXT DEFAULT NULL,
   event_place VARCHAR(255) DEFAULT NULL,
   document_datetime DATETIME DEFAULT NULL,
@@ -76,8 +68,6 @@ CREATE TABLE IF NOT EXISTS personal_data_consents (
   PRIMARY KEY (id),
   KEY idx_pdc_consent_type (consent_type_id),
   KEY idx_pdc_rut (rut),
-  KEY idx_pdc_folio (folio),
-  KEY idx_pdc_pay_id (pay_id),
   KEY idx_pdc_accepted_datetime (accepted_datetime),
   KEY idx_pdc_accepted_date (accepted_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -183,6 +173,22 @@ def main() -> None:
         else:
             print("FK already exists: consent_type_id")
 
+        drop_columns = (
+            "dte_id",
+            "folio",
+            "dte_type_id",
+            "document_type",
+            "branch_office_id",
+            "branch_office_name",
+            "amount",
+            "pay_id",
+        )
+        for column in drop_columns:
+            if _column_exists(db, "personal_data_consents", column):
+                db.execute(text(f"ALTER TABLE personal_data_consents DROP COLUMN {column}"))
+                db.commit()
+                print(f"column dropped: {column}")
+
         types = db.execute(
             text("SELECT id, code, name FROM personal_data_consent_types ORDER BY id")
         ).fetchall()
@@ -190,6 +196,18 @@ def main() -> None:
         print(f"table ok: personal_data_consents rows={count}")
         print("table ok: payment_consent_challenges")
         print("types:", [(row[0], row[1], row[2]) for row in types])
+        columns = db.execute(
+            text(
+                """
+                SELECT COLUMN_NAME
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'personal_data_consents'
+                ORDER BY ORDINAL_POSITION
+                """
+            )
+        ).fetchall()
+        print("columns:", [row[0] for row in columns])
     finally:
         db.close()
 

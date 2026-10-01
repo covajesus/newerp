@@ -2576,7 +2576,7 @@ class PersonalDataConsentTypeModel(Base):
 
 
 class PersonalDataConsentModel(Base):
-    """Aceptacion de datos personales. El origen va en consent_type_id; el DTE solo si aplica."""
+    """Aceptacion de datos personales. El origen va en consent_type_id."""
 
     __tablename__ = "personal_data_consents"
 
@@ -2588,14 +2588,6 @@ class PersonalDataConsentModel(Base):
     email = Column(String(255), nullable=True)
     phone = Column(String(64), nullable=True)
     customer_id = Column(Integer, nullable=True)
-    dte_id = Column(Integer, nullable=True)
-    folio = Column(Integer, nullable=True, index=True)
-    dte_type_id = Column(Integer, nullable=True)
-    document_type = Column(String(64), nullable=True)
-    branch_office_id = Column(Integer, nullable=True)
-    branch_office_name = Column(String(255), nullable=True)
-    amount = Column(Integer, nullable=True)
-    pay_id = Column(String(128), nullable=True, index=True)
     case_description = Column(Text, nullable=True)
     event_place = Column(String(255), nullable=True)
     document_datetime = Column(DateTime(), nullable=True)
