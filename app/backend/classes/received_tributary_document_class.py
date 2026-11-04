@@ -262,6 +262,15 @@ class ReceivedTributaryDocumentClass:
 
             summary["fetched"] = len(data)
 
+            removed = (
+                self.db.query(DteModel)
+                .filter(DteModel.dte_version_id == 2)
+                .filter(or_(DteModel.folio.is_(None), DteModel.folio <= 0))
+                .delete(synchronize_session=False)
+            )
+            if removed:
+                summary["deleted_zero_dupes"] += int(removed)
+
             existing_rows = (
                 self.db.query(DteModel)
                 .filter(DteModel.dte_version_id == 2)

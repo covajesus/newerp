@@ -2427,6 +2427,81 @@ class CustomerTicketClass:
             "v2_branch_office": branch_office_name or None,
         }
 
+    def _resolve_referenced_dte_fchref(self, dte, ref_dte_type):
+        """
+        FchRef debe ser la fecha real del DTE referenciado en SimpleFactura/SII.
+        `dtes.added_date` en abonos suele ser el día 1 del período, no la FchEmis
+        real (ej. factura 25557: local 2026-10-01 vs SF 2026-10-05). Esa diferencia
+        puede hacer rechazar la NC y, si SF agrupa el envío, contaminar el track.
+        """
+        fallback = dte.added_date if getattr(dte, "added_date", None) else datetime.now()
+        folio = getattr(dte, "folio", None)
+        if not folio:
+            return fallback
+
+        token, token_err = self._v2_bearer_token()
+        if not token:
+            print(
+                f"[v2-nc] FchRef fallback local: sin token ({token_err})",
+                flush=True,
+            )
+            return fallback
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        # Misma sucursal que documentIssued en producción; probar alias por si acaso.
+        for sucursal in (SIMPLEFACTURA_SUCURSAL, "Casa_Matriz"):
+            payload = {
+                "credenciales": {
+                    "rutEmisor": SIMPLEFACTURA_RUT_EMISOR,
+                    "nombreSucursal": sucursal,
+                },
+                "dteReferenciadoExterno": {
+                    "folio": int(folio),
+                    "codigoTipoDte": int(ref_dte_type),
+                    "ambiente": SIMPLEFACTURA_AMBIENTE,
+                },
+            }
+            try:
+                response = requests.post(
+                    "https://api.simplefactura.cl/documentIssued",
+                    json=payload,
+                    headers=headers,
+                    timeout=DTE_V2_HTTP_TIMEOUT,
+                )
+            except requests.RequestException as exc:
+                print(
+                    f"[v2-nc] FchRef SF error folio={folio} tipo={ref_dte_type}: {exc}",
+                    flush=True,
+                )
+                continue
+            if response.status_code != 200:
+                continue
+            try:
+                body = response.json() if response.text else {}
+            except ValueError:
+                continue
+            data = body.get("data") if isinstance(body, dict) else None
+            if not isinstance(data, dict):
+                continue
+            fecha = data.get("fechaDte") or data.get("FechaDte")
+            if not fecha:
+                continue
+            print(
+                f"[v2-nc] FchRef desde SF folio={folio} tipo={ref_dte_type} "
+                f"fecha={fecha} (local={fallback})",
+                flush=True,
+            )
+            return fecha
+        print(
+            f"[v2-nc] FchRef fallback local folio={folio} tipo={ref_dte_type} "
+            f"fecha={fallback}",
+            flush=True,
+        )
+        return fallback
+
     def _build_subscriber_credit_note_document_v2(
         self,
         customer_data,
@@ -2444,6 +2519,8 @@ class CustomerTicketClass:
         gross = int(abs(gross_amount))
         net = round(gross / 1.19)
         tax = gross - net
+        # CodRef=1 (anula): el SII exige UNA sola referencia al documento anulado.
+        # No agregar una segunda línea con FchEmis.
         return {
             "Encabezado": {
                 "IdDoc": {
@@ -2896,7 +2973,7 @@ class CustomerTicketClass:
             return {"status": "error", "message": "Sucursal no encontrada"}
 
         gross = int(dte.cash_amount) if dte.cash_amount else int(dte.total)
-        ref_date = dte.added_date if dte.added_date else datetime.now()
+        ref_date = self._resolve_referenced_dte_fchref(dte, ref_dte_type)
 
         # Folio NC desde tabla folios (document_type_id=61), no desde la API.
         # SimpleFactura puede responder "Consumo Existente" cuando ya usó un folio
