@@ -556,6 +556,10 @@ class FolioClass:
             return True
         if "ya existe un dte con folio" in text_blob:
             return True
+        # Folio "bloqueado" en SF tras un intento a medias: no reutilizar;
+        # marcar consumido y pasar al siguiente (desbloquear a veces no lo limpia).
+        if "bloqueado" in text_blob or "desbloquear el folio" in text_blob:
+            return True
         if "no respondió a tiempo" in text_blob or "no respondio a tiempo" in text_blob:
             return True
         # SF a menudo responde HTTP 500 EF ("entity changes") por folio ya usado
