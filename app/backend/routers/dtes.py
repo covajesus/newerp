@@ -895,29 +895,33 @@ def send_massive_dtes_stream(
     def generate_dte_stream():
         try:
             dte_class = DteClass(db)
-            
-            # Procesar DTEs uno por uno usando el generador
+
+            # Procesar DTEs uno por uno usando el generador.
+            # Padding SSE: evita que nginx/proxies buffericen y la UI quede “pegada”.
             for progress_data in dte_class.send_massive_dtes_streaming(
                 branch_office_id, dte_type_id, category_id
             ):
-                yield f"data: {json.dumps(progress_data)}\n\n"
-            
+                payload = json.dumps(progress_data, ensure_ascii=False, default=str)
+                yield f"data: {payload}\n\n"
+                yield f": {' ' * 2048}\n\n"
+
         except Exception as e:
             error_data = {
                 "type": "error",
                 "message": f"Error en envío masivo: {str(e)}"
             }
-            yield f"data: {json.dumps(error_data)}\n\n"
-    
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
     return StreamingResponse(
         generate_dte_stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
+            "Access-Control-Allow-Headers": "*",
+        },
     )
 
 @dtes.get("/check_payments")

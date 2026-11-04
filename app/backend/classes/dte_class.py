@@ -2767,8 +2767,8 @@ class DteClass:
             branch_info = f"sucursal {branch_office_id}" if branch_office_id != 0 else "todas las sucursales"
             type_info = f"tipo {dte_type_id}" if dte_type_id != 0 else "todos los tipos"
             category_info = f"categoría {category_id}" if int(category_id or 0) > 0 else "todas las categorías"
-            
-            # Enviar mensaje inicial con información de filtros
+
+            # Contar/cargar primero para que el init lleve total_dtes (la UI no quede en 0/0).
             yield {
                 "type": "init",
                 "period": current_period,
@@ -2776,11 +2776,15 @@ class DteClass:
                 "dte_type_id": dte_type_id,
                 "category_id": int(category_id or 0),
                 "expected_status": expected_status,
-                "message": f"Iniciando envío masivo para {type_info}, {category_info} en {branch_info} del período {current_period}"
+                "total_dtes": None,
+                "message": (
+                    f"Buscando DTEs pendientes ({type_info}, {category_info}) "
+                    f"en {branch_info}…"
+                ),
             }
-            
+
             dtes = self.db.query(DteModel).filter(*base_filter).all()
-            
+
             # Información adicional de depuración si no hay DTEs
             if not dtes:
                 # Contar DTEs en la sucursal sin filtro de status para diagnóstico
@@ -2848,13 +2852,27 @@ class DteClass:
             successful_sends = 0
             failed_sends = 0
             processed = 0
-            
+
+            yield {
+                "type": "init",
+                "period": current_period,
+                "branch_office_id": branch_office_id,
+                "dte_type_id": dte_type_id,
+                "category_id": int(category_id or 0),
+                "expected_status": expected_status,
+                "total_dtes": total_dtes,
+                "message": (
+                    f"Iniciando envío masivo de {total_dtes} DTE(s) "
+                    f"({type_info}, {category_info}) en {branch_info}"
+                ),
+            }
+
             # Procesar cada DTE individualmente
             for i, dte in enumerate(dtes, 1):
                 try:
                     processed += 1
-                    
-                    # Enviar progreso
+
+                    # Enviar progreso ANTES de emitir (NC v2 puede tardar >1 min en SF).
                     yield {
                         "type": "progress",
                         "current": i,
@@ -2863,11 +2881,17 @@ class DteClass:
                         "processing_dte": {
                             "id": dte.id,
                             "rut": dte.rut,
-                            "dte_type_id": dte.dte_type_id
+                            "dte_type_id": dte.dte_type_id,
+                            "folio": getattr(dte, "folio", None),
+                            "denied_folio": getattr(dte, "denied_folio", None),
                         },
                         "successful_sends": successful_sends,
                         "failed_sends": failed_sends,
-                        "message": f"Procesando DTE {i}/{total_dtes}"
+                        "message": (
+                            f"Procesando DTE {i}/{total_dtes} "
+                            f"(id={dte.id}, tipo={dte.dte_type_id}, rut={dte.rut}). "
+                            f"Si es NC v2 puede demorar por SimpleFactura…"
+                        ),
                     }
                     
                     # VERIFICACIÓN 1: Verificar que el DTE no haya sido procesado ya (evita race conditions)
