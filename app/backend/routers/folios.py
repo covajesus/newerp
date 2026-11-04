@@ -159,6 +159,44 @@ def quantity(cashier_id: int, quantity: int, db: Session = Depends(get_db)):
     return {"message": data}
 
 
+@folios.get("/db1/available_by_document_type")
+def available_by_document_type_db1(db: Session = Depends(get_db)):
+    """
+    Folios libres en pool central DB1 (abonados / DTE v2):
+    used_id=0, branch_office_id=0, sin dte_id.
+    Tipos: 39 boleta abonados, 33 factura, 61 nota de crédito.
+    """
+    query = text(
+        """
+        SELECT document_type_id, COUNT(*) AS total
+        FROM folios
+        WHERE used_id = 0
+          AND branch_office_id = 0
+          AND (dte_id IS NULL OR dte_id = 0)
+          AND document_type_id IN (33, 39, 61)
+        GROUP BY document_type_id
+        """
+    )
+    by_type = {
+        int(row.document_type_id): int(row.total)
+        for row in db.execute(query)
+    }
+    labels = {
+        39: "Boletas abonados",
+        33: "Facturas",
+        61: "Notas de crédito",
+    }
+    rows = [
+        {
+            "document_type_id": doc_type,
+            "label": labels[doc_type],
+            "total": by_type.get(doc_type, 0),
+        }
+        for doc_type in (39, 33, 61)
+    ]
+    return {"message": rows}
+
+
 @folios.get("/db2/counts_by_segment")
 def counts_by_segment_db2(db2: Session = Depends(get_db2)):
     """
