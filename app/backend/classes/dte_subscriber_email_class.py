@@ -113,7 +113,69 @@ def _smtp_settings() -> dict[str, Any]:
         "user": (os.getenv("DTE_EMAIL_SMTP_USER") or "contacto@jisparking.com").strip(),
         "password": password,
         "from_name": (os.getenv("DTE_EMAIL_FROM_NAME") or "JIS Parking").strip(),
+        "timeout": int(os.getenv("DTE_EMAIL_SMTP_TIMEOUT") or "60"),
     }
+
+
+def _smtp_send(smtp: dict[str, Any], recipients: list[str], msg: MIMEMultipart) -> None:
+    """
+    SMTP_SSL (465) con timeout + 1 reintento.
+    Si el servidor cierra la conexión, prueba STARTTLS en 587.
+    """
+    server_host = smtp["server"]
+    port = int(smtp["port"])
+    timeout = int(smtp.get("timeout") or 60)
+    payload = msg.as_string()
+    last_exc: Exception | None = None
+
+    def _ssl_send(ssl_port: int) -> None:
+        with smtplib.SMTP_SSL(server_host, ssl_port, timeout=timeout) as server:
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["user"], recipients, payload)
+
+    def _starttls_send(tls_port: int = 587) -> None:
+        with smtplib.SMTP(server_host, tls_port, timeout=timeout) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["user"], recipients, payload)
+
+    for attempt in range(2):
+        try:
+            if port == 587:
+                _starttls_send(587)
+            else:
+                _ssl_send(port)
+            return
+        except smtplib.SMTPAuthenticationError:
+            raise
+        except (smtplib.SMTPServerDisconnected, smtplib.SMTPException, OSError) as exc:
+            last_exc = exc
+            msg_l = str(exc).lower()
+            closed = (
+                isinstance(exc, smtplib.SMTPServerDisconnected)
+                or "connection unexpectedly closed" in msg_l
+                or "connection reset" in msg_l
+            )
+            print(
+                f"[dte-email] smtp attempt={attempt + 1} port={port} err={exc}",
+                flush=True,
+            )
+            if not closed or attempt == 1:
+                break
+
+    if port != 587:
+        try:
+            print("[dte-email] smtp fallback STARTTLS :587", flush=True)
+            _starttls_send(587)
+            return
+        except Exception as exc:
+            last_exc = exc
+
+    if last_exc:
+        raise last_exc
+    raise smtplib.SMTPException("No se pudo enviar el correo SMTP")
 
 
 def _dte_label(dte_type_id: int) -> str:
@@ -725,9 +787,7 @@ class DteSubscriberEmailClass:
         msg.attach(attachment)
 
         try:
-            with smtplib.SMTP_SSL(smtp["server"], smtp["port"]) as server:
-                server.login(smtp["user"], smtp["password"])
-                server.sendmail(smtp["user"], recipients, msg.as_string())
+            _smtp_send(smtp, recipients, msg)
         except smtplib.SMTPAuthenticationError as exc:
             msg_err = "Error de autenticación SMTP"
             self._log_email_error(msg_err, detail=f"nc folio={folio}; to={recipients}", exc=exc, reference_id=folio)
@@ -854,9 +914,7 @@ class DteSubscriberEmailClass:
         msg.attach(attachment)
 
         try:
-            with smtplib.SMTP_SSL(smtp["server"], smtp["port"]) as server:
-                server.login(smtp["user"], smtp["password"])
-                server.sendmail(smtp["user"], recipients, msg.as_string())
+            _smtp_send(smtp, recipients, msg)
         except smtplib.SMTPAuthenticationError as exc:
             msg_err = "Error de autenticación SMTP"
             self._log_email_error(msg_err, detail=f"dte folio={folio}; to={recipients}", exc=exc, reference_id=folio)

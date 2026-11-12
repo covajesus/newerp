@@ -45,3 +45,18 @@ def download_cashier_dte_pdf(
     if isinstance(result, dict) and result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result.get("message"))
     return {"message": result}
+
+
+@cashier_dtes.get("/download_folio/{folio}")
+def download_cashier_dte_pdf_by_folio(
+    folio: int,
+    session_user: UserLogin = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+    db2: Session = Depends(get_db2),
+):
+    """PDF por folio cuando la boleta no tiene fila en dtes (solo folio usado en DB2)."""
+    del session_user
+    result = CashierDteClass(db2, db).download_pdf_by_folio(folio)
+    if isinstance(result, dict) and result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return {"message": result}

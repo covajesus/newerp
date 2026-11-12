@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 import requests
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.backend.classes.customer_ticket_class import CustomerTicketClass
@@ -18,6 +18,24 @@ class CashierDteClass:
         self.db2 = db2
         self.db_main = db_main
         self.file_class = FileClass(db_main)
+
+    def _cashier_ids_for_branch(self, branch_office_id: int) -> list[int]:
+        """IDs de caja de la sucursal (DB2, con fallback a DB1)."""
+        bid = int(branch_office_id)
+        ids = [
+            int(r[0])
+            for r in self.db2.query(CashierModel.id)
+            .filter(CashierModel.branch_office_id == bid)
+            .all()
+        ]
+        if ids:
+            return ids
+        return [
+            int(r[0])
+            for r in self.db_main.query(CashierModel.id)
+            .filter(CashierModel.branch_office_id == bid)
+            .all()
+        ]
 
     def search(
         self,
@@ -37,8 +55,21 @@ class CashierDteClass:
                 DteModel.folio > 0,
             ]
 
+            cashier_ids: list[int] = []
             if branch_office_id is not None:
-                filters.append(DteModel.branch_office_id == int(branch_office_id))
+                bid = int(branch_office_id)
+                cashier_ids = self._cashier_ids_for_branch(bid)
+                # Algunas cajas (p. ej. Cordillera) guardan mal/null branch_office_id
+                # en dtes pero sí el cashier_id correcto.
+                if cashier_ids:
+                    filters.append(
+                        or_(
+                            DteModel.branch_office_id == bid,
+                            DteModel.cashier_id.in_(cashier_ids),
+                        )
+                    )
+                else:
+                    filters.append(DteModel.branch_office_id == bid)
             if folio is not None:
                 filters.append(DteModel.folio == int(folio))
             if amount is not None:
@@ -77,6 +108,21 @@ class CashierDteClass:
 
             total_items = query.count()
             if total_items == 0:
+                # Fallback: folios usados/facturados en DB2 (sin fila en dtes).
+                # Caso típico sucursales nuevas como LIDER CORDILLERA.
+                # Sin monto: los folios DB2 no guardan total.
+                if amount is None and (
+                    branch_office_id is not None or folio is not None or since or until
+                ):
+                    return self._search_from_used_folios(
+                        branch_office_id=branch_office_id,
+                        folio=folio,
+                        since=since,
+                        until=until,
+                        page=page,
+                        items_per_page=items_per_page,
+                        cashier_ids=cashier_ids,
+                    )
                 return {
                     "total_items": 0,
                     "total_pages": 0,
@@ -95,14 +141,14 @@ class CashierDteClass:
 
             data = []
             for row in rows:
-                folio = row.folio
+                folio_n = row.folio
                 have_credit_note = 0
-                if folio:
+                if folio_n:
                     nc_count = (
                         self.db2.query(DteModel.id)
                         .filter(
                             DteModel.dte_type_id == 61,
-                            DteModel.denied_folio == str(folio),
+                            DteModel.denied_folio == str(folio_n),
                         )
                         .count()
                     )
@@ -128,6 +174,7 @@ class CashierDteClass:
                         else None,
                         "branch_office": row.branch_office,
                         "have_credit_note": have_credit_note,
+                        "source": "dtes",
                     }
                 )
 
@@ -140,6 +187,140 @@ class CashierDteClass:
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def _search_from_used_folios(
+        self,
+        *,
+        branch_office_id=None,
+        folio=None,
+        since=None,
+        until=None,
+        page=1,
+        items_per_page=10,
+        cashier_ids=None,
+    ):
+        """Lista boletas desde folios DB2 usados/facturados cuando no hay filas en dtes."""
+        where = [
+            "f.folio IS NOT NULL",
+            "f.folio > 0",
+            "(COALESCE(f.used_status_id, 0) = 1 OR COALESCE(f.billed_status_id, 0) = 1)",
+        ]
+        params: dict = {}
+
+        if folio is not None:
+            where.append("f.folio = :folio")
+            params["folio"] = int(folio)
+
+        if branch_office_id is not None:
+            bid = int(branch_office_id)
+            cids = cashier_ids or self._cashier_ids_for_branch(bid)
+            if cids:
+                placeholders = ", ".join(f":c{i}" for i in range(len(cids)))
+                where.append(
+                    f"(f.branch_office_id = :bid OR f.cashier_id IN ({placeholders}))"
+                )
+                params["bid"] = bid
+                for i, cid in enumerate(cids):
+                    params[f"c{i}"] = int(cid)
+            else:
+                where.append("f.branch_office_id = :bid")
+                params["bid"] = bid
+
+        if since:
+            where.append("DATE(COALESCE(f.updated_date, f.added_date)) >= :since")
+            params["since"] = since
+        if until:
+            where.append("DATE(COALESCE(f.updated_date, f.added_date)) <= :until")
+            params["until"] = until
+
+        where_sql = " AND ".join(where)
+        count_row = self.db2.execute(
+            text(f"SELECT COUNT(*) AS total FROM folios f WHERE {where_sql}"),
+            params,
+        ).mappings().first()
+        total_items = int(count_row["total"] if count_row else 0)
+        if total_items == 0:
+            return {
+                "total_items": 0,
+                "total_pages": 0,
+                "current_page": page,
+                "items_per_page": items_per_page,
+                "data": [],
+            }
+
+        total_pages = max(1, (total_items + items_per_page - 1) // items_per_page)
+        if page < 1:
+            page = 1
+        if page > total_pages:
+            page = total_pages
+        offset = (page - 1) * items_per_page
+
+        rows = self.db2.execute(
+            text(
+                f"""
+                SELECT
+                    f.folio,
+                    f.branch_office_id,
+                    f.cashier_id,
+                    COALESCE(f.updated_date, f.added_date) AS folio_date,
+                    bo.branch_office,
+                    c.cashier
+                FROM folios f
+                LEFT JOIN branch_offices bo ON bo.id = f.branch_office_id
+                LEFT JOIN cashiers c ON c.id = f.cashier_id
+                WHERE {where_sql}
+                ORDER BY COALESCE(f.updated_date, f.added_date) DESC, f.folio DESC
+                LIMIT :limit_n OFFSET :offset_n
+                """
+            ),
+            {**params, "limit_n": int(items_per_page), "offset_n": int(offset)},
+        ).mappings().all()
+
+        # Nombres de sucursal/caja desde DB1 si DB2 no los trae
+        branch_name = None
+        if branch_office_id is not None:
+            bo = (
+                self.db_main.query(BranchOfficeModel.branch_office)
+                .filter(BranchOfficeModel.id == int(branch_office_id))
+                .first()
+            )
+            branch_name = bo[0] if bo else None
+
+        data = []
+        for row in rows:
+            folio_n = int(row["folio"])
+            folio_date = row["folio_date"]
+            data.append(
+                {
+                    "id": None,
+                    "rut": None,
+                    "branch_office_id": row["branch_office_id"],
+                    "cashier_id": row["cashier_id"],
+                    "cashier": row["cashier"],
+                    "entrance_hour": None,
+                    "exit_hour": None,
+                    "dte_type_id": 39,
+                    "folio": folio_n,
+                    "total": None,
+                    "cash_amount": None,
+                    "card_amount": None,
+                    "status_id": None,
+                    "added_date": folio_date.strftime("%d-%m-%Y %H:%M")
+                    if folio_date
+                    else None,
+                    "branch_office": row["branch_office"] or branch_name,
+                    "have_credit_note": 0,
+                    "source": "folios",
+                }
+            )
+
+        return {
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "items_per_page": items_per_page,
+            "data": data,
+        }
 
     def _simplefactura_bearer_token(self) -> str | None:
         ticket_cls = CustomerTicketClass(self.db_main)
@@ -157,14 +338,7 @@ class CashierDteClass:
             .first()
         )
 
-    def download_pdf(self, dte_id: int):
-        row = self._db2_dte_for_pdf(dte_id)
-        if not row or not row.folio:
-            return {"status": "error", "message": "DTE no encontrado o sin folio"}
-
-        folio = row.folio
-        dte_type_id = row.dte_type_id or 39
-
+    def _pdf_from_simplefactura(self, folio: int, dte_type_id: int = 39):
         token = self._simplefactura_bearer_token()
         if not token:
             return {"status": "error", "message": "No hay token SimpleFactura configurado"}
@@ -224,3 +398,23 @@ class CashierDteClass:
             "file_name": unique_filename,
             "file_data": encoded_file,
         }
+
+    def download_pdf(self, dte_id: int):
+        row = self._db2_dte_for_pdf(dte_id)
+        if not row or not row.folio:
+            return {"status": "error", "message": "DTE no encontrado o sin folio"}
+        return self._pdf_from_simplefactura(int(row.folio), int(row.dte_type_id or 39))
+
+    def download_pdf_by_folio(self, folio: int, dte_type_id: int = 39):
+        """PDF directo por folio (cuando no hay fila en dtes de DB2)."""
+        if not folio or int(folio) <= 0:
+            return {"status": "error", "message": "Folio inválido"}
+        # Preferir tipo/dte local si existe
+        row = (
+            self.db2.query(DteModel.id, DteModel.folio, DteModel.dte_type_id)
+            .filter(DteModel.folio == int(folio), DteModel.dte_type_id == int(dte_type_id))
+            .order_by(desc(DteModel.id))
+            .first()
+        )
+        tipo = int(row.dte_type_id) if row and row.dte_type_id else int(dte_type_id)
+        return self._pdf_from_simplefactura(int(folio), tipo)
