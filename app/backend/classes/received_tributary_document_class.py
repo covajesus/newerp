@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, SupplierModel, ExpenseTypeModel
+from app.backend.db.models import DteModel, CustomerModel, BranchOfficeModel, UserModel, SupplierModel, ExpenseTypeModel, ReceivedInboxModel
 from app.backend.classes.customer_class import CustomerClass
 from app.backend.classes.file_class import FileClass
 from sqlalchemy import desc
@@ -214,197 +214,150 @@ class ReceivedTributaryDocumentClass:
             error_message = str(e)
             return {"status": "error", "message": error_message}
     
-    def refresh(self):
+    def _find_folio_for_zero_received(self, zero):
         """
-        Importa DTEs recibidos desde LibreDTE (ultimos 89 dias).
-        - No aborta el lote si un item viene sin emisor (continue).
-        - Omite items sin folio valido.
-        - Si ya existe el mismo doc con folio=0, actualiza el folio real.
-        - Elimina duplicados folio=0 cuando ya existe el folio correcto.
+        Busca folio real para un recibido con folio<=0:
+        1) hermano en dtes (mismo rut/tipo/total, folio>0)
+        2) received_inbox (SimpleFactura) mismo rut/tipo/total
         """
-        TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-        since = (datetime.now() - timedelta(days=89)).strftime('%Y-%m-%d')
-        until = datetime.now().strftime('%Y-%m-%d')
+        rut = str(zero.rut or "")
+        dte_type_id = int(zero.dte_type_id or 0)
+        total = int(zero.total or 0)
+        if not rut or not dte_type_id:
+            return None
 
+        sibling = (
+            self.db.query(DteModel)
+            .filter(DteModel.dte_version_id == 2)
+            .filter(DteModel.rut == rut)
+            .filter(DteModel.dte_type_id == dte_type_id)
+            .filter(DteModel.total == total)
+            .filter(DteModel.folio > 0)
+            .filter(DteModel.id != zero.id)
+            .order_by(DteModel.id.asc())
+            .first()
+        )
+        if sibling and int(sibling.folio or 0) > 0:
+            return int(sibling.folio)
+
+        inbox = (
+            self.db.query(ReceivedInboxModel)
+            .filter(ReceivedInboxModel.rut == rut)
+            .filter(ReceivedInboxModel.dte_type_id == dte_type_id)
+            .filter(ReceivedInboxModel.total == total)
+            .filter(ReceivedInboxModel.folio > 0)
+            .order_by(ReceivedInboxModel.id.asc())
+            .first()
+        )
+        if inbox and int(inbox.folio or 0) > 0:
+            return int(inbox.folio)
+        return None
+
+    def repair_zero_folios(self):
+        """
+        Limpia recibidos (dte_version_id=2) con folio<=0:
+        - status 4/5 (imputada por pagar / pagada): busca folio y UPDATE (nunca borra).
+        - resto (p.ej. no revisada / clones apertura periodo): DELETE.
+        SimpleFactura / clones residuales con folio=0.
+        """
         summary = {
             "status": "success",
-            "fetched": 0,
-            "inserted": 0,
+            "scanned": 0,
             "updated_folio": 0,
-            "deleted_zero_dupes": 0,
-            "skipped": 0,
-            "errors": [],
+            "deleted": 0,
+            "left": 0,
         }
-
         try:
-            url = (
-                "https://libredte.cl/api/dte/dte_recibidos/buscar/76063822"
-                f"?fecha_desde={since}&fecha_hasta={until}"
-            )
-            response = requests.get(
-                url,
-                json={
-                    "fecha_desde": since,
-                    "fecha_hasta": until,
-                    "dte": [33, 34, 39, 61],
-                },
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Content-Type": "application/json",
-                },
-                timeout=60,
-            )
-            data = json.loads(response.text)
-            if not isinstance(data, list):
-                summary["status"] = "error"
-                summary["errors"].append(f"Respuesta LibreDTE inesperada: {type(data).__name__}")
-                return summary
-
-            summary["fetched"] = len(data)
-
-            removed = (
+            zeros = (
                 self.db.query(DteModel)
                 .filter(DteModel.dte_version_id == 2)
+                .filter(DteModel.dte_type_id.in_([33, 34, 39, 61]))
                 .filter(or_(DteModel.folio.is_(None), DteModel.folio <= 0))
-                .delete(synchronize_session=False)
-            )
-            if removed:
-                summary["deleted_zero_dupes"] += int(removed)
-
-            existing_rows = (
-                self.db.query(DteModel)
-                .filter(DteModel.dte_version_id == 2)
-                .filter(DteModel.added_date >= since)
+                .order_by(DteModel.id.desc())
                 .all()
             )
-            by_correct = {}
-            zeros_by_key = {}
-            for row in existing_rows:
-                folio_i = int(row.folio or 0)
-                key_rt = (str(row.rut), int(row.dte_type_id or 0), int(row.total or 0))
-                if folio_i > 0:
-                    by_correct[(folio_i, str(row.rut), int(row.dte_type_id or 0))] = row
-                else:
-                    zeros_by_key.setdefault(key_rt, []).append(row)
+            summary["scanned"] = len(zeros)
+            if not zeros:
+                return summary
 
-            supplier_ruts = {
-                r[0] for r in self.db.query(SupplierModel.rut).all() if r[0]
-            }
+            for zero in list(zeros):
+                zero_status = int(zero.status_id or 0)
 
-            for item in data:
-                if item.get('dte') not in [33, 34, 39, 61]:
+                # Imputadas por pagar / pagadas: solo update de folio
+                if zero_status in (4, 5):
+                    folio = self._find_folio_for_zero_received(zero)
+                    if folio and folio > 0:
+                        zero.folio = folio
+                        summary["updated_folio"] += 1
+                    else:
+                        summary["left"] += 1
                     continue
 
-                if not item.get('emisor'):
-                    summary["skipped"] += 1
+                # No revisado (1) con folio 0: borrar
+                if zero_status == 1:
+                    self.db.delete(zero)
+                    summary["deleted"] += 1
                     continue
 
-                try:
-                    folio = int(item.get('folio')) if item.get('folio') is not None else 0
-                except (TypeError, ValueError):
-                    folio = 0
-                if folio <= 0:
-                    summary["skipped"] += 1
-                    continue
-
-                emisor = item['emisor']
-                if isinstance(emisor, int) and emisor < 10000000:
-                    emisor_body = '0' + str(emisor)
-                else:
-                    emisor_body = str(emisor)
-
-                verificator_digit = HelperClass.verificator_digit(emisor_body)
-                rut = str(emisor_body) + '-' + str(verificator_digit)
-
-                total = item['total'] if item['total'] is not None else 0
-                net = item['neto'] if item['neto'] is not None else 0
-                if item['dte'] == 61:
-                    total = -abs(total)
-                    net = -abs(net)
-
-                if rut not in supplier_ruts:
-                    supplier = SupplierModel()
-                    supplier.rut = rut
-                    supplier.supplier = (item.get('razon_social') or '').upper()
-                    self.db.add(supplier)
-                    supplier_ruts.add(rut)
-
-                correct_key = (folio, rut, int(item['dte']))
-                zero_key = (rut, int(item['dte']), int(total))
-                fecha = str(item.get('fecha') or '')
-
-                if correct_key in by_correct:
-                    for orphan in list(zeros_by_key.get(zero_key, [])):
-                        self.db.delete(orphan)
-                        summary["deleted_zero_dupes"] += 1
-                    zeros_by_key[zero_key] = []
-                    summary["skipped"] += 1
-                    continue
-
-                zero_list = zeros_by_key.get(zero_key, [])
-                if zero_list:
-                    preferred = None
-                    fallback = zero_list[0]
-                    for candidate in zero_list:
-                        cand_fecha = (
-                            candidate.added_date.strftime('%Y-%m-%d')
-                            if candidate.added_date
-                            else ''
-                        )
-                        if fecha and cand_fecha and cand_fecha == fecha:
-                            preferred = candidate
-                            break
-                    target = preferred or fallback
-                    target.folio = folio
-                    if target.subtotal is None:
-                        target.subtotal = net
-                    if target.tax is None:
-                        target.tax = int(total) - int(net)
-                    by_correct[correct_key] = target
-                    zeros_by_key[zero_key] = [z for z in zero_list if z.id != target.id]
-                    summary["updated_folio"] += 1
-                    continue
-
-                dte = DteModel()
-                dte.branch_office_id = 0
-                dte.cashier_id = 0
-                dte.dte_type_id = item['dte']
-                dte.dte_version_id = 2
-                dte.status_id = 1
-                dte.chip_id = 0
-                dte.rut = rut
-                dte.folio = folio
-                dte.cash_amount = total
-                dte.card_amount = 0
-                dte.subtotal = net
-                dte.tax = int(total) - int(net)
-                dte.discount = 0
-                dte.total = total
-                dte.added_date = fecha + ' 00:00:00' if fecha else datetime.now()
-                self.db.add(dte)
-                by_correct[correct_key] = dte
-                summary["inserted"] += 1
+                summary["left"] += 1
 
             self.db.commit()
             print(
-                f"[received_dtes.refresh] fetched={summary['fetched']} "
-                f"inserted={summary['inserted']} updated_folio={summary['updated_folio']} "
-                f"deleted_zero_dupes={summary['deleted_zero_dupes']} "
-                f"skipped={summary['skipped']}",
+                f"[received_dtes.repair_zero_folios] scanned={summary['scanned']} "
+                f"updated_folio={summary['updated_folio']} deleted={summary['deleted']} "
+                f"left={summary['left']}",
                 flush=True,
             )
             return summary
-
         except Exception as e:
             self.db.rollback()
-            print("Error al conectarse a la API:", e, flush=True)
+            return {"status": "error", "message": str(e), **summary}
+
+    def refresh(self):
+        """
+        Importa/actualiza DTEs recibidos solo desde SimpleFactura
+        (received_inbox → dtes) y repara folio=0.
+        """
+        from app.backend.classes.received_inbox_class import ReceivedInboxClass
+
+        summary = {
+            "status": "success",
+            "source": "simplefactura",
+            "repair": None,
+            "simplefactura": None,
+            "errors": [],
+        }
+        try:
+            repair = self.repair_zero_folios()
+            summary["repair"] = repair
+            if isinstance(repair, dict) and repair.get("status") == "error":
+                summary["errors"].append(repair.get("message") or "repair_zero_folios failed")
+
+            sf = ReceivedInboxClass(self.db).refresh()
+            summary["simplefactura"] = sf
+            if isinstance(sf, dict) and sf.get("status") == "error":
+                summary["status"] = "error"
+                err = sf.get("message") or sf.get("errors") or "SimpleFactura refresh failed"
+                if isinstance(err, list):
+                    summary["errors"].extend([str(x) for x in err])
+                else:
+                    summary["errors"].append(str(err))
+
+            print(
+                f"[received_dtes.refresh] source=simplefactura "
+                f"repair={summary['repair']} sf={summary['simplefactura']}",
+                flush=True,
+            )
+            return summary
+        except Exception as e:
+            print("Error refresh SimpleFactura recibidos:", e, flush=True)
             summary["status"] = "error"
             summary["errors"].append(str(e))
             return summary
 
     def refresh_simplefactura(self):
-        from app.backend.classes.received_inbox_class import ReceivedInboxClass
-        return ReceivedInboxClass(self.db).refresh()
+        """Alias de refresh(): recibidos solo SimpleFactura."""
+        return self.refresh()
 
     def pay(self, form_data):
         selected_bills = form_data.selected_bills
@@ -957,10 +910,7 @@ class ReceivedTributaryDocumentClass:
             return None
         
     def download(self, id):
-        """
-        PDF de DTE recibido (proveedor).
-        SimpleFactura getPdf → LibreDTE dte_recibidos/pdf.
-        """
+        """PDF de DTE recibido (proveedor) solo vía SimpleFactura getPdf."""
         dte = self.db.query(DteModel).filter(DteModel.id == id).first()
         if not dte or not dte.folio or not dte.rut:
             return None
@@ -971,7 +921,6 @@ class ReceivedTributaryDocumentClass:
         pdf_content = None
         errors = []
 
-        # 1) SimpleFactura documentReceived/getPdf
         try:
             from app.backend.classes.received_inbox_class import (
                 ReceivedInboxClass,
@@ -998,37 +947,6 @@ class ReceivedTributaryDocumentClass:
         except Exception as exc:
             errors.append(f"SimpleFactura: {exc}")
             pdf_content = None
-
-        # 2) LibreDTE
-        if not pdf_content or not pdf_content.startswith(b"%PDF"):
-            try:
-                issuer_rut = HelperClass().numeric_rut(rut)
-                token = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
-                url = (
-                    f"https://libredte.cl/api/dte/dte_recibidos/pdf/"
-                    f"{issuer_rut}/{dte_type_id}/{folio}/76063822"
-                    f"?papelContinuo=0&copias_tributarias=1&copias_cedibles=0"
-                    f"&cedible=0&compress=0&base64=0"
-                )
-                response = requests.get(
-                    url,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Accept": "application/pdf, application/octet-stream, */*",
-                    },
-                    timeout=60,
-                )
-                if response.status_code == 200 and response.content.startswith(b"%PDF"):
-                    pdf_content = response.content
-                else:
-                    errors.append(
-                        f"LibreDTE HTTP {response.status_code}: "
-                        f"{(response.text or '')[:160]}"
-                    )
-                    pdf_content = None
-            except Exception as exc:
-                errors.append(f"LibreDTE: {exc}")
-                pdf_content = None
 
         if not pdf_content or not pdf_content.startswith(b"%PDF"):
             print(

@@ -1788,11 +1788,13 @@ class DteClass:
         last_period = HelperClass.fix_last_dte_period(period)
 
         try:
+            # Solo emitidas (v1). Incluir v2 (recibidas de proveedores) clonaba
+            # facturas de compra con folio=0 en received_tributary_documents.
             dte_data = (
                 self.db.query(DteModel)
                 .filter(DteModel.period == last_period)
                 .filter(DteModel.status_id.in_([4, 5]))
-                .filter(DteModel.dte_version_id.in_([1, 2]))
+                .filter(DteModel.dte_version_id == 1)
                 .filter(DteModel.dte_type_id.in_([33, 39]))
                 .filter(DteModel.cashier_id == 0)
                 .all()
@@ -1825,7 +1827,6 @@ class DteClass:
 
             for dte_datum in dte_data:
                 added_date = HelperClass.create_period_date(period)
-                src_version = int(dte_datum.dte_version_id or 1)
                 target_category = self._period_open_category_id(dte_datum)
                 uses_pxq = target_category in (2, 3)
 
@@ -1856,7 +1857,7 @@ class DteClass:
                     branch_office_id=dte_datum.branch_office_id,
                     cashier_id=0,
                     dte_type_id=dte_datum.dte_type_id,
-                    dte_version_id=src_version,
+                    dte_version_id=1,
                     expense_type_id=25,
                     chip_id=chip_id,
                     status_id=1,

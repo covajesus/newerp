@@ -35,6 +35,12 @@ def refresh(db: Session = Depends(get_db)):
 
     return {"message": data}
 
+@received_tributary_documents.get("/repair_zero_folios")
+def repair_zero_folios(db: Session = Depends(get_db)):
+    data = ReceivedTributaryDocumentClass(db).repair_zero_folios()
+
+    return {"message": data}
+
 @received_tributary_documents.get("/refresh_simplefactura")
 def refresh_simplefactura(db: Session = Depends(get_db)):
     data = ReceivedTributaryDocumentClass(db).refresh_simplefactura()

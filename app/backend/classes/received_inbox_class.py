@@ -297,7 +297,7 @@ class ReceivedInboxClass:
 
     def _ensure_received_dte(self, row):
         """
-        After SII/SimpleFactura accept, mirror LibreDTE import into dtes
+        After SII/SimpleFactura accept, mirror into dtes
         (dte_version_id=2, status_id=1 = No revisada / Recibidas).
         """
         if not row or not row.rut or not row.folio:
