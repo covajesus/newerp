@@ -238,81 +238,138 @@ class CustomerCreditNoteClass:
             print(f"ERROR in get_one: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error retrieving credit note: {str(e)}")
 
-    def search(self, rol_id=None, rut=None, branch_office_id=None, customer_rut=None, customer=None, status_id=None, supervisor_id=None, page=0, items_per_page=10):
+    def _normalize_rut_filter(self, value):
+        if value is None:
+            return None
+        text = str(value).strip().upper().replace(".", "").replace(" ", "")
+        return text or None
+
+    def search(
+        self,
+        rol_id=None,
+        rut=None,
+        branch_office_id=None,
+        customer_rut=None,
+        customer=None,
+        status_id=None,
+        supervisor_id=None,
+        page=0,
+        items_per_page=10,
+    ):
         try:
-            if rol_id == 1 or rol_id == 2:
-                filters = []
-                filters.append(DteModel.dte_version_id.in_([1, 2]))
-                filters.append(DteModel.dte_type_id == 61)  # Notas de crédito
-                filters.append(DteModel.rut != None)
+            if rol_id not in (1, 2, 4):
+                return {
+                    "credit_notes": [],
+                    "total_count": 0,
+                    "page": page,
+                    "items_per_page": items_per_page,
+                }
 
-                # Aplicar filtros adicionales
-                if branch_office_id:
-                    filters.append(DteModel.branch_office_id == branch_office_id)
-                
-                if customer_rut:
-                    filters.append(DteModel.rut == customer_rut)
-                
-                if status_id:
-                    filters.append(DteModel.status_id == status_id)
+            filters = []
+            filters.append(DteModel.dte_version_id.in_([1, 2]))
+            filters.append(DteModel.dte_type_id == 61)
+            filters.append(DteModel.rut != None)
 
-                # Construir la consulta base con los filtros aplicados
-                query = self.db.query(
-                    DteModel.id, 
-                    DteModel.branch_office_id, 
-                    DteModel.folio, 
+            if branch_office_id not in (None, "", 0, "0"):
+                filters.append(DteModel.branch_office_id == int(branch_office_id))
+
+            rut_filter = self._normalize_rut_filter(customer_rut)
+            if rut_filter:
+                # Coincide exacto o sin puntos; también parcial por si escriben sin DV.
+                filters.append(
+                    or_(
+                        DteModel.rut == rut_filter,
+                        func.replace(func.upper(DteModel.rut), ".", "") == rut_filter,
+                        func.replace(func.upper(DteModel.rut), ".", "").like(
+                            f"%{rut_filter}%"
+                        ),
+                    )
+                )
+
+            if status_id not in (None, "", 0, "0"):
+                filters.append(DteModel.status_id == int(status_id))
+            else:
+                filters.append(or_(DteModel.status_id == 14, DteModel.status_id == 5))
+
+            query = (
+                self.db.query(
+                    DteModel.id,
+                    DteModel.branch_office_id,
+                    DteModel.folio,
                     DteModel.total,
                     DteModel.added_date,
                     DteModel.rut,
                     DteModel.status_id,
                     DteModel.chip_id,
                     CustomerModel.customer,
-                    BranchOfficeModel.branch_office
-                ).join(
-                    CustomerModel, DteModel.rut == CustomerModel.rut, isouter=True
-                ).join(
-                    BranchOfficeModel, DteModel.branch_office_id == BranchOfficeModel.id, isouter=True
-                ).filter(*filters)
+                    BranchOfficeModel.branch_office,
+                )
+                .join(CustomerModel, DteModel.rut == CustomerModel.rut, isouter=True)
+                .join(
+                    BranchOfficeModel,
+                    DteModel.branch_office_id == BranchOfficeModel.id,
+                    isouter=True,
+                )
+                .filter(*filters)
+            )
 
-                # Aplicar filtro por nombre de cliente si se proporciona
-                if customer:
-                    query = query.filter(CustomerModel.customer.like(f'%{customer}%'))
+            if rol_id == 4:
+                query = query.filter(BranchOfficeModel.principal_supervisor == rut)
 
-                total_count = query.count()
-                query = query.order_by(desc(DteModel.id))
+            if supervisor_id not in (None, "", 0, "0"):
+                query = query.filter(
+                    BranchOfficeModel.principal_supervisor == str(supervisor_id).strip()
+                )
 
-                if page > 0:
-                    offset = (page - 1) * items_per_page
-                    query = query.offset(offset).limit(items_per_page)
+            customer_name = str(customer or "").strip()
+            if customer_name:
+                query = query.filter(
+                    CustomerModel.customer.like(f"%{customer_name}%")
+                )
 
-                dtes = query.all()
+            total_count = query.count()
+            query = query.order_by(
+                case(
+                    (DteModel.status_id == 14, 1),
+                    (DteModel.status_id == 5, 2),
+                    else_=3,
+                ),
+                desc(DteModel.id),
+            )
 
-                result = []
-                for dte in dtes:
-                    result.append({
-                        'id': dte.id,
-                        'branch_office_id': dte.branch_office_id,
-                        'folio': dte.folio,
-                        'total': dte.total,
-                        'added_date': dte.added_date.isoformat() if dte.added_date else None,
-                        'rut': dte.rut,
-                        'status_id': dte.status_id,
-                        'chip_id': dte.chip_id,
-                        'customer': dte.customer,
-                        'branch_office': dte.branch_office
-                    })
+            if page > 0:
+                offset = (page - 1) * items_per_page
+                query = query.offset(offset).limit(items_per_page)
 
-                return {
-                    'credit_notes': result,
-                    'total_count': total_count
+            dtes = query.all()
+            result = [
+                {
+                    "id": dte.id,
+                    "branch_office_id": dte.branch_office_id,
+                    "folio": dte.folio,
+                    "total": dte.total,
+                    "added_date": dte.added_date.isoformat() if dte.added_date else None,
+                    "rut": dte.rut,
+                    "status_id": dte.status_id,
+                    "chip_id": dte.chip_id,
+                    "customer": dte.customer,
+                    "branch_office": dte.branch_office,
                 }
+                for dte in dtes
+            ]
 
-            else:
-                return {'credit_notes': [], 'total_count': 0}
+            return {
+                "credit_notes": result,
+                "total_count": total_count,
+                "page": page,
+                "items_per_page": items_per_page,
+            }
 
         except Exception as e:
             print(f"ERROR in search: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error searching credit notes: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Error searching credit notes: {str(e)}"
+            )
 
     def get(self, dte_id):
         try:
