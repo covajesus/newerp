@@ -751,7 +751,12 @@ class CustomerTicketBillClass:
                 if validate_credit_note_count > 0:
                     return {
                         "status": "error",
-                        "message": "A credit note with this denied_folio already exists"
+                        "message": (
+                            f"Este documento ya tiene una nota de crédito solicitada "
+                            f"para el folio {original_dte_folio}"
+                        ),
+                        "already_exists": True,
+                        "folio": original_dte_folio,
                     }
                 
                 credit_note_dte = DteModel()

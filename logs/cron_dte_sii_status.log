@@ -46550,3 +46550,3683 @@ HTTP 200
     "pending_remaining": 15
   }
 }
+[2026-11-16 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-16 11:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 12:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 13:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 13:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 13:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 14:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 14:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 15:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 16:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 17:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 17:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-16 18:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 18:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 18:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-16 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 21:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 22:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 22:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 22:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 23:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-16 23:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 00:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 00:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 07:38:44] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 07:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 08:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 08:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 09:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 09:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 09:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 11:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 11:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C^C[2026-11-17 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 13:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 13:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 14:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 15:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 16:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 17:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 17:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 18:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 18:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 18:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C^C[2026-11-17 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 22:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-17 23:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 23:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-17 23:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 00:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 00:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 00:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 01:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 01:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 02:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 08:19:58] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 08:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 09:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 09:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 09:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 11:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 13:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 13:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 13:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 14:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 14:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 15:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 16:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 17:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 17:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 18:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 18:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 20:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 22:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-18 22:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 23:11:04] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 23:31:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-18 23:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 00:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 00:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 01:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 01:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 08:22:28] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 08:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 08:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 09:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 09:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 09:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 11:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 13:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 13:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 14:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 14:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 17:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 17:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 18:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 18:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 18:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 19:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 19:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 19:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 20:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 20:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-19 21:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 21:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-19 22:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C^C[2026-11-19 23:11:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C^C[2026-11-20 08:51:03] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 09:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 09:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 09:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 10:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 10:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 10:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 11:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 11:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 11:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 12:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 12:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 12:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 13:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 13:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 13:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 14:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 14:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 14:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 15:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 15:31:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 15:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+[2026-11-20 16:11:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}
+^C[2026-11-20 16:51:02] GET https://intrajisbackend.com/api/dte_sii_status/cron
+HTTP 200
+{
+  "message": {
+    "status": "success",
+    "mode": "one_by_one",
+    "processed": 0,
+    "checked": 0,
+    "updated": 0,
+    "still_pending": 0,
+    "rejected_alerts": 0,
+    "skipped": 15,
+    "errors": [],
+    "items": [],
+    "has_more": true,
+    "lookback_days": 30,
+    "elapsed_seconds": 0.0,
+    "pending_remaining": 15
+  }
+}

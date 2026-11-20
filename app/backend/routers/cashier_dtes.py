@@ -33,6 +33,14 @@ def search_cashier_dtes(
     return {"message": data}
 
 
+def _cashier_pdf_error_detail(result: dict) -> str:
+    msg = str(result.get("message") or "No se pudo descargar el PDF")
+    detail = result.get("detail")
+    if detail:
+        return f"{msg}. {detail}"
+    return msg
+
+
 @cashier_dtes.get("/download/{dte_id}")
 def download_cashier_dte_pdf(
     dte_id: int,
@@ -43,7 +51,7 @@ def download_cashier_dte_pdf(
     del session_user
     result = CashierDteClass(db2, db).download_pdf(dte_id)
     if isinstance(result, dict) and result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("message"))
+        raise HTTPException(status_code=400, detail=_cashier_pdf_error_detail(result))
     return {"message": result}
 
 
@@ -58,5 +66,5 @@ def download_cashier_dte_pdf_by_folio(
     del session_user
     result = CashierDteClass(db2, db).download_pdf_by_folio(folio)
     if isinstance(result, dict) and result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("message"))
+        raise HTTPException(status_code=400, detail=_cashier_pdf_error_detail(result))
     return {"message": result}

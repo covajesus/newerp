@@ -2916,6 +2916,26 @@ class CustomerTicketClass:
                 "message": "Solo se puede anular un DTE emitido o pagado (status 4 o 5)",
             }
         pre_recovered = None
+        # Si ya hay NC local completada, avisar con el folio (no reintentar emisión).
+        completed_nc = (
+            self.db.query(DteModel)
+            .filter(
+                DteModel.dte_type_id == 61,
+                DteModel.denied_folio == str(dte.folio),
+                DteModel.status_id == 5,
+            )
+            .first()
+        )
+        if completed_nc:
+            return {
+                "status": "success",
+                "message": (
+                    f"Este documento ya tiene nota de crédito folio {completed_nc.folio}"
+                ),
+                "folio": completed_nc.folio,
+                "already_completed": True,
+            }
+
         # Status 5 también representa documentos pagados, por lo que deben poder
         # anularse. Si ya contiene datos de anulación, primero se confirma la NC en
         # SimpleFactura para completar un proceso local que pudo quedar a medias.
@@ -2936,26 +2956,16 @@ class CustomerTicketClass:
                 pending_nc_dte_id=pending_nc_dte_id,
             )
             if not pre_recovered:
+                nc_hint = f" folio {comment_folio}" if comment_folio else ""
                 return {
                     "status": "error",
-                    "message": "El DTE original figura anulado, pero no se pudo verificar su NC en SimpleFactura",
+                    "message": (
+                        f"Este documento ya figura anulado con nota de crédito{nc_hint}, "
+                        "pero no se pudo verificar en SimpleFactura"
+                    ),
+                    "folio": comment_folio,
+                    "already_completed": True,
                 }
-        completed_nc = (
-            self.db.query(DteModel)
-            .filter(
-                DteModel.dte_type_id == 61,
-                DteModel.denied_folio == str(dte.folio),
-                DteModel.status_id == 5,
-            )
-            .first()
-        )
-        if completed_nc:
-            return {
-                "status": "success",
-                "message": "El DTE original y su nota de crédito ya están anulados",
-                "folio": completed_nc.folio,
-                "already_completed": True,
-            }
         if int(dte.dte_type_id) != int(ref_dte_type):
             return {"status": "error", "message": "Tipo de DTE no coincide"}
 

@@ -1,4 +1,4 @@
-"""DTE de cajas (tabla dtes en DB2) — consulta y PDF vía SimpleFactura getPdf."""
+"""DTE de cajas (tabla dtes en DB2) — consulta y PDF (SimpleFactura → LibreDTE)."""
 import base64
 import uuid
 from datetime import datetime
@@ -11,6 +11,9 @@ from app.backend.classes.customer_ticket_class import CustomerTicketClass
 from app.backend.classes.file_class import FileClass
 from app.backend.classes.setting_class import SettingClass
 from app.backend.db.models import BranchOfficeModel, CashierModel, DteModel
+
+LIBREDTE_TOKEN = "JXou3uyrc7sNnP2ewOCX38tWZ6BTm4D1"
+LIBREDTE_RUT_EMISOR = "76063822-6"
 
 
 class CashierDteClass:
@@ -338,6 +341,25 @@ class CashierDteClass:
             .first()
         )
 
+    def _encode_pdf_response(self, pdf_content: bytes, folio: int):
+        if not pdf_content or not pdf_content.startswith(b"%PDF"):
+            return {
+                "status": "error",
+                "message": "Respuesta no es un PDF válido",
+            }
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        unique_filename = f"boleta_caja_{folio}_{timestamp}_{uuid.uuid4().hex[:8]}.pdf"
+        remote_path = unique_filename
+        self.file_class.temporal_upload(pdf_content, remote_path)
+        file_contents = self.file_class.download(remote_path)
+        encoded_file = base64.b64encode(file_contents).decode("utf-8")
+        self.file_class.delete(remote_path)
+        return {
+            "status": "success",
+            "file_name": unique_filename,
+            "file_data": encoded_file,
+        }
+
     def _pdf_from_simplefactura(self, folio: int, dte_type_id: int = 39):
         token = self._simplefactura_bearer_token()
         if not token:
@@ -377,33 +399,84 @@ class CashierDteClass:
             except (ValueError, requests.RequestException) as exc:
                 return {"status": "error", "message": f"No se pudo refrescar token: {exc}"}
 
-        if response.status_code != 200 or not response.content:
+        if (
+            response.status_code != 200
+            or not response.content
+            or not response.content.startswith(b"%PDF")
+        ):
             return {
                 "status": "error",
                 "message": f"SimpleFactura getPdf HTTP {response.status_code}",
                 "detail": (response.text or "")[:300],
             }
 
-        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        unique_filename = f"boleta_caja_{folio}_{timestamp}_{uuid.uuid4().hex[:8]}.pdf"
-        remote_path = unique_filename
+        return self._encode_pdf_response(response.content, int(folio))
 
-        self.file_class.temporal_upload(response.content, remote_path)
-        file_contents = self.file_class.download(remote_path)
-        encoded_file = base64.b64encode(file_contents).decode("utf-8")
-        self.file_class.delete(remote_path)
+    def _pdf_from_libredte(self, folio: int, dte_type_id: int = 39):
+        """Fallback para boletas de caja emitidas por LibreDTE (p.ej. Cordillera)."""
+        url = (
+            f"https://libredte.cl/api/dte/dte_emitidos/pdf/{int(dte_type_id)}/"
+            f"{int(folio)}/{LIBREDTE_RUT_EMISOR}?formato=general&papelContinuo=0"
+            f"&copias_tributarias=1&copias_cedibles=1&cedible=0&compress=0&base64=0"
+        )
+        try:
+            response = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {LIBREDTE_TOKEN}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/pdf, application/octet-stream, */*",
+                },
+                timeout=60,
+            )
+        except requests.RequestException as exc:
+            return {"status": "error", "message": f"Error al conectar con LibreDTE: {exc}"}
+
+        if (
+            response.status_code != 200
+            or not response.content
+            or not response.content.startswith(b"%PDF")
+        ):
+            return {
+                "status": "error",
+                "message": f"LibreDTE pdf HTTP {response.status_code}",
+                "detail": (response.text or "")[:300],
+            }
+
+        return self._encode_pdf_response(response.content, int(folio))
+
+    def _download_pdf_with_fallbacks(self, folio: int, dte_type_id: int = 39):
+        errors = []
+        for tipo in (int(dte_type_id or 39), 39, 33):
+            sf = self._pdf_from_simplefactura(int(folio), tipo)
+            if sf.get("status") == "success":
+                sf["source"] = "simplefactura"
+                return sf
+            errors.append(f"SF tipo={tipo}: {sf.get('message')} {sf.get('detail') or ''}".strip())
+
+            ldte = self._pdf_from_libredte(int(folio), tipo)
+            if ldte.get("status") == "success":
+                ldte["source"] = "libredte"
+                return ldte
+            errors.append(
+                f"LibreDTE tipo={tipo}: {ldte.get('message')} {ldte.get('detail') or ''}".strip()
+            )
 
         return {
-            "status": "success",
-            "file_name": unique_filename,
-            "file_data": encoded_file,
+            "status": "error",
+            "message": (
+                f"No se encontró PDF del folio {folio} en SimpleFactura ni LibreDTE"
+            ),
+            "detail": " | ".join(errors)[:800],
         }
 
     def download_pdf(self, dte_id: int):
         row = self._db2_dte_for_pdf(dte_id)
         if not row or not row.folio:
             return {"status": "error", "message": "DTE no encontrado o sin folio"}
-        return self._pdf_from_simplefactura(int(row.folio), int(row.dte_type_id or 39))
+        return self._download_pdf_with_fallbacks(
+            int(row.folio), int(row.dte_type_id or 39)
+        )
 
     def download_pdf_by_folio(self, folio: int, dte_type_id: int = 39):
         """PDF directo por folio (cuando no hay fila en dtes de DB2)."""
@@ -412,9 +485,9 @@ class CashierDteClass:
         # Preferir tipo/dte local si existe
         row = (
             self.db2.query(DteModel.id, DteModel.folio, DteModel.dte_type_id)
-            .filter(DteModel.folio == int(folio), DteModel.dte_type_id == int(dte_type_id))
+            .filter(DteModel.folio == int(folio))
             .order_by(desc(DteModel.id))
             .first()
         )
         tipo = int(row.dte_type_id) if row and row.dte_type_id else int(dte_type_id)
-        return self._pdf_from_simplefactura(int(folio), tipo)
+        return self._download_pdf_with_fallbacks(int(folio), tipo)
